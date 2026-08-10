@@ -92,6 +92,10 @@ class DocumentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "file",
+            "submitted_at",
+            "archived_at",
+            "rejected_at",
+            "rejection_reason",
         ]
         read_only_fields = [
             "id",
@@ -103,6 +107,10 @@ class DocumentSerializer(serializers.ModelSerializer):
             "created_by_email",
             "created_at",
             "updated_at",
+            "submitted_at",
+            "archived_at",
+            "rejected_at",
+            "rejection_reason",
         ]
         extra_kwargs = {"dossier": {"required": False}, "type": {"required": False}}
 
@@ -186,6 +194,10 @@ class DocumentListSerializer(serializers.ModelSerializer):
             "sha256",
             "created_at",
             "updated_at",
+            "submitted_at",
+            "archived_at",
+            "rejected_at",
+            "rejection_reason",
         ]
 
     def to_representation(self, instance):

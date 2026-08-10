@@ -15,6 +15,14 @@ class DocumentType(models.Model):
     is_restricted_rh = models.BooleanField(
         default=False, verbose_name="Accès restreint RH (RF-33)"
     )
+    circuit = models.ForeignKey(
+        "workflow.Circuit",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="document_types",
+        verbose_name="Circuit de validation (RF-29 à 31)",
+    )
 
     class Meta:
         ordering = ["label"]
@@ -127,6 +135,14 @@ class Document(models.Model):
         related_name="documents",
         verbose_name="Type de document",
     )
+
+    # Cycle de vie / workflow (RF-40 : actions automatiques au changement de statut)
+    submitted_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Soumis le (circuit de validation)"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True, verbose_name="Archivé le")
+    rejected_at = models.DateTimeField(null=True, blank=True, verbose_name="Rejeté le")
+    rejection_reason = models.TextField(blank=True, verbose_name="Motif de rejet (RF-39)")
 
     # Métadonnées (RF-19 : date, fournisseur/client, projet/affaire, créateur,
     # type, montant, n° facture/contrat, mots-clés)
