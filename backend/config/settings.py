@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "users",
     "documents",
     "workflow",
+    "reports",
 ]
 
 MIDDLEWARE = [
