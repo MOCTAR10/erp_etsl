@@ -156,3 +156,28 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ── Celery (relances RF-35, ingestion, OCR, exports programmés) ──
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TIMEZONE = TIME_ZONE
+
+# ── Emails (RF-34 : notifications) — console en dev, SMTP en prod via .env ──
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = env("EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("EMAIL_PORT", default=25)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="archivage@etls.local")
+
+# ── Ingestion (RF-04/05) ──
+IMAP_HOST = env("IMAP_HOST", default="")
+IMAP_USERNAME = env("IMAP_USERNAME", default="")
+IMAP_PASSWORD = env("IMAP_PASSWORD", default="")
+IMAP_MAILBOXES = env("IMAP_MAILBOXES", default="INBOX")
+WATCHED_FOLDER = env("WATCHED_FOLDER", default="")

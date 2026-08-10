@@ -1,13 +1,18 @@
 import hashlib
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core import mail
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from documents.models import Document, DocumentType
-from workflow.models import Circuit, CircuitStep, Task, TaskComment
+from workflow.models import Circuit, CircuitStep, Notification, Task, TaskComment
+
+from .tasks import check_overdue_tasks
 
 User = get_user_model()
 
@@ -235,3 +240,119 @@ class WorkflowTests(APITestCase):
         resp = self.client.get("/api/workflow/tasks/summary/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertGreaterEqual(resp.data["total_pending"], 1)
+
+
+@override_settings(
+    STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}},
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class IntegrityAndNotificationsTests(APITestCase):
+    """RF-67 (vérification d'intégrité) + RF-34/35 (notifications, relances)."""
+
+    def setUp(self):
+        self.chef_service = User.objects.create_user(
+            email="chef@etls.local", password="MotDePasse#2026", role=User.Role.CHEF_SERVICE
+        )
+        self.comptable = User.objects.create_user(
+            email="compta@etls.local", password="MotDePasse#2026", role=User.Role.COMPTABLE
+        )
+        self.admin = User.objects.create_user(
+            email="admin@etls.local", password="MotDePasse#2026", role=User.Role.ADMIN, is_staff=True
+        )
+        self.circuit = Circuit.objects.create(code="c1", label="Compta", max_days=5)
+        self.step = CircuitStep.objects.create(
+            circuit=self.circuit, order=1, name="Réception",
+            actor_role=User.Role.CHEF_SERVICE, max_days=1,
+        )
+        self.facture_type = DocumentType.objects.create(
+            code="factures_fournisseurs", label="Factures fournisseurs", circuit=self.circuit
+        )
+
+    def _auth(self, user):
+        tokens = self.client.post(
+            "/api/users/token/",
+            {"email": user.email, "password": "MotDePasse#2026"},
+            format="json",
+        ).data
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+    def _upload_and_submit(self, user):
+        self._auth(user)
+        resp = self.client.post(
+            "/api/documents/documents/",
+            {
+                "title": "Facture intégrité",
+                "type": self.facture_type.id,
+                "file": SimpleUploadedFile("f.pdf", b"contenu-auditable", content_type="application/pdf"),
+            },
+            format="multipart",
+        )
+        doc_id = resp.data["id"]
+        resp = self.client.post(
+            "/api/workflow/tasks/submit/", {"document": doc_id}, format="json"
+        )
+        return doc_id, resp.data["id"]
+
+    def test_verify_integrity_ok(self):
+        doc_id, _ = self._upload_and_submit(self.comptable)
+        self._auth(self.comptable)
+        resp = self.client.get(f"/api/documents/documents/{doc_id}/verify/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data["ok"])
+        self.assertEqual(
+            resp.data["actual_sha256"],
+            hashlib.sha256(b"contenu-auditable").hexdigest(),
+        )
+
+    def test_reminder_created_for_overdue_task(self):
+        doc_id, task_id = self._upload_and_submit(self.comptable)
+        Task.objects.filter(id=task_id).update(
+            due_date=timezone.now() - timedelta(hours=12)
+        )
+        result = check_overdue_tasks.run()
+        self.assertEqual(result["reminded"], 1)
+        self.assertEqual(result["escalated"], 0)
+        reminder = Notification.objects.get(task_id=task_id, kind="reminder")
+        self.assertEqual(reminder.user, self.chef_service)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_escalation_to_admin_when_way_overdue(self):
+        doc_id, task_id = self._upload_and_submit(self.comptable)
+        Task.objects.filter(id=task_id).update(
+            due_date=timezone.now() - timedelta(days=3)
+        )
+        result = check_overdue_tasks.run()
+        self.assertEqual(result["reminded"], 1)
+        self.assertEqual(result["escalated"], 1)
+        self.assertTrue(Notification.objects.filter(task_id=task_id, kind="escalation").exists())
+
+    def test_no_reminder_when_task_not_overdue(self):
+        doc_id, task_id = self._upload_and_submit(self.comptable)
+        Task.objects.filter(id=task_id).update(
+            due_date=timezone.now() + timedelta(days=3)
+        )
+        result = check_overdue_tasks.run()
+        self.assertEqual(result["reminded"], 0)
+        self.assertEqual(Notification.objects.count(), 0)
+
+    def test_notifications_endpoint(self):
+        doc_id, task_id = self._upload_and_submit(self.comptable)
+        Task.objects.filter(id=task_id).update(
+            due_date=timezone.now() - timedelta(days=2)
+        )
+        check_overdue_tasks.run()
+
+        self._auth(self.chef_service)
+        resp = self.client.get("/api/workflow/notifications/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data["results"]), 1)
+        notif_id = resp.data["results"][0]["id"]
+        self.assertFalse(resp.data["results"][0]["is_read"])
+
+        resp = self.client.post(f"/api/workflow/notifications/{notif_id}/mark_read/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data["is_read"])
+
+        self._auth(self.comptable)
+        resp = self.client.get("/api/workflow/notifications/")
+        self.assertEqual(len(resp.data["results"]), 0)

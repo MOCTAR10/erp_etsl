@@ -226,6 +226,38 @@ class DocumentViewSet(viewsets.ModelViewSet):
         )
         return redirect(document.current_version.file.url)
 
+    @action(detail=True, methods=["get"])
+    def verify(self, request, pk=None):
+        """Vérifie l'intégrité du fichier stocké (SHA-256, RF-67)."""
+        from .serializers import compute_sha256
+
+        document = self.get_object()
+        if document.current_version_id is None:
+            return Response(
+                {"detail": "Le document n'a pas de version courante."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        version = document.current_version
+        try:
+            actual = compute_sha256(version.file)
+        except Exception as exc:
+            return Response(
+                {"detail": f"Lecture du fichier impossible : {exc}"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        ok = actual == version.sha256
+        log_audit(
+            request.user,
+            AuditLog.Action.UPDATE,
+            "document",
+            document.id,
+            {"integrity_verified": ok},
+            request_ip(request),
+        )
+        return Response(
+            {"ok": ok, "expected_sha256": version.sha256, "actual_sha256": actual}
+        )
+
     @action(detail=True, methods=["get", "post", "delete"])
     def acl(self, request, pk=None):
         """Gestion des droits au niveau document (RF-57)."""

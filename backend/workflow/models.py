@@ -118,3 +118,32 @@ class TaskComment(models.Model):
 
     def __str__(self):
         return f"Commentaire {self.task_id}"
+
+
+class Notification(models.Model):
+    """Notification utilisateur — relances, escalades, échéances (RF-34/35/37)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications"
+    )
+    task = models.ForeignKey(
+        Task, null=True, blank=True, on_delete=models.SET_NULL, related_name="notifications"
+    )
+    subject = models.CharField(max_length=255, verbose_name="Objet")
+    message = models.TextField(verbose_name="Message")
+    kind = models.CharField(
+        max_length=20,
+        choices=[("reminder", "Relance"), ("escalation", "Escalade"), ("info", "Information")],
+        default="info",
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Notification"
+        verbose_name_plural = "Notifications"
+
+    def __str__(self):
+        return f"[{self.kind}] {self.subject} → {self.user_id}"

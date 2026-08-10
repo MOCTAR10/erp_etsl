@@ -9,11 +9,12 @@ from documents.permissions import IsAdminOrStaff
 from documents.services import can_write_document, visible_documents
 from users.models import User
 
-from .models import Circuit, Task
+from .models import Circuit, Notification, Task
 from .serializers import (
     CircuitSerializer,
     CommentSerializer,
     DelegateSerializer,
+    NotificationSerializer,
     RejectSerializer,
     SubmitSerializer,
     TaskCommentSerializer,
@@ -204,3 +205,26 @@ class TaskViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(
             TaskCommentSerializer(task.comments.select_related("author"), many=True).data
         )
+
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """Notifications de l'utilisateur connecté (RF-34/35/37)."""
+
+    serializer_class = NotificationSerializer
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).select_related(
+            "task__document", "task__step"
+        )
+
+    @action(detail=True, methods=["post"])
+    def mark_read(self, request, pk=None):
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save(update_fields=["is_read"])
+        return Response(NotificationSerializer(notification).data)
+
+    @action(detail=False, methods=["post"])
+    def mark_all_read(self, request):
+        updated = self.get_queryset().update(is_read=True)
+        return Response({"updated": updated})

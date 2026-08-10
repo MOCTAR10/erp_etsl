@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from users.models import User
 
-from .models import Circuit, CircuitStep, Task, TaskComment
+from .models import Circuit, CircuitStep, Notification, Task, TaskComment
 
 
 class CircuitStepSerializer(serializers.ModelSerializer):
@@ -94,3 +94,23 @@ class CommentSerializer(serializers.Serializer):
     """Commentaire dans le circuit (RF-38)."""
 
     text = serializers.CharField(required=True, allow_blank=False)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    document_title = serializers.CharField(source="task.document.title", read_only=True)
+    step_name = serializers.CharField(source="task.step.name", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "subject",
+            "message",
+            "kind",
+            "is_read",
+            "task",
+            "document_title",
+            "step_name",
+            "created_at",
+        ]
+        read_only_fields = fields
