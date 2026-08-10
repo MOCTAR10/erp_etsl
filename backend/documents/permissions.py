@@ -48,3 +48,13 @@ class CanManageACL(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return can_manage_acl(request.user, document=getattr(obj, "document", None), dossier=getattr(obj, "dossier", None))
+
+
+class IsAdminOrStaff(BasePermission):
+    """Accès à la piste d'audit réservé à l'administration."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        return user.is_staff or user.role == User.Role.ADMIN

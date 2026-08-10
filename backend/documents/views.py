@@ -1,13 +1,29 @@
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Document, DocumentType, Dossier, DocumentAccess, DossierAccess, Version
-from .permissions import CanManageACL, DocumentPermission, DossierPermission
+from .audit import log_audit, request_ip
+from .models import (
+    AuditLog,
+    Document,
+    DocumentType,
+    Dossier,
+    DocumentAccess,
+    DossierAccess,
+    Version,
+)
+from .permissions import (
+    CanManageACL,
+    DocumentPermission,
+    DossierPermission,
+    IsAdminOrStaff,
+)
 from .serializers import (
     AccessEntrySerializer,
+    AuditLogSerializer,
     DocumentListSerializer,
     DocumentSerializer,
     DocumentTypeSerializer,
@@ -45,7 +61,38 @@ class DossierViewSet(viewsets.ModelViewSet):
             raise PermissionDenied(
                 "Votre rôle ne permet pas de créer de dossier (matrice §3.3)."
             )
-        serializer.save(created_by=user)
+        dossier = serializer.save(created_by=user)
+        log_audit(
+            user,
+            AuditLog.Action.CREATE,
+            "dossier",
+            dossier.id,
+            {"name": dossier.name},
+            request_ip(self.request),
+        )
+
+    def perform_update(self, serializer):
+        before = {f: str(getattr(serializer.instance, f)) for f in serializer.validated_data}
+        dossier = serializer.save()
+        log_audit(
+            self.request.user,
+            AuditLog.Action.UPDATE,
+            "dossier",
+            dossier.id,
+            {"changed": before},
+            request_ip(self.request),
+        )
+
+    def perform_destroy(self, instance):
+        log_audit(
+            self.request.user,
+            AuditLog.Action.DELETE,
+            "dossier",
+            instance.id,
+            {"name": instance.name},
+            request_ip(self.request),
+        )
+        instance.delete()
 
     @action(detail=True, methods=["get", "post", "delete"])
     def acl(self, request, pk=None):
@@ -67,13 +114,31 @@ class DossierViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user_id = serializer.validated_data["user"]
         if request.method == "DELETE":
-            dossier.acl.filter(user_id=user_id).delete()
+            removed = dossier.acl.filter(user_id=user_id)
+            if removed.exists():
+                removed.delete()
+                log_audit(
+                    request.user,
+                    AuditLog.Action.ACL_REVOKE,
+                    "dossier",
+                    dossier.id,
+                    {"user": user_id},
+                    request_ip(request),
+                )
             return Response(status=status.HTTP_204_NO_CONTENT)
         permission = serializer.validated_data.get("permission", "read")
         DossierAccess.objects.update_or_create(
             dossier=dossier,
             user_id=user_id,
             defaults={"permission": permission, "granted_by": request.user},
+        )
+        log_audit(
+            request.user,
+            AuditLog.Action.ACL_GRANT,
+            "dossier",
+            dossier.id,
+            {"user": user_id, "permission": permission},
+            request_ip(request),
         )
         return Response(status=status.HTTP_200_OK)
 
@@ -109,7 +174,57 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 "Les documents de type restreint (paie) sont réservés à l'administration (RF-33)."
             )
         # created_by est posé dans DocumentSerializer.create (via le contexte).
-        serializer.save()
+        document = serializer.save()
+        log_audit(
+            user,
+            AuditLog.Action.CREATE,
+            "document",
+            document.id,
+            {"title": document.title, "version": 1},
+            request_ip(self.request),
+        )
+
+    def perform_update(self, serializer):
+        before = {f: str(getattr(serializer.instance, f)) for f in serializer.validated_data if f != "file"}
+        document = serializer.save()
+        log_audit(
+            self.request.user,
+            AuditLog.Action.UPDATE,
+            "document",
+            document.id,
+            {"changed": before},
+            request_ip(self.request),
+        )
+
+    def perform_destroy(self, instance):
+        log_audit(
+            self.request.user,
+            AuditLog.Action.DELETE,
+            "document",
+            instance.id,
+            {"title": instance.title},
+            request_ip(self.request),
+        )
+        instance.delete()
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        """Téléchargement tracé (RF-64) — redirige vers l'objet MinIO."""
+        document = self.get_object()
+        if document.current_version_id is None:
+            return Response(
+                {"detail": "Le document n'a pas de version courante."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        log_audit(
+            request.user,
+            AuditLog.Action.DOWNLOAD,
+            "document",
+            document.id,
+            {"version": document.current_version.number, "filename": document.current_version.original_filename},
+            request_ip(request),
+        )
+        return redirect(document.current_version.file.url)
 
     @action(detail=True, methods=["get", "post", "delete"])
     def acl(self, request, pk=None):
@@ -131,13 +246,31 @@ class DocumentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user_id = serializer.validated_data["user"]
         if request.method == "DELETE":
-            document.acl.filter(user_id=user_id).delete()
+            removed = document.acl.filter(user_id=user_id)
+            if removed.exists():
+                removed.delete()
+                log_audit(
+                    request.user,
+                    AuditLog.Action.ACL_REVOKE,
+                    "document",
+                    document.id,
+                    {"user": user_id},
+                    request_ip(request),
+                )
             return Response(status=status.HTTP_204_NO_CONTENT)
         permission = serializer.validated_data.get("permission", "read")
         DocumentAccess.objects.update_or_create(
             document=document,
             user_id=user_id,
             defaults={"permission": permission, "granted_by": request.user},
+        )
+        log_audit(
+            request.user,
+            AuditLog.Action.ACL_GRANT,
+            "document",
+            document.id,
+            {"user": user_id, "permission": permission},
+            request_ip(request),
         )
         return Response(status=status.HTTP_200_OK)
 
@@ -171,6 +304,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document.current_version = version
         document.sha256 = sha256
         document.save(update_fields=["current_version", "sha256"])
+        log_audit(
+            request.user,
+            AuditLog.Action.UPDATE,
+            "document",
+            document.id,
+            {"new_version": version.number, "note": version.note},
+            request_ip(request),
+        )
         return Response(VersionSerializer(version).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
@@ -187,6 +328,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document.current_version = version
         document.sha256 = version.sha256
         document.save(update_fields=["current_version", "sha256"])
+        log_audit(
+            request.user,
+            AuditLog.Action.UPDATE,
+            "document",
+            document.id,
+            {"rollback_version": version.number},
+            request_ip(request),
+        )
         return Response(VersionSerializer(version).data)
 
     @action(detail=True, methods=["post"])
@@ -201,6 +350,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document.checked_out_by = request.user
         document.checked_out_at = timezone.now()
         document.save(update_fields=["checked_out_by", "checked_out_at"])
+        log_audit(
+            request.user,
+            AuditLog.Action.UPDATE,
+            "document",
+            document.id,
+            {"checkout": True},
+            request_ip(request),
+        )
         return Response(DocumentSerializer(document, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["post"])
@@ -217,6 +374,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document.checked_out_by = None
         document.checked_out_at = None
         document.save(update_fields=["checked_out_by", "checked_out_at"])
+        log_audit(
+            request.user,
+            AuditLog.Action.UPDATE,
+            "document",
+            document.id,
+            {"checkout": False},
+            request_ip(request),
+        )
         return Response(DocumentSerializer(document, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])
@@ -226,3 +391,23 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return Response(
             VersionSerializer(document.versions.all(), many=True).data
         )
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """Piste d'audit (RF-63 à 65) — consultation réservée à l'administration."""
+
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAdminOrStaff]
+
+    def get_queryset(self):
+        params = self.request.query_params
+        queryset = AuditLog.objects.select_related("user").all()
+        if object_type := params.get("object_type"):
+            queryset = queryset.filter(object_type=object_type)
+        if object_id := params.get("object_id"):
+            queryset = queryset.filter(object_id=object_id)
+        if action := params.get("action"):
+            queryset = queryset.filter(action=action)
+        if user_id := params.get("user"):
+            queryset = queryset.filter(user_id=user_id)
+        return queryset

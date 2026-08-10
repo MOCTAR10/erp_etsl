@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import Document, DocumentType, Dossier, DocumentAccess, DossierAccess, Version
+from .models import (
+    AuditLog,
+    Document,
+    DocumentType,
+    Dossier,
+    DocumentAccess,
+    DossierAccess,
+    Version,
+)
 
 
 @admin.register(DocumentType)
@@ -43,3 +51,12 @@ class DossierAccessAdmin(admin.ModelAdmin):
     list_display = ["dossier", "user", "permission", "granted_by", "created_at"]
     list_filter = ["permission"]
     search_fields = ["user__email", "dossier__name"]
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ["created_at", "user", "action", "object_type", "object_id", "ip_address"]
+    list_filter = ["action", "object_type"]
+    search_fields = ["object_id", "user__email"]
+    readonly_fields = ["id", "created_at"]
+    date_hierarchy = "created_at"

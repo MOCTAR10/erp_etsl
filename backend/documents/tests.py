@@ -6,7 +6,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Document, DocumentType, Dossier, Version
+from .models import AuditLog, Document, DocumentType, Dossier, Version
 
 User = get_user_model()
 
@@ -423,3 +423,113 @@ class AccessControlTests(APITestCase):
         self._auth(self.direction)
         resp = self._upload(self.direction, title="Interdit")
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(
+    STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}}
+)
+class AuditTrailTests(APITestCase):
+    """RF-63/64/65 : traçabilité création / modif / suppression / téléchargement."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="admin@etls.local", password="MotDePasse#2026", role=User.Role.ADMIN, is_staff=True
+        )
+        self.comptable = User.objects.create_user(
+            email="compta@etls.local", password="MotDePasse#2026", role=User.Role.COMPTABLE
+        )
+        self.facture_type = DocumentType.objects.create(
+            code="factures_fournisseurs", label="Factures fournisseurs", retention_years=10
+        )
+
+    def _auth(self, user):
+        tokens = self.client.post(
+            "/api/users/token/",
+            {"email": user.email, "password": "MotDePasse#2026"},
+            format="json",
+        ).data
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+    def _upload(self, user):
+        self._auth(user)
+        return self.client.post(
+            "/api/documents/documents/",
+            {
+                "title": "Facture auditable",
+                "type": self.facture_type.id,
+                "file": SimpleUploadedFile("facture.pdf", b"contenu", content_type="application/pdf"),
+            },
+            format="multipart",
+        )
+
+    def _log(self, **filters):
+        return AuditLog.objects.filter(**filters).first()
+
+    def test_create_is_traced(self):
+        resp = self._upload(self.comptable)
+        entry = self._log(object_type="document", object_id=resp.data["id"], action=AuditLog.Action.CREATE)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.user, self.comptable)
+        self.assertEqual(entry.detail["title"], "Facture auditable")
+
+    def test_new_version_is_traced(self):
+        doc_id = self._upload(self.comptable).data["id"]
+        self._auth(self.comptable)
+        self.client.post(
+            f"/api/documents/documents/{doc_id}/new_version/",
+            {"file": SimpleUploadedFile("facture.pdf", b"contenu v2", content_type="application/pdf")},
+            format="multipart",
+        )
+        entry = self._log(object_type="document", object_id=doc_id, action=AuditLog.Action.UPDATE)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.detail["new_version"], 2)
+
+    def test_download_is_traced(self):
+        doc_id = self._upload(self.comptable).data["id"]
+        self._auth(self.comptable)
+        resp = self.client.get(f"/api/documents/documents/{doc_id}/download/")
+        self.assertEqual(resp.status_code, status.HTTP_302_FOUND)
+        entry = self._log(object_type="document", object_id=doc_id, action=AuditLog.Action.DOWNLOAD)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.detail["version"], 1)
+
+    def test_acl_grant_is_traced(self):
+        doc_id = self._upload(self.admin).data["id"]
+        self._auth(self.admin)
+        self.client.post(
+            f"/api/documents/documents/{doc_id}/acl/",
+            {"user": self.comptable.id, "permission": "write"},
+            format="json",
+        )
+        entry = self._log(object_type="document", object_id=doc_id, action=AuditLog.Action.ACL_GRANT)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.detail["permission"], "write")
+
+    def test_delete_is_traced(self):
+        doc_id = self._upload(self.comptable).data["id"]
+        self._auth(self.comptable)
+        self.assertEqual(
+            self.client.delete(f"/api/documents/documents/{doc_id}/").status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+        entry = self._log(object_type="document", object_id=doc_id, action=AuditLog.Action.DELETE)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.detail["title"], "Facture auditable")
+
+    def test_audit_endpoint_admin_only(self):
+        self._upload(self.comptable)
+        self._auth(self.comptable)
+        self.assertEqual(
+            self.client.get("/api/documents/audit/").status_code, status.HTTP_403_FORBIDDEN
+        )
+        self._auth(self.admin)
+        resp = self.client.get("/api/documents/audit/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(resp.data["results"]), 1)
+
+    def test_audit_endpoint_filters_by_object(self):
+        doc_id = self._upload(self.comptable).data["id"]
+        self._auth(self.admin)
+        resp = self.client.get(f"/api/documents/audit/?object_id={doc_id}")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(all(d["object_id"] == doc_id for d in resp.data["results"]))

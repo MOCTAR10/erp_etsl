@@ -2,7 +2,7 @@ import hashlib
 
 from rest_framework import serializers
 
-from .models import Document, DocumentType, Dossier, Version
+from .models import AuditLog, Document, DocumentType, Dossier, Version
 from .services import can_see_amount
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # RF-03 : upload max 10 Mo
@@ -205,3 +205,24 @@ class AccessEntrySerializer(serializers.Serializer):
     permission = serializers.ChoiceField(
         choices=["read", "write", "deny"], required=False
     )
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """Entrée de la piste d'audit (RF-63 à 65)."""
+
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            "id",
+            "user",
+            "user_email",
+            "action",
+            "object_type",
+            "object_id",
+            "detail",
+            "ip_address",
+            "created_at",
+        ]
+        read_only_fields = fields

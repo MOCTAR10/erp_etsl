@@ -255,3 +255,43 @@ class DossierAccess(models.Model):
                 fields=["dossier", "user"], name="uniq_dossier_access"
             )
         ]
+
+
+class AuditLog(models.Model):
+    """Piste d'audit (RF-63 à 65) — traçabilité des actions sensibles."""
+
+    class Action(models.TextChoices):
+        CREATE = "create", "Création"
+        UPDATE = "update", "Modification"
+        DELETE = "delete", "Suppression"
+        DOWNLOAD = "download", "Téléchargement / export"
+        PRINT = "print", "Impression"
+        ACL_GRANT = "acl_grant", "Droit accordé"
+        ACL_REVOKE = "acl_revoke", "Droit retiré"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="audit_logs",
+        verbose_name="Utilisateur",
+    )
+    action = models.CharField(max_length=20, choices=Action.choices, verbose_name="Action")
+    object_type = models.CharField(max_length=50, verbose_name="Type d'objet")
+    object_id = models.CharField(max_length=36, verbose_name="Identifiant de l'objet")
+    detail = models.JSONField(default=dict, blank=True, verbose_name="Détail")
+    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="Adresse IP")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Horodatage")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Entrée d'audit"
+        verbose_name_plural = "Piste d'audit"
+        indexes = [
+            models.Index(fields=["object_type", "object_id"]),
+            models.Index(fields=["user", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.action} {self.object_type}:{self.object_id} ({self.created_at:%Y-%m-%d %H:%M})"
