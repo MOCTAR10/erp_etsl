@@ -1,6 +1,8 @@
 import uuid
 
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
 
@@ -190,10 +192,23 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Recherche full-text (RF-23/26/27) — OCR invisible + métadonnées.
+    extracted_text = models.TextField(
+        blank=True, verbose_name="Texte extrait (OCR invisible, RF-27)"
+    )
+    search_vector = SearchVectorField(
+        null=True, editable=False, verbose_name="Index full-text"
+    )
+
     class Meta:
         ordering = ["-created_at"]
         verbose_name = "Document"
         verbose_name_plural = "Documents"
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["document_date"]),
+            GinIndex(fields=["search_vector"], name="doc_search_gin"),
+        ]
 
     def __str__(self):
         return self.title

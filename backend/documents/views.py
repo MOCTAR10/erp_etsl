@@ -1,4 +1,6 @@
+from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count, F
 from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -151,7 +153,52 @@ class DocumentViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
 
     def get_queryset(self):
-        return visible_documents(self.request.user)
+        queryset = visible_documents(self.request.user)
+
+        # Filtres facettes (RF-23/26) : type, statut, dossier, année.
+        params = self.request.query_params
+        if doc_type := params.get("type"):
+            queryset = queryset.filter(type_id=doc_type)
+        if doc_status := params.get("status"):
+            queryset = queryset.filter(status=doc_status)
+        if dossier := params.get("dossier"):
+            queryset = queryset.filter(dossier_id=dossier)
+        if year := params.get("year"):
+            queryset = queryset.filter(document_date__year=year)
+
+        # Recherche full-text (RF-23/26/27) : classée par pertinence.
+        if search := params.get("search"):
+            query = SearchQuery(search, config="french")
+            queryset = (
+                queryset.annotate(rank=SearchRank(F("search_vector"), query))
+                .filter(search_vector=query)
+                .order_by("-rank", "-created_at")
+            )
+        return queryset
+
+    @action(detail=False, methods=["get"])
+    def facets(self, request):
+        """Compteurs par statut, type et année sur la sélection (RF-23/26)."""
+        base = self.get_queryset()
+        return Response(
+            {
+                "total": base.count(),
+                "by_status": dict(
+                    base.values_list("status").annotate(count=Count("id")).order_by()
+                ),
+                "by_type": list(
+                    base.values("type__label")
+                    .annotate(count=Count("id"))
+                    .order_by("-count")
+                ),
+                "by_year": dict(
+                    base.filter(document_date__isnull=False)
+                    .values_list("document_date__year")
+                    .annotate(count=Count("id"))
+                    .order_by("-document_date__year")
+                ),
+            }
+        )
 
     def get_serializer_class(self):
         if self.action == "list":

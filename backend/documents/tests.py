@@ -6,7 +6,9 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import AuditLog, Document, DocumentType, Dossier, Version
+from workflow.models import Circuit
+
+from .models import AuditLog, Document, DocumentType, Dossier, DossierAccess, Version
 
 User = get_user_model()
 
@@ -533,3 +535,121 @@ class AuditTrailTests(APITestCase):
         resp = self.client.get(f"/api/documents/audit/?object_id={doc_id}")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(all(d["object_id"] == doc_id for d in resp.data["results"]))
+
+
+@override_settings(
+    STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}}
+)
+class SearchAndFacetsTests(APITestCase):
+    """RF-23/26/27 : recherche full-text et facettes."""
+
+    def setUp(self):
+        self.comptable = User.objects.create_user(
+            email="compta@etls.local", password="MotDePasse#2026", role=User.Role.COMPTABLE
+        )
+        self.admin = User.objects.create_user(
+            email="admin@etls.local", password="MotDePasse#2026", role=User.Role.ADMIN, is_staff=True
+        )
+        self.facture_type = DocumentType.objects.create(
+            code="factures_fournisseurs", label="Factures fournisseurs", retention_years=10
+        )
+        self.devis_type = DocumentType.objects.create(
+            code="devis", label="Devis", retention_years=5
+        )
+        self.circuit = Circuit.objects.create(code="c1", label="Circuit", max_days=5)
+
+    def _upload(self, title, counterparty="", extracted_text="", status=Document.Status.IN_VALIDATION):
+        self._auth(self.comptable)
+        resp = self.client.post(
+            "/api/documents/documents/",
+            {
+                "title": title,
+                "type": self.facture_type.id if "Facture" in title else self.devis_type.id,
+                "counterparty": counterparty,
+                "file": SimpleUploadedFile("f.pdf", b"contenu", content_type="application/pdf"),
+            },
+            format="multipart",
+        )
+        doc = Document.objects.get(id=resp.data["id"])
+        if extracted_text:
+            doc.extracted_text = extracted_text
+        if status:
+            doc.status = status
+        if extracted_text or status:
+            doc.save()
+        return doc.id
+
+    def _auth(self, user):
+        tokens = self.client.post(
+            "/api/users/token/",
+            {"email": user.email, "password": "MotDePasse#2026"},
+            format="json",
+        ).data
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+    def test_search_matches_title_and_counterparty(self):
+        self._upload("Facture electricite", counterparty="EDF SA")
+        self._upload("Facture telephone", counterparty="Orange")
+        self._upload("Devis travaux", counterparty="Macon")
+        self._auth(self.comptable)
+        resp = self.client.get("/api/documents/documents/?search=EDF")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data["results"]), 1)
+        self.assertEqual(resp.data["results"][0]["title"], "Facture electricite")
+
+    def test_search_matches_ocr_invisible_text(self):
+        self._upload("Facture electricite", extracted_text="montant electricite fournisseur")
+        self._upload("Devis travaux")
+        self._auth(self.comptable)
+        resp = self.client.get("/api/documents/documents/?search=electricite")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data["results"]), 1)
+
+    def test_search_respects_visibility(self):
+        # Document placé dans un dossier refusé à la compta via ACL (RF-58).
+        dossier = Dossier.objects.create(name="Dossier secret", created_by=self.admin)
+        DossierAccess.objects.create(
+            dossier=dossier, user=self.comptable,
+            permission=DossierAccess.Permission.DENY, granted_by=self.admin,
+        )
+        doc = Document.objects.create(
+            title="Facture confidentielle",
+            type=self.facture_type,
+            dossier=dossier,
+            created_by=self.admin,
+        )
+        Version.objects.create(
+            document=doc, number=1,
+            file=SimpleUploadedFile("f.pdf", b"c", content_type="application/pdf"),
+            sha256="abc", size=1, original_filename="f.pdf", created_by=self.admin,
+        )
+        doc.current_version = doc.versions.first()
+        doc.save(update_fields=["current_version"])
+        self._auth(self.comptable)
+        resp = self.client.get("/api/documents/documents/?search=confidentielle")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data["results"]), 0)
+        self._auth(self.admin)
+        resp = self.client.get("/api/documents/documents/?search=confidentielle")
+        self.assertEqual(len(resp.data["results"]), 1)
+
+    def test_facets_counts(self):
+        self._upload("Facture electricite")
+        self._upload("Facture telephone")
+        self._upload("Devis travaux")
+        self._auth(self.comptable)
+        resp = self.client.get("/api/documents/documents/facets/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["total"], 3)
+        self.assertEqual(resp.data["by_status"]["in_validation"], 3)
+        by_type = {t["type__label"]: t["count"] for t in resp.data["by_type"]}
+        self.assertEqual(by_type["Factures fournisseurs"], 2)
+        self.assertEqual(by_type["Devis"], 1)
+
+    def test_facets_respects_search_filter(self):
+        self._upload("Facture electricite")
+        self._upload("Facture telephone")
+        self._upload("Devis travaux")
+        self._auth(self.comptable)
+        resp = self.client.get("/api/documents/documents/facets/?search=telephone")
+        self.assertEqual(resp.data["total"], 1)
