@@ -139,12 +139,19 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# ── MinIO object storage (activated with document upload, Increment 4) ──
-# AWS_ACCESS_KEY_ID = env("MINIO_ROOT_USER", default="etls_minio")
-# AWS_SECRET_ACCESS_KEY = env("MINIO_ROOT_PASSWORD", default="")
-# AWS_STORAGE_BUCKET_NAME = "etls-documents"
-# AWS_S3_ENDPOINT_URL = env("MINIO_ENDPOINT", default="http://localhost:9000")
-# AWS_S3_ADDRESSING_STYLE = "path"
-# AWS_QUERYSTRING_AUTH = False
+# ── MinIO object storage (RF-45 : NAS, S3-compatible) ──
+AWS_ACCESS_KEY_ID = env("MINIO_ROOT_USER", default="etls_minio")
+AWS_SECRET_ACCESS_KEY = env("MINIO_ROOT_PASSWORD", default="etls_minio_dev_password")
+AWS_STORAGE_BUCKET_NAME = "etls-documents"
+AWS_S3_ENDPOINT_URL = env("MINIO_ENDPOINT", default="http://localhost:9000")
+AWS_S3_ADDRESSING_STYLE = "path"
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = True
+AWS_S3_FILE_OVERWRITE = False
+
+STORAGES = {
+    "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
