@@ -3,6 +3,7 @@ import hashlib
 from rest_framework import serializers
 
 from .models import Document, DocumentType, Dossier, Version
+from .services import can_see_amount
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # RF-03 : upload max 10 Mo
 
@@ -105,6 +106,14 @@ class DocumentSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {"dossier": {"required": False}, "type": {"required": False}}
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        user = self.context.get("request").user
+        if not can_see_amount(user):
+            # RF-59 : montant masqué pour les rôles non autorisés.
+            data["amount"] = None
+        return data
+
     def validate_file(self, value):
         if value.size > MAX_UPLOAD_SIZE:
             raise serializers.ValidationError(
@@ -113,9 +122,12 @@ class DocumentSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        user = self.context["request"].user
+        if not can_see_amount(user):
+            # RF-59 : un rôle non autorisé ne peut pas non plus renseigner le montant.
+            validated_data["amount"] = None
         uploaded = validated_data.pop("file")
         sha256 = compute_sha256(uploaded)
-        user = self.context["request"].user
 
         document = Document.objects.create(
             **validated_data,
@@ -175,3 +187,21 @@ class DocumentListSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        user = self.context.get("request").user
+        if not can_see_amount(user):
+            # RF-59 : montant masqué pour les rôles non autorisés.
+            data["amount"] = None
+        return data
+
+
+class AccessEntrySerializer(serializers.Serializer):
+    """Entrée ACL (RF-57/58) — GET liste, POST upsert, DELETE retire."""
+
+    user = serializers.UUIDField()
+    user_email = serializers.EmailField(read_only=True)
+    permission = serializers.ChoiceField(
+        choices=["read", "write", "deny"], required=False
+    )

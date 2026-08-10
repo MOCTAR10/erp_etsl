@@ -4,15 +4,24 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Document, DocumentType, Dossier, Version
-from .permissions import DocumentPermission, DossierPermission
+from .models import Document, DocumentType, Dossier, DocumentAccess, DossierAccess, Version
+from .permissions import CanManageACL, DocumentPermission, DossierPermission
 from .serializers import (
+    AccessEntrySerializer,
     DocumentListSerializer,
     DocumentSerializer,
     DocumentTypeSerializer,
     DossierSerializer,
     NewVersionSerializer,
     VersionSerializer,
+)
+from .services import (
+    WRITE_ROLES,
+    can_manage_acl,
+    can_write_dossier,
+    is_admin_or_staff,
+    visible_documents,
+    visible_dossiers,
 )
 
 
@@ -27,8 +36,46 @@ class DossierViewSet(viewsets.ModelViewSet):
     permission_classes = [DossierPermission]
     http_method_names = ["get", "post", "patch", "delete"]
 
+    def get_queryset(self):
+        return visible_dossiers(self.request.user)
+
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        user = self.request.user
+        if not is_admin_or_staff(user) and user.role not in WRITE_ROLES:
+            raise PermissionDenied(
+                "Votre rôle ne permet pas de créer de dossier (matrice §3.3)."
+            )
+        serializer.save(created_by=user)
+
+    @action(detail=True, methods=["get", "post", "delete"])
+    def acl(self, request, pk=None):
+        """Gestion des droits au niveau dossier (RF-58, héritage descendants)."""
+        dossier = self.get_object()
+        if not can_manage_acl(request.user, dossier=dossier):
+            raise PermissionDenied("Seul l'admin ou le créateur du dossier gère ses droits.")
+        if request.method == "GET":
+            entries = [
+                {
+                    "user": a.user_id,
+                    "user_email": a.user.email,
+                    "permission": a.permission,
+                }
+                for a in dossier.acl.select_related("user").all()
+            ]
+            return Response(entries)
+        serializer = AccessEntrySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user_id = serializer.validated_data["user"]
+        if request.method == "DELETE":
+            dossier.acl.filter(user_id=user_id).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        permission = serializer.validated_data.get("permission", "read")
+        DossierAccess.objects.update_or_create(
+            dossier=dossier,
+            user_id=user_id,
+            defaults={"permission": permission, "granted_by": request.user},
+        )
+        return Response(status=status.HTTP_200_OK)
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -38,14 +85,61 @@ class DocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [DocumentPermission]
     http_method_names = ["get", "post", "patch", "delete"]
 
+    def get_queryset(self):
+        return visible_documents(self.request.user)
+
     def get_serializer_class(self):
         if self.action == "list":
             return DocumentListSerializer
         return DocumentSerializer
 
     def perform_create(self, serializer):
+        user = self.request.user
+        # Matrice §3.3 : création réservée aux rôles à écriture, sauf droit dossier (RF-58).
+        if not is_admin_or_staff(user) and user.role not in WRITE_ROLES:
+            dossier = serializer.validated_data.get("dossier")
+            if not (dossier and can_write_dossier(user, dossier)):
+                raise PermissionDenied(
+                    "Votre rôle ne permet pas de créer de document (matrice §3.3)."
+                )
+        # RF-33 : seul l'admin peut créer un document de type restreint (paie).
+        doc_type = serializer.validated_data.get("type")
+        if doc_type and doc_type.is_restricted_rh and not is_admin_or_staff(user):
+            raise PermissionDenied(
+                "Les documents de type restreint (paie) sont réservés à l'administration (RF-33)."
+            )
         # created_by est posé dans DocumentSerializer.create (via le contexte).
         serializer.save()
+
+    @action(detail=True, methods=["get", "post", "delete"])
+    def acl(self, request, pk=None):
+        """Gestion des droits au niveau document (RF-57)."""
+        document = self.get_object()
+        if not can_manage_acl(request.user, document=document):
+            raise PermissionDenied("Seul l'admin ou le créateur du document gère ses droits.")
+        if request.method == "GET":
+            entries = [
+                {
+                    "user": a.user_id,
+                    "user_email": a.user.email,
+                    "permission": a.permission,
+                }
+                for a in document.acl.select_related("user").all()
+            ]
+            return Response(entries)
+        serializer = AccessEntrySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user_id = serializer.validated_data["user"]
+        if request.method == "DELETE":
+            document.acl.filter(user_id=user_id).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        permission = serializer.validated_data.get("permission", "read")
+        DocumentAccess.objects.update_or_create(
+            document=document,
+            user_id=user_id,
+            defaults={"permission": permission, "granted_by": request.user},
+        )
+        return Response(status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"])
     def new_version(self, request, pk=None):

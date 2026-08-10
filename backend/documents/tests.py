@@ -6,7 +6,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Document, DocumentType, Version
+from .models import Document, DocumentType, Dossier, Version
 
 User = get_user_model()
 
@@ -27,6 +27,9 @@ class DocumentAPITests(APITestCase):
         )
         self.other = User.objects.create_user(
             email="autre@etls.local", password="MotDePasse#2026", role=User.Role.CHEF_SERVICE
+        )
+        self.rh = User.objects.create_user(
+            email="rh@etls.local", password="MotDePasse#2026", role=User.Role.RH
         )
         self.facture_type = DocumentType.objects.create(
             code="factures_fournisseurs", label="Factures fournisseurs", retention_years=10
@@ -159,3 +162,264 @@ class DocumentAPITests(APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(resp.data["path"], "Client A / 2026")
+
+
+class AccessControlTests(APITestCase):
+    """RF-33 (paie→RH), RF-57 (ACL document), RF-58 (ACL dossier), RF-59 (montant)."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="admin@etls.local", password="MotDePasse#2026", role=User.Role.ADMIN, is_staff=True
+        )
+        self.comptable = User.objects.create_user(
+            email="compta@etls.local", password="MotDePasse#2026", role=User.Role.COMPTABLE
+        )
+        self.direction = User.objects.create_user(
+            email="direction@etls.local", password="MotDePasse#2026", role=User.Role.DIRECTION
+        )
+        self.chef_service = User.objects.create_user(
+            email="chef@etls.local", password="MotDePasse#2026", role=User.Role.CHEF_SERVICE
+        )
+        self.rh = User.objects.create_user(
+            email="rh@etls.local", password="MotDePasse#2026", role=User.Role.RH
+        )
+        self.facture_type = DocumentType.objects.create(
+            code="factures_fournisseurs", label="Factures fournisseurs", retention_years=10
+        )
+        self.paie_type = DocumentType.objects.create(
+            code="bulletins_paie", label="Bulletins de paie", retention_years=3, is_restricted_rh=True
+        )
+
+    def _auth(self, user):
+        tokens = self.client.post(
+            "/api/users/token/",
+            {"email": user.email, "password": "MotDePasse#2026"},
+            format="json",
+        ).data
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+    def _file(self, content=b"contenu paie", name="bulletin.pdf"):
+        return SimpleUploadedFile(name, content, content_type="application/pdf")
+
+    def _upload(self, user, title="Facture A", doc_type=None, dossier=None, **extra):
+        self._auth(user)
+        data = {
+            "title": title,
+            "type": (doc_type or self.facture_type).id,
+            "file": self._file(),
+            **extra,
+        }
+        if dossier:
+            data["dossier"] = dossier.id
+        return self.client.post("/api/documents/documents/", data, format="multipart")
+
+    # ── RF-33 : paie → accès restreint RH ──
+    def test_restricted_doc_visible_only_to_rh_and_admin(self):
+        resp = self._upload(self.admin, title="Bulletin paie", doc_type=self.paie_type)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        doc_id = resp.data["id"]
+
+        for user in (self.comptable, self.direction, self.chef_service):
+            self._auth(user)
+            self.assertEqual(
+                self.client.get(f"/api/documents/documents/{doc_id}/").status_code,
+                status.HTTP_404_NOT_FOUND,
+            )
+            self.assertNotIn(
+                doc_id,
+                [d["id"] for d in self.client.get("/api/documents/documents/").data["results"]],
+            )
+
+        for user in (self.rh, self.admin):
+            self._auth(user)
+            self.assertEqual(
+                self.client.get(f"/api/documents/documents/{doc_id}/").status_code,
+                status.HTTP_200_OK,
+            )
+
+    def test_non_admin_cannot_create_restricted_document(self):
+        for user in (self.comptable, self.direction, self.chef_service, self.rh):
+            resp = self._upload(user, title="Paie", doc_type=self.paie_type)
+            self.assertEqual(
+                resp.status_code, status.HTTP_403_FORBIDDEN, f"rôle {user.role}"
+            )
+
+    def test_restricted_document_not_writable_by_rh(self):
+        resp = self._upload(self.admin, title="Paie", doc_type=self.paie_type)
+        doc_id = resp.data["id"]
+        self._auth(self.rh)
+        resp = self.client.patch(
+            f"/api/documents/documents/{doc_id}/", {"title": "modif"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    # ── RF-59 : montant masqué ──
+    def test_amount_masked_for_non_authorized_roles(self):
+        resp = self._upload(self.comptable, amount="1234.56")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        doc_id = resp.data["id"]
+        self.assertEqual(resp.data["amount"], "1234.56")
+
+        self._auth(self.chef_service)
+        self.assertEqual(
+            self.client.get(f"/api/documents/documents/{doc_id}/").data["amount"], None
+        )
+        self.assertEqual(
+            self.client.get("/api/documents/documents/").data["results"][0]["amount"], None
+        )
+
+        for user in (self.direction, self.admin):
+            self._auth(user)
+            self.assertEqual(
+                self.client.get(f"/api/documents/documents/{doc_id}/").data["amount"],
+                "1234.56",
+            )
+
+    def test_non_authorized_role_cannot_set_amount(self):
+        resp = self._upload(self.chef_service, amount="9999")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        doc = Document.objects.get(id=resp.data["id"])
+        self.assertIsNone(doc.amount)
+
+    # ── RF-57 : ACL document ──
+    def test_document_acl_deny_hides_document(self):
+        resp = self._upload(self.comptable, title="Facture sensible")
+        doc_id = resp.data["id"]
+
+        self._auth(self.admin)
+        resp = self.client.post(
+            f"/api/documents/documents/{doc_id}/acl/",
+            {"user": self.chef_service.id, "permission": "deny"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        self._auth(self.chef_service)
+        self.assertEqual(
+            self.client.get(f"/api/documents/documents/{doc_id}/").status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self._auth(self.comptable)
+        self.assertEqual(
+            self.client.get(f"/api/documents/documents/{doc_id}/").status_code,
+            status.HTTP_200_OK,
+        )
+
+    def test_document_acl_write_grant_allows_direction(self):
+        resp = self._upload(self.comptable, title="Facture")
+        doc_id = resp.data["id"]
+
+        self._auth(self.admin)
+        self.client.post(
+            f"/api/documents/documents/{doc_id}/acl/",
+            {"user": self.direction.id, "permission": "write"},
+            format="json",
+        )
+
+        self._auth(self.direction)
+        resp = self.client.patch(
+            f"/api/documents/documents/{doc_id}/", {"title": "Modifié"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["title"], "Modifié")
+
+        self._auth(self.direction)
+        resp = self.client.post(
+            f"/api/documents/documents/{doc_id}/new_version/",
+            {"file": self._file(b"contenu v2")},
+            format="multipart",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+    def test_direction_cannot_write_without_grant(self):
+        resp = self._upload(self.comptable, title="Facture")
+        doc_id = resp.data["id"]
+        self._auth(self.direction)
+        resp = self.client.patch(
+            f"/api/documents/documents/{doc_id}/", {"title": "Hack"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_only_manager_can_edit_acl(self):
+        resp = self._upload(self.comptable, title="Facture")
+        doc_id = resp.data["id"]
+        self._auth(self.chef_service)
+        resp = self.client.post(
+            f"/api/documents/documents/{doc_id}/acl/",
+            {"user": self.rh.id, "permission": "deny"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    # ── RF-58 : ACL dossier avec héritage ──
+    def test_dossier_acl_deny_hides_subtree(self):
+        self._auth(self.admin)
+        parent = self.client.post(
+            "/api/documents/dossiers/", {"name": "Client X"}, format="json"
+        ).data
+        child = self.client.post(
+            "/api/documents/dossiers/",
+            {"name": "2026", "parent": parent["id"]},
+            format="json",
+        ).data
+        resp = self._upload(
+            self.admin,
+            title="Doc du client X",
+            dossier=Dossier.objects.get(id=child["id"]),
+        )
+        doc_id = resp.data["id"]
+
+        self._auth(self.admin)
+        self.client.post(
+            f"/api/documents/dossiers/{parent['id']}/acl/",
+            {"user": self.chef_service.id, "permission": "deny"},
+            format="json",
+        )
+
+        self._auth(self.chef_service)
+        self.assertNotIn(
+            parent["id"],
+            [d["id"] for d in self.client.get("/api/documents/dossiers/").data["results"]],
+        )
+        self.assertNotIn(
+            child["id"],
+            [d["id"] for d in self.client.get("/api/documents/dossiers/").data["results"]],
+        )
+        self.assertEqual(
+            self.client.get(f"/api/documents/documents/{doc_id}/").status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+        self._auth(self.comptable)
+        self.assertEqual(
+            self.client.get(f"/api/documents/documents/{doc_id}/").status_code,
+            status.HTTP_200_OK,
+        )
+
+    def test_dossier_acl_write_grant_allows_creation_in_subtree(self):
+        self._auth(self.admin)
+        parent = self.client.post(
+            "/api/documents/dossiers/", {"name": "Client Y"}, format="json"
+        ).data
+        child = self.client.post(
+            "/api/documents/dossiers/",
+            {"name": "2027", "parent": parent["id"]},
+            format="json",
+        ).data
+        self.client.post(
+            f"/api/documents/dossiers/{parent['id']}/acl/",
+            {"user": self.direction.id, "permission": "write"},
+            format="json",
+        )
+
+        resp = self._upload(
+            self.direction,
+            title="Créé par la direction",
+            dossier=Dossier.objects.get(id=child["id"]),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+    def test_direction_cannot_create_document_without_grant(self):
+        self._auth(self.direction)
+        resp = self._upload(self.direction, title="Interdit")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)

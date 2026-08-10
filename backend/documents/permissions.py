@@ -4,42 +4,47 @@ from rest_framework.permissions import BasePermission
 
 from users.models import User
 
+from .services import can_manage_acl, can_read_document, can_write_document, can_write_dossier
+
 WRITE_ROLES = (User.Role.ADMIN, User.Role.CHEF_SERVICE, User.Role.COMPTABLE)
 
 
 class DocumentPermission(BasePermission):
     """
-    Lecture : tout utilisateur authentifié.
-    Écriture : admin / chef de service / compta (matrice §3.3), ou le créateur du document.
-    Les droits fins par document / dossier (ACL) et la règle paie→RH arrivent avec
-    le module Sécurité (RF-57/58/33).
+    Lecture / écriture résolues via la matrice des rôles, la règle paie→RH
+    (RF-33) et les ACL document / dossier (RF-57/58).
+    La matrice des rôles pour la création est vérifiée dans perform_create
+    (l'ACL "write" peut ouvrir l'écriture sur un objet existant, ex. Direction).
     """
 
     def has_permission(self, request, view):
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-        if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-        return user.role in WRITE_ROLES or user.is_staff
+        return bool(request.user and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-        return user.role in WRITE_ROLES or user.is_staff or obj.created_by_id == user.id
+            return can_read_document(user, obj)
+        return can_write_document(user, obj)
 
 
 class DossierPermission(BasePermission):
-    """Les dossiers suivent la même règle que les documents."""
+    """Les dossiers suivent la matrice des rôles + ACL héritée (RF-58)."""
 
     def has_permission(self, request, view):
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-        if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-        return user.role in WRITE_ROLES or user.is_staff
+        return bool(request.user and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
-        return self.has_permission(request, view)
+        user = request.user
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return True
+        return can_write_dossier(user, obj)
+
+
+class CanManageACL(BasePermission):
+    """Gestion des ACL : admin / staff ou créateur de l'objet."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        return can_manage_acl(request.user, document=getattr(obj, "document", None), dossier=getattr(obj, "dossier", None))

@@ -185,3 +185,73 @@ class Document(models.Model):
     @property
     def is_checked_out(self):
         return self.checked_out_by_id is not None
+
+
+class DocumentAccess(models.Model):
+    """ACL au niveau document (RF-57) — outrepasse la matrice des rôles."""
+
+    class Permission(models.TextChoices):
+        READ = "read", "Lecture"
+        WRITE = "write", "Écriture"
+        DENY = "deny", "Refus explicite"
+
+    document = models.ForeignKey(
+        Document, on_delete=models.CASCADE, related_name="acl"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="document_acls"
+    )
+    permission = models.CharField(
+        max_length=10, choices=Permission.choices, default=Permission.READ
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Droit document (ACL)"
+        verbose_name_plural = "Droits document (ACL)"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document", "user"], name="uniq_document_access"
+            )
+        ]
+
+
+class DossierAccess(models.Model):
+    """ACL au niveau dossier / collection (RF-58) — hérité par les descendants."""
+
+    class Permission(models.TextChoices):
+        READ = "read", "Lecture"
+        WRITE = "write", "Écriture"
+        DENY = "deny", "Refus explicite"
+
+    dossier = models.ForeignKey(
+        Dossier, on_delete=models.CASCADE, related_name="acl"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="dossier_acls"
+    )
+    permission = models.CharField(
+        max_length=10, choices=Permission.choices, default=Permission.READ
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Droit dossier (ACL)"
+        verbose_name_plural = "Droits dossier (ACL)"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dossier", "user"], name="uniq_dossier_access"
+            )
+        ]

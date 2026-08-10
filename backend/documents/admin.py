@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Document, DocumentType, Dossier, Version
+from .models import Document, DocumentType, Dossier, DocumentAccess, DossierAccess, Version
 
 
 @admin.register(DocumentType)
@@ -29,3 +29,17 @@ class DocumentAdmin(admin.ModelAdmin):
     search_fields = ["title", "counterparty", "project", "reference", "sha256"]
     readonly_fields = ["id", "sha256", "current_version", "created_at", "updated_at"]
     inlines = [VersionInline]
+
+
+@admin.register(DocumentAccess)
+class DocumentAccessAdmin(admin.ModelAdmin):
+    list_display = ["document", "user", "permission", "granted_by", "created_at"]
+    list_filter = ["permission"]
+    search_fields = ["user__email", "document__title"]
+
+
+@admin.register(DossierAccess)
+class DossierAccessAdmin(admin.ModelAdmin):
+    list_display = ["dossier", "user", "permission", "granted_by", "created_at"]
+    list_filter = ["permission"]
+    search_fields = ["user__email", "dossier__name"]
