@@ -17,4 +17,5 @@ urlpatterns = [
     path("api/accounting/", include("accounting_kernel.urls")),
     path("api/integrations/", include("integrations.urls")),
     path("api/outbox/", include("outbox.urls")),
+    path("api/commercial/", include("commercial.urls")),
 ]

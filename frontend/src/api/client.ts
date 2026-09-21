@@ -82,4 +82,8 @@ export const api = {
   tasks: () => raw<import("../types").WorkflowTask[]>("/api/workflow/tasks/"),
   circuits: () => raw<import("../types").Circuit[]>("/api/workflow/circuits/"),
   notifications: () => raw<import("../types").NotificationItem[]>("/api/workflow/notifications/"),
+  opportunities: () =>
+    raw<import("../types").Paginated<import("../types").Opportunity>>("/api/commercial/opportunities/"),
+  pipeline: () =>
+    raw<import("../types").PipelineStats>("/api/commercial/opportunities/pipeline/"),
 };

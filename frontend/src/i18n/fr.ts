@@ -6,7 +6,8 @@ export const fr = {
   },
   nav: {
     dashboard: "Tableau de bord",
-    kanban: "Kanban M1 — Commercial",
+    pipeline: "Pipeline M1",
+    kanban: "Suivi commercial",
     circuits: "Circuits",
     notifications: "Notifications",
     documents: "Documents",
@@ -46,7 +47,7 @@ export const fr = {
     processedIn: "jours",
   },
   kanban: {
-    title: "Kanban M1 — Suivi commercial",
+    title: "Kanban — Suivi commercial",
     pending: "En attente",
     done: "Terminé",
     rejected: "Rejeté",
@@ -56,6 +57,19 @@ export const fr = {
     step: "Étape",
     due: "Échéance",
     overdue: "en retard",
+  },
+  pipeline: {
+    title: "Pipeline commercial (M1)",
+    prospection: "Prospection",
+    qualification: "Qualification",
+    offre: "Offre",
+    negociation: "Négociation",
+    gagne: "Gagnée",
+    perdu: "Perdue",
+    wonTotal: "Montant contracté",
+    conversion: "Taux de conversion",
+    activeSegments: "Segments actifs",
+    masked: "Montant restreint",
   },
   circuits: {
     title: "Circuits de validation",

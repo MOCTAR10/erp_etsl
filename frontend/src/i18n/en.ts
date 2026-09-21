@@ -6,7 +6,8 @@ export const en = {
   },
   nav: {
     dashboard: "Dashboard",
-    kanban: "Kanban M1 — Sales",
+    pipeline: "Pipeline M1",
+    kanban: "Sales tracking",
     circuits: "Circuits",
     notifications: "Notifications",
     documents: "Documents",
@@ -46,7 +47,7 @@ export const en = {
     processedIn: "days",
   },
   kanban: {
-    title: "Kanban M1 — Sales tracking",
+    title: "Kanban — Sales tracking",
     pending: "Pending",
     done: "Done",
     rejected: "Rejected",
@@ -56,6 +57,19 @@ export const en = {
     step: "Step",
     due: "Due",
     overdue: "overdue",
+  },
+  pipeline: {
+    title: "Sales pipeline (M1)",
+    prospection: "Prospecting",
+    qualification: "Qualification",
+    offre: "Offer",
+    negociation: "Negotiation",
+    gagne: "Won",
+    perdu: "Lost",
+    wonTotal: "Won amount",
+    conversion: "Conversion rate",
+    activeSegments: "Active segments",
+    masked: "Amount restricted",
   },
   circuits: {
     title: "Validation circuits",

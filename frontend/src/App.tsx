@@ -11,6 +11,7 @@ import { DashboardPage } from "./pages/Dashboard";
 import { KanbanPage } from "./pages/Kanban";
 import { LoginPage } from "./pages/Login";
 import { NotificationsPage } from "./pages/Notifications";
+import { PipelinePage } from "./pages/Pipeline";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const access = useAuth((s) => s.access);
@@ -48,6 +49,7 @@ export default function App() {
       >
         <Route index element={withPilot(<DashboardPage />)} />
         <Route path="kanban" element={withPilot(<KanbanPage />)} />
+        <Route path="pipeline" element={withPilot(<PipelinePage />)} />
         <Route path="circuits" element={<CircuitsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "accounting_kernel",
     "integrations",
     "outbox",
+    "commercial",
     "django_celery_beat",
     "django_celery_results",
 ]

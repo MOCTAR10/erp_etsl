@@ -6,6 +6,7 @@ import { MotionProvider } from "./Pilot";
 
 const NAV_KEYS = [
   ["/", "nav.dashboard"],
+  ["/pipeline", "nav.pipeline"],
   ["/kanban", "nav.kanban"],
   ["/circuits", "nav.circuits"],
   ["/notifications", "nav.notifications"],

@@ -77,3 +77,51 @@ export interface NotificationItem {
   step_name: string | null;
   created_at: string;
 }
+
+export interface Paginated<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export type OpportunityStage =
+  | "prospection"
+  | "qualification"
+  | "offre"
+  | "negociation"
+  | "gagne"
+  | "perdu";
+
+export interface Opportunity {
+  id: string;
+  code: string;
+  client: string | null;
+  client_name: string | null;
+  subject: string;
+  stage: OpportunityStage;
+  stage_label: string;
+  amount: string | null;
+  probability: number;
+  expected_close: string | null;
+  origin: string;
+  owner: string | null;
+  owner_name: string | null;
+  description: string;
+  won_date: string | null;
+  lost_reason: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PipelineByStage {
+  count: number;
+  total: number;
+}
+export interface PipelineStats {
+  by_stage: Record<string, PipelineByStage>;
+  conversion_rate: number;
+  won_total: number;
+  margin_by_segment: Record<string, { count: number; total_margin: number; total_amount: number }>;
+}
