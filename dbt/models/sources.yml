@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: etls_replica
+    description: "Réplica PostgreSQL du système primaire — lecture réservée au pipeline dbt (jamais le primaire)."
+    loader: dbt
+    schema: public
+    tables:
+      - name: documents_document
+      - name: documents_documenttype
+      - name: documents_version
+      - name: workflow_task
+      - name: workflow_circuit
+      - name: workflow_circuitstep
+      - name: users_user

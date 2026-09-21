@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: dm_documents
+    description: "Fiche document enrichie pour le BI (type, projet, montant, rétention, poids)."
+    columns:
+      - name: id
+        tests:
+          - not_null
+  - name: dm_workflow
+    description: "Tâches de workflow enrichies (circuit, étape, acteur, délais de traitement)."
+    columns:
+      - name: id
+        tests:
+          - not_null
+  - name: dm_retention
+    description: "KPIs de rétention sur 0/30/60/90 jours (alertes J-90/J-60/J-30)."
+    tests:
+      - not_null:
+          column_name: as_of_date
+  - name: dm_retention_alerts
+    description: "Liste des documents par fenêtre d'alerte de rétention (J30/J60/J90/EXPIRED)."
+    columns:
+      - name: id
+        tests:
+          - not_null
+      - name: alert_window
+        tests:
+          - not_null

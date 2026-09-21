@@ -11,8 +11,8 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env up -d
 #
 # Variables requises (shell ou .env) : DJANGO_SECRET_KEY, POSTGRES_PASSWORD,
-# POSTGRES_HOST (serveur dédié), MINIO_ROOT_PASSWORD, MINIO_ENDPOINT,
-# SUPERSET_SECRET_KEY, SUPERSET_DB_PASSWORD.
+# POSTGRES_HOST (serveur d�di�), POSTGRES_REPLICA_HOST (lecture BI/dbt),
+# MINIO_ROOT_PASSWORD, MINIO_ENDPOINT, SUPERSET_SECRET_KEY, SUPERSET_DB_PASSWORD.
 
 x-backend: &backend
   build:
@@ -40,7 +40,7 @@ x-backend: &backend
 services:
   web:
     <<: *backend
-    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]
     expose:
       - "8000"
 
@@ -50,7 +50,7 @@ services:
 
   celery-beat:
     <<: *backend
-    command: ["celery", "-A", "config", "beat", "-l", "info"]
+    command: ["sh", "-c", "python manage.py setup_beat_schedule && celery -A config beat -l info"]
 
   redis:
     image: redis:7-alpine
@@ -72,7 +72,7 @@ services:
   #   docker compose -f docker-compose.prod.yml exec superset superset fab create-admin
   #   docker compose -f docker-compose.prod.yml exec superset superset init
   superset:
-    image: apache/superset:latest
+    image: apache/superset:4.1.1
     container_name: etls_superset
     restart: unless-stopped
     environment:
@@ -90,6 +90,26 @@ services:
       - "80:80"
     depends_on:
       - web
+
+  # Pipelines dbt (Couche D) — lecture du RÉPLICA uniquement.
+  # Usage (one-shot, jamais lancé par `up`) :
+  #   docker compose -f docker-compose.prod.yml --env-file .env run --rm dbt run
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.8.9
+    profiles: ["dbt"]
+    working_dir: /usr/app
+    volumes:
+      - ./dbt:/usr/app
+      - ./dbt/profiles.yml:/root/.dbt/profiles.yml:ro
+    environment:
+      DBT_HOST: ${POSTGRES_REPLICA_HOST:?set POSTGRES_REPLICA_HOST}
+      DBT_PORT: ${POSTGRES_PORT:-5432}
+      DBT_USER: ${POSTGRES_USER:-etls}
+      DBT_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      DBT_DBNAME: ${POSTGRES_DB:-etls}
+      DBT_SCHEMA: ${DBT_SCHEMA:-dbt}
+    entrypoint: ["dbt"]
+    command: ["build"]
 
 volumes:
   redis_data:
