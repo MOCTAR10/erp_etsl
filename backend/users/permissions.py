@@ -31,3 +31,13 @@ def role_permission(*roles):
 
 IsAdmin = role_permission(User.Role.ADMIN)
 IsAdminOrDirection = role_permission(User.Role.ADMIN, User.Role.DIRECTION)
+
+
+class IsAdminOrStaff(BasePermission):
+    """Accès réservé à l'administration (staff ou rôle admin)."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        return user.is_staff or user.role == User.Role.ADMIN

@@ -4,7 +4,8 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core import mail
-from django.test import override_settings
+from django.core.management import call_command
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -356,3 +357,26 @@ class IntegrityAndNotificationsTests(APITestCase):
         self._auth(self.comptable)
         resp = self.client.get("/api/workflow/notifications/")
         self.assertEqual(len(resp.data["results"]), 0)
+
+
+class ManualCircuitsSeedTests(TestCase):
+    """Incrément 13a : les 4 circuits du MANUEL (RF-ERP-W1 à RF-ERP-W4)."""
+
+    CODES = {"circuit_adm_fin", "circuit_technique", "circuit_commercial", "circuit_rh"}
+
+    def test_seed_creates_four_circuits(self):
+        call_command("seed_manual_circuits")
+        self.assertEqual(
+            set(Circuit.objects.filter(code__in=self.CODES).values_list("code", flat=True)),
+            self.CODES,
+        )
+        for circuit in Circuit.objects.filter(code__in=self.CODES):
+            self.assertEqual(circuit.steps.count(), 3)
+            for step in circuit.steps.all():
+                self.assertIsNotNone(step.actor_role)
+
+    def test_seed_is_idempotent(self):
+        call_command("seed_manual_circuits")
+        count = CircuitStep.objects.count()
+        call_command("seed_manual_circuits")
+        self.assertEqual(CircuitStep.objects.count(), count)

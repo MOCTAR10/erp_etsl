@@ -41,6 +41,13 @@ INSTALLED_APPS = [
     "documents",
     "workflow",
     "reports",
+    "referentiels",
+    "registres",
+    "accounting_kernel",
+    "integrations",
+    "outbox",
+    "django_celery_beat",
+    "django_celery_results",
 ]
 
 MIDDLEWARE = [
@@ -165,6 +172,7 @@ CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # ── Emails (RF-34 : notifications) — console en dev, SMTP en prod via .env ──
 EMAIL_BACKEND = env(

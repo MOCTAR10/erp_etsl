@@ -2,13 +2,14 @@ import hashlib
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from workflow.models import Circuit
 
 from .models import AuditLog, Document, DocumentType, Dossier, DossierAccess, Version
+from .services import AMOUNT_ROLES, WRITE_ROLES, can_see_amount
 
 User = get_user_model()
 
@@ -653,3 +654,39 @@ class SearchAndFacetsTests(APITestCase):
         self._auth(self.comptable)
         resp = self.client.get("/api/documents/documents/facets/?search=telephone")
         self.assertEqual(resp.data["total"], 1)
+
+
+class RoleMatrixUnitTests(TestCase):
+    """Incrément 12 : la matrice RBAC couvre les 12 fonctions ETSL (sans I/O)."""
+
+    def _user(self, role):
+        return User(role=role)
+
+    def test_amount_roles(self):
+        for role in (
+            User.Role.ADMIN,
+            User.Role.COMPTABLE,
+            User.Role.FINANCE,
+            User.Role.DIRECTION,
+            User.Role.PDG,
+            User.Role.DGA,
+        ):
+            self.assertIn(role, AMOUNT_ROLES)
+            self.assertTrue(can_see_amount(self._user(role)))
+        for role in (User.Role.CHEF_SERVICE, User.Role.SECRETAIRE_GENERAL, User.Role.HSE):
+            self.assertNotIn(role, AMOUNT_ROLES)
+            self.assertFalse(can_see_amount(self._user(role)))
+
+    def test_write_roles_exclude_rh_and_direction(self):
+        for role in (
+            User.Role.SECRETAIRE_GENERAL,
+            User.Role.FINANCE,
+            User.Role.QAQC,
+            User.Role.HSE,
+            User.Role.LOGISTIQUE,
+            User.Role.MAINTENANCE,
+            User.Role.CHEF_ATELIER,
+        ):
+            self.assertIn(role, WRITE_ROLES)
+        self.assertNotIn(User.Role.RH, WRITE_ROLES)
+        self.assertNotIn(User.Role.DIRECTION, WRITE_ROLES)

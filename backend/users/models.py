@@ -33,11 +33,25 @@ class User(AbstractBaseUser, PermissionsMixin):
     """Utilisateur du système — identifié par email, rôles ETSL (RF-62)."""
 
     class Role(models.TextChoices):
-        ADMIN = "admin", "Administrateur"
-        DIRECTION = "direction", "Direction"
-        CHEF_SERVICE = "chef_service", "Chef de service"
-        COMPTABLE = "comptable", "Comptable"
-        RH = "rh", "RH"
+        # Rôle technique (hors 12 fonctions).
+        ADMIN = "admin", "Administrateur (technique)"
+        # 12 fonctions ETSL (MANUEL ch.2).
+        PDG = "pdg", "PDG"
+        DGA = "dga", "DGA"
+        SECRETAIRE_GENERAL = "secretaire_general", "Secrétariat Général"
+        DIRECTEUR_PROJETS = "directeur_projets", "Directeur Projets"
+        DIRECTEUR_OPERATIONS = "directeur_operations", "Directeur Opérations"
+        RH = "rh", "Ressources Humaines"
+        FINANCE = "finance", "Finance / Comptabilité / Contrôle de gestion"
+        QAQC = "qaqc", "QA/QC"
+        HSE = "hse", "HSE"
+        LOGISTIQUE = "logistique", "Logistique & Magasin"
+        MAINTENANCE = "maintenance", "Maintenance"
+        CHEF_ATELIER = "chef_atelier", "Chef d'atelier / chantier"
+        # Codes hérités (rétro-compatibilité des données existantes).
+        DIRECTION = "direction", "Direction (hérité)"
+        CHEF_SERVICE = "chef_service", "Chef de service (hérité)"
+        COMPTABLE = "comptable", "Comptable (hérité)"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, verbose_name="Adresse email")

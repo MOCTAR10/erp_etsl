@@ -2,11 +2,15 @@
 
 from rest_framework.permissions import BasePermission
 
-from users.models import User
+from users.permissions import IsAdminOrStaff  # noqa: F401  (ré-export historique)
 
-from .services import can_manage_acl, can_read_document, can_write_document, can_write_dossier
-
-WRITE_ROLES = (User.Role.ADMIN, User.Role.CHEF_SERVICE, User.Role.COMPTABLE)
+from .services import (  # noqa: F401  (WRITE_ROLES ré-exporté)
+    WRITE_ROLES,
+    can_manage_acl,
+    can_read_document,
+    can_write_document,
+    can_write_dossier,
+)
 
 
 class DocumentPermission(BasePermission):
@@ -48,13 +52,3 @@ class CanManageACL(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return can_manage_acl(request.user, document=getattr(obj, "document", None), dossier=getattr(obj, "dossier", None))
-
-
-class IsAdminOrStaff(BasePermission):
-    """Accès à la piste d'audit réservé à l'administration."""
-
-    def has_permission(self, request, view):
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-        return user.is_staff or user.role == User.Role.ADMIN

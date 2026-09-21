@@ -10,14 +10,38 @@ from users.models import User
 
 from .models import Document, Dossier, DocumentAccess, DossierAccess
 
-# Matrice §3.3 : écriture sur les documents courants.
-WRITE_ROLES = (User.Role.ADMIN, User.Role.CHEF_SERVICE, User.Role.COMPTABLE)
+# Matrice §3.3 : écriture sur les documents courants (12 fonctions + admin).
+# EXCLUSIONS volontaires : RH (lecture seule sur la paie, RF-33) et DIRECTION
+# (hérité : doit recevoir un droit explicite, cf. tests ACL).
+WRITE_ROLES = (
+    User.Role.ADMIN,
+    User.Role.SECRETAIRE_GENERAL,
+    User.Role.CHEF_SERVICE,
+    User.Role.COMPTABLE,
+    User.Role.FINANCE,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.DIRECTEUR_PROJETS,
+    User.Role.DIRECTEUR_OPERATIONS,
+    User.Role.QAQC,
+    User.Role.HSE,
+    User.Role.LOGISTIQUE,
+    User.Role.MAINTENANCE,
+    User.Role.CHEF_ATELIER,
+)
 
 # RF-33 : rôles autorisés sur un type restreint (paie).
 RESTRICTED_ROLES = (User.Role.ADMIN, User.Role.RH)
 
-# RF-59 : rôles autorisés à voir le montant.
-AMOUNT_ROLES = (User.Role.ADMIN, User.Role.COMPTABLE, User.Role.DIRECTION)
+# RF-59 : rôles autorisés à voir le montant (chef_service volontairement exclu).
+AMOUNT_ROLES = (
+    User.Role.ADMIN,
+    User.Role.COMPTABLE,
+    User.Role.FINANCE,
+    User.Role.DIRECTION,
+    User.Role.PDG,
+    User.Role.DGA,
+)
 
 
 def is_admin_or_staff(user):
