@@ -125,3 +125,39 @@ export interface PipelineStats {
   won_total: number;
   margin_by_segment: Record<string, { count: number; total_margin: number; total_amount: number }>;
 }
+
+export type PoStatus =
+  | "brouillon"
+  | "confirmee"
+  | "partielle"
+  | "cloturee"
+  | "annulee"
+  | "previ";
+export type ReceiptStatus = "en_attente" | "valide" | "annule";
+
+export interface ConformityRow {
+  label: string;
+  ordered: number;
+  received: number;
+  invoiced: number;
+  ok: boolean;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  code: string;
+  supplier: string | null;
+  supplier_name: string | null;
+  request: string | null;
+  request_code: string | null;
+  order_date: string;
+  expected_date: string | null;
+  status: PoStatus;
+  status_label: string;
+  is_global_rental: boolean;
+  total: string | null;
+  conformity: ConformityRow[];
+  lines_count: number;
+  created_by_name: string | null;
+  created_at: string;
+}

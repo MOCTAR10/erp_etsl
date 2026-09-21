@@ -47,6 +47,12 @@ async function postForm<T>(path: string, body: Record<string, string>): Promise<
   return (await res.json()) as T;
 }
 
+/** Dépagination : les listes DRF sont paginées par défaut (count/results). */
+async function rawList<T>(path: string): Promise<T[]> {
+  const page = await raw<import("../types").Paginated<T>>(path);
+  return page.results;
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -79,11 +85,13 @@ export const api = {
   get: <T,>(path: string) => raw<T>(path),
   me: () => raw<Me>("/api/users/me/"),
   dashboard: () => raw<import("../types").DashboardData>("/api/reports/dashboard/"),
-  tasks: () => raw<import("../types").WorkflowTask[]>("/api/workflow/tasks/"),
-  circuits: () => raw<import("../types").Circuit[]>("/api/workflow/circuits/"),
-  notifications: () => raw<import("../types").NotificationItem[]>("/api/workflow/notifications/"),
+  tasks: () => rawList<import("../types").WorkflowTask>("/api/workflow/tasks/"),
+  circuits: () => rawList<import("../types").Circuit>("/api/workflow/circuits/"),
+  notifications: () => rawList<import("../types").NotificationItem>("/api/workflow/notifications/"),
   opportunities: () =>
     raw<import("../types").Paginated<import("../types").Opportunity>>("/api/commercial/opportunities/"),
   pipeline: () =>
     raw<import("../types").PipelineStats>("/api/commercial/opportunities/pipeline/"),
+  purchaseOrders: (params = "") =>
+    raw<import("../types").Paginated<import("../types").PurchaseOrder>>(`/api/achats/orders/${params}`),
 };
