@@ -619,3 +619,233 @@ export interface PvControle {
   validated_by_name: string | null;
   notes: string;
 }
+
+export type TypePermis =
+  | "chaud"
+  | "hauteur"
+  | "levage"
+  | "confine"
+  | "atex"
+  | "froid"
+  | "electrique"
+  | "fouille"
+  | "chimique";
+export type StatutPermis = "demande" | "valide" | "actif" | "cloture" | "refuse" | "annule";
+
+export interface PermisTravail {
+  id: string;
+  code: string;
+  type_permis: TypePermis;
+  type_label: string;
+  affaire: string | null;
+  affaire_code: string | null;
+  ordre: string | null;
+  ordre_code: string | null;
+  emplacement: string;
+  description: string;
+  mesures: string;
+  demandeur: string | null;
+  demandeur_name: string | null;
+  validateur: string | null;
+  validateur_name: string | null;
+  date_debut: string;
+  date_fin: string | null;
+  statut: StatutPermis;
+  statut_label: string;
+  date_validation: string | null;
+  date_cloture: string | null;
+  notes: string;
+}
+
+export type CriticiteRisque = "faible" | "moyenne" | "elevee" | "critique";
+export type StatutRisque = "ouverte" | "traitee" | "cloturee";
+
+export interface EvaluationRisque {
+  id: string;
+  code: string;
+  lieux: string;
+  activite: string;
+  description: string;
+  probabilite: number;
+  gravite: number;
+  score: number;
+  criticite: CriticiteRisque;
+  mesure: string;
+  responsable: string | null;
+  responsable_name: string | null;
+  affaire: string | null;
+  affaire_code: string | null;
+  statut: StatutRisque;
+  statut_label: string;
+}
+
+export type TypeIncident =
+  | "incident"
+  | "accident"
+  | "quasi_accident"
+  | "blessure"
+  | "depart_feu"
+  | "pollution"
+  | "deversement"
+  | "dommage_materiel"
+  | "situation_dangereuse";
+export type GraviteIncident = "mineure" | "majeure" | "critique";
+export type StatutIncident = "declare" | "en_enquete" | "plan_action" | "cloture";
+
+export interface Incident {
+  id: string;
+  code: string;
+  type_incident: TypeIncident;
+  type_label: string;
+  gravite: GraviteIncident;
+  gravite_label: string;
+  date_evenement: string;
+  lieu: string;
+  description: string;
+  personnes_impliquees: string;
+  cause_immediate: string;
+  cause_profonde: string;
+  consequences: string;
+  rapport: string;
+  statut: StatutIncident;
+  statut_label: string;
+  archive: boolean;
+  enqueteur_name: string | null;
+  date_ouverture_enquete: string | null;
+  date_rapport: string | null;
+  actions_count: number;
+}
+
+export type TypeActionHse = "corrective" | "preventive";
+export type StatutActionHse = "ouverte" | "en_cours" | "cloturee";
+
+export interface ActionHse {
+  id: string;
+  code: string;
+  incident: string | null;
+  incident_code: string | null;
+  risque: string | null;
+  risque_code: string | null;
+  type: TypeActionHse;
+  type_label: string;
+  description: string;
+  responsable: string | null;
+  responsable_name: string | null;
+  echeance: string | null;
+  statut: StatutActionHse;
+  statut_label: string;
+  efficace: boolean | null;
+  closed_at: string | null;
+}
+
+export type StatutAtex = "disponible" | "quarantaine" | "ecarte";
+
+export interface EquipementAtex {
+  id: string;
+  code: string;
+  designation: string;
+  zone_atex: string;
+  marquage: string;
+  fabricant: string;
+  numero_serie: string;
+  certificat: string;
+  date_expiration_certificat: string | null;
+  certificat_expire: boolean;
+  date_derniere_inspection: string | null;
+  prochaine_inspection: string | null;
+  statut: StatutAtex;
+  statut_label: string;
+  notes: string;
+}
+
+export type TypeFormation = "formation" | "demonstration" | "causerie" | "exercice" | "campagne" | "recyclage";
+export type StatutFormation = "planifiee" | "realisee" | "annulee";
+
+export interface FormationSecurite {
+  id: string;
+  code: string;
+  type_session: TypeFormation;
+  type_label: string;
+  theme: string;
+  formateur: string;
+  organisme: string;
+  date_session: string;
+  duree_heures: string;
+  nb_participants: number;
+  evalue: boolean;
+  statut: StatutFormation;
+  statut_label: string;
+  notes: string;
+}
+
+export type TypeEpi =
+  | "casque"
+  | "lunettes"
+  | "ecran_facial"
+  | "protection_auditive"
+  | "gants"
+  | "chaussures"
+  | "veste_haute_visibilite"
+  | "harnais"
+  | "masque"
+  | "baudrier";
+export type StatutEpi = "en_usage" | "disponible" | "rendu" | "hors_service";
+
+export interface Epi {
+  id: string;
+  code: string;
+  type_epi: TypeEpi;
+  type_label: string;
+  designation: string;
+  taille: string;
+  beneficiaire: string | null;
+  beneficiaire_name: string | null;
+  date_dotation: string;
+  date_renouvellement: string | null;
+  a_renouveler: boolean;
+  statut: StatutEpi;
+  statut_label: string;
+  notes: string;
+}
+
+export type TypeDechet =
+  | "huiles"
+  | "solvants"
+  | "batteries"
+  | "peintures"
+  | "dib"
+  | "deee"
+  | "metaux"
+  | "papier_carton";
+export type StatutBSD = "en_attente" | "emis" | "traite";
+
+export interface BordereauDechet {
+  id: string;
+  code: string;
+  type_dechet: TypeDechet;
+  type_label: string;
+  quantite: string;
+  unite: string;
+  unite_label: string;
+  transporteur: string | null;
+  transporteur_name: string | null;
+  numero_bsd: string;
+  date_enlevement: string | null;
+  destination: string;
+  statut: StatutBSD;
+  statut_label: string;
+  notes: string;
+}
+
+export interface HseStats {
+  jours_sans_accident: number | null;
+  incidents_ouverts: number;
+  incidents_critiques: number;
+  actions_ouvertes: number;
+  permis_actifs: number;
+  risques_critiques: number;
+  epi_a_renouveler: number;
+  formations_prevues: number;
+  bsd_en_attente: number;
+  atex_quarantaine: number;
+}

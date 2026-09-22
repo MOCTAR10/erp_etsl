@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "logistique",
     "stocks",
     "qualite",
+    "hse",
     "django_celery_beat",
     "django_celery_results",
 ]

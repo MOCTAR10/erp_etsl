@@ -134,4 +134,21 @@ export const api = {
     raw<import("../types").Paginated<import("../types").NonConformite>>(`/api/qualite/non-conformites/${params}`),
   actionsCorrectives: (params = "") =>
     raw<import("../types").Paginated<import("../types").ActionCorrective>>(`/api/qualite/actions-correctives/${params}`),
+  hseStats: () => raw<import("../types").HseStats>("/api/hse/incidents/stats/"),
+  permis: (params = "") =>
+    raw<import("../types").Paginated<import("../types").PermisTravail>>(`/api/hse/permis/${params}`),
+  incidents: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Incident>>(`/api/hse/incidents/${params}`),
+  risquesHse: (params = "") =>
+    raw<import("../types").Paginated<import("../types").EvaluationRisque>>(`/api/hse/evaluations-risques/${params}`),
+  equipementsAtex: (params = "") =>
+    raw<import("../types").Paginated<import("../types").EquipementAtex>>(`/api/hse/equipements-atex/${params}`),
+  actionsHse: (params = "") =>
+    raw<import("../types").Paginated<import("../types").ActionHse>>(`/api/hse/actions/${params}`),
+  formationsHse: (params = "") =>
+    raw<import("../types").Paginated<import("../types").FormationSecurite>>(`/api/hse/formations/${params}`),
+  episHse: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Epi>>(`/api/hse/epis/${params}`),
+  bordereauxDechets: (params = "") =>
+    raw<import("../types").Paginated<import("../types").BordereauDechet>>(`/api/hse/bordereaux-dechets/${params}`),
 };
