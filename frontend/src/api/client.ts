@@ -99,4 +99,11 @@ export const api = {
   charge: () => raw<import("../types").ChargeStats>("/api/operations/ordres/charge/"),
   situations: (params = "") =>
     raw<import("../types").Paginated<import("../types").SituationTravaux>>(`/api/operations/situations/${params}`),
+  equipements: (params = "") =>
+    raw<import("../types").Paginated<import("../types").EquipementParc>>(`/api/logistique/equipements/${params}`),
+  locationsGR: (params = "") =>
+    raw<import("../types").Paginated<import("../types").LocationGR>>(`/api/logistique/locations/${params}`),
+  demandesLog: (params = "") =>
+    raw<import("../types").Paginated<import("../types").DemandeMobilisation>>(`/api/logistique/demandes/${params}`),
+  parcStats: () => raw<import("../types").ParcStats>("/api/logistique/locations/stats/"),
 };

@@ -230,3 +230,98 @@ export interface ChargeStats {
     chantier: { calculated: number; pointed: number; count: number };
   };
 }
+
+export type EquipementStatut =
+  | "disponible"
+  | "affecte"
+  | "en_location"
+  | "hors_service"
+  | "maintenance";
+
+export interface EquipementParc {
+  id: string;
+  code: string;
+  label: string;
+  registration: string;
+  categorie: string;
+  categorie_label: string;
+  statut: EquipementStatut;
+  statut_label: string;
+  compteur_type: string;
+  compteur_type_label: string;
+  compteur_value: string;
+  site: string;
+  is_global_rental: boolean;
+  proprietaire: string | null;
+  proprietaire_code: string | null;
+  proprietaire_gr: boolean | null;
+  signe_618: boolean;
+}
+
+export interface DemandeMobilisation {
+  id: string;
+  code: string;
+  label: string;
+  affaire: string | null;
+  affaire_code: string | null;
+  ordre: string | null;
+  departement: string;
+  date_debut: string | null;
+  date_fin: string | null;
+  notes: string;
+  statut: string;
+  statut_label: string;
+}
+
+export interface LocationGR {
+  id: string;
+  code: string;
+  partenaire: string | null;
+  partenaire_name: string | null;
+  equipement: string;
+  equipement_code: string;
+  equipement_label: string;
+  affaire: string | null;
+  affaire_code: string | null;
+  reference_bc: string;
+  reference_gr: string;
+  reference_bl: string;
+  date_debut: string | null;
+  date_fin: string | null;
+  periodicite: string;
+  periodicite_label: string;
+  tarif: string;
+  devise: string | null;
+  devise_code: string | null;
+  montant_estime: string | null;
+  lecture_initiale: string | null;
+  lecture_finale: string | null;
+  consommation: string | null;
+  imputation_618: boolean;
+  statut: string;
+  statut_label: string;
+  lectures_count: number;
+}
+
+export interface ParcStats {
+  parc: {
+    total: number;
+    par_statut: Record<string, number>;
+    global_rental: number;
+    propre: number;
+  };
+  locations: {
+    actives: number;
+    total_montant_estime: number;
+    rows: Array<{
+      code: string;
+      equipement: string | null;
+      partenaire: string | null;
+      affaire_code: string | null;
+      montant_estime: number;
+      devise: string | null;
+      consommation: number;
+      fin: string | null;
+    }>;
+  };
+}

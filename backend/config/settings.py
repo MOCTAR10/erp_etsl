@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "commercial",
     "achats",
     "operations",
+    "logistique",
     "django_celery_beat",
     "django_celery_results",
 ]
