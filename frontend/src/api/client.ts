@@ -179,4 +179,18 @@ export const api = {
     raw<import("../types").Paginated<import("../types").BulletinPaie>>(`/api/rh-paie/bulletins/${params}`),
   masseSalariale: (params = "") =>
     raw<import("../types").MasseSalariale>(`/api/rh-paie/bulletins/masse/${params}`),
+  comptesBancaires: (params = "") =>
+    raw<import("../types").Paginated<import("../types").CompteBancaire>>(`/api/comptabilite/comptes-bancaires/${params}`),
+  relevesBancaires: (params = "") =>
+    raw<import("../types").Paginated<import("../types").ReleveBancaire>>(`/api/comptabilite/releves/${params}`),
+  rapprochements: (params = "") =>
+    raw<import("../types").Paginated<import("../types").RapprochementBancaire>>(`/api/comptabilite/rapprochements/${params}`),
+  engagements: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Engagement>>(`/api/comptabilite/engagements/${params}`),
+  paiements: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Paiement>>(`/api/comptabilite/paiements/${params}`),
+  declarationsTva: (params = "") =>
+    raw<import("../types").Paginated<import("../types").DeclarationTva>>(`/api/comptabilite/declarations-tva/${params}`),
+  controlesCompta: (params = "") =>
+    raw<import("../types").Paginated<import("../types").ControleInterne>>(`/api/comptabilite/controles/${params}`),
 };

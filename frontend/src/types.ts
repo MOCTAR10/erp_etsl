@@ -1239,3 +1239,155 @@ export interface MasseSalariale {
   brut_total: string;
   net_total: string;
 }
+
+export type StatutReleve = "importe" | "valide";
+export type StatutRapprochement = "brouillon" | "valide";
+export type StatutEngagement = "brouillon" | "soumis" | "approuve" | "annule";
+export type StatutPaiement = "brouillon" | "valide" | "annule";
+export type StatutDeclarationTva = "brouillon" | "deposee";
+export type StatutControleCompta = "planifie" | "realise" | "cloture";
+
+export interface CompteBancaire {
+  id: string;
+  code: string;
+  label: string;
+  banque: string;
+  numero: string;
+  compte_comptable: string;
+  compte_comptable_code: string;
+  devise: string | null;
+  devise_code: string | null;
+  solde_initial: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LigneReleve {
+  id: string;
+  releve: string;
+  date: string;
+  libelle: string;
+  reference: string;
+  debit: string;
+  credit: string;
+  rapprochee: boolean;
+}
+
+export interface ReleveBancaire {
+  id: string;
+  code: string;
+  compte_bancaire: string;
+  compte_bancaire_label: string;
+  date_debut: string;
+  date_fin: string;
+  solde_initial: string;
+  solde_final: string;
+  statut: StatutReleve;
+  statut_label: string;
+  source: string;
+  source_label: string;
+  total_debit: string;
+  total_credit: string;
+  lignes: LigneReleve[];
+  created_at: string;
+}
+
+export interface RapprochementBancaire {
+  id: string;
+  code: string;
+  compte_bancaire: string;
+  compte_bancaire_label: string;
+  date: string;
+  statut: StatutRapprochement;
+  statut_label: string;
+  notes: string;
+  lignes: {
+    id: string;
+    ligne_releve: string;
+    ligne_libelle: string;
+    ligne_date: string;
+    debit: string;
+    credit: string;
+  }[];
+  created_at: string;
+}
+
+export interface Engagement {
+  id: string;
+  code: string;
+  objet: string;
+  montant: string;
+  compte_depense: string | null;
+  compte_depense_code: string | null;
+  fournisseur: string | null;
+  fournisseur_name: string | null;
+  statut: StatutEngagement;
+  statut_label: string;
+  date_engagement: string | null;
+  demande_par: string | null;
+  demande_par_name: string | null;
+  total_paye: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Paiement {
+  id: string;
+  code: string;
+  sens: "sortie" | "entree";
+  sens_label: string;
+  mode: string;
+  mode_label: string;
+  montant: string | null;
+  date: string;
+  compte_bancaire: string;
+  compte_bancaire_label: string;
+  engagement: string | null;
+  engagement_code: string | null;
+  tiers: string | null;
+  tiers_name: string | null;
+  facture: string | null;
+  facture_code: string | null;
+  imputation_618: boolean;
+  reference: string;
+  statut: StatutPaiement;
+  statut_label: string;
+  move: string | null;
+  move_number: string | null;
+  has_amount_access: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeclarationTva {
+  id: string;
+  code: string;
+  mois: string;
+  taux_tva: string;
+  taux_tva_code: string;
+  base_imposable: string | null;
+  tva_collectee: string | null;
+  tva_deductible: string | null;
+  net_a_payer: string | null;
+  statut: StatutDeclarationTva;
+  statut_label: string;
+  has_amount_access: boolean;
+  created_at: string;
+}
+
+export interface ControleInterne {
+  id: string;
+  code: string;
+  libelle: string;
+  reference_procedure: string;
+  statut: StatutControleCompta;
+  statut_label: string;
+  responsable: string | null;
+  responsable_name: string | null;
+  date_prevue: string | null;
+  date_realise: string | null;
+  constat: string;
+  created_at: string;
+  updated_at: string;
+}

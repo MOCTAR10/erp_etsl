@@ -18,6 +18,7 @@ import { QualitePage } from "./pages/Qualite";
 import { HsePage } from "./pages/Hse";
 import { MaintenancePage } from "./pages/Maintenance";
 import { RhPaiePage } from "./pages/RhPaie";
+import { ComptabilitePage } from "./pages/Comptabilite";
 import { PipelinePage } from "./pages/Pipeline";
 import { PurchasesPage } from "./pages/Purchases";
 
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="hse" element={withPilot(<HsePage />)} />
         <Route path="maintenance" element={withPilot(<MaintenancePage />)} />
         <Route path="rh-paie" element={withPilot(<RhPaiePage />)} />
+        <Route path="comptabilite" element={withPilot(<ComptabilitePage />)} />
         <Route path="circuits" element={<CircuitsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>
