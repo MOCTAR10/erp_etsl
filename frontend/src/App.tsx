@@ -11,6 +11,7 @@ import { DashboardPage } from "./pages/Dashboard";
 import { KanbanPage } from "./pages/Kanban";
 import { LoginPage } from "./pages/Login";
 import { NotificationsPage } from "./pages/Notifications";
+import { OperationsPage } from "./pages/Operations";
 import { PipelinePage } from "./pages/Pipeline";
 import { PurchasesPage } from "./pages/Purchases";
 
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="kanban" element={withPilot(<KanbanPage />)} />
         <Route path="pipeline" element={withPilot(<PipelinePage />)} />
         <Route path="purchases" element={withPilot(<PurchasesPage />)} />
+        <Route path="operations" element={withPilot(<OperationsPage />)} />
         <Route path="circuits" element={<CircuitsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>

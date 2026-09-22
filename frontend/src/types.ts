@@ -161,3 +161,72 @@ export interface PurchaseOrder {
   created_by_name: string | null;
   created_at: string;
 }
+
+export type OfStatus =
+  | "prevu"
+  | "lance"
+  | "en_cours"
+  | "termine"
+  | "cloture"
+  | "annule";
+export type OfScope = "atelier" | "chantier";
+
+export interface OrdreFabrication {
+  id: string;
+  code: string;
+  label: string;
+  affaire: string | null;
+  affaire_code: string | null;
+  gamme: string | null;
+  gamme_code: string | null;
+  scope: OfScope;
+  scope_label: string;
+  article: string | null;
+  article_code: string | null;
+  quantity: string;
+  status: OfStatus;
+  status_label: string;
+  planned_start: string | null;
+  planned_end: string | null;
+  calculated_hours: string;
+  responsible: string | null;
+  responsible_name: string | null;
+  pointage_hours: string;
+  pointages_count: number;
+  created_at: string;
+}
+
+export interface SituationTravaux {
+  id: string;
+  code: string;
+  affaire: string | null;
+  affaire_code: string | null;
+  label: string;
+  period_start: string;
+  period_end: string;
+  amount: string | null;
+  progress: number;
+  status: string;
+  status_label: string;
+  ordres_count: number;
+  ordered_hours: string;
+  created_by_name: string | null;
+  validated_by_name: string | null;
+  validated_at: string | null;
+}
+
+export interface ChargeRow {
+  code: string;
+  label: string;
+  scope: OfScope;
+  status: OfStatus;
+  calculated_hours: number;
+  pointed_hours: number;
+}
+export interface ChargeStats {
+  ordres: ChargeRow[];
+  totals: {
+    atelier: { calculated: number; pointed: number; count: number };
+    chantier: { calculated: number; pointed: number; count: number };
+  };
+}

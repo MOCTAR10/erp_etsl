@@ -94,4 +94,9 @@ export const api = {
     raw<import("../types").PipelineStats>("/api/commercial/opportunities/pipeline/"),
   purchaseOrders: (params = "") =>
     raw<import("../types").Paginated<import("../types").PurchaseOrder>>(`/api/achats/orders/${params}`),
+  ordres: (params = "") =>
+    raw<import("../types").Paginated<import("../types").OrdreFabrication>>(`/api/operations/ordres/${params}`),
+  charge: () => raw<import("../types").ChargeStats>("/api/operations/ordres/charge/"),
+  situations: (params = "") =>
+    raw<import("../types").Paginated<import("../types").SituationTravaux>>(`/api/operations/situations/${params}`),
 };

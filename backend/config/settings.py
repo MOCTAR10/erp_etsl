@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "outbox",
     "commercial",
     "achats",
+    "operations",
     "django_celery_beat",
     "django_celery_results",
 ]
