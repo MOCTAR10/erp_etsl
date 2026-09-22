@@ -151,4 +151,11 @@ export const api = {
     raw<import("../types").Paginated<import("../types").Epi>>(`/api/hse/epis/${params}`),
   bordereauxDechets: (params = "") =>
     raw<import("../types").Paginated<import("../types").BordereauDechet>>(`/api/hse/bordereaux-dechets/${params}`),
+  maintenanceStats: () => raw<import("../types").MaintenanceStats>("/api/maintenance/ordres/stats/"),
+  actifs: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Actif>>(`/api/maintenance/actifs/${params}`),
+  ordresTravail: (params = "") =>
+    raw<import("../types").Paginated<import("../types").OrdreTravail>>(`/api/maintenance/ordres/${params}`),
+  inspections: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Inspection>>(`/api/maintenance/inspections/${params}`),
 };

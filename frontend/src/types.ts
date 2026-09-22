@@ -849,3 +849,139 @@ export interface HseStats {
   bsd_en_attente: number;
   atex_quarantaine: number;
 }
+
+export type CategorieActif =
+  | "machine"
+  | "engin"
+  | "levage"
+  | "atelier"
+  | "chantier"
+  | "outillage";
+export type StatutActif =
+  | "operationnel"
+  | "en_maintenance"
+  | "en_panne"
+  | "hors_service"
+  | "reforme";
+export type TypeCompteurActif = "heures" | "km" | "aucun";
+
+export interface Actif {
+  id: string;
+  code: string;
+  designation: string;
+  categorie: CategorieActif;
+  categorie_label: string;
+  fabricant: string;
+  modele: string;
+  numero_serie: string;
+  site: string;
+  statut: StatutActif;
+  statut_label: string;
+  en_arret: boolean;
+  date_mise_en_service: string | null;
+  garanti_jusqu: string | null;
+  compteur_type: TypeCompteurActif;
+  compteur_type_label: string;
+  compteur_value: string;
+  compteur_lecture: string | null;
+  is_global_rental: boolean;
+  equipement_gr: string | null;
+  equipe_gr_code: string | null;
+  signe_618: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TypeOT = "correctif" | "preventif" | "urgence" | "inspection";
+export type PrioriteOT = "basse" | "moyenne" | "haute" | "critique";
+export type StatutOT =
+  | "demande"
+  | "planifie"
+  | "en_cours"
+  | "termine"
+  | "cloture"
+  | "annule";
+export type DecisionOT = "reparation" | "mise_hors_service" | "reforme";
+
+export interface OrdreTravail {
+  id: string;
+  code: string;
+  actif: string;
+  actif_code: string;
+  actif_designation: string;
+  type_ot: TypeOT;
+  type_label: string;
+  priorite: PrioriteOT;
+  priorite_label: string;
+  description: string;
+  cause: string;
+  demandeur: string | null;
+  demandeur_name: string | null;
+  technicien: string | null;
+  technicien_name: string | null;
+  date_demande: string;
+  date_planifiee: string | null;
+  date_debut: string | null;
+  date_fin: string | null;
+  heures_mo: string | null;
+  tarif_horaire: string | null;
+  cout_pieces: string | null;
+  cout_main_oeuvre: string | null;
+  cout_total: string | null;
+  has_amount_access: boolean;
+  decision: DecisionOT | "";
+  decision_label: string | null;
+  rapport: string;
+  statut: StatutOT;
+  statut_label: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TypeInspection =
+  | "visuelle"
+  | "fonctionnelle"
+  | "securite"
+  | "levage"
+  | "atex"
+  | "metrologie";
+export type ResultatInspection = "conforme" | "sous_reserve" | "non_conforme";
+export type StatutInspection = "planifiee" | "realisee" | "annulee";
+
+export interface Inspection {
+  id: string;
+  code: string;
+  actif: string;
+  actif_code: string;
+  actif_designation: string;
+  type_inspection: TypeInspection;
+  type_label: string;
+  date_inspection: string;
+  prochaine_inspection: string | null;
+  organisme: string;
+  organisme_libelle: string;
+  resultat: ResultatInspection | "";
+  resultat_label: string | null;
+  constat: string;
+  intervenant: string | null;
+  intervenant_name: string | null;
+  statut: StatutInspection;
+  statut_label: string;
+  ot_genere: string | null;
+  ot_genere_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MaintenanceStats {
+  ot_ouverts: number;
+  ot_en_cours: number;
+  ot_critiques: number;
+  actifs_arret: number;
+  actifs_operationnels: number;
+  inspections_prevues: number;
+  cout_total: number;
+  heures_total: number;
+}
