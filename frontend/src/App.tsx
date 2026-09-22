@@ -13,6 +13,7 @@ import { LoginPage } from "./pages/Login";
 import { NotificationsPage } from "./pages/Notifications";
 import { OperationsPage } from "./pages/Operations";
 import { LogistiquePage } from "./pages/Logistique";
+import { StocksPage } from "./pages/Stocks";
 import { PipelinePage } from "./pages/Pipeline";
 import { PurchasesPage } from "./pages/Purchases";
 
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="purchases" element={withPilot(<PurchasesPage />)} />
         <Route path="operations" element={withPilot(<OperationsPage />)} />
         <Route path="logistique" element={withPilot(<LogistiquePage />)} />
+        <Route path="stocks" element={withPilot(<StocksPage />)} />
         <Route path="circuits" element={<CircuitsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>

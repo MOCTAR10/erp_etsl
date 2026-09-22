@@ -325,3 +325,128 @@ export interface ParcStats {
     }>;
   };
 }
+
+export interface Depot {
+  id: string;
+  code: string;
+  label: string;
+  site: string;
+  responsable: string | null;
+  responsable_label: string | null;
+  description: string;
+  is_active: boolean;
+}
+
+export type LotStatut = "disponible" | "partiel" | "epuise" | "bloque";
+
+export interface LotMatiere {
+  id: string;
+  code: string;
+  article: string;
+  article_code: string | null;
+  article_label: string | null;
+  numero_lot: string;
+  date_reception: string;
+  date_peremption: string | null;
+  quantite_initiale: string;
+  quantite_restante: string;
+  statut: LotStatut;
+  certificats: string[];
+}
+
+export interface CertificatMatiere {
+  id: string;
+  code: string;
+  lot: string;
+  lot_code: string | null;
+  article_code: string | null;
+  type: "mtc" | "coc";
+  numero_certificat: string;
+  organisme: string;
+  date_emission: string | null;
+  date_validation: string | null;
+  conforme: boolean;
+}
+
+export interface StockQuant {
+  id: string;
+  depot: string;
+  depot_code: string;
+  article: string;
+  article_code: string;
+  article_label: string;
+  lot: string | null;
+  lot_code: string | null;
+  quantity: string;
+  unit_cost: number;
+  stock_value: string | null;
+  has_amount_access: boolean;
+}
+
+export interface MouvementStock {
+  id: string;
+  code: string;
+  type_mouvement: "reception" | "transfert" | "consommation" | "retour" | "inventaire";
+  type_label: string;
+  article: string;
+  article_code: string | null;
+  article_label: string | null;
+  quantite: string;
+  prix_unitaire: string | null;
+  source: string | null;
+  source_code: string | null;
+  destination: string | null;
+  destination_code: string | null;
+  lot: string | null;
+  lot_code: string | null;
+  ordre: string | null;
+  ordre_code: string | null;
+  document_reference: string;
+  date: string;
+  executed: boolean;
+  montant_total: string | null;
+  has_amount_access: boolean;
+  notes: string;
+}
+
+export interface Inventaire {
+  id: string;
+  code: string;
+  depot: string;
+  depot_label: string;
+  date: string;
+  statut: "brouillon" | "en_cours" | "cloture" | "annule";
+  responsable: string | null;
+  responsable_label: string | null;
+  note: string;
+  ecart_total: string;
+  lignes: Array<{
+    id: string;
+    article_code: string | null;
+    article_label: string | null;
+    lot_code: string | null;
+    quantite_systeme: string;
+    quantite_reelle: string;
+    ecart: string;
+  }>;
+  created_at: string;
+}
+
+export interface ValorisationRow {
+  depot: string;
+  article: string;
+  label: string;
+  quantity: number;
+  value: number;
+  unit_cost: number;
+  method: "fifo" | "peps" | "cump" | "pp";
+  lot: string | null;
+}
+
+export interface StocksKpis {
+  depots: number;
+  lots: number;
+  quants: number;
+  value: number;
+  has_amount_access: boolean;
+}

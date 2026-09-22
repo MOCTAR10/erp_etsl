@@ -10,6 +10,7 @@ const NAV_KEYS = [
   ["/purchases", "nav.purchases"],
   ["/operations", "nav.operations"],
   ["/logistique", "nav.logistique"],
+  ["/stocks", "nav.stocks"],
   ["/kanban", "nav.kanban"],
   ["/circuits", "nav.circuits"],
   ["/notifications", "nav.notifications"],

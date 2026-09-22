@@ -106,4 +106,18 @@ export const api = {
   demandesLog: (params = "") =>
     raw<import("../types").Paginated<import("../types").DemandeMobilisation>>(`/api/logistique/demandes/${params}`),
   parcStats: () => raw<import("../types").ParcStats>("/api/logistique/locations/stats/"),
+  depots: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Depot>>(`/api/stocks/depots/${params}`),
+  lotsStocks: (params = "") =>
+    raw<import("../types").Paginated<import("../types").LotMatiere>>(`/api/stocks/lots/${params}`),
+  certificats: (params = "") =>
+    raw<import("../types").Paginated<import("../types").CertificatMatiere>>(`/api/stocks/certificats/${params}`),
+  mouvementsStock: (params = "") =>
+    raw<import("../types").Paginated<import("../types").MouvementStock>>(`/api/stocks/mouvements/${params}`),
+  quantsStock: (params = "") =>
+    raw<import("../types").Paginated<import("../types").StockQuant>>(`/api/stocks/quants/${params}`),
+  inventaires: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Inventaire>>(`/api/stocks/inventaires/${params}`),
+  valorisation: (depot = "") =>
+    raw<import("../types").ValorisationRow[]>(`/api/stocks/quants/valorisation/${depot ? `?depot=${depot}` : ""}`),
 };
