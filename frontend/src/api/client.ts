@@ -120,4 +120,18 @@ export const api = {
     raw<import("../types").Paginated<import("../types").Inventaire>>(`/api/stocks/inventaires/${params}`),
   valorisation: (depot = "") =>
     raw<import("../types").ValorisationRow[]>(`/api/stocks/quants/valorisation/${depot ? `?depot=${depot}` : ""}`),
+  soudeurs: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Soudeur>>(`/api/qualite/soudeurs/${params}`),
+  qualifications: (params = "") =>
+    raw<import("../types").Paginated<import("../types").QualificationSoudeur>>(`/api/qualite/qualifications/${params}`),
+  wps: (params = "") =>
+    raw<import("../types").Paginated<import("../types").WpsWpqr>>(`/api/qualite/wps/${params}`),
+  controlesQualite: (params = "") =>
+    raw<import("../types").Paginated<import("../types").ControleQualite>>(`/api/qualite/controles/${params}`),
+  pvsControle: (params = "") =>
+    raw<import("../types").Paginated<import("../types").PvControle>>(`/api/qualite/pvs/${params}`),
+  nonConformites: (params = "") =>
+    raw<import("../types").Paginated<import("../types").NonConformite>>(`/api/qualite/non-conformites/${params}`),
+  actionsCorrectives: (params = "") =>
+    raw<import("../types").Paginated<import("../types").ActionCorrective>>(`/api/qualite/actions-correctives/${params}`),
 };

@@ -450,3 +450,172 @@ export interface StocksKpis {
   value: number;
   has_amount_access: boolean;
 }
+
+export type NormeSoudeur = "iso9606" | "asme_ix";
+export type ProcedeSoudage = "smaw" | "gtaw" | "gmaw" | "fcaw";
+export type StatutQualification = "valide" | "expiree" | "suspendue";
+
+export interface Soudeur {
+  id: string;
+  code: string;
+  nom: string;
+  prenoms: string;
+  matricule: string;
+  qualification: string;
+  is_active: boolean;
+  display_name: string;
+}
+
+export interface QualificationSoudeur {
+  id: string;
+  code: string;
+  soudeur: string;
+  soudeur_code: string;
+  soudeur_name: string;
+  norme: NormeSoudeur;
+  norme_label: string;
+  procede: ProcedeSoudage;
+  procede_label: string;
+  position: string;
+  groupe_materiaux: string;
+  epaisseur_min: string;
+  epaisseur_max: string;
+  gamme_diametre: string;
+  date_qualification: string;
+  date_validite: string;
+  statut: StatutQualification;
+  statut_label: string;
+  est_valide: boolean;
+  certificat: string;
+}
+
+export type TypeWps = "wps" | "wpqr";
+export type StatutWps = "brouillon" | "valide" | "obsolete";
+
+export interface WpsWpqr {
+  id: string;
+  code: string;
+  type: TypeWps;
+  type_label: string;
+  reference: string;
+  norme: NormeSoudeur;
+  norme_label: string;
+  procede: ProcedeSoudage;
+  procede_label: string;
+  materiau: string;
+  position: string;
+  epaisseur: string;
+  gaz_protection: string;
+  parametres: Record<string, string>;
+  revue: string;
+  statut: StatutWps;
+  statut_label: string;
+  date_validation: string | null;
+}
+
+export type TypeControleQualite =
+  | "visuel"
+  | "dimensionnel"
+  | "cnd"
+  | "pda"
+  | "itp"
+  | "peinture";
+export type ResultatControle = "conforme" | "reserve" | "non_conforme";
+export type StatutControle = "en_attente" | "en_cours" | "valide" | "annule";
+
+export interface ControleQualite {
+  id: string;
+  code: string;
+  type_controle: TypeControleQualite;
+  type_label: string;
+  organisme: "interne" | "agrege";
+  organisme_label: string;
+  organisme_libelle: string;
+  affaire: string | null;
+  affaire_code: string | null;
+  ordre: string | null;
+  ordre_code: string | null;
+  wps: string | null;
+  wps_code: string | null;
+  lot: string | null;
+  lot_code: string | null;
+  point_controle: string;
+  exigence: string;
+  date_controle: string;
+  resultat: ResultatControle;
+  resultat_label: string;
+  statut: StatutControle;
+  statut_label: string;
+  notes: string;
+  created_by_name: string | null;
+}
+
+export type SourceNC = "controle" | "client" | "fournisseur" | "interne";
+export type GraviteNC = "mineure" | "majeure" | "critique";
+export type TraitementNC =
+  | "reprise"
+  | "reparation"
+  | "rejet"
+  | "acceptation"
+  | "arbitrage";
+export type StatutNC = "signalee" | "analysee" | "en_traitement" | "cloturee";
+
+export interface NonConformite {
+  id: string;
+  code: string;
+  controle: string | null;
+  controle_code: string | null;
+  source: SourceNC;
+  source_label: string;
+  gravite: GraviteNC;
+  gravite_label: string;
+  description: string;
+  traitement: TraitementNC;
+  traitement_label: string;
+  statut: StatutNC;
+  statut_label: string;
+  date_decision: string | null;
+  archive: boolean;
+  actions_count: number;
+}
+
+export type TypeCapa = "corrective" | "preventive";
+export type StatutCapa = "ouverte" | "en_cours" | "cloturee";
+
+export interface ActionCorrective {
+  id: string;
+  code: string;
+  non_conformite: string;
+  non_conformite_code: string;
+  type: TypeCapa;
+  type_label: string;
+  description: string;
+  responsable_name: string | null;
+  echeance: string | null;
+  statut: StatutCapa;
+  statut_label: string;
+  efficace: boolean | null;
+}
+
+export type StatutPv = "en_cours" | "reserve" | "receptionne" | "rejete";
+
+export interface PvControle {
+  id: string;
+  code: string;
+  affaire: string | null;
+  affaire_code: string | null;
+  ordre: string | null;
+  ordre_code: string | null;
+  intitule: string;
+  date_pv: string;
+  statut: StatutPv;
+  statut_label: string;
+  resultat: ResultatControle;
+  resultat_label: string;
+  reserve_motif: string;
+  levee_reserve: string | null;
+  retention_years: number;
+  date_archivage: string | null;
+  validated_by_name: string | null;
+  notes: string;
+}
