@@ -158,4 +158,25 @@ export const api = {
     raw<import("../types").Paginated<import("../types").OrdreTravail>>(`/api/maintenance/ordres/${params}`),
   inspections: (params = "") =>
     raw<import("../types").Paginated<import("../types").Inspection>>(`/api/maintenance/inspections/${params}`),
+  rhPaieStats: () => raw<import("../types").RhPaieStats>("/api/rh-paie/employes/stats/"),
+  employes: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Employe>>(`/api/rh-paie/employes/${params}`),
+  contratsRh: (params = "") =>
+    raw<import("../types").Paginated<import("../types").ContratTravail>>(`/api/rh-paie/contrats/${params}`),
+  qualificationsRh: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Qualification>>(`/api/rh-paie/qualifications/${params}`),
+  congesRh: (params = "") =>
+    raw<import("../types").Paginated<import("../types").DemandeConge>>(`/api/rh-paie/conges/${params}`),
+  recrutements: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Recrutement>>(`/api/rh-paie/recrutements/${params}`),
+  formationsRh: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Formation>>(`/api/rh-paie/formations/${params}`),
+  sanctions: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Sanction>>(`/api/rh-paie/sanctions/${params}`),
+  saisiesTemps: (params = "") =>
+    raw<import("../types").Paginated<import("../types").SaisieTemps>>(`/api/rh-paie/temps/${params}`),
+  bulletinsPaie: (params = "") =>
+    raw<import("../types").Paginated<import("../types").BulletinPaie>>(`/api/rh-paie/bulletins/${params}`),
+  masseSalariale: (params = "") =>
+    raw<import("../types").MasseSalariale>(`/api/rh-paie/bulletins/masse/${params}`),
 };

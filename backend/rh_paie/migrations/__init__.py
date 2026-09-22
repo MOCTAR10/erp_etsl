@@ -1,0 +1,1 @@
+# Placeholder marker pour que git suive le dossier (migrations g�n�r�es par makemigrations).

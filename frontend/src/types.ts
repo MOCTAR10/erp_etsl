@@ -985,3 +985,257 @@ export interface MaintenanceStats {
   cout_total: number;
   heures_total: number;
 }
+
+// ── M9 — RH & Paie ─────────────────────────────────────────────────────────
+
+export type CiviliteEmploye = "masculin" | "feminin";
+export type StatutEmploye = "actif" | "conge" | "suspendu" | "sorti";
+export type CategorieEmploye = "cadre" | "agent_maitrise" | "technicien" | "ouvrier";
+export type TypeContrat = "cdd" | "cdi" | "chantier" | "mission" | "stage";
+export type StatutContrat = "actif" | "essai" | "expire" | "resilie";
+export type TypeQualificationRh = "habilitation" | "permis" | "certificat" | "diplome";
+export type StatutRecrutement =
+  | "demande"
+  | "validee"
+  | "candidats"
+  | "entrevue"
+  | "integre"
+  | "annulee";
+export type TypeFormationRh = "planifie" | "realisee" | "annulee";
+export type TypeConge =
+  | "annuel"
+  | "rotation"
+  | "maladie"
+  | "maternite"
+  | "sans_solde"
+  | "exceptionnel";
+export type StatutConge = "demande" | "approuve" | "valide" | "refuse" | "annule";
+export type TypeSanction =
+  | "rappel"
+  | "avertissement"
+  | "mise_a_pied"
+  | "suspension"
+  | "licenciement"
+  | "autre";
+export type StatutSanction = "constate" | "instruite" | "decidee" | "archivee";
+export type TypeTemps = "normal" | "supplementaire" | "nuit" | "astreinte";
+export type StatutTemps = "saisi" | "transfere";
+export type NatureRubrique = "gain" | "retenue";
+export type StatutBulletin = "brouillon" | "valide" | "cloture" | "annule";
+
+export interface ContractActif {
+  code: string;
+  type: TypeContrat;
+  type_label: string;
+  date_debut: string;
+  date_fin: string | null;
+  a_renouveler: boolean;
+}
+
+export interface Employe {
+  id: string;
+  code: string;
+  civilite: CiviliteEmploye;
+  nom: string;
+  prenom: string;
+  nom_complet: string;
+  date_naissance: string | null;
+  lieu_naissance: string;
+  nationalite: string;
+  numero_securite_sociale: string;
+  telephone: string;
+  email: string;
+  adresse: string;
+  categorie: CategorieEmploye;
+  fonction: string;
+  departement: string;
+  site: string;
+  statut: StatutEmploye;
+  matricule_cnps: string;
+  date_embauche: string | null;
+  date_sortie: string | null;
+  contrat_actif: ContractActif | null;
+  solde_conges: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContratTravail {
+  id: string;
+  code: string;
+  employe: string;
+  employe_nom: string;
+  type: TypeContrat;
+  type_label: string;
+  date_debut: string;
+  date_fin: string | null;
+  salaire_base: string | null;
+  regime_horaire: string;
+  lieu_affectation: string;
+  statut: StatutContrat;
+  statut_label: string;
+  expire_dans: number | null;
+  a_renouveler: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Qualification {
+  id: string;
+  code: string;
+  employe: string;
+  employe_nom: string;
+  type: TypeQualificationRh;
+  type_label: string;
+  intitule: string;
+  organisme: string;
+  date_obtention: string | null;
+  date_validite: string | null;
+  expiree: boolean;
+  a_renouveler: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Recrutement {
+  id: string;
+  code: string;
+  poste: string;
+  type: string;
+  type_label: string;
+  justification: string;
+  responsable: string | null;
+  responsable_name: string | null;
+  date_souhaitee: string | null;
+  statut: StatutRecrutement;
+  statut_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Formation {
+  id: string;
+  code: string;
+  theme: string;
+  organisme: string;
+  formateur: string;
+  date_session: string;
+  duree_heures: string;
+  participants: string[];
+  nb_participants: number;
+  type: TypeFormationRh;
+  type_label: string;
+  evaluation: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DemandeConge {
+  id: string;
+  code: string;
+  employe: string;
+  employe_nom: string;
+  type: TypeConge;
+  type_label: string;
+  date_debut: string;
+  date_fin: string;
+  nb_jours: number;
+  motif: string;
+  statut: StatutConge;
+  statut_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Sanction {
+  id: string;
+  code: string;
+  employe: string;
+  employe_nom: string;
+  type: TypeSanction;
+  type_label: string;
+  faits: string;
+  rapport: string;
+  date_constat: string;
+  date_decision: string | null;
+  statut: StatutSanction;
+  statut_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SaisieTemps {
+  id: string;
+  code: string;
+  employe: string;
+  employe_nom: string;
+  date: string;
+  heures: string;
+  type: TypeTemps;
+  type_label: string;
+  source: string;
+  statut: StatutTemps;
+  statut_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RubriquePaie {
+  id: string;
+  code: string;
+  label: string;
+  nature: NatureRubrique;
+  nature_label: string;
+  base: "fixe" | "salaire" | "brut";
+  taux: string | null;
+  ordre: number;
+}
+
+export interface BulletinLigne {
+  id: string;
+  bulletin: string;
+  rubrique: string;
+  rubrique_code: string;
+  rubrique_label: string;
+  nature: NatureRubrique;
+  libelle: string;
+  montant: string;
+}
+
+export interface BulletinPaie {
+  id: string;
+  code: string;
+  employe: string;
+  employe_nom: string;
+  matricule: string;
+  periode: string;
+  salaire_base: string | null;
+  brut: string | null;
+  net: string | null;
+  total_gains: string | null;
+  total_retenues: string | null;
+  lignes: BulletinLigne[];
+  statut: StatutBulletin;
+  statut_label: string;
+  has_amount_access: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RhPaieStats {
+  effectif: number;
+  en_conge: number;
+  contrats_expirants_30: number;
+  conges_en_attente: number;
+  qualifications_expirees: number;
+  bulletins_mois: number;
+}
+
+export interface MasseSalariale {
+  mois: string;
+  bulletins: number;
+  brut_total: string;
+  net_total: string;
+}
