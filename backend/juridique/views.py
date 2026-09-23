@@ -3,6 +3,8 @@
 from datetime import date as _date
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -355,6 +357,10 @@ class DossierGlobalRentalViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         return Response(self.get_serializer(dossier).data)
 
 
+@extend_schema(
+    responses={200: OpenApiTypes.OBJECT},
+    description="Alertes J-90 / J-60 / J-30 / expirées (RF-ERP-B0).",
+)
 class AlertesViewSet(viewsets.ViewSet):
     """Alertes J-90 / J-60 / J-30 / expirées (RF-ERP-B0)."""
 

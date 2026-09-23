@@ -374,6 +374,43 @@ class BordereauDechetTests(M7BaseTest):
         self.assertEqual(res.data["results"][0]["transporteur_name"], "Fret Services Gabon")
 
 
+class SerializerCrudRegressionTests(M7BaseTest):
+    """Régression Schemathesis : le sérialiseur renvoyait self au lieu d'attrs
+    (TypeError 'PermisTravailSerializer' object is not a mapping) — les POST/PATCH
+    API avec données valides crashaient en 500."""
+
+    def _valid_permis_payload(self):
+        return {
+            "type_permis": PermisTravail.TypePermis.CHAUD,
+            "affaire": self.affaire.id,
+            "emplacement": "Zone chaufferie",
+            "description": "Soudure raccord vapeur",
+            "date_debut": str(date.today()),
+            "date_fin": str(date.today() + timedelta(days=1)),
+        }
+
+    def test_api_post_permis_creates(self):
+        self.auth()
+        res = self.client.post("/api/hse/permis/", self._valid_permis_payload(), format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertTrue(res.data["code"].startswith("PERM"))
+
+    def test_api_patch_permis_updates(self):
+        p = PermisTravail.objects.create(
+            type_permis=PermisTravail.TypePermis.HAUTEUR,
+            emplacement="V1",
+            description="Avant",
+            date_debut=date.today(),
+        )
+        self.auth()
+        res = self.client.patch(
+            f"/api/hse/permis/{p.pk}/",
+            {"description": "Après mise à jour"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+
+
 class PermissionsTests(M7BaseTest):
     def test_lecture_ouverte_a_tous_authentifies(self):
         self.auth(self.comptable)

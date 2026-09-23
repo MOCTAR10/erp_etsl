@@ -18,6 +18,7 @@ from .models import (
     Convention,
     Courrier,
     DossierGlobalRental,
+    JuridiqueSequence,
     Reunion,
 )
 from .services import compute_alertes, compute_stats
@@ -308,6 +309,79 @@ class ReunionTests(BaseJuridiqueTest):
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         r.refresh_from_db()
         self.assertEqual(r.statut, Reunion.Statut.TENUE)
+
+
+class SequenceSyncRegressionTests(BaseJuridiqueTest):
+    """Régression Schemathesis : les seeds créent des codes explicites
+    (COU00001…) sans avancer les compteurs → le prochain POST API régénère un
+    code déjà pris (UniqueViolation 500). `_sync_sequences` réaligne le compteur."""
+
+    def test_sync_repair_drift_so_next_post_creates(self):
+        # Simule la dérive : 2 courriers seedés avec codes explicites, compteur à 1.
+        self._courrier()
+        self._courrier()
+        JuridiqueSequence.objects.filter(kind="COU").update(next_number=1)
+        c1 = Courrier.objects.filter(code__startswith="COU").first()
+        c2 = Courrier.objects.exclude(pk=c1.pk).filter(code__startswith="COU").first()
+        self.assertNotEqual(c1.code, c2.code)
+
+        from users.management.commands.seed_all_demo import _sync_sequences
+
+        synced = _sync_sequences()
+
+        seq = JuridiqueSequence.objects.get(kind="COU")
+        self.assertGreater(seq.next_number, 1)
+        self.assertGreaterEqual(synced, 1)
+
+        # Le prochain code servi ne colle plus avec un code existant → POST API OK.
+        code = JuridiqueSequence.next_for("COU", "COU")
+        self.assertFalse(
+            Courrier.objects.filter(code=code).exists(),
+            f"code {code} déjà pris : le POST API échouerait en 500",
+        )
+
+    def test_sync_left_counters_untouched_when_no_drift(self):
+        from users.management.commands.seed_all_demo import _sync_sequences
+
+        before = list(
+            JuridiqueSequence.objects.values_list("kind", "next_number")
+        )
+        synced = _sync_sequences()
+        after = list(
+            JuridiqueSequence.objects.values_list("kind", "next_number")
+        )
+        self.assertEqual(before, after)
+        self.assertEqual(synced, 0)
+
+
+class ProtectedErrorRegressionTests(BaseJuridiqueTest):
+    """Régression Schemathesis : DELETE sur un objet référencé par des FK
+    protégées levait django.db.ProtectedError → 500. Le handler global
+    `config.exceptions` le convertit en HTTP 409 Conflict."""
+
+    def test_delete_partner_protege_retourne_409(self):
+        self._dossier_gr()  # partenaire_gr → on_delete=PROTECT (ligne 675)
+        from config.exceptions import drf_exception_handler
+        from django.db.models.deletion import ProtectedError
+
+        with self.assertRaises(ProtectedError):
+            self.gr.delete()
+        resp = drf_exception_handler(ProtectedError("x", {}), {})
+        self.assertEqual(resp.status_code, status.HTTP_409_CONFLICT)
+
+    def test_integrity_error_retourne_409(self):
+        from config.exceptions import drf_exception_handler
+        from django.db import IntegrityError
+
+        resp = drf_exception_handler(IntegrityError("duplicate key"), {})
+        self.assertEqual(resp.status_code, status.HTTP_409_CONFLICT)
+
+    def test_other_exception_falls_back_to_drf(self):
+        from config.exceptions import drf_exception_handler
+        from rest_framework.exceptions import NotFound
+
+        resp = drf_exception_handler(NotFound(), {})
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class AlertesTests(BaseJuridiqueTest):

@@ -87,6 +87,26 @@ class EmployeTests(BaseRHTest):
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(len(r.data["results"]), 2)
 
+    def test_delete_employe_protege_retourne_409(self):
+        """Régression Schemathesis : DELETE sur un employé couvert par des FK
+        protégées (contrat, congé, bulletin) levait ProtectedError → 500.
+        Le handler global `config.exceptions` doit renvoyer 409 Conflict."""
+        ContratTravail.objects.create(
+            employe=self.employe, type="cdi",
+            date_debut=date.today().replace(year=2024, month=1, day=1),
+        )
+        # Associer aussi un bien associé au bulletin pour confirmer le PROTECT.
+        _auth(self.client, "rh@etls.local")
+        r = self.client.delete(f"{BASE}employes/{self.employe.pk}/")
+        self.assertEqual(r.status_code, status.HTTP_409_CONFLICT, r.data)
+        self.assertTrue(Employe.objects.filter(pk=self.employe.pk).exists())
+
+    def test_delete_employe_sans_dependance_ok(self):
+        _auth(self.client, "rh@etls.local")
+        r = self.client.delete(f"{BASE}employes/{self.employe2.pk}/")
+        self.assertEqual(r.status_code, status.HTTP_204_NO_CONTENT, r.data)
+        self.assertFalse(Employe.objects.filter(pk=self.employe2.pk).exists())
+
     def test_employes_non_authentifie_403(self):
         r = self.client.get(f"{BASE}employes/")
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
@@ -129,6 +149,21 @@ class EmployeTests(BaseRHTest):
         r = self.client.get(f"{BASE}employes/stats/")
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(r.json()["effectif"], 2)
+
+    def test_sortir_date_garbage_400(self):
+        """Régression Schemathesis : `sortir` assignait la date brute au champ modèle
+        → ValueError/TypeError non capturé -> 500. Doit renvoyer 400."""
+        _auth(self.client, "rh@etls.local")
+        r = self.client.post(
+            f"{BASE}employes/{self.employe.pk}/sortir/",
+            {"date_sortie": "217/-not-a-date"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST, r.data)
+        r2 = self.client.post(
+            f"{BASE}employes/{self.employe.pk}/sortir/",
+            {"date_sortie": 187}, format="json",
+        )
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST, r2.data)
 
 
 class ContratTests(BaseRHTest):
@@ -230,6 +265,33 @@ class FormationTests(BaseRHTest):
         r = self.client.post(f"{BASE}formations/{f.pk}/realiser/")
         self.assertEqual(r.json()["type"], "realisee")
 
+    def test_creation_form_urlencode_sans_participants(self):
+        """Régression Schemathesis : un POST formulaire/multipart sans le champ M2M
+        `participants` l'injecte à [] (DRF ManyRelatedField sur QueryDict) → le
+        constructeur `Formation(participants=[])` levait un TypeError 500."""
+        _auth(self.client, "rh@etls.local")
+        r = self.client.post(
+            f"{BASE}formations/",
+            {"theme": "Chariot élévateur", "date_session": "2026-09-01"},
+            format="multipart",
+        )
+        self.assertNotEqual(r.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR, r.data)
+        self.assertIn(r.status_code, (status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST))
+
+    def test_creation_form_urlencode_avec_participants(self):
+        """Le M2M fourni en multipart doit être appliqué (participants.set) sans 500."""
+        _auth(self.client, "rh@etls.local")
+        r = self.client.post(
+            f"{BASE}formations/",
+            {"theme": "Sécurité chantier", "date_session": "2026-10-01",
+             "participants": str(self.employe.pk)},
+            format="multipart",
+        )
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.data)
+        formation = Formation.objects.get(pk=r.json()["id"])
+        self.assertEqual(formation.participants.count(), 1)
+        self.assertEqual(formation.participants.first().pk, self.employe.pk)
+
 
 class RecrutementTests(BaseRHTest):
     def test_validation_et_integration(self):
@@ -251,6 +313,21 @@ class RecrutementTests(BaseRHTest):
         )
         r = self.client.post(f"{BASE}recrutements/{dr.pk}/integrer/")
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_annuler_statut_inconnu_400(self):
+        """Régression Schemathesis : un `statut` hors choix passait par le else de
+        `avancer` et mutait la demande (ex. statut='zzz') sans validation."""
+        _auth(self.client, "rh@etls.local")
+        dr = DemandeRecrutement.objects.create(
+            poste="Soudeur", type=DemandeRecrutement.Type.REMPLACEMENT,
+            justification="Renfort", statut=DemandeRecrutement.Statut.DEMANDE,
+        )
+        r = self.client.post(
+            f"{BASE}recrutements/{dr.pk}/annuler/", {"statut": "zzz"}, format="json"
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST, r.data)
+        dr.refresh_from_db()
+        self.assertEqual(dr.statut, DemandeRecrutement.Statut.DEMANDE)
 
 
 class TempsTests(BaseRHTest):

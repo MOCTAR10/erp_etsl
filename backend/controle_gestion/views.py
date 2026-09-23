@@ -3,6 +3,8 @@
 from datetime import date, timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -170,6 +172,8 @@ class ClotureGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         fiscal_year = self.request.query_params.get("fiscal_year")
         statut = self.request.query_params.get("statut")
         if fiscal_year:
+            if not fiscal_year.isdigit():
+                raise DRFValidationError("Paramètre `fiscal_year` doit être un entier.")
             qs = qs.filter(period__fiscal_year_id=fiscal_year)
         if statut:
             qs = qs.filter(statut=statut)
@@ -197,10 +201,20 @@ class ClotureGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def stats(self, request):
         fiscal_year = request.query_params.get("fiscal_year") or None
+        if fiscal_year and not fiscal_year.isdigit():
+            raise DRFValidationError("Paramètre `fiscal_year` doit être un entier.")
         result = compute_clotures_stats(fiscal_year)
         return Response(result)
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter("fiscal_year", type=int, required=True, description="Exercice (année)."),
+        OpenApiParameter("axis", type=str, required=False, description="Code axe analytique."),
+        OpenApiParameter("analytic", type=str, required=False, description="Code compte analytique."),
+    ],
+    responses={200: OpenApiTypes.OBJECT},
+)
 class MargesView(viewsets.ViewSet):
     """Marges par axe analytique (RF-ERP-A2) — coût GR isolé (A4)."""
 
@@ -210,7 +224,13 @@ class MargesView(viewsets.ViewSet):
         fiscal_year = request.query_params.get("fiscal_year")
         if not fiscal_year:
             raise DRFValidationError("Paramètre `fiscal_year` requis.")
+        if not fiscal_year.isdigit():
+            raise DRFValidationError("Paramètre `fiscal_year` doit être un entier.")
         axis = request.query_params.get("axis")
         analytic = request.query_params.get("analytic")
+        if axis and not axis.isdigit():
+            raise DRFValidationError("Paramètre `axis` doit être un entier (id d'axe).")
+        if analytic and not analytic.isdigit():
+            raise DRFValidationError("Paramètre `analytic` doit être un entier (id de compte analytique).")
         result = compute_marges(fiscal_year, axis=axis, analytic=analytic)
         return Response(result, status=status.HTTP_200_OK)

@@ -15,7 +15,7 @@ from .models import (
 )
 
 
-def _validate_instance(serializer, instance, exclude=()):
+def _validate_instance(instance, exclude=()):
     """Valide le modèle (clean) et remonte les erreurs Django vers DRF."""
     try:
         instance.full_clean(exclude=list(exclude))
@@ -23,7 +23,16 @@ def _validate_instance(serializer, instance, exclude=()):
         if hasattr(exc, "error_dict"):
             raise serializers.ValidationError(exc.message_dict)
         raise serializers.ValidationError({"detail": exc.messages})
-    return serializer
+
+
+def _apply_and_validate(serializer, attrs, exclude=("code",)):
+    """Applique les attrs sur l'instance et valide le modèle ; retourne attrs."""
+    instance = serializer.instance or serializer.Meta.model(**attrs)
+    if serializer.instance:
+        for key, value in attrs.items():
+            setattr(instance, key, value)
+    _validate_instance(instance, exclude=exclude)
+    return attrs
 
 
 class PermisTravailSerializer(serializers.ModelSerializer):
@@ -50,11 +59,7 @@ class PermisTravailSerializer(serializers.ModelSerializer):
         read_only_fields = ["code", "date_validation", "date_cloture"]
 
     def validate(self, attrs):
-        instance = self.instance or self.Meta.model(**attrs)
-        if self.instance:
-            for key, value in attrs.items():
-                setattr(instance, key, value)
-        return _validate_instance(self, instance, exclude=["code"])
+        return _apply_and_validate(self, attrs)
 
 
 class EvaluationRisqueSerializer(serializers.ModelSerializer):
@@ -77,11 +82,7 @@ class EvaluationRisqueSerializer(serializers.ModelSerializer):
         read_only_fields = ["code", "score", "criticite"]
 
     def validate(self, attrs):
-        instance = self.instance or self.Meta.model(**attrs)
-        if self.instance:
-            for key, value in attrs.items():
-                setattr(instance, key, value)
-        return _validate_instance(self, instance, exclude=["code"])
+        return _apply_and_validate(self, attrs)
 
 
 class EquipementAtexSerializer(serializers.ModelSerializer):
@@ -127,11 +128,7 @@ class IncidentSerializer(serializers.ModelSerializer):
         return obj.actions.count()
 
     def validate(self, attrs):
-        instance = self.instance or self.Meta.model(**attrs)
-        if self.instance:
-            for key, value in attrs.items():
-                setattr(instance, key, value)
-        return _validate_instance(self, instance, exclude=["code"])
+        return _apply_and_validate(self, attrs)
 
 
 class ActionHseSerializer(serializers.ModelSerializer):

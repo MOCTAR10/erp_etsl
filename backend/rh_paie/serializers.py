@@ -20,9 +20,14 @@ from .services import can_see_amount
 
 
 def _apply_and_validate(serializer, attrs, exclude=("code",)):
-    instance = serializer.instance or serializer.Meta.model(**attrs)
+    # Les champs M2M (ex. Formation.participants) ne se passent pas au constructeur
+    # ni par setattr direct : un input formulaire/multipart le fournit comme [] même
+    # absent (DRF ManyRelatedField.get_value sur QueryDict) -> TypeError 500 sinon.
+    m2m = {f.name for f in serializer.Meta.model._meta.many_to_many}
+    init = {key: value for key, value in attrs.items() if key not in m2m}
+    instance = serializer.instance or serializer.Meta.model(**init)
     if serializer.instance:
-        for key, value in attrs.items():
+        for key, value in init.items():
             setattr(instance, key, value)
     try:
         instance.full_clean(exclude=list(exclude))
@@ -33,9 +38,18 @@ def _apply_and_validate(serializer, attrs, exclude=("code",)):
     return attrs
 
 
+class ContratActifSerializer(serializers.Serializer):
+    code = serializers.CharField(read_only=True)
+    type = serializers.CharField(read_only=True)
+    type_label = serializers.CharField(read_only=True)
+    date_debut = serializers.DateField(read_only=True)
+    date_fin = serializers.DateField(read_only=True, allow_null=True)
+    a_renouveler = serializers.BooleanField(read_only=True)
+
+
 class EmployeSerializer(serializers.ModelSerializer):
     nom_complet = serializers.CharField(read_only=True)
-    contrat_actif = serializers.SerializerMethodField()
+    contrat_actif = ContratActifSerializer(read_only=True)
     solde_conges = serializers.DecimalField(max_digits=8, decimal_places=1, read_only=True)
 
     class Meta:
@@ -48,19 +62,6 @@ class EmployeSerializer(serializers.ModelSerializer):
             "contrat_actif", "solde_conges", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "nom_complet"]
-
-    def get_contrat_actif(self, obj):
-        c = obj.contrat_actif
-        if not c:
-            return None
-        return {
-            "code": c.code,
-            "type": c.type,
-            "type_label": c.get_type_display(),
-            "date_debut": c.date_debut,
-            "date_fin": c.date_fin,
-            "a_renouveler": c.a_renouveler,
-        }
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)

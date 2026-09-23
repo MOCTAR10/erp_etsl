@@ -1,5 +1,7 @@
 """Rapports, exports et tableaux de bord (RF-74/80/94/95/98)."""
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from django.http import HttpResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,6 +14,12 @@ from documents.services import visible_documents
 from .services import dashboard, export_sage, export_selection
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter("export", type=str, required=False, enum=["csv", "xlsx", "pdf"]),
+    ],
+    responses={200: OpenApiTypes.BINARY},
+)
 class ExportView(APIView):
     """Export d'une sélection de documents visibles — CSV/XLSX/PDF (RF-98, RF-74)."""
 
@@ -40,6 +48,7 @@ class ExportView(APIView):
         return response
 
 
+@extend_schema(responses={200: OpenApiTypes.BINARY})
 class SageExportView(APIView):
     """Export SAGE I7 — écritures comptables validées (RF-68/80)."""
 
@@ -63,6 +72,10 @@ class SageExportView(APIView):
         return response
 
 
+@extend_schema(
+    responses={200: OpenApiTypes.OBJECT},
+    description="Tableau de bord direction (RF-94) / service (RF-95), temps de traitement (RF-96).",
+)
 class DashboardView(APIView):
     """Tableau de bord direction (RF-94) / service (RF-95), temps de traitement (RF-96)."""
 
@@ -72,6 +85,12 @@ class DashboardView(APIView):
         return Response(dashboard(request.user))
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter("export", type=str, required=False, enum=["csv"]),
+    ],
+    responses={200: OpenApiTypes.OBJECT},
+)
 class RetentionReportView(APIView):
     """Documents à échéance de rétention + bordereau de destruction CSV (RF-50/51/52)."""
 

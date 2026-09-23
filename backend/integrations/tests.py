@@ -173,6 +173,39 @@ class ImportAPITests(APITestCase):
         resp = self._upload(connector="inconnu")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_empty_file_is_failed_batch_not_500(self):
+        """Régression Schemathesis : fichier vide → fieldnames=None → TypeError 500
+        avant le correctif `set(fieldnames or ())`. Doit produire un lot FAILED."""
+        self.client.force_authenticate(self.admin)
+        file = SimpleUploadedFile(
+            "vide.csv", b"", content_type="text/csv"
+        )
+        resp = self.client.post(
+            "/api/integrations/import/",
+            {"connector": "partners", "file": file},
+            format="multipart",
+        )
+        self.assertNotEqual(
+            resp.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR, resp.content
+        )
+        self.assertIn(resp.status_code, (status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST))
+        if resp.status_code == status.HTTP_201_CREATED:
+            self.assertEqual(resp.data["status"], "failed")
+
+    def test_gl_empty_file_is_failed_batch_not_500(self):
+        self.client.force_authenticate(self.admin)
+        file = SimpleUploadedFile(
+            "vide.csv", b"", content_type="text/csv"
+        )
+        resp = self.client.post(
+            "/api/integrations/import/",
+            {"connector": "gl", "file": file},
+            format="multipart",
+        )
+        self.assertNotEqual(
+            resp.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR, resp.content
+        )
+
     def test_batches_list_requires_auth(self):
         resp = self.client.get("/api/integrations/batches/")
         self.assertIn(

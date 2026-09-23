@@ -294,6 +294,15 @@ class MargesTests(BaseGestionTest):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data["totals"]["produits"], Decimal("5000000"))
 
+    def test_marges_rejette_params_non_numeriques(self):
+        _auth(self.client, "finance@etls.local")
+        resp = self.client.get(f"{BASE}marges/?fiscal_year=abc")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        resp = self.client.get(f"{BASE}marges/?fiscal_year={self._fy.pk}&axis=^")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        resp = self.client.get(f"{BASE}marges/?fiscal_year={self._fy.pk}&analytic=aP")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class VarianceTests(BaseGestionTest):
     def test_variance_budget_charges(self):
@@ -357,3 +366,8 @@ class ClotureGestionTests(BaseGestionTest):
         self.assertEqual(stats["realisees"], 1)
         self.assertEqual(stats["conformes_j4"], 1)
         self.assertEqual(stats["en_attente"], 11)
+
+    def test_retention_rejette_fiscal_year_non_numerique(self):
+        _auth(self.client, "finance@etls.local")
+        resp = self.client.get(f"{BASE}clotures/stats/?fiscal_year=abc")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)

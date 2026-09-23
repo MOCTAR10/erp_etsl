@@ -34,7 +34,7 @@ class BaseHandler:
     REQUIRED_FIELDS = ()
 
     def validate_headers(self, fieldnames):
-        missing = set(self.REQUIRED_FIELDS) - set(fieldnames)
+        missing = set(self.REQUIRED_FIELDS) - set(fieldnames or ())
         if missing:
             raise ImportError(
                 "Colonnes manquantes : " + ", ".join(sorted(missing)) + "."

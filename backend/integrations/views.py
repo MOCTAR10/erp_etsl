@@ -1,5 +1,7 @@
 """API des intégrations par fichiers (H-04) — upload idempotent + journal des lots."""
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,6 +12,24 @@ from .models import ImportBatch
 from .serializers import ImportBatchSerializer
 
 
+@extend_schema(
+    request={
+        "multipart/form-data": {
+            "type": "object",
+            "properties": {
+                "connector": {
+                    "type": "string",
+                    "enum": ["partners", "gl"],
+                    "description": "Connecteur d'import (tiers ou écritures).",
+                },
+                "file": {"type": "string", "format": "binary"},
+                "force": {"type": "string", "description": "true pour rejouer un lot existant."},
+            },
+            "required": ["connector", "file"],
+        }
+    },
+    responses={200: ImportBatchSerializer},
+)
 class ImportFileView(APIView):
     """POST multipart : `connector`, `file`, `force` (optionnel).
 

@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -68,7 +68,12 @@ class EmployeViewSet(viewsets.ModelViewSet):
     def sortir(self, request, pk=None):
         e = self.get_object()
         e.statut = Employe.Statut.SORTI
-        e.date_sortie = request.data.get("date_sortie") or timezone.localdate()
+        date_sortie = request.data.get("date_sortie")
+        if date_sortie:
+            # Parse strict via DRF : un valeur invalide (str/nombre/binaire) -> 400, pas 500.
+            e.date_sortie = serializers.DateField().run_validation(date_sortie)
+        else:
+            e.date_sortie = timezone.localdate()
         e.save(update_fields=["statut", "date_sortie", "updated_at"])
         return Response(self.get_serializer(e).data)
 
@@ -150,8 +155,11 @@ class RecrutementViewSet(viewsets.ModelViewSet):
         dr = self.get_object()
         if dr.statut not in allowed:
             return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
-        if request.data.get("statut"):
-            new_statut = request.data.get("statut")
+        requested = request.data.get("statut")
+        if requested is not None and str(requested) not in DemandeRecrutement.Statut.values:
+            return Response({"detail": "Statut inconnu."}, status=status.HTTP_400_BAD_REQUEST)
+        if requested:
+            new_statut = requested
         dr.avancer(new_statut)
         return Response(self.get_serializer(dr).data)
 
