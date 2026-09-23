@@ -37,7 +37,7 @@ env:
 jobs:
   backend:
     name: Backend (tests + couverture)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     services:
       postgres:
@@ -103,7 +103,7 @@ jobs:
 
   frontend:
     name: Frontend (typecheck, build, vitest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
@@ -122,7 +122,7 @@ jobs:
 
   e2e:
     name: E2E Playwright (chromium + firefox)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
