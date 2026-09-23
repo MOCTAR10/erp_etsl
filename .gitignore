@@ -27,6 +27,9 @@ playwright-report/
 test-results/
 .schemathesis/
 .hypothesis/
+.coverage
+htmlcov/
+coverage.xml
 
 # OS / editor
 .DS_Store
