@@ -27,3 +27,20 @@ models:
       - name: alert_window
         tests:
           - not_null
+  - name: dm_direction_kpis
+    description: "KPIs consolidés de la Direction (Couche D, C1) — un enregistrement par date."
+    tests:
+      - not_null:
+          column_name: as_of_date
+  - name: dm_reporting_petrolier
+    description: "Reporting client pétrolier (Couche D, C2) — ASMR / HSE / Qualité."
+    tests:
+      - not_null:
+          column_name: as_of_date
+  - name: dm_alertes_echances
+    description: "Échéancier transverse des alertes (Couche D, C3) — juridique, RH, GED ; fenêtres J90/J60/J30/EXPIRED."
+    tests:
+      - not_null:
+          column_name: ref_code
+      - not_null:
+          column_name: alert_window

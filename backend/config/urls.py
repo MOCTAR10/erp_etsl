@@ -29,4 +29,5 @@ urlpatterns = [
     path("api/comptabilite/", include("comptabilite.urls")),
     path("api/controle-gestion/", include("controle_gestion.urls")),
     path("api/juridique/", include("juridique.urls")),
+    path("api/analytics/", include("analytics.urls")),
 ]

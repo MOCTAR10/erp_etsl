@@ -221,4 +221,10 @@ export const api = {
     raw<import("../types").Paginated<import("../types").DossierGlobalRental>>(`/api/juridique/dossiers-gr/${params}`),
   alertesJuridique: () => raw<import("../types").AlertesResult>("/api/juridique/alertes/"),
   juridiqueStats: () => raw<import("../types").JuridiqueStats>("/api/juridique/reunions/stats/"),
+  dashboardDirection: () =>
+    raw<import("../types").DashboardDirection>("/api/analytics/dashboard/"),
+  reportingPetrolier: () =>
+    raw<import("../types").ReportingPetrolier>("/api/analytics/petrolier/"),
+  alertesAgregees: () =>
+    raw<import("../types").AlertesAgregees>("/api/analytics/alertes/"),
 };

@@ -13,3 +13,37 @@ sources:
       - name: workflow_circuit
       - name: workflow_circuitstep
       - name: users_user
+      # ERP — Couche D (incr.32) : sources des 12 modules pour les marts BI.
+      - name: commercial_opportunity
+      - name: commercial_affaire
+      - name: commercial_contract
+      - name: achats_purchaseorder
+      - name: achats_purchaseorderline
+      - name: operations_ordrefabrication
+      - name: logistique_equipementparc
+      - name: logistique_locationgr
+      - name: stocks_depot
+      - name: stocks_lotmatiere
+      - name: stocks_stockquant
+      - name: stocks_mouvementstock
+      - name: qualite_nonconformite
+      - name: qualite_qualificationsoudeur
+      - name: hse_incident
+      - name: hse_permistravail
+      - name: hse_equipementatex
+      - name: hse_epi
+      - name: maintenance_actif
+      - name: maintenance_ordretravail
+      - name: rh_paie_employe
+      - name: rh_paie_contrattravail
+      - name: rh_paie_qualification
+      - name: rh_paie_bulletinpaie
+      - name: juridique_convention
+      - name: juridique_caution
+      - name: juridique_assurance
+      - name: juridique_contentieux
+      - name: juridique_courrier
+      - name: comptabilite_engagement
+      - name: comptabilite_paiement
+      - name: controle_gestion_budget
+      - name: controle_gestion_cloturegestion

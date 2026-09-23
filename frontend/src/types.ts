@@ -1694,3 +1694,133 @@ export interface JuridiqueStats {
   reunions_planifiees: number;
   dossiers_gr_ouverts: number;
 }
+
+/** Couche D — tableau de bord Direction (C1). */
+export interface DashboardDirection {
+  documents: { total: number; dossiers: number; par_statut: { status: string; count: number }[] };
+  workflow: { circuits: number; taches_pending: number; taches_done: number; taches_en_retard: number };
+  referentiels: { partners: number; articles: number; annexes: number };
+  registres: { registres: number; entrees: number };
+  commercial: {
+    opportunites_ouvertes: number;
+    pipeline_stages: number;
+    taux_conversion: number | null;
+    ca_gagne: number | null;
+    affaires_actives: number;
+  };
+  achats: {
+    da: number;
+    consultations: number;
+    bc: number;
+    bc_en_cours: number;
+    bl: number;
+    rc: number;
+    montant_bc: number | null;
+  };
+  operations: { of_en_cours: number };
+  logistique: {
+    equipements: number;
+    disponibles: number;
+    affectes: number;
+    locations: number;
+    locations_actives: number;
+  };
+  stocks: {
+    depots: number;
+    articles: number;
+    lots: number;
+    mouvements: number;
+    lots_non_dispo: number;
+    valorisation: number | null;
+  };
+  qualite: { nc_ouvertes: number; soudeurs: number; wps_valides: number; pv_sous_reserve: number };
+  hse: {
+    jours_sans_accident: number | null;
+    incidents_ouverts: number;
+    permis_actifs: number;
+    actions_ouvertes: number;
+    risques_critiques: number;
+  };
+  maintenance: {
+    actifs: number;
+    en_panne: number;
+    en_maintenance: number;
+    ot_ouverts: number;
+    inspections_prevues: number;
+    en_arret: number;
+  };
+  rh_paie: { effectif: number; en_conge: number; conges_en_attente: number; bulletins_mois: number };
+  comptabilite: {
+    engagements_a_visa: number;
+    engagements_approuves: number;
+    paiements_mois: number;
+    declarations_tva: number;
+  };
+  controle_gestion: {
+    budgets: number;
+    budgets_approuves: number;
+    revisions: number;
+    clotures_realisees: number;
+    conformite_j4: { conformes: number; periodes: number; taux: number };
+  };
+  juridique: {
+    courriers: number;
+    courriers_a_classer: number;
+    conventions: number;
+    contentieux_ouverts: number;
+    cautions_en_cours: number;
+    assurances: number;
+  };
+}
+
+/** Couche D — reporting client pétrolier ASMR / HSE / Qualité (C2). */
+export interface ReportingPetrolier {
+  asmr: {
+    equipements: number;
+    operationnels: number;
+    en_panne: number;
+    en_maintenance: number;
+    hors_service: number;
+    en_arret: number;
+    taux_disponibilite: number;
+  };
+  hse: {
+    jours_sans_accident: number | null;
+    incidents: number;
+    incidents_ouverts: number;
+    accidents: number;
+    permis_actifs: number;
+    permis_atex: number;
+    equipements_atex_quarantaine: number;
+    epi_a_renouveler: number;
+  };
+  qualite: {
+    soudeurs_qualifies: number;
+    soudeurs_expires: number;
+    wps_valides: number;
+    nc_total: number;
+    nc_ouvertes: number;
+    nc_critiques: number;
+    pv_sous_reserve: number;
+  };
+}
+
+/** Couche D — alerte d'échéance transverse (C3). */
+export interface AlerteEcheanceItem {
+  type: string;
+  code: string | null;
+  libelle: string;
+  date_echeance: string | null;
+  bande: string;
+  jours: number | null;
+  statut: string;
+}
+
+export interface AlertesAgregees {
+  documents: AlerteEcheanceItem[];
+  juridique: AlertesResult;
+  rh: AlerteEcheanceItem[];
+  maintenance: AlerteEcheanceItem[];
+  compteurs: Record<BandeEcheance, number>;
+  total: number;
+}

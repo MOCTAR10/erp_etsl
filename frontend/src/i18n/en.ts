@@ -25,6 +25,7 @@ export const en = {
     juridique: "Legal & DMS",
     referentiels: "Master data",
     outbox: "Outbox",
+    direction: "Direction / BI",
   },
   common: {
     logout: "Sign out",
@@ -836,6 +837,24 @@ export const en = {
       j90: "≤ 90 d",
     },
     pendingNote: "Mail registry (§3.3), contracts & agreements (§3.6/8.3), guarantees & insurance (§8.6), disputes (§8.5), meetings & minutes (§3.7), intra-group GLOBAL RENTAL file (account 618 — RF-ERP-B4). Automatic J-90 / J-60 / J-30 alerts (RF-ERP-B0), documents linked to the DMS.",
+  },
+  direction: {
+    title: "Direction / BI — Layer D (RF-ERP-C0 … C3)",
+    subtitle: "Consolidated KPIs across the 12 modules, ASMR / HSE / Quality oil & gas client reporting and transversal expiry alerts.",
+    alertes: "Expiry alerts (C3)",
+    alertesTotal: "Total alerts",
+    documentsRetention: "DMS retention",
+    juridique: "Legal",
+    rh: "HR — payroll",
+    maintenance: "Maintenance",
+    asmr: "ASMR — equipment availability",
+    tauxDisponibilite: "Availability rate",
+    reportPetrolier: "Oil & gas client reporting (C2)",
+    directionKPIs: "Executive dashboard (C1)",
+    joursSansAccident: "Incident-free days",
+    operations: "Operations",
+    annuel: "J+4 closing compliance",
+    equipes: "Headcount",
   },
 } as const;
 

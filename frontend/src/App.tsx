@@ -23,6 +23,7 @@ import { ControleGestionPage } from "./pages/ControleGestion";
 import { JuridiquePage } from "./pages/Juridique";
 import { PipelinePage } from "./pages/Pipeline";
 import { PurchasesPage } from "./pages/Purchases";
+import { DirectionPage } from "./pages/Direction";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const access = useAuth((s) => s.access);
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="comptabilite" element={withPilot(<ComptabilitePage />)} />
         <Route path="controle-gestion" element={withPilot(<ControleGestionPage />)} />
         <Route path="juridique" element={withPilot(<JuridiquePage />)} />
+        <Route path="direction" element={withPilot(<DirectionPage />)} />
         <Route path="circuits" element={<CircuitsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>

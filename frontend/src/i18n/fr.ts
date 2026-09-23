@@ -25,6 +25,7 @@ export const fr = {
     juridique: "Juridique & GED",
     referentiels: "Référentiels",
     outbox: "Outbox",
+    direction: "Direction / BI",
   },
   common: {
     logout: "Déconnexion",
@@ -836,6 +837,24 @@ export const fr = {
       j90: "≤ 90 j",
     },
     pendingNote: "Bureau d'ordre (§3.3), contrats & conventions (§3.6/8.3), cautions & assurances (§8.6), contentieux (§8.5), réunions & comptes rendus (§3.7), dossier intra-groupe GLOBAL RENTAL (compte 618 — RF-ERP-B4). Alertes automatiques J-90 / J-60 / J-30 (RF-ERP-B0), pièces liées à la GED.",
+  },
+  direction: {
+    title: "Direction / BI — Couche D (RF-ERP-C0 … C3)",
+    subtitle: "KPIs consolidés des 12 modules, reporting client pétrolier ASMR/HSE/Qualité et alertes d'échéance transverses.",
+    alertes: "Alertes d'échéance (C3)",
+    alertesTotal: "Total des alertes",
+    documentsRetention: "Rétention GED",
+    juridique: "Juridique",
+    rh: "RH — paie",
+    maintenance: "Maintenance",
+    asmr: "ASMR — disponibilité matérielle",
+    tauxDisponibilite: "Taux de disponibilité",
+    reportPetrolier: "Reporting client pétrolier (C2)",
+    directionKPIs: "Tableau de bord Direction (C1)",
+    joursSansAccident: "Jours sans accident",
+    operations: "Opérations",
+    annuel: "Conformité clôture J+4",
+    equipes: "Effectif",
   },
 } as const;
 
