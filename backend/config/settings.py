@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "rh_paie",
     "comptabilite",
     "controle_gestion",
+    "juridique",
     "django_celery_beat",
     "django_celery_results",
 ]

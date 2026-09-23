@@ -205,4 +205,20 @@ export const api = {
     raw<import("../types").MargesResult>(`/api/controle-gestion/marges/${params}`),
   fiscalYears: (params = "") =>
     raw<import("../types").Paginated<import("../types").FiscalYear>>(`/api/accounting/fiscal-years/${params}`),
+  courriersJuridique: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Courrier>>(`/api/juridique/courriers/${params}`),
+  conventionsJuridique: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Convention>>(`/api/juridique/conventions/${params}`),
+  contentieuxJuridique: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Contentieux>>(`/api/juridique/contentieux/${params}`),
+  cautionsJuridique: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Caution>>(`/api/juridique/cautions/${params}`),
+  assurancesJuridique: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Assurance>>(`/api/juridique/assurances/${params}`),
+  reunionsJuridique: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Reunion>>(`/api/juridique/reunions/${params}`),
+  dossiersGrJuridique: (params = "") =>
+    raw<import("../types").Paginated<import("../types").DossierGlobalRental>>(`/api/juridique/dossiers-gr/${params}`),
+  alertesJuridique: () => raw<import("../types").AlertesResult>("/api/juridique/alertes/"),
+  juridiqueStats: () => raw<import("../types").JuridiqueStats>("/api/juridique/reunions/stats/"),
 };

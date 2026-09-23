@@ -1521,3 +1521,176 @@ export interface CloturesStats {
   en_attente: number;
   max_jours_ecoulement: number | null;
 }
+
+export type StatutCourrier = "recu" | "enregistre" | "classe" | "archive";
+export type StatutConvention = "brouillon" | "en_signature" | "signe" | "cloture" | "resilie";
+export type StatutContentieux = "ouvert" | "en_instruction" | "gagne" | "perdu" | "transaction" | "cloture";
+export type StatutCaution = "en_cours" | "levee" | "appelee" | "expiree";
+export type StatutAssurance = "active" | "a_renouveler" | "expiree" | "resiliee";
+export type StatutReunion = "planifiee" | "tenue" | "cloturee";
+export type StatutDossierGR = "brouillon" | "ouvert" | "cloture";
+export type BandeEcheance = "expiree" | "j30" | "j60" | "j90";
+
+export interface Courrier {
+  id: string;
+  code: string;
+  sens: string;
+  sens_label: string;
+  type: string;
+  type_label: string;
+  objet: string;
+  reference: string | null;
+  tiers: string | null;
+  tiers_name: string | null;
+  date_courrier: string | null;
+  date_reception: string | null;
+  statut: StatutCourrier;
+  statut_label: string;
+  notes: string | null;
+}
+
+export interface Convention {
+  id: string;
+  code: string;
+  type: string;
+  type_label: string;
+  titre: string;
+  partenaire: string | null;
+  partenaire_name: string | null;
+  montant: string | null;
+  date_debut: string | null;
+  date_fin: string | null;
+  renouvelable: boolean;
+  statut: StatutConvention;
+  statut_label: string;
+  days_left: number | null;
+  expiry_status: BandeEcheance | "en_cours";
+  a_renouveler: boolean;
+  has_amount_access: boolean;
+  affaire_code: string | null;
+}
+
+export interface Contentieux {
+  id: string;
+  code: string;
+  nature: string;
+  nature_label: string;
+  objet: string;
+  partie_adverse: string | null;
+  conseil_ext: string | null;
+  montant_en_jeu: string | null;
+  reference: string | null;
+  date_ouverture: string;
+  phase: string;
+  phase_label: string;
+  statut: StatutContentieux;
+  statut_label: string;
+  decision: string | null;
+  has_amount_access: boolean;
+}
+
+export interface Caution {
+  id: string;
+  code: string;
+  type: string;
+  type_label: string;
+  emetteur_name: string | null;
+  beneficiaire: string;
+  objet: string;
+  montant: string | null;
+  numero_instrument: string | null;
+  date_emission: string;
+  date_echeance: string;
+  statut: StatutCaution;
+  statut_label: string;
+  days_left: number | null;
+  expiry_status: BandeEcheance | "en_cours";
+  has_amount_access: boolean;
+  convention_code: string | null;
+}
+
+export interface Assurance {
+  id: string;
+  code: string;
+  type: string;
+  type_label: string;
+  assureur_name: string | null;
+  numero_police: string;
+  prime_annuelle: string | null;
+  date_debut: string;
+  date_echeance: string;
+  objets_couverts: string;
+  statut: StatutAssurance;
+  statut_label: string;
+  nb_sinistres: number;
+  sinistres: Array<{ date: string; detail: string }>;
+  days_left: number | null;
+  expiry_status: BandeEcheance | "en_cours";
+  has_amount_access: boolean;
+}
+
+export interface Reunion {
+  id: string;
+  code: string;
+  type: string;
+  type_label: string;
+  objet: string;
+  date_reunion: string;
+  lieu: string | null;
+  animateur_name: string | null;
+  participants_names: string[];
+  statut: StatutReunion;
+  statut_label: string;
+  nb_decisions: number;
+  nb_decisions_ouvertes: number;
+  decisions: Array<{ decision: string; responsable: string; date_echeance: string; cloturee: boolean }>;
+}
+
+export interface DossierGlobalRental {
+  id: string;
+  code: string;
+  partenaire_gr: string;
+  partenaire_gr_name: string;
+  affaire_code: string | null;
+  reference_contrat: string | null;
+  objet: string;
+  montant_estime: string | null;
+  signe_618: boolean;
+  date_debut: string;
+  date_fin: string;
+  statut: StatutDossierGR;
+  statut_label: string;
+  references_documents: string[];
+  has_amount_access: boolean;
+}
+
+export interface AlerteEcheance {
+  type: "convention" | "caution" | "assurance";
+  code: string;
+  libelle: string;
+  date_echeance: string;
+  bande: BandeEcheance;
+  jours: number;
+  statut: string;
+}
+
+export interface AlertesResult {
+  conventions: AlerteEcheance[];
+  cautions: AlerteEcheance[];
+  assurances: AlerteEcheance[];
+  compteurs: Record<BandeEcheance, number>;
+  total: number;
+}
+
+export interface JuridiqueStats {
+  courriers: number;
+  courriers_a_classer: number;
+  conventions: number;
+  conventions_a_renouveler: number;
+  contentieux_ouverts: number;
+  cautions_en_cours: number;
+  assurances: number;
+  assurances_a_renouveler: number;
+  reunions_planifiees: number;
+  dossiers_gr_ouverts: number;
+}

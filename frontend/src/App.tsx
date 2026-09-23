@@ -20,6 +20,7 @@ import { MaintenancePage } from "./pages/Maintenance";
 import { RhPaiePage } from "./pages/RhPaie";
 import { ComptabilitePage } from "./pages/Comptabilite";
 import { ControleGestionPage } from "./pages/ControleGestion";
+import { JuridiquePage } from "./pages/Juridique";
 import { PipelinePage } from "./pages/Pipeline";
 import { PurchasesPage } from "./pages/Purchases";
 
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="rh-paie" element={withPilot(<RhPaiePage />)} />
         <Route path="comptabilite" element={withPilot(<ComptabilitePage />)} />
         <Route path="controle-gestion" element={withPilot(<ControleGestionPage />)} />
+        <Route path="juridique" element={withPilot(<JuridiquePage />)} />
         <Route path="circuits" element={<CircuitsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>

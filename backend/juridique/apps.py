@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class JuridiqueConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "juridique"
+    verbose_name = "Juridique & GED"
