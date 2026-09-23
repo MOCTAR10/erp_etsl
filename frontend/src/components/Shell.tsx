@@ -16,6 +16,7 @@ const NAV_KEYS = [
   ["/maintenance", "nav.maintenance"],
   ["/rh-paie", "nav.rhPaie"],
   ["/comptabilite", "nav.comptabilite"],
+  ["/controle-gestion", "nav.controleGestion"],
   ["/kanban", "nav.kanban"],
   ["/circuits", "nav.circuits"],
   ["/notifications", "nav.notifications"],

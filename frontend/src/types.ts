@@ -1391,3 +1391,133 @@ export interface ControleInterne {
   created_at: string;
   updated_at: string;
 }
+
+export interface FiscalYear {
+  id: string;
+  year: number;
+  start_date: string;
+  end_date: string;
+  status: string;
+}
+
+export type TypeBudget = "charge" | "produit";
+export type StatutBudget = "brouillon" | "approuve" | "cloture";
+export type StatutRevision = "brouillon" | "appliquee" | "annulee";
+export type StatutClotureGestion = "en_attente" | "realisee";
+
+export interface BudgetLigne {
+  id: string;
+  budget: string;
+  period: string;
+  period_number: number;
+  period_label: string;
+  montant: string;
+}
+
+export interface Budget {
+  id: string;
+  code: string;
+  label: string;
+  type_budget: TypeBudget;
+  type_label: string;
+  fiscal_year: string;
+  axis: string | null;
+  axis_code: string | null;
+  analytic: string | null;
+  analytic_code: string | null;
+  analytic_label: string | null;
+  montant: string | null;
+  montant_lignes: string | null;
+  statut: StatutBudget;
+  statut_label: string;
+  lignes: BudgetLigne[];
+  nb_revisions: number;
+  created_by: string | null;
+  has_amount_access: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BudgetRevision {
+  id: string;
+  code: string;
+  budget: string;
+  budget_code: string;
+  numero: number;
+  date_revision: string;
+  ancien_montant: string | null;
+  nouveau_montant: string | null;
+  commentaire: string;
+  statut: StatutRevision;
+  statut_label: string;
+  created_by: string | null;
+  created_by_name: string | null;
+  has_amount_access: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClotureGestion {
+  id: string;
+  code: string;
+  period: string;
+  period_label: string;
+  date_cloture: string | null;
+  statut: StatutClotureGestion;
+  statut_label: string;
+  jours_ecoulement: number | null;
+  conforme_j4: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MargeRow {
+  analytic: string | null;
+  code_axe: string;
+  libelle: string;
+  produits: string;
+  charges: string;
+  marge: string;
+  taux_marge: string | null;
+}
+
+export interface MargesResult {
+  rows: MargeRow[];
+  totals: {
+    produits: string;
+    charges: string;
+    marge: string;
+    marge_hors_gr: string;
+    cout_gr: string;
+  };
+}
+
+export interface VarianceLigne {
+  period: string;
+  period_number: number;
+  period_label: string;
+  montant: string;
+  realise: string;
+  ecart: string;
+  taux: string | null;
+}
+
+export interface VarianceResult {
+  lignes: VarianceLigne[];
+  totals: {
+    montant: string;
+    realise: string;
+    ecart: string;
+    taux: string | null;
+    sous_activite: boolean;
+  };
+}
+
+export interface CloturesStats {
+  periodes: number;
+  realisees: number;
+  conformes_j4: number;
+  en_attente: number;
+  max_jours_ecoulement: number | null;
+}

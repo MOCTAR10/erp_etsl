@@ -193,4 +193,16 @@ export const api = {
     raw<import("../types").Paginated<import("../types").DeclarationTva>>(`/api/comptabilite/declarations-tva/${params}`),
   controlesCompta: (params = "") =>
     raw<import("../types").Paginated<import("../types").ControleInterne>>(`/api/comptabilite/controles/${params}`),
+  cgBudgets: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Budget>>(`/api/controle-gestion/budgets/${params}`),
+  cgRevisions: (params = "") =>
+    raw<import("../types").Paginated<import("../types").BudgetRevision>>(`/api/controle-gestion/revisions/${params}`),
+  cgClotures: (params = "") =>
+    raw<import("../types").Paginated<import("../types").ClotureGestion>>(`/api/controle-gestion/clotures/${params}`),
+  cgCloturesStats: (params = "") =>
+    raw<import("../types").CloturesStats>(`/api/controle-gestion/clotures/stats/${params}`),
+  cgMarges: (params = "") =>
+    raw<import("../types").MargesResult>(`/api/controle-gestion/marges/${params}`),
+  fiscalYears: (params = "") =>
+    raw<import("../types").Paginated<import("../types").FiscalYear>>(`/api/accounting/fiscal-years/${params}`),
 };
