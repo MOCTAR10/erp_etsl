@@ -49,7 +49,7 @@ export function LoginPage() {
     <div className="login">
       <motion.aside className="login-panel" {...enter}>
         <span className="brand-chip">
-          <img src="/etsl-logo.jpg" alt={t("app.logoAlt")} />
+          <img src={`${import.meta.env.BASE_URL}etsl-logo.jpg`} alt={t("app.logoAlt")} />
         </span>
 
         <div className="login-hero">

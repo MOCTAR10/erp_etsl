@@ -1,6 +1,13 @@
 import { useAuth } from "../store/auth";
 import type { Me, Tokens } from "../types";
 
+// BASE_URL = "/" en dev/racine, "/erp_etsl/" sous sous-chemin nginx → préfixe tous les /api.
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 async function raw<T>(path: string, init?: RequestInit): Promise<T> {
   const auth = useAuth.getState();
   const headers = new Headers(init?.headers);
@@ -9,13 +16,13 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
 
   if (res.status === 401 && auth.refresh) {
     try {
       const refreshed = await refreshToken(auth.refresh);
       useAuth.getState().setAccess(refreshed.access);
-      const retry = await fetch(path, {
+      const retry = await fetch(apiUrl(path), {
         ...init,
         headers: new Headers({
           ...Object.fromEntries(headers.entries()),
@@ -35,7 +42,7 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function postForm<T>(path: string, body: Record<string, string>): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -74,7 +81,7 @@ async function refreshToken(refresh: string): Promise<{ access: string }> {
 }
 
 async function authenticatedMe(access: string): Promise<Me> {
-  const res = await fetch("/api/users/me/", {
+  const res = await fetch(apiUrl("/api/users/me/"), {
     headers: { Authorization: `Bearer ${access}` },
   });
   if (!res.ok) throw new ApiError(res.status, null);

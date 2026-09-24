@@ -162,8 +162,8 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = env("MEDIA_URL", default="media/")
+MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
 
 # ── MinIO object storage (RF-45 : NAS, S3-compatible) ──
 AWS_ACCESS_KEY_ID = env("MINIO_ROOT_USER", default="etls_minio")
@@ -175,10 +175,19 @@ AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = True
 AWS_S3_FILE_OVERWRITE = False
 
-STORAGES = {
-    "default": {"BACKEND": "storages.backends.s3.S3Storage"},
-    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-}
+# Stockage : "s3" (défaut, MinIO/S3) ou "local" (disque serveur, uploads GED).
+# "local" évite de dépendre d'un serveur d'objets pour un premier déploiement natif.
+STORAGE_BACKEND = env("STORAGE_BACKEND", default="s3")
+if STORAGE_BACKEND == "local":
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+else:
+    STORAGES = {
+        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

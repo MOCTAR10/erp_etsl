@@ -12,7 +12,7 @@ export function BrandLogo({ size = "sm", showTag = true }: BrandLogoProps) {
   return (
     <div className="brand-lockup" data-testid="brand-logo">
       <span className="brand-chip" style={{ padding: chip }}>
-        <img src="/etsl-logo.jpg" alt={t("app.logoAlt")} />
+        <img src={`${import.meta.env.BASE_URL}etsl-logo.jpg`} alt={t("app.logoAlt")} />
       </span>
       <div className="brand-text">
         <span className="brand-word">ETSL ERP</span>
