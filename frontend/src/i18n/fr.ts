@@ -3,8 +3,11 @@ export const fr = {
     title: "ETSL — ERP",
     tagline: "Gestion documentaire & processus",
     brand: "ETSL ERP",
+    logoAlt: "Logo ETSL",
   },
   nav: {
+    groupPilotage: "Pilotage",
+    groupModules: "Modules métier",
     dashboard: "Tableau de bord",
     pipeline: "Pipeline M1",
     purchases: "Commandes M2",
@@ -35,6 +38,8 @@ export const fr = {
     empty: "Aucune donnée",
     error: "Erreur",
     retry: "Réessayer",
+    search: "Rechercher un module…",
+    noResult: "Aucun module trouvé",
   },
   login: {
     title: "Connexion",
@@ -43,9 +48,17 @@ export const fr = {
     submit: "Se connecter",
     invalid: "Identifiants incorrects.",
     serverError: "Serveur indisponible. Vérifiez que le backend est démarré.",
+    welcome: "Bienvenue sur ETSL ERP",
+    panelSub:
+      "Gestion documentaire, circuits de validation et les 12 modules métier réunis dans une seule application.",
+    featureWorkflow: "Circuits de validation & relances",
+    featureModules: "12 modules métier : commercial → juridique",
+    featureSecurity: "Habilitations par rôle & journal d'audit",
+    footer: "© ETSL — application interne",
   },
   dashboard: {
     title: "Tableau de bord",
+    subtitle: "Vue d'ensemble des documents, du flux de travail et des échéances de rétention.",
     documents: "Documents",
     storage: "Stockage",
     workflowPending: "Tâches en cours",

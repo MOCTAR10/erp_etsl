@@ -3,8 +3,11 @@ export const en = {
     title: "ETSL — ERP",
     tagline: "Document management & processes",
     brand: "ETSL ERP",
+    logoAlt: "ETSL logo",
   },
   nav: {
+    groupPilotage: "Overview",
+    groupModules: "Business modules",
     dashboard: "Dashboard",
     pipeline: "Pipeline M1",
     purchases: "Purchases M2",
@@ -35,6 +38,8 @@ export const en = {
     empty: "No data",
     error: "Error",
     retry: "Retry",
+    search: "Search a module…",
+    noResult: "No module found",
   },
   login: {
     title: "Sign in",
@@ -43,9 +48,17 @@ export const en = {
     submit: "Sign in",
     invalid: "Invalid credentials.",
     serverError: "Server unreachable. Check the backend is running.",
+    welcome: "Welcome to ETSL ERP",
+    panelSub:
+      "Document management, validation workflows and the 12 business modules in a single application.",
+    featureWorkflow: "Validation workflows & reminders",
+    featureModules: "12 modules: sales → legal",
+    featureSecurity: "Role-based access & audit trail",
+    footer: "© ETSL — internal application",
   },
   dashboard: {
     title: "Dashboard",
+    subtitle: "At a glance view of documents, workflow and retention deadlines.",
     documents: "Documents",
     storage: "Storage",
     workflowPending: "Tasks in progress",

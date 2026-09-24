@@ -38,7 +38,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title={t("dashboard.title")} />
+      <PageHeader title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} />
       <div className="kpi-grid">
         <Kpi label={t("dashboard.documents")} value={data.documents.total} icon={FileText} tone="brand" delay={0} />
         <Kpi label={t("dashboard.storage")} value={data.documents.storage_bytes} format={formatBytes} icon={HardDrive} tone="brand" delay={0.05} />
@@ -49,14 +49,20 @@ export function DashboardPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1rem", alignItems: "start" }}>
-        <ChartCard title={t("dashboard.byType")} height={230}>
+        <ChartCard title={t("dashboard.byType")} height={240}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barBrand" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chart.brand} stopOpacity={1} />
+                  <stop offset="100%" stopColor={chart.brand} stopOpacity={0.55} />
+                </linearGradient>
+              </defs>
               <CartesianGrid stroke={chart.border} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" stroke={chart.textMuted} fontSize={12} tickLine={false} axisLine={false} angle={-18} textAnchor="end" height={46} interval={0} />
               <YAxis stroke={chart.textMuted} fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="count" fill={chart.brand} radius={[6, 6, 0, 0]} maxBarSize={48} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: chart.brandSoft }} />
+              <Bar dataKey="count" fill="url(#barBrand)" radius={[6, 6, 0, 0]} maxBarSize={48} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

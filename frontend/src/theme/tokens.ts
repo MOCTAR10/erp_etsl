@@ -16,7 +16,7 @@ export const motionTokens = {
 } as const;
 
 export const designTokens = {
-  radius: { sm: 8, md: 10, lg: 12, xl: 16 },
+  radius: { sm: 8, md: 10, lg: 14, xl: 18, "2xl": 24 },
   space: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
   font: {
     xs: 12,
@@ -24,12 +24,14 @@ export const designTokens = {
     md: 14,
     lg: 16,
     xl: 20,
-    "2xl": 26,
+    "2xl": 24,
+    "3xl": 32,
   },
-  weight: { regular: 400, medium: 500, semibold: 600, bold: 700 },
+  weight: { regular: 400, medium: 500, semibold: 600, bold: 700, extrabold: 800 },
   shadow: {
-    card: "0 1px 2px rgb(16 24 40 / 0.06), 0 4px 12px rgb(16 24 40 / 0.05)",
-    pop: "0 4px 16px rgb(16 24 40 / 0.10), 0 12px 32px rgb(16 24 40 / 0.08)",
+    card: "0 1px 2px rgb(16 24 40 / 0.05), 0 6px 18px rgb(16 24 40 / 0.05)",
+    pop: "0 10px 28px rgb(16 24 40 / 0.12), 0 22px 60px rgb(16 24 40 / 0.10)",
+    brand: "0 6px 18px rgb(11 58 140 / 0.30)",
   },
   grid: { kpi: "repeat(auto-fit, minmax(190px, 1fr))", board: "repeat(auto-fit, minmax(230px, 1fr))" },
 } as const;
@@ -42,7 +44,10 @@ export interface ThemeColors {
   text: string;
   textMuted: string;
   brand: string;
+  brandDeep: string;
   brandSoft: string;
+  brandTint: string;
+  ring: string;
   accent: string;
   accentSoft: string;
   ok: string;
@@ -60,9 +65,12 @@ export const palette = {
     surface2: "#eef1f6",
     border: "#dde3ec",
     text: "#101828",
-    textMuted: "#667085",
+    textMuted: "#637083",
     brand: "#0b3a8c",
+    brandDeep: "#082a62",
     brandSoft: "#e8eefb",
+    brandTint: "#d9e5fb",
+    ring: "rgba(11, 58, 140, 0.40)",
     accent: "#f59e0b",
     accentSoft: "#fdf1da",
     ok: "#16a34a",
@@ -74,13 +82,16 @@ export const palette = {
   },
   dark: {
     bg: "#0b1020",
-    surface: "#131a2e",
+    surface: "#141b30",
     surface2: "#1b2440",
     border: "#26304e",
     text: "#e8edf7",
-    textMuted: "#93a0be",
+    textMuted: "#95a2c2",
     brand: "#7aa2ff",
+    brandDeep: "#152a52",
     brandSoft: "rgba(122, 162, 255, 0.14)",
+    brandTint: "rgba(122, 162, 255, 0.22)",
+    ring: "rgba(122, 162, 255, 0.60)",
     accent: "#fbbf24",
     accentSoft: "rgba(251, 191, 36, 0.14)",
     ok: "#34d399",

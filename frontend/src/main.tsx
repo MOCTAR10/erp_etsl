@@ -7,6 +7,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./i18n";
 import "@fontsource-variable/inter";
+import "@fontsource-variable/plus-jakarta-sans";
 import "./styles/global.css";
 
 const storedTheme = localStorage.getItem("etls.theme");
