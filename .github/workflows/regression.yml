@@ -43,6 +43,9 @@ jobs:
     name: Backend (tests + couverture)
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
     services:
       postgres:
         image: postgres:16
@@ -62,12 +65,21 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Start MinIO (image sans CMD -> commande explicite)
+      - name: Start MinIO (cache GHCR — pull anonyme Quay/Docker Hub inutilisable)
         run: |
+          set -euo pipefail
+          MINIO_IMG=ghcr.io/${{ github.repository }}/minio:ci
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null 2>&1
+          if ! docker manifest inspect "$MINIO_IMG" >/dev/null 2>&1; then
+            echo "Bootstrap GHCR : pull + push one-shot de l'image MinIO"
+            for i in 1 2 3; do docker pull minio/minio:latest && break; sleep 5; done
+            docker tag minio/minio:latest "$MINIO_IMG"
+            docker push "$MINIO_IMG"
+          fi
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=etls_minio \
             -e MINIO_ROOT_PASSWORD=etls_minio_dev_password \
-            quay.io/minio/minio:latest server /data
+            "$MINIO_IMG" server /data
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/minio/health/live >/dev/null && break
             sleep 2
@@ -141,6 +153,9 @@ jobs:
     name: E2E Playwright (chromium + firefox)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
     services:
       postgres:
         image: postgres:16
@@ -160,12 +175,21 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Start MinIO (image sans CMD -> commande explicite)
+      - name: Start MinIO (cache GHCR — pull anonyme Quay/Docker Hub inutilisable)
         run: |
+          set -euo pipefail
+          MINIO_IMG=ghcr.io/${{ github.repository }}/minio:ci
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null 2>&1
+          if ! docker manifest inspect "$MINIO_IMG" >/dev/null 2>&1; then
+            echo "Bootstrap GHCR : pull + push one-shot de l'image MinIO"
+            for i in 1 2 3; do docker pull minio/minio:latest && break; sleep 5; done
+            docker tag minio/minio:latest "$MINIO_IMG"
+            docker push "$MINIO_IMG"
+          fi
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=etls_minio \
             -e MINIO_ROOT_PASSWORD=etls_minio_dev_password \
-            quay.io/minio/minio:latest server /data
+            "$MINIO_IMG" server /data
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/minio/health/live >/dev/null && break
             sleep 2
