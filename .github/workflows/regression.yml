@@ -1,6 +1,7 @@
 # régression ETSL — GitHub Actions (gratuit : dépôt public)
 #
-# 3 jobs indépendants, déclenchés à chaque push sur master (+ bouton manuel) :
+# 3 jobs indépendants, déclenchés à chaque push sur master, chaque nuit à 23h UTC
+# (= 00h à Libreville, UTC+1) et via le bouton manuel :
 #   backend  → suite Django (22 apps, ~400 tests) + rapport de couverture (report-only)
 #   frontend → typecheck + build + vitest
 #   e2e      → Playwright chromium/firefox contre une base dédiée seedée (etls_e2e)
@@ -14,6 +15,9 @@ name: regression
 on:
   push:
     branches: [master]
+  schedule:
+    # régression quotidienne automatique (minuit heure du Gabon = 23h UTC)
+    - cron: '0 23 * * *'
   workflow_dispatch:
 
 concurrency:
