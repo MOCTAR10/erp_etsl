@@ -50,13 +50,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U etls -d etls_ci"
           --health-interval 5s --health-timeout 5s --health-retries 10
-      minio:
-        image: minio/minio:latest
-        command: ["server", "/data"]
-        ports: ["9000:9000", "9001:9001"]
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
@@ -65,6 +58,17 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - name: Start MinIO (image sans CMD -> commande explicite)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=etls_minio \
+            -e MINIO_ROOT_PASSWORD=etls_minio_dev_password \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:9000/minio/health/live >/dev/null && echo "minio ok"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -144,13 +148,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U etls -d etls_e2e"
           --health-interval 5s --health-timeout 5s --health-retries 10
-      minio:
-        image: minio/minio:latest
-        command: ["server", "/data"]
-        ports: ["9000:9000", "9001:9001"]
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
@@ -159,6 +156,17 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - name: Start MinIO (image sans CMD -> commande explicite)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=etls_minio \
+            -e MINIO_ROOT_PASSWORD=etls_minio_dev_password \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:9000/minio/health/live >/dev/null && echo "minio ok"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
