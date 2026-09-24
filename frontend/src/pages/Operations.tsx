@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { ClipboardList, Clock3, Construction, Factory, HardHat } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type {
   ChargeStats,
   OfStatus,
@@ -26,16 +26,10 @@ const STATUS_BADGE: Record<OfStatus, "ok" | "warn" | "err" | "brand"> = {
 const VALID_STATUSES = new Set<OfStatus>(["prevu", "lance", "en_cours", "termine", "cloture", "annule"]);
 const BOARD_ORDER: OfStatus[] = ["en_cours", "lance", "prevu", "termine", "cloture"];
 
-function OfCard({ of }: { of: OrdreFabrication }) {
+function OfCard({ of, index }: { of: OrdreFabrication; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         <span className="muted">{of.code}</span> · {of.label}
       </div>
@@ -59,27 +53,26 @@ function OfCard({ of }: { of: OrdreFabrication }) {
           {t("operations.due")} {formatDate(of.planned_end, "fr")}
         </div>
       ) : null}
-    </motion.div>
+    </BoardCard>
   );
 }
 
 function Charge({ stats }: { stats: ChargeStats }) {
   const { t } = useTranslation();
-  const scope = (key: "atelier" | "chantier") => (
-    <div className="card kpi">
-      <span className="kpi-label">{t(`operations.${key}`)}</span>
-      <span className="kpi-value">
-        {formatNumber(stats.totals[key].calculated)} h {t("operations.planned")}
-      </span>
-      <span className="meta muted">
-        {formatNumber(stats.totals[key].pointed)} h {t("operations.pointed")} · {stats.totals[key].count} OF
-      </span>
-    </div>
+  const scope = (key: "atelier" | "chantier", delay: number, icon: typeof Factory) => (
+    <Kpi
+      label={t(`operations.${key}`)}
+      value={`${formatNumber(stats.totals[key].calculated)} h ${t("operations.planned")}`}
+      hint={`${formatNumber(stats.totals[key].pointed)} h ${t("operations.pointed")} · ${stats.totals[key].count} OF`}
+      icon={icon}
+      tone="brand"
+      delay={delay}
+    />
   );
   return (
-    <div className="kpis">
-      {scope("atelier")}
-      {scope("chantier")}
+    <div className="kpi-grid">
+      {scope("atelier", 0, Factory)}
+      {scope("chantier", 0.05, Construction)}
     </div>
   );
 }
@@ -118,22 +111,18 @@ export function OperationsPage() {
   });
 
   if (byStatus.isLoading || charge.isLoading || situations.isLoading)
-    return <p className="muted">{t("common.loading")}</p>;
+    return <BoardSkeleton cols={5} rows={3} />;
   if (byStatus.isError || charge.isError || situations.isError || !byStatus.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void byStatus.refetch();
-            void charge.refetch();
-            void situations.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void byStatus.refetch();
+          void charge.refetch();
+          void situations.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const groups = byStatus.data;
@@ -142,44 +131,35 @@ export function OperationsPage() {
 
   return (
     <>
-      <h2>{t("operations.title")}</h2>
+      <PageHeader title={t("operations.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("operations.of")}</span>
-          <span className="kpi-value">{active}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("operations.reported")}</span>
-          <span className="kpi-value">{formatNumber(reported)} h</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi label={t("operations.of")} value={active} icon={HardHat} tone="brand" delay={0} />
+        <Kpi label={t("operations.reported")} value={`${formatNumber(reported)} h`} icon={Clock3} tone="accent" delay={0.05} />
       </div>
       {charge.data ? <Charge stats={charge.data} /> : null}
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {BOARD_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`operations.${st}`)}</span>
-              <span className={`badge ${STATUS_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((of_) => <OfCard key={of_.id} of={of_} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {BOARD_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`operations.${st}`)}
+              count={groups[st].length}
+              tone={STATUS_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
+                  {t("common.empty")}
+                </p>
+              ) : (
+                groups[st].map((of_, i) => <OfCard key={of_.id} of={of_} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       {situations.data && situations.data.length > 0 ? (
@@ -187,19 +167,17 @@ export function OperationsPage() {
           {t("operations.situations")}
         </h3>
       ) : null}
-      <div className="kpis" style={{ flexWrap: "wrap" }}>
-        {(situations.data ?? []).map((s) => (
-          <div className="card kpi" key={s.id}>
-            <span className="kpi-label">
-              {s.code} · {s.status_label}
-            </span>
-            <span className="kpi-value">
-              {s.amount === null ? t("operations.masked") : formatNumber(Number(s.amount))}
-            </span>
-            <span className="meta muted">
-              {formatNumber(Number(s.ordered_hours))} h · {s.ordres_count} OF · {s.progress}%
-            </span>
-          </div>
+      <div className="kpi-grid">
+        {(situations.data ?? []).map((s, i) => (
+          <Kpi
+            key={s.id}
+            label={`${s.code} · ${s.status_label}`}
+            value={s.amount === null ? t("operations.masked") : formatNumber(Number(s.amount))}
+            hint={`${formatNumber(Number(s.ordered_hours))} h · ${s.ordres_count} OF · ${s.progress}%`}
+            icon={ClipboardList}
+            tone="brand"
+            delay={i * 0.05}
+          />
         ))}
       </div>
     </>

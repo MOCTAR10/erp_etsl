@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { ClipboardCheck, Coins, Hammer, Inbox, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
 import { formatDate } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
 import type {
   Actif,
   Inspection,
@@ -80,16 +80,10 @@ function InspectionCard({ insp }: { insp: Inspection }) {
   );
 }
 
-function OtCard({ ot }: { ot: OrdreTravail }) {
+function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {ot.code} <span className="muted">· {t(`maintenance.ot_types.${ot.type_ot}`)}</span>
         {ot.actif_code ? <span className="muted"> · {ot.actif_code}</span> : null}
@@ -106,7 +100,7 @@ function OtCard({ ot }: { ot: OrdreTravail }) {
           {ot.has_amount_access && ot.cout_total !== null ? ` · ${ot.cout_total} F` : ""}
         </span>
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
@@ -140,23 +134,19 @@ export function MaintenancePage() {
   });
 
   if (stats.isLoading || ordres.isLoading || !stats.data)
-    return <p className="muted">{t("common.loading")}</p>;
+    return <BoardSkeleton cols={6} rows={3} />;
   if (stats.isError || ordres.isError || !ordres.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void stats.refetch();
-            void actifs.refetch();
-            void ordres.refetch();
-            void inspections.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void stats.refetch();
+          void actifs.refetch();
+          void ordres.refetch();
+          void inspections.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const s = stats.data;
@@ -170,55 +160,34 @@ export function MaintenancePage() {
 
   return (
     <>
-      <h2>{t("maintenance.title")}</h2>
+      <PageHeader title={t("maintenance.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("maintenance.otOuverts")}</span>
-          <span className="kpi-value">{s.ot_ouverts}</span>
-          <span className="meta muted">{t("maintenance.enCours")} · {s.ot_en_cours} · {t("maintenance.critiques")} · {s.ot_critiques}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("maintenance.actifsArret")}</span>
-          <span className="kpi-value">{arrete || s.actifs_arret}</span>
-          <span className="meta muted">{t("maintenance.operationnels")} · {s.actifs_operationnels}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("maintenance.inspectionsPrevues")}</span>
-          <span className="kpi-value">{s.inspections_prevues}</span>
-          <span className="meta muted">{t("maintenance.heuresTotal")} · {s.heures_total}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("maintenance.coutTotal")}</span>
-          <span className="kpi-value">{s.cout_total > 0 ? s.cout_total.toLocaleString("fr-FR") : "0"} F</span>
-          <span className="meta muted">{t("maintenance.actifs")} · {actifsAll.length}</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi label={t("maintenance.otOuverts")} value={s.ot_ouverts} hint={`${t("maintenance.enCours")} · ${s.ot_en_cours} · ${t("maintenance.critiques")} · ${s.ot_critiques}`} icon={Wrench} tone="brand" delay={0} />
+        <Kpi label={t("maintenance.actifsArret")} value={arrete || s.actifs_arret} hint={`${t("maintenance.operationnels")} · ${s.actifs_operationnels}`} icon={Hammer} tone="warn" delay={0.05} />
+        <Kpi label={t("maintenance.inspectionsPrevues")} value={s.inspections_prevues} hint={`${t("maintenance.heuresTotal")} · ${s.heures_total}`} icon={ClipboardCheck} tone="accent" delay={0.1} />
+        <Kpi label={t("maintenance.coutTotal")} value={`${s.cout_total > 0 ? s.cout_total.toLocaleString("fr-FR") : "0"} F`} hint={`${t("maintenance.actifs")} · ${actifsAll.length}`} icon={Coins} tone="brand" delay={0.15} />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {OT_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`maintenance.ot_statut.${st}`)}</span>
-              <span className={`badge ${OT_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((ot) => <OtCard key={ot.id} ot={ot} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {OT_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`maintenance.ot_statut.${st}`)}
+              count={groups[st].length}
+              tone={OT_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <EmptyState icon={Inbox} label={t("common.empty")} />
+              ) : (
+                groups[st].map((ot, i) => <OtCard key={ot.id} ot={ot} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       {ouvertNonClos > 0 ? (

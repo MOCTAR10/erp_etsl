@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { CalendarCheck, Coins, Inbox, PieChart, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
 import { formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
 import type {
   Budget,
   BudgetRevision,
@@ -25,16 +25,10 @@ const BUD_BADGE: Record<StatutBudget, "ok" | "warn" | "err" | "brand"> = {
 const BUD_ORDER: StatutBudget[] = ["brouillon", "approuve", "cloture"];
 const BUD_VALID = new Set<StatutBudget>(BUD_ORDER);
 
-function BudgetCard({ b }: { b: Budget }) {
+function BudgetCard({ b, index }: { b: Budget; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {b.code} <span className="muted">· {t(`controleGestion.budgetType${b.type_budget === "charge" ? "Charge" : "Produit"}`)}</span>
       </div>
@@ -46,7 +40,7 @@ function BudgetCard({ b }: { b: Budget }) {
         {b.analytic_code ? ` · ${b.axis_code ?? "axe"}:${b.analytic_code}` : ""}
         {b.nb_revisions > 0 ? ` · R${b.nb_revisions}` : ""}
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
@@ -143,25 +137,21 @@ export function ControleGestionPage() {
   });
 
   if (!fy.data || budgets.isLoading || !budgets.data)
-    return <p className="muted">{t("common.loading")}</p>;
+    return <BoardSkeleton cols={3} rows={3} />;
 
   if (budgets.isError || marges.isError || cloturesStats.isError)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void budgets.refetch();
-            void revisions.refetch();
-            void clotures.refetch();
-            void cloturesStats.refetch();
-            void marges.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void budgets.refetch();
+          void revisions.refetch();
+          void clotures.refetch();
+          void cloturesStats.refetch();
+          void marges.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const groups = budgets.data;
@@ -174,59 +164,34 @@ export function ControleGestionPage() {
 
   return (
     <>
-      <h2>{t("controleGestion.title")}</h2>
+      <PageHeader title={t("controleGestion.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("controleGestion.budgets")}</span>
-          <span className="kpi-value">{enCours}</span>
-          <span className="meta muted">{t("controleGestion.variance")}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("controleGestion.revisions")}</span>
-          <span className="kpi-value">{appliquees}</span>
-          <span className="meta muted">R1 - R4</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("controleGestion.clotures")}</span>
-          <span className="kpi-value">
-            {stats ? `${stats.conformes_j4}/${stats.periodes}` : "—"}
-          </span>
-          <span className="meta muted">{t("controleGestion.realizeesJ4")}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("controleGestion.marge")}</span>
-          <span className="kpi-value">
-            {m && m.totals.marge_hors_gr !== null ? `${formatNumber(m.totals.marge_hors_gr)} F` : "••••••"}
-          </span>
-          <span className="meta muted">{t("controleGestion.coutGr")} {m ? formatNumber(m.totals.cout_gr) : "—"} F</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi label={t("controleGestion.budgets")} value={enCours} hint={t("controleGestion.variance")} icon={PieChart} tone="brand" delay={0} />
+        <Kpi label={t("controleGestion.revisions")} value={appliquees} hint="R1 - R4" icon={Target} tone="warn" delay={0.05} />
+        <Kpi label={t("controleGestion.clotures")} value={stats ? `${stats.conformes_j4}/${stats.periodes}` : "—"} hint={t("controleGestion.realizeesJ4")} icon={CalendarCheck} tone="brand" delay={0.1} />
+        <Kpi label={t("controleGestion.marge")} value={m && m.totals.marge_hors_gr !== null ? `${formatNumber(m.totals.marge_hors_gr)} F` : "••••••"} hint={`${t("controleGestion.coutGr")} ${m ? formatNumber(m.totals.cout_gr) : "—"} F`} icon={Coins} tone="accent" delay={0.15} />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {BUD_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 280 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`controleGestion.statut_budget.${st}`)}</span>
-              <span className={`badge ${BUD_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((b) => <BudgetCard key={b.id} b={b} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {BUD_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`controleGestion.statut_budget.${st}`)}
+              count={groups[st].length}
+              tone={BUD_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={280}
+            >
+              {groups[st].length === 0 ? (
+                <EmptyState icon={Inbox} label={t("common.empty")} />
+              ) : (
+                groups[st].map((b, i) => <BudgetCard key={b.id} b={b} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       {m && m.rows.length > 0 ? (

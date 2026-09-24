@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { BoardSkeleton, ErrorState, PageHeader } from "../components/ui";
 
 export function CircuitsPage() {
   const { t } = useTranslation();
@@ -10,20 +11,15 @@ export function CircuitsPage() {
     queryFn: api.circuits,
   });
 
-  if (isLoading) return <p className="muted">{t("common.loading")}</p>;
+  if (isLoading) return <BoardSkeleton cols={1} rows={3} />;
   if (isError || !data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button className="btn ghost" onClick={() => void refetch()}>
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState message={t("common.error")} onRetry={() => void refetch()} retryLabel={t("common.retry")} />
     );
 
   return (
     <>
-      <h2>{t("circuits.title")}</h2>
+      <PageHeader title={t("circuits.title")} />
       {data.map((circuit) => (
         <div className="card" key={circuit.id} style={{ marginBottom: "1rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

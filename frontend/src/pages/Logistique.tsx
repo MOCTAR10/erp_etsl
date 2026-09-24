@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { ClipboardList, MapPin, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type {
   DemandeMobilisation,
   EquipementParc,
@@ -31,16 +31,10 @@ const VALID_STATUSES = new Set<EquipementStatut>([
 ]);
 const BOARD_ORDER: EquipementStatut[] = ["disponible", "affecte", "en_location", "maintenance", "hors_service"];
 
-function EquipementCard({ eq }: { eq: EquipementParc }) {
+function EquipementCard({ eq, index }: { eq: EquipementParc; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {eq.is_global_rental ? (
           <span className="badge warn" title={t("logistique.globalRental")}>
@@ -64,43 +58,40 @@ function EquipementCard({ eq }: { eq: EquipementParc }) {
           {[eq.site, eq.proprietaire_code].filter(Boolean).join(" · ")}
         </div>
       ) : null}
-    </motion.div>
+    </BoardCard>
   );
 }
 
-function LocationCard({ loc }: { loc: LocationGR }) {
+function LocationCard({ loc, index }: { loc: LocationGR; index: number }) {
   const { t } = useTranslation();
   const masked = loc.montant_estime === null;
   return (
-    <div className="card kpi" key={loc.id}>
-      <span className="kpi-label">
-        {loc.code} · {loc.statut_label} {loc.imputation_618 ? `· 618` : ""}
-      </span>
-      <span className="kpi-value">
-        {masked ? t("logistique.masked") : formatNumber(Number(loc.montant_estime))}
-      </span>
-      <span className="meta muted">
-        {loc.equipement_code} — {loc.partenaire_name} · {loc.periodicite_label} ·{" "}
-        {loc.consommation === null ? "—" : `${formatNumber(Number(loc.consommation))}`}
-      </span>
-    </div>
+    <Kpi
+      label={`${loc.code} · ${loc.statut_label}${loc.imputation_618 ? ` · 618` : ""}`}
+      value={masked ? t("logistique.masked") : formatNumber(Number(loc.montant_estime))}
+      hint={`${loc.equipement_code} — ${loc.partenaire_name} · ${loc.periodicite_label} · ${
+        loc.consommation === null ? "—" : `${formatNumber(Number(loc.consommation))}`
+      }`}
+      icon={MapPin}
+      tone="warn"
+      delay={index * 0.05}
+    />
   );
 }
 
-function DemandeCard({ demande }: { demande: DemandeMobilisation }) {
+function DemandeCard({ demande, index }: { demande: DemandeMobilisation; index: number }) {
   const { t } = useTranslation();
   return (
-    <div className="card kpi" key={demande.id}>
-      <span className="kpi-label">
-        {demande.code} · {demande.statut_label}
-      </span>
-      <span className="kpi-value">{demande.label}</span>
-      <span className="meta muted">
-        {demande.departement}
-        {demande.date_debut ? ` · ${t("logistique.debut")} ${formatDate(demande.date_debut, "fr")}` : ""}
-        {demande.affaire_code ? ` · ${demande.affaire_code}` : ""}
-      </span>
-    </div>
+    <Kpi
+      label={`${demande.code} · ${demande.statut_label}`}
+      value={demande.label}
+      hint={`${demande.departement}${demande.date_debut ? ` · ${t("logistique.debut")} ${formatDate(demande.date_debut, "fr")}` : ""}${
+        demande.affaire_code ? ` · ${demande.affaire_code}` : ""
+      }`}
+      icon={ClipboardList}
+      tone="brand"
+      delay={index * 0.05}
+    />
   );
 }
 
@@ -142,24 +133,19 @@ export function LogistiquePage() {
     select: (page: Paginated<DemandeMobilisation>) => page.results,
   });
 
-  if (byStatus.isLoading || parc.isLoading)
-    return <p className="muted">{t("common.loading")}</p>;
+  if (byStatus.isLoading || parc.isLoading) return <BoardSkeleton cols={5} rows={3} />;
   if (byStatus.isError || parc.isError || !byStatus.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void byStatus.refetch();
-            void parc.refetch();
-            void locations.refetch();
-            void demandes.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void byStatus.refetch();
+          void parc.refetch();
+          void locations.refetch();
+          void demandes.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const groups = byStatus.data;
@@ -169,60 +155,53 @@ export function LogistiquePage() {
 
   return (
     <>
-      <h2>{t("logistique.title")}</h2>
+      <PageHeader title={t("logistique.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">
-            {t("logistique.parc")} · {stats?.parc.total ?? groups.disponible.length}
-          </span>
-          <span className="kpi-value">
-            {stats ? formatNumber(stats.parc.global_rental) : 0} GR · {stats ? formatNumber(stats.parc.propre) : 0}{" "}
-            {t("logistique.propre")}
-          </span>
-          <span className="meta muted">
-            {t("logistique.equipements")} · {stats ? formatNumber(stats.parc.total) : 0}
-          </span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("logistique.locationsActives")}</span>
-          <span className="kpi-value">{stats ? stats.locations.actives : "—"}</span>
-          <span className="meta muted">
-            {stats?.locations.total_montant_estime !== undefined
+      <div className="kpi-grid">
+        <Kpi
+          label={`${t("logistique.parc")} · ${stats?.parc.total ?? groups.disponible.length}`}
+          value={`${stats ? formatNumber(stats.parc.global_rental) : 0} GR · ${stats ? formatNumber(stats.parc.propre) : 0} ${t("logistique.propre")}`}
+          hint={`${t("logistique.equipements")} · ${stats ? formatNumber(stats.parc.total) : 0}`}
+          icon={Truck}
+          tone="brand"
+          delay={0}
+        />
+        <Kpi
+          label={t("logistique.locationsActives")}
+          value={stats ? stats.locations.actives : "—"}
+          hint={
+            stats?.locations.total_montant_estime !== undefined
               ? `${formatNumber(stats.locations.total_montant_estime)} FCFA`
-              : t("logistique.masked")}
-          </span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("logistique.demandes")}</span>
-          <span className="kpi-value">{demandes.data?.length ?? "—"}</span>
-        </div>
+              : t("logistique.masked")
+          }
+          icon={MapPin}
+          tone="accent"
+          delay={0.05}
+        />
+        <Kpi label={t("logistique.demandes")} value={demandes.data?.length ?? "—"} icon={ClipboardList} tone="warn" delay={0.1} />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {BOARD_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{statutLabel(st)}</span>
-              <span className={`badge ${STATUS_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((eq) => <EquipementCard key={eq.id} eq={eq} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {BOARD_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={statutLabel(st)}
+              count={groups[st].length}
+              tone={STATUS_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
+                  {t("common.empty")}
+                </p>
+              ) : (
+                groups[st].map((eq, i) => <EquipementCard key={eq.id} eq={eq} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       {(locations.data ?? []).length > 0 ? (
@@ -230,9 +209,9 @@ export function LogistiquePage() {
           {t("logistique.locationsActives")} — GLOBAL RENTAL
         </h3>
       ) : null}
-      <div className="kpis" style={{ flexWrap: "wrap" }}>
-        {(locations.data ?? []).map((loc) => (
-          <LocationCard key={loc.id} loc={loc} />
+      <div className="kpi-grid">
+        {(locations.data ?? []).map((loc, i) => (
+          <LocationCard key={loc.id} loc={loc} index={i} />
         ))}
       </div>
 
@@ -241,9 +220,9 @@ export function LogistiquePage() {
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("logistique.demandes")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {(demandes.data ?? []).map((demande) => (
-              <DemandeCard key={demande.id} demande={demande} />
+          <div className="kpi-grid">
+            {(demandes.data ?? []).map((demande, i) => (
+              <DemandeCard key={demande.id} demande={demande} index={i} />
             ))}
           </div>
         </>

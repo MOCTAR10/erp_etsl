@@ -68,6 +68,8 @@ export const en = {
     step: "Step",
     due: "Due",
     overdue: "overdue",
+    tasks: "tasks",
+    task: "task",
   },
   pipeline: {
     title: "Sales pipeline (M1)",

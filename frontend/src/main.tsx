@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import App from "./App";
 import "./i18n";
+import "@fontsource-variable/inter";
 import "./styles/global.css";
 
 const storedTheme = localStorage.getItem("etls.theme");

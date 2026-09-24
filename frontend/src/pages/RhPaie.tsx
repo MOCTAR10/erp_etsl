@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { Banknote, CalendarClock, FileText, Inbox, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
 import type {
   BulletinPaie,
   DemandeConge,
@@ -51,16 +51,10 @@ function EmployeCard({ emp }: { emp: Employe }) {
   );
 }
 
-function CongeCard({ c }: { c: DemandeConge }) {
+function CongeCard({ c, index }: { c: DemandeConge; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {c.code} <span className="muted">· {t(`rhPaie.conges_types.${c.type}`)}</span>
       </div>
@@ -69,7 +63,7 @@ function CongeCard({ c }: { c: DemandeConge }) {
         {formatDate(c.date_debut, "fr")} → {formatDate(c.date_fin, "fr")} · {c.nb_jours} j
         {c.motif ? ` · ${c.motif}` : ""}
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
@@ -132,24 +126,20 @@ export function RhPaiePage() {
   });
 
   if (stats.isLoading || conges.isLoading || !stats.data || !conges.data)
-    return <p className="muted">{t("common.loading")}</p>;
+    return <BoardSkeleton cols={5} rows={3} />;
   if (stats.isError || conges.isError || !masse.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void stats.refetch();
-            void employes.refetch();
-            void conges.refetch();
-            void bulletins.refetch();
-            void masse.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void stats.refetch();
+          void employes.refetch();
+          void conges.refetch();
+          void bulletins.refetch();
+          void masse.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const s = stats.data;
@@ -161,55 +151,34 @@ export function RhPaiePage() {
 
   return (
     <>
-      <h2>{t("rhPaie.title")}</h2>
+      <PageHeader title={t("rhPaie.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("rhPaie.effectif")}</span>
-          <span className="kpi-value">{s.effectif}</span>
-          <span className="meta muted">{t("rhPaie.enConge")} · {s.en_conge} · {t("rhPaie.contratsExpirants")} · {s.contrats_expirants_30}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("rhPaie.congesEnAttente")}</span>
-          <span className="kpi-value">{enAttente || s.conges_en_attente}</span>
-          <span className="meta muted">{t("rhPaie.qualsExpirees")} · {s.qualifications_expirees}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("rhPaie.bulletinsMois")}</span>
-          <span className="kpi-value">{s.bulletins_mois}</span>
-          <span className="meta muted">{m.mois} · {t("rhPaie.masseBrute")} {formatNumber(m.brut_total)} F</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("rhPaie.masseNette")}</span>
-          <span className="kpi-value">{formatNumber(m.net_total)} F</span>
-          <span className="meta muted">{t("rhPaie.bulletins")} · {m.bulletins}</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi label={t("rhPaie.effectif")} value={s.effectif} hint={`${t("rhPaie.enConge")} · ${s.en_conge} · ${t("rhPaie.contratsExpirants")} · ${s.contrats_expirants_30}`} icon={Users} tone="brand" delay={0} />
+        <Kpi label={t("rhPaie.congesEnAttente")} value={enAttente || s.conges_en_attente} hint={`${t("rhPaie.qualsExpirees")} · ${s.qualifications_expirees}`} icon={CalendarClock} tone="warn" delay={0.05} />
+        <Kpi label={t("rhPaie.bulletinsMois")} value={s.bulletins_mois} hint={`${m.mois} · ${t("rhPaie.masseBrute")} ${formatNumber(m.brut_total)} F`} icon={FileText} tone="brand" delay={0.1} />
+        <Kpi label={t("rhPaie.masseNette")} value={`${formatNumber(m.net_total)} F`} hint={`${t("rhPaie.bulletins")} · ${m.bulletins}`} icon={Banknote} tone="accent" delay={0.15} />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {CONGE_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 240 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`rhPaie.conges_statut.${st}`)}</span>
-              <span className={`badge ${CONGE_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((c) => <CongeCard key={c.id} c={c} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {CONGE_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`rhPaie.conges_statut.${st}`)}
+              count={groups[st].length}
+              tone={CONGE_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={240}
+            >
+              {groups[st].length === 0 ? (
+                <EmptyState icon={Inbox} label={t("common.empty")} />
+              ) : (
+                groups[st].map((c, i) => <CongeCard key={c.id} c={c} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       <p className="muted" style={{ marginTop: "0.5rem" }}>

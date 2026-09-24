@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { CheckCircle2, ShoppingCart, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type { Paginated, PoStatus, PurchaseOrder } from "../types";
 
 type Groups = Record<PoStatus, PurchaseOrder[]>;
@@ -19,16 +19,10 @@ const STATUS_BADGE: Record<PoStatus, "ok" | "warn" | "err" | "brand"> = {
 };
 const VALID_STATUSES = new Set<PoStatus>(["brouillon", "confirmee", "partielle", "cloturee", "annulee"]);
 
-function OrderCard({ order }: { order: PurchaseOrder }) {
+function OrderCard({ order, index }: { order: PurchaseOrder; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         <span className="muted">{order.code}</span> · {order.supplier_name ?? "—"}
         {order.is_global_rental ? <span className="badge err">GR</span> : null}
@@ -46,7 +40,7 @@ function OrderCard({ order }: { order: PurchaseOrder }) {
           {t("purchases.expected")} {formatDate(order.expected_date, "fr")}
         </div>
       ) : null}
-    </motion.div>
+    </BoardCard>
   );
 }
 
@@ -73,63 +67,44 @@ export function PurchasesPage() {
   });
 
   const data = byStatus.data;
-  if (byStatus.isLoading) return <p className="muted">{t("common.loading")}</p>;
+  if (byStatus.isLoading) return <BoardSkeleton cols={4} rows={3} />;
   if (byStatus.isError || !data)
-    return (
-      <p>
-        {t("common.error")}{" "}
-        <button className="btn ghost" onClick={() => void byStatus.refetch()}>
-          {t("common.retry")}
-        </button>
-      </p>
-    );
+    return <ErrorState message={t("common.error")} onRetry={() => void byStatus.refetch()} retryLabel={t("common.retry")} />;
 
   const groups = data.groups;
   const total = (Object.values(groups) as PurchaseOrder[][]).reduce((a, l) => a + l.length, 0);
 
   return (
     <>
-      <h2>{t("purchases.title")}</h2>
+      <PageHeader title={t("purchases.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("purchases.orders")}</span>
-          <span className="kpi-value">{total}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("purchases.confirmed")}</span>
-          <span className="kpi-value">{groups.confirmee.length + groups.partielle.length + groups.cloturee.length}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("purchases.gr")}</span>
-          <span className="kpi-value">{data.grCount}</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi label={t("purchases.orders")} value={total} icon={ShoppingCart} tone="brand" delay={0} />
+        <Kpi label={t("purchases.confirmed")} value={groups.confirmee.length + groups.partielle.length + groups.cloturee.length} icon={CheckCircle2} tone="ok" delay={0.05} />
+        <Kpi label={t("purchases.gr")} value={data.grCount} icon={Truck} tone="warn" delay={0.1} />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {(["confirmee", "partielle", "cloturee", "brouillon"] as PoStatus[]).map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`purchases.${st}`)}</span>
-              <span className={`badge ${STATUS_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((o) => <OrderCard key={o.id} order={o} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {(["confirmee", "partielle", "cloturee", "brouillon"] as PoStatus[]).map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`purchases.${st}`)}
+              count={groups[st].length}
+              tone={STATUS_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
+                  {t("common.empty")}
+                </p>
+              ) : (
+                groups[st].map((o, i) => <OrderCard key={o.id} order={o} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
     </>
   );

@@ -8,13 +8,13 @@ test.describe("Régression : thème et langue (charte, Motion, réduit-motion)",
   });
 
   test("bascule de thème clair/sombre", async ({ page }) => {
-    await page.locator('button.icon-btn', { hasText: "◐" }).click();
+    await page.locator('button.icon-btn[aria-label="Sombre"]').click();
     const theme = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
     expect(["light", "dark"]).toContain(theme);
   });
 
   test("bascule de langue FR/EN rebranche les libellés", async ({ page }) => {
-    await page.locator("button.icon-btn", { hasText: "EN" }).click();
+    await page.locator('button.icon-btn[aria-label="Français"]').click();
     await expect(page.getByText("Dashboard").first()).toBeVisible();
   });
 });

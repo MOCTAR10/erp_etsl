@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { Activity, Flame, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
 import { formatDate } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
 import type {
   BordereauDechet,
   Epi,
@@ -138,16 +138,10 @@ function BsdCard({ bsd }: { bsd: BordereauDechet }) {
   );
 }
 
-function IncidentCard({ inc }: { inc: Incident }) {
+function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {inc.code} <span className="muted">· {t(`hse.incident_types.${inc.type_incident}`)}</span>
       </div>
@@ -162,7 +156,7 @@ function IncidentCard({ inc }: { inc: Incident }) {
           {inc.actions_count > 0 ? ` · ${t("hse.actions")} ×${inc.actions_count}` : ""}
         </span>
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
@@ -223,27 +217,23 @@ export function HsePage() {
   });
 
   if (stats.isLoading || incidents.isLoading || !stats.data)
-    return <p className="muted">{t("common.loading")}</p>;
+    return <BoardSkeleton cols={4} rows={3} />;
   if (stats.isError || incidents.isError || !incidents.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void stats.refetch();
-            void permis.refetch();
-            void incidents.refetch();
-            void risques.refetch();
-            void atex.refetch();
-            void formations.refetch();
-            void epis.refetch();
-            void bsd.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void stats.refetch();
+          void permis.refetch();
+          void incidents.refetch();
+          void risques.refetch();
+          void atex.refetch();
+          void formations.refetch();
+          void epis.refetch();
+          void bsd.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const s = stats.data;
@@ -261,57 +251,34 @@ export function HsePage() {
 
   return (
     <>
-      <h2>{t("hse.title")}</h2>
+      <PageHeader title={t("hse.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("hse.joursSansAccident")}</span>
-          <span className="kpi-value">{s.jours_sans_accident ?? "∞"}</span>
-          <span className="meta muted">{t("hse.incidentsOuverts")} · {s.incidents_ouverts}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("hse.permisActifs")}</span>
-          <span className="kpi-value">{s.permis_actifs}</span>
-          <span className="meta muted">{t("hse.risquesCritiques")} · {s.risques_critiques}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("hse.atexQuarantaine")}</span>
-          <span className="kpi-value">{s.atex_quarantaine}</span>
-          <span className="meta muted">{t("hse.actionsOuvertes")} · {s.actions_ouvertes}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("hse.epiRenouveler")}</span>
-          <span className="kpi-value">{aRenouveler || s.epi_a_renouveler}</span>
-          <span className="meta muted">
-            {t("hse.formationsPrevues")} · {s.formations_prevues} · {t("hse.bsdAttente")} · {s.bsd_en_attente}
-          </span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? "∞"} hint={`${t("hse.incidentsOuverts")} · ${s.incidents_ouverts}`} icon={ShieldAlert} tone="ok" delay={0} />
+        <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${t("hse.risquesCritiques")} · ${s.risques_critiques}`} icon={ShieldCheck} tone="brand" delay={0.05} />
+        <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${t("hse.actionsOuvertes")} · ${s.actions_ouvertes}`} icon={Flame} tone="warn" delay={0.1} />
+        <Kpi label={t("hse.epiRenouveler")} value={aRenouveler || s.epi_a_renouveler} hint={`${t("hse.formationsPrevues")} · ${s.formations_prevues} · ${t("hse.bsdAttente")} · ${s.bsd_en_attente}`} icon={Activity} tone="warn" delay={0.15} />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {INC_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`hse.incident_statut.${st}`)}</span>
-              <span className={`badge ${INC_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((inc) => <IncidentCard key={inc.id} inc={inc} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {INC_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`hse.incident_statut.${st}`)}
+              count={groups[st].length}
+              tone={INC_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <EmptyState icon={Inbox} label={t("common.empty")} />
+              ) : (
+                groups[st].map((inc, i) => <IncidentCard key={inc.id} inc={inc} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       {ouvertNonClos > 0 ? (

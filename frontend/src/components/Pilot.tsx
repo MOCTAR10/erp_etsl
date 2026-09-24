@@ -2,6 +2,7 @@ import { motion, MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 
 import { motionTokens } from "../theme/tokens";
+import { pageTransition, staggerContainer, staggerItem } from "../lib/motion";
 
 /** Transition de page pilote — fade + légère translation (tokens partagés). */
 export function withPilot(node: ReactNode): ReactNode {
@@ -9,10 +10,7 @@ export function withPilot(node: ReactNode): ReactNode {
     <motion.div
       initial={{ opacity: 0, y: motionTokens.distance.sm }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: motionTokens.duration.base,
-        ease: motionTokens.ease.out,
-      }}
+      transition={pageTransition}
     >
       {node}
     </motion.div>
@@ -26,12 +24,7 @@ export function MotionGrid({ children }: { children: ReactNode }) {
       className="kpi-grid"
       initial="hidden"
       animate="visible"
-      variants={{
-        hidden: {},
-        visible: {
-          transition: { staggerChildren: motionTokens.stagger.quick },
-        },
-      }}
+      variants={staggerContainer()}
     >
       {children}
     </motion.div>
@@ -41,17 +34,8 @@ export function MotionGrid({ children }: { children: ReactNode }) {
 export function MotionItem({ children }: { children: ReactNode }) {
   return (
     <motion.div
-      variants={{
-        hidden: { opacity: 0, y: motionTokens.distance.xs },
-        visible: {
-          opacity: 1,
-          y: 0,
-          transition: {
-            duration: motionTokens.duration.base,
-            ease: motionTokens.ease.out,
-          },
-        },
-      }}
+      className="motion-item"
+      variants={staggerItem}
     >
       {children}
     </motion.div>

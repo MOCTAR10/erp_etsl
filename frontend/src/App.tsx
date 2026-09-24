@@ -1,29 +1,34 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { useAuth } from "./store/auth";
 import { Shell } from "./components/Shell";
 import { withPilot } from "./components/Pilot";
-
-import { CircuitsPage } from "./pages/Circuits";
-import { DashboardPage } from "./pages/Dashboard";
-import { KanbanPage } from "./pages/Kanban";
+import { KpiGridSkeleton } from "./components/ui";
 import { LoginPage } from "./pages/Login";
-import { NotificationsPage } from "./pages/Notifications";
-import { OperationsPage } from "./pages/Operations";
-import { LogistiquePage } from "./pages/Logistique";
-import { StocksPage } from "./pages/Stocks";
-import { QualitePage } from "./pages/Qualite";
-import { HsePage } from "./pages/Hse";
-import { MaintenancePage } from "./pages/Maintenance";
-import { RhPaiePage } from "./pages/RhPaie";
-import { ComptabilitePage } from "./pages/Comptabilite";
-import { ControleGestionPage } from "./pages/ControleGestion";
-import { JuridiquePage } from "./pages/Juridique";
-import { PipelinePage } from "./pages/Pipeline";
-import { PurchasesPage } from "./pages/Purchases";
-import { DirectionPage } from "./pages/Direction";
+
+const DashboardPage = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
+const KanbanPage = lazy(() => import("./pages/Kanban").then((m) => ({ default: m.KanbanPage })));
+const PipelinePage = lazy(() => import("./pages/Pipeline").then((m) => ({ default: m.PipelinePage })));
+const PurchasesPage = lazy(() => import("./pages/Purchases").then((m) => ({ default: m.PurchasesPage })));
+const OperationsPage = lazy(() => import("./pages/Operations").then((m) => ({ default: m.OperationsPage })));
+const LogistiquePage = lazy(() => import("./pages/Logistique").then((m) => ({ default: m.LogistiquePage })));
+const StocksPage = lazy(() => import("./pages/Stocks").then((m) => ({ default: m.StocksPage })));
+const QualitePage = lazy(() => import("./pages/Qualite").then((m) => ({ default: m.QualitePage })));
+const HsePage = lazy(() => import("./pages/Hse").then((m) => ({ default: m.HsePage })));
+const MaintenancePage = lazy(() => import("./pages/Maintenance").then((m) => ({ default: m.MaintenancePage })));
+const RhPaiePage = lazy(() => import("./pages/RhPaie").then((m) => ({ default: m.RhPaiePage })));
+const ComptabilitePage = lazy(() => import("./pages/Comptabilite").then((m) => ({ default: m.ComptabilitePage })));
+const ControleGestionPage = lazy(() => import("./pages/ControleGestion").then((m) => ({ default: m.ControleGestionPage })));
+const JuridiquePage = lazy(() => import("./pages/Juridique").then((m) => ({ default: m.JuridiquePage })));
+const DirectionPage = lazy(() => import("./pages/Direction").then((m) => ({ default: m.DirectionPage })));
+const CircuitsPage = lazy(() => import("./pages/Circuits").then((m) => ({ default: m.CircuitsPage })));
+const NotificationsPage = lazy(() => import("./pages/Notifications").then((m) => ({ default: m.NotificationsPage })));
+
+function pilotPage(children: ReactNode) {
+  return withPilot(<Suspense fallback={<KpiGridSkeleton count={6} />}>{children}</Suspense>);
+}
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const access = useAuth((s) => s.access);
@@ -59,23 +64,23 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={withPilot(<DashboardPage />)} />
-        <Route path="kanban" element={withPilot(<KanbanPage />)} />
-        <Route path="pipeline" element={withPilot(<PipelinePage />)} />
-        <Route path="purchases" element={withPilot(<PurchasesPage />)} />
-        <Route path="operations" element={withPilot(<OperationsPage />)} />
-        <Route path="logistique" element={withPilot(<LogistiquePage />)} />
-        <Route path="stocks" element={withPilot(<StocksPage />)} />
-        <Route path="qualite" element={withPilot(<QualitePage />)} />
-        <Route path="hse" element={withPilot(<HsePage />)} />
-        <Route path="maintenance" element={withPilot(<MaintenancePage />)} />
-        <Route path="rh-paie" element={withPilot(<RhPaiePage />)} />
-        <Route path="comptabilite" element={withPilot(<ComptabilitePage />)} />
-        <Route path="controle-gestion" element={withPilot(<ControleGestionPage />)} />
-        <Route path="juridique" element={withPilot(<JuridiquePage />)} />
-        <Route path="direction" element={withPilot(<DirectionPage />)} />
-        <Route path="circuits" element={<CircuitsPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
+        <Route index element={pilotPage(<DashboardPage />)} />
+        <Route path="kanban" element={pilotPage(<KanbanPage />)} />
+        <Route path="pipeline" element={pilotPage(<PipelinePage />)} />
+        <Route path="purchases" element={pilotPage(<PurchasesPage />)} />
+        <Route path="operations" element={pilotPage(<OperationsPage />)} />
+        <Route path="logistique" element={pilotPage(<LogistiquePage />)} />
+        <Route path="stocks" element={pilotPage(<StocksPage />)} />
+        <Route path="qualite" element={pilotPage(<QualitePage />)} />
+        <Route path="hse" element={pilotPage(<HsePage />)} />
+        <Route path="maintenance" element={pilotPage(<MaintenancePage />)} />
+        <Route path="rh-paie" element={pilotPage(<RhPaiePage />)} />
+        <Route path="comptabilite" element={pilotPage(<ComptabilitePage />)} />
+        <Route path="controle-gestion" element={pilotPage(<ControleGestionPage />)} />
+        <Route path="juridique" element={pilotPage(<JuridiquePage />)} />
+        <Route path="direction" element={pilotPage(<DirectionPage />)} />
+        <Route path="circuits" element={pilotPage(<CircuitsPage />)} />
+        <Route path="notifications" element={pilotPage(<NotificationsPage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

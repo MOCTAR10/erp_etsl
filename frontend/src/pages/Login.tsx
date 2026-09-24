@@ -1,11 +1,14 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { LogIn } from "lucide-react";
+import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { login } from "../api/client";
 import { useAuth } from "../store/auth";
+import { motionTokens } from "../theme/tokens";
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -37,7 +40,12 @@ export function LoginPage() {
 
   return (
     <div className="login">
-      <div className="card login-card">
+      <motion.div
+        initial={{ opacity: 0, y: motionTokens.distance.md, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
+        className="card login-card"
+      >
         <div className="sidebar-brand" style={{ padding: "0 0 1rem" }}>
           <span className="brand-mark">ET</span>
           <div style={{ lineHeight: 1.2 }}>
@@ -76,11 +84,18 @@ export function LoginPage() {
               {error}
             </p>
           )}
-          <button className="btn primary" style={{ width: "100%" }} type="submit" disabled={busy}>
+          <motion.button
+            className="btn primary"
+            style={{ width: "100%" }}
+            type="submit"
+            disabled={busy}
+            whileTap={{ scale: 0.98 }}
+          >
+            <LogIn size={15} />
             {busy ? t("common.loading") : t("login.submit")}
-          </button>
+          </motion.button>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import { formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
 import type {
   AlertesResult,
   Assurance,
@@ -30,7 +30,7 @@ const BANDE_BADGE: Record<BandeEcheance, "ok" | "warn" | "err"> = {
 };
 const BANDES: BandeEcheance[] = ["expiree", "j30", "j60", "j90"];
 
-function ConventionCard({ c }: { c: Convention }) {
+function ConventionCard({ c, index }: { c: Convention; index: number }) {
   const { t } = useTranslation();
   const badge =
     c.statut === "signe"
@@ -41,13 +41,7 @@ function ConventionCard({ c }: { c: Convention }) {
         ? "err"
         : "warn";
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {c.code} <span className="muted">· {c.type_label}</span>
       </div>
@@ -64,7 +58,7 @@ function ConventionCard({ c }: { c: Convention }) {
           </span>
         ) : null}
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
@@ -173,29 +167,25 @@ export function JuridiquePage() {
   const loading =
     !stats.data || alertes.isLoading || conventions.isLoading || cautions.isLoading || assurances.isLoading;
 
-  if (loading) return <p className="muted">{t("common.loading")}</p>;
+  if (loading) return <BoardSkeleton cols={4} rows={3} />;
 
   if (alertes.isError || conventions.isError)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void stats.refetch();
-            void alertes.refetch();
-            void courriers.refetch();
-            void conventions.refetch();
-            void cautions.refetch();
-            void assurances.refetch();
-            void contentieux.refetch();
-            void reunions.refetch();
-            void dossiersGr.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void stats.refetch();
+          void alertes.refetch();
+          void courriers.refetch();
+          void conventions.refetch();
+          void cautions.refetch();
+          void assurances.refetch();
+          void contentieux.refetch();
+          void reunions.refetch();
+          void dossiersGr.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const s = stats.data as JuridiqueStats;
@@ -210,37 +200,30 @@ export function JuridiquePage() {
 
   return (
     <>
-      <h2>{t("juridique.title")}</h2>
+      <PageHeader title={t("juridique.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("juridique.alertes")}</span>
-          <span className="kpi-value">{a.total}</span>
-          <span className="meta muted">
-            <span className="badge err">{a.compteurs["expiree"]}</span> {t("juridique.echeanceExpi")}
-            {" · "}
-            <span className="badge warn">{a.compteurs["j30"]}</span> {t("juridique.echeanceJ30")}
-            {" · "}
-            <span className="badge warn">{a.compteurs["j60"]}</span> {t("juridique.echeanceJ60")}
-            {" · "}
-            <span className="badge ok">{a.compteurs["j90"]}</span> {t("juridique.echeanceJ90")}
-          </span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("juridique.conventions")}</span>
-          <span className="kpi-value">{s.conventions}</span>
-          <span className="meta muted">{t("juridique.conventionsARenouveler")} {s.conventions_a_renouveler}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("juridique.contentieux")}</span>
-          <span className="kpi-value">{s.contentieux_ouverts}</span>
-          <span className="meta muted">{t("juridique.courriers")} {s.courriers}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("juridique.cautions")}</span>
-          <span className="kpi-value">{s.cautions_en_cours}</span>
-          <span className="meta muted">{t("juridique.assurances")} {s.assurances}</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi
+          label={t("juridique.alertes")}
+          value={a.total}
+          hint={
+            <>
+              <span className="badge err">{a.compteurs["expiree"]}</span> {t("juridique.echeanceExpi")}
+              {" · "}
+              <span className="badge warn">{a.compteurs["j30"]}</span> {t("juridique.echeanceJ30")}
+              {" · "}
+              <span className="badge warn">{a.compteurs["j60"]}</span> {t("juridique.echeanceJ60")}
+              {" · "}
+              <span className="badge ok">{a.compteurs["j90"]}</span> {t("juridique.echeanceJ90")}
+            </>
+          }
+          icon={Scale}
+          tone="warn"
+          delay={0}
+        />
+        <Kpi label={t("juridique.conventions")} value={s.conventions} hint={`${t("juridique.conventionsARenouveler")} ${s.conventions_a_renouveler}`} icon={FileText} tone="brand" delay={0.05} />
+        <Kpi label={t("juridique.contentieux")} value={s.contentieux_ouverts} hint={`${t("juridique.courriers")} ${s.courriers}`} icon={Gavel} tone="err" delay={0.1} />
+        <Kpi label={t("juridique.cautions")} value={s.cautions_en_cours} hint={`${t("juridique.assurances")} ${s.assurances}`} icon={ShieldCheck} tone="brand" delay={0.15} />
       </div>
 
       {a.total > 0 ? (
@@ -274,22 +257,27 @@ export function JuridiquePage() {
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("juridique.conventions")} · {convs.length}
           </h3>
-          <div className="board" style={{ overflowX: "auto" }}>
-            {(["signe", "en_signature", "brouillon", "cloture", "resilie"] as StatutConvention[]).map((st) => {
-              const items = convs.filter((c) => c.statut === st);
-              if (items.length === 0) return null;
-              return (
-                <motion.div key={st} layout className="board-col" style={{ minWidth: 280 }}>
-                  <div className="board-col-head">
-                    <span>{t(`juridique.statut_convention.${st}`)}</span>
-                    <span className="badge warn">{items.length}</span>
-                  </div>
-                  {items.map((c) => (
-                    <ConventionCard key={c.id} c={c} />
-                  ))}
-                </motion.div>
-              );
-            })}
+          <div style={{ overflowX: "auto" }}>
+            <Board>
+              {(["signe", "en_signature", "brouillon", "cloture", "resilie"] as StatutConvention[]).map((st, ci) => {
+                const items = convs.filter((c) => c.statut === st);
+                if (items.length === 0) return null;
+                return (
+                  <BoardColumn
+                    key={st}
+                    title={t(`juridique.statut_convention.${st}`)}
+                    count={items.length}
+                    tone="warn"
+                    delay={ci * 0.05}
+                    minWidth={280}
+                  >
+                    {items.map((c, i) => (
+                      <ConventionCard key={c.id} c={c} index={i} />
+                    ))}
+                  </BoardColumn>
+                );
+              })}
+            </Board>
           </div>
         </>
       ) : null}

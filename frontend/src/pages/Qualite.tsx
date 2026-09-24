@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { Award, ClipboardCheck, FileCheck2, FileText, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type {
   ControleQualite,
   NonConformite,
@@ -26,73 +26,76 @@ const NC_BADGE: Record<StatutNC, "ok" | "warn" | "err" | "brand"> = {
 const NC_ORDER: StatutNC[] = ["signalee", "analysee", "en_traitement", "cloturee"];
 const NC_VALID = new Set<StatutNC>(NC_ORDER);
 
-function QualifCard({ qual }: { qual: QualificationSoudeur }) {
+function QualifCard({ qual, index }: { qual: QualificationSoudeur; index: number }) {
   const { t } = useTranslation();
   const expired = qual.statut === "expiree";
   return (
-    <div className="card kpi" key={qual.id}>
-      <span className="kpi-label">
-        {qual.code} · {qual.soudeur_code} · {t(`qualite.norms.${qual.norme}`)}
-      </span>
-      <span className="kpi-value">{qual.soudeur_name}</span>
-      <span className="meta muted">
-        {qual.procede_label} · {qual.position || "—"} · {formatDate(qual.date_validite, "fr")}
-        {expired ? (
-          <span className="badge err"> {t("qualite.expiree")}</span>
-        ) : (
-          <span className="badge ok"> {t("qualite.valide")}</span>
-        )}
-      </span>
-    </div>
+    <Kpi
+      label={`${qual.code} · ${qual.soudeur_code} · ${t(`qualite.norms.${qual.norme}`)}`}
+      value={qual.soudeur_name}
+      hint={
+        <>
+          {qual.procede_label} · {qual.position || "—"} · {formatDate(qual.date_validite, "fr")}
+          {expired ? (
+            <span className="badge err"> {t("qualite.expiree")}</span>
+          ) : (
+            <span className="badge ok"> {t("qualite.valide")}</span>
+          )}
+        </>
+      }
+      icon={Award}
+      tone={expired ? "warn" : "ok"}
+      delay={index * 0.05}
+    />
   );
 }
 
-function WpsCard({ wps }: { wps: WpsWpqr }) {
+function WpsCard({ wps, index }: { wps: WpsWpqr; index: number }) {
   const { t } = useTranslation();
   return (
-    <div className="card kpi" key={wps.id}>
-      <span className="kpi-label">
-        {wps.code} · {t(`qualite.wps_type.${wps.type}`)}
-      </span>
-      <span className="kpi-value">{wps.reference || "—"}</span>
-      <span className="meta muted">
-        {wps.procede_label} · {wps.materiau || "—"} ·{" "}
-        <span className={`badge ${wps.statut === "valide" ? "ok" : "brand"}`}>
-          {t(`qualite.wps_status.${wps.statut}`)}
-        </span>
-      </span>
-    </div>
+    <Kpi
+      label={`${wps.code} · ${t(`qualite.wps_type.${wps.type}`)}`}
+      value={wps.reference || "—"}
+      hint={
+        <>
+          {wps.procede_label} · {wps.materiau || "—"} ·{" "}
+          <span className={`badge ${wps.statut === "valide" ? "ok" : "brand"}`}>
+            {t(`qualite.wps_status.${wps.statut}`)}
+          </span>
+        </>
+      }
+      icon={FileCheck2}
+      tone={wps.statut === "valide" ? "ok" : "brand"}
+      delay={index * 0.05}
+    />
   );
 }
 
-function CtrlCard({ ctrl }: { ctrl: ControleQualite }) {
+function CtrlCard({ ctrl, index }: { ctrl: ControleQualite; index: number }) {
   const { t } = useTranslation();
-  const badge = ctrl.resultat === "conforme" ? "ok" : ctrl.resultat === "reserve" ? "warn" : "err";
+  const badge: "ok" | "warn" | "err" = ctrl.resultat === "conforme" ? "ok" : ctrl.resultat === "reserve" ? "warn" : "err";
   return (
-    <div className="card kpi" key={ctrl.id}>
-      <span className="kpi-label">
-        {ctrl.code} · {t(`qualite.ctrl_types.${ctrl.type_controle}`)}
-      </span>
-      <span className="kpi-value">{ctrl.point_controle || ctrl.type_label}</span>
-      <span className="meta muted">
-        {ctrl.affaire_code ?? ctrl.ordre_code ?? ctrl.lot_code ?? "—"}
-        {ctrl.organisme === "agrege" ? ` · ${ctrl.organisme_libelle || t("qualite.agrege")}` : ""}
-        <span className={`badge ${badge}`}> {t(`qualite.ctrl_result.${ctrl.resultat}`)}</span>
-      </span>
-    </div>
+    <Kpi
+      label={`${ctrl.code} · ${t(`qualite.ctrl_types.${ctrl.type_controle}`)}`}
+      value={ctrl.point_controle || ctrl.type_label}
+      hint={
+        <>
+          {ctrl.affaire_code ?? ctrl.ordre_code ?? ctrl.lot_code ?? "—"}
+          {ctrl.organisme === "agrege" ? ` · ${ctrl.organisme_libelle || t("qualite.agrege")}` : ""}
+          <span className={`badge ${badge}`}> {t(`qualite.ctrl_result.${ctrl.resultat}`)}</span>
+        </>
+      }
+      icon={ClipboardCheck}
+      tone={badge}
+      delay={index * 0.05}
+    />
   );
 }
 
-function NcCard({ nc }: { nc: NonConformite }) {
+function NcCard({ nc, index }: { nc: NonConformite; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {nc.code} <span className="muted">· {t(`qualite.nc_source.${nc.source}`)}</span>
       </div>
@@ -107,23 +110,28 @@ function NcCard({ nc }: { nc: NonConformite }) {
         {nc.controle_code ? `· ${nc.controle_code}` : ""}
         {nc.actions_count > 0 ? ` · ${t("qualite.capa")} ×${nc.actions_count}` : ""}
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
-function PvCard({ pv }: { pv: PvControle }) {
+function PvCard({ pv, index }: { pv: PvControle; index: number }) {
   const { t } = useTranslation();
-  const badge = pv.statut === "receptionne" ? "ok" : pv.statut === "reserve" ? "warn" : pv.statut === "rejete" ? "err" : "brand";
+  const badge: "ok" | "warn" | "err" | "brand" = pv.statut === "receptionne" ? "ok" : pv.statut === "reserve" ? "warn" : pv.statut === "rejete" ? "err" : "brand";
   return (
-    <div className="card kpi" key={pv.id}>
-      <span className="kpi-label">{pv.code} · {t("qualite.intitule")}</span>
-      <span className="kpi-value">{pv.intitule}</span>
-      <span className="meta muted">
-        {pv.affaire_code ?? "—"} · {formatDate(pv.date_pv, "fr")}
-        <span className={`badge ${badge}`}> {t(`qualite.pv_statut.${pv.statut}`)}</span>
-        <span className="badge brand"> {pv.retention_years}y</span>
-      </span>
-    </div>
+    <Kpi
+      label={`${pv.code} · ${t("qualite.intitule")}`}
+      value={pv.intitule}
+      hint={
+        <>
+          {pv.affaire_code ?? "—"} · {formatDate(pv.date_pv, "fr")}
+          <span className={`badge ${badge}`}> {t(`qualite.pv_statut.${pv.statut}`)}</span>
+          <span className="badge brand"> {pv.retention_years}y</span>
+        </>
+      }
+      icon={FileText}
+      tone={badge}
+      delay={index * 0.05}
+    />
   );
 }
 
@@ -172,26 +180,21 @@ export function QualitePage() {
     select: (page: Paginated<import("../types").ActionCorrective>) => page.results,
   });
 
-  if (qualifs.isLoading || ncs.isLoading)
-    return <p className="muted">{t("common.loading")}</p>;
+  if (qualifs.isLoading || ncs.isLoading) return <BoardSkeleton cols={4} rows={3} />;
   if (qualifs.isError || ncs.isError || !ncs.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void qualifs.refetch();
-            void wps.refetch();
-            void controles.refetch();
-            void pvs.refetch();
-            void ncs.refetch();
-            void capa.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void qualifs.refetch();
+          void wps.refetch();
+          void controles.refetch();
+          void pvs.refetch();
+          void ncs.refetch();
+          void capa.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const qualifsAll = qualifs.data ?? [];
@@ -209,59 +212,64 @@ export function QualitePage() {
 
   return (
     <>
-      <h2>{t("qualite.title")}</h2>
+      <PageHeader title={t("qualite.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("qualite.qualifsValides")}</span>
-          <span className="kpi-value">{valids}</span>
-          <span className="meta muted">
-            {t("qualite.qualifs")} · {qualifsAll.length}
-          </span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("qualite.ncOuvertes")}</span>
-          <span className="kpi-value">{openNc}</span>
-          <span className="meta muted">
-            {t("qualite.capa")} · {capaAll.length} (ouvertes {capaAll.filter((a) => a.statut !== "cloturee").length})
-          </span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("qualite.wpsValides")}</span>
-          <span className="kpi-value">{wpsValid}</span>
-          <span className="meta muted">{t("qualite.wps")} · {wpsAll.length}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("qualite.reservations")}</span>
-          <span className="kpi-value">{reservations}</span>
-          <span className="meta muted">{t("qualite.archive10")} · retention 10 ans</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi
+          label={t("qualite.qualifsValides")}
+          value={valids}
+          hint={`${t("qualite.qualifs")} · ${qualifsAll.length}`}
+          icon={Award}
+          tone="ok"
+          delay={0}
+        />
+        <Kpi
+          label={t("qualite.ncOuvertes")}
+          value={openNc}
+          hint={`${t("qualite.capa")} · ${capaAll.length} (ouvertes ${capaAll.filter((a) => a.statut !== "cloturee").length})`}
+          icon={ShieldAlert}
+          tone="warn"
+          delay={0.05}
+        />
+        <Kpi
+          label={t("qualite.wpsValides")}
+          value={wpsValid}
+          hint={`${t("qualite.wps")} · ${wpsAll.length}`}
+          icon={FileCheck2}
+          tone="brand"
+          delay={0.1}
+        />
+        <Kpi
+          label={t("qualite.reservations")}
+          value={reservations}
+          hint={`${t("qualite.archive10")} · retention 10 ans`}
+          icon={ClipboardCheck}
+          tone="accent"
+          delay={0.15}
+        />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {NC_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`qualite.nc_statut.${st}`)}</span>
-              <span className={`badge ${NC_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((nc) => <NcCard key={nc.id} nc={nc} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {NC_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`qualite.nc_statut.${st}`)}
+              count={groups[st].length}
+              tone={NC_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
+                  {t("common.empty")}
+                </p>
+              ) : (
+                groups[st].map((nc, i) => <NcCard key={nc.id} nc={nc} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       {qualifsAll.length > 0 ? (
@@ -269,20 +277,20 @@ export function QualitePage() {
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("qualite.qualifs")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {qualifsAll.map((q) => <QualifCard key={q.id} qual={q} />)}
+          <div className="kpi-grid">
+            {qualifsAll.map((q, i) => <QualifCard key={q.id} qual={q} index={i} />)}
           </div>
         </>
       ) : null}
 
-      {(wpsAll.length > 0 || ctrlAll.length > 0) ? (
+      {wpsAll.length > 0 || ctrlAll.length > 0 ? (
         <>
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("qualite.wps")} · {t("qualite.controles")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {wpsAll.map((w) => <WpsCard key={w.id} wps={w} />)}
-            {ctrlAll.map((c) => <CtrlCard key={c.id} ctrl={c} />)}
+          <div className="kpi-grid">
+            {wpsAll.map((w, i) => <WpsCard key={w.id} wps={w} index={i} />)}
+            {ctrlAll.map((c, i) => <CtrlCard key={c.id} ctrl={c} index={i} />)}
           </div>
         </>
       ) : null}
@@ -292,8 +300,8 @@ export function QualitePage() {
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("qualite.pvs")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {pvAll.map((pv) => <PvCard key={pv.id} pv={pv} />)}
+          <div className="kpi-grid">
+            {pvAll.map((pv, i) => <PvCard key={pv.id} pv={pv} index={i} />)}
           </div>
         </>
       ) : null}

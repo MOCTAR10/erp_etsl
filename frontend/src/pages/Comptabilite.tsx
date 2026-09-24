@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { BadgePercent, ClipboardList, CreditCard, Inbox, Landmark } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
 import type {
   CompteBancaire,
   ControleInterne,
@@ -43,16 +43,10 @@ function BankCard({ b }: { b: CompteBancaire }) {
   );
 }
 
-function EngagementCard({ e }: { e: Engagement }) {
+function EngagementCard({ e, index }: { e: Engagement; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {e.code} <span className="muted">· {e.compte_depense_code ?? "—"}</span>
       </div>
@@ -61,7 +55,7 @@ function EngagementCard({ e }: { e: Engagement }) {
         {formatNumber(e.montant)} F · {t("comptabilite.totalDepenses")} {formatNumber(e.total_paye)} F
         {e.fournisseur_name ? ` · ${e.fournisseur_name}` : ""}
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
@@ -181,26 +175,22 @@ export function ComptabilitePage() {
   });
 
   if (paiements.isLoading || engagements.isLoading || !paiements.data || !engagements.data)
-    return <p className="muted">{t("common.loading")}</p>;
+    return <BoardSkeleton cols={4} rows={3} />;
 
   if (paiements.isError || engagements.isError || !tva.data || !controles.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void banques.refetch();
-            void paiements.refetch();
-            void engagements.refetch();
-            void tva.refetch();
-            void controles.refetch();
-            void releves.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void banques.refetch();
+          void paiements.refetch();
+          void engagements.refetch();
+          void tva.refetch();
+          void controles.refetch();
+          void releves.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const pay = paiements.data;
@@ -218,55 +208,34 @@ export function ComptabilitePage() {
 
   return (
     <>
-      <h2>{t("comptabilite.title")}</h2>
+      <PageHeader title={t("comptabilite.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("comptabilite.banques")}</span>
-          <span className="kpi-value">{banquesAll.length}</span>
-          <span className="meta muted">512 · {t("comptabilite.compte")}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("comptabilite.engagements")}</span>
-          <span className="kpi-value">{enCours}</span>
-          <span className="meta muted">{t("comptabilite.engagementsEnCours")}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("comptabilite.paiements")}</span>
-          <span className="kpi-value">{valides.length}</span>
-          <span className="meta muted">{t("comptabilite.paiementsValides")}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("comptabilite.tva")}</span>
-          <span className="kpi-value">{formatNumber(tvaDue)} F</span>
-          <span className="meta muted">{t("comptabilite.tvaDue")}</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi label={t("comptabilite.banques")} value={banquesAll.length} hint={`512 · ${t("comptabilite.compte")}`} icon={Landmark} tone="brand" delay={0} />
+        <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("comptabilite.engagementsEnCours")} icon={ClipboardList} tone="warn" delay={0.05} />
+        <Kpi label={t("comptabilite.paiements")} value={valides.length} hint={t("comptabilite.paiementsValides")} icon={CreditCard} tone="brand" delay={0.1} />
+        <Kpi label={t("comptabilite.tva")} value={`${formatNumber(tvaDue)} F`} hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {ENG_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`comptabilite.engagement_statut.${st}`)}</span>
-              <span className={`badge ${ENG_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((e) => <EngagementCard key={e.id} e={e} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {ENG_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`comptabilite.engagement_statut.${st}`)}
+              count={groups[st].length}
+              tone={ENG_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <EmptyState icon={Inbox} label={t("common.empty")} />
+              ) : (
+                groups[st].map((e, i) => <EngagementCard key={e.id} e={e} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
       <p className="muted" style={{ marginTop: "0.5rem" }}>

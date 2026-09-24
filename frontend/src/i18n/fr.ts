@@ -68,6 +68,8 @@ export const fr = {
     step: "Étape",
     due: "Échéance",
     overdue: "en retard",
+    tasks: "tâches",
+    task: "tâche",
   },
   pipeline: {
     title: "Pipeline commercial (M1)",

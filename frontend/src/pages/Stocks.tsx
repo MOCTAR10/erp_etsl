@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
+import { ArrowLeftRight, Boxes, Package, Warehouse } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { motionTokens } from "../theme/tokens";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type {
   CertificatMatiere,
   Depot,
@@ -28,16 +28,10 @@ const STATUS_BADGE: Record<LotStatut, "ok" | "warn" | "err" | "brand"> = {
 const VALID_STATUSES = new Set<LotStatut>(["disponible", "partiel", "epuise", "bloque"]);
 const BOARD_ORDER: LotStatut[] = ["disponible", "partiel", "epuise", "bloque"];
 
-function LotCard({ lot }: { lot: LotMatiere }) {
+function LotCard({ lot, index }: { lot: LotMatiere; index: number }) {
   const { t } = useTranslation();
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      className="task-card"
-    >
+    <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         {lot.code} <span className="muted">· {lot.article_code}</span>
       </div>
@@ -55,66 +49,65 @@ function LotCard({ lot }: { lot: LotMatiere }) {
         {t("stocks.lot")} {lot.numero_lot} · {formatDate(lot.date_reception, "fr")}
         {lot.certificats.length > 0 ? ` · ${t("stocks.mtc")}` : ""}
       </div>
-    </motion.div>
+    </BoardCard>
   );
 }
 
-function QuantCard({ quant }: { quant: StockQuant }) {
+function QuantCard({ quant, index }: { quant: StockQuant; index: number }) {
   const { t } = useTranslation();
   const masked = quant.stock_value === null;
   return (
-    <div className="card kpi" key={quant.id}>
-      <span className="kpi-label">
-        {quant.article_code} · {quant.depot_code}
-        {quant.lot_code ? ` · ${quant.lot_code}` : ""}
-      </span>
-      <span className="kpi-value">{formatNumber(Number(quant.quantity))}</span>
-      <span className="meta muted">
-        {masked && !quant.has_amount_access
+    <Kpi
+      label={`${quant.article_code} · ${quant.depot_code}${quant.lot_code ? ` · ${quant.lot_code}` : ""}`}
+      value={formatNumber(Number(quant.quantity))}
+      hint={
+        masked && !quant.has_amount_access
           ? t("stocks.demi")
-          : `${formatNumber(Number(quant.stock_value))} FCFA · ${t("stocks.stockValue")}`}
-      </span>
-    </div>
+          : `${formatNumber(Number(quant.stock_value))} FCFA · ${t("stocks.stockValue")}`
+      }
+      icon={Boxes}
+      tone="brand"
+      delay={index * 0.05}
+    />
   );
 }
 
-function MvtCard({ mvt }: { mvt: MouvementStock }) {
+function MvtCard({ mvt, index }: { mvt: MouvementStock; index: number }) {
   const { t } = useTranslation();
   return (
-    <div className="card kpi" key={mvt.id}>
-      <span className="kpi-label">
-        {mvt.code} · {t(`stocks.type_labels.${mvt.type_mouvement}`)}
-      </span>
-      <span className="kpi-value">
-        {mvt.quantite} <span className="muted">{mvt.article_code}</span>
-      </span>
-      <span className="meta muted">
-        {(mvt.source_code ?? t("stocks.reserved"))} → {(mvt.destination_code ?? "—")}
-        {mvt.ordre_code ? ` · ${mvt.ordre_code}` : ""}
-        {mvt.document_reference ? ` · ${mvt.document_reference}` : ""} ·{" "}
-        {formatDate(mvt.date, "fr")}
-      </span>
-    </div>
+    <Kpi
+      label={`${mvt.code} · ${t(`stocks.type_labels.${mvt.type_mouvement}`)}`}
+      value={`${mvt.quantite} ${mvt.article_code}`}
+      hint={`${mvt.source_code ?? t("stocks.reserved")} → ${mvt.destination_code ?? "—"}${
+        mvt.ordre_code ? ` · ${mvt.ordre_code}` : ""
+      }${mvt.document_reference ? ` · ${mvt.document_reference}` : ""} · ${formatDate(mvt.date, "fr")}`}
+      icon={ArrowLeftRight}
+      tone="warn"
+      delay={index * 0.05}
+    />
   );
 }
 
-function CertCard({ cert }: { cert: CertificatMatiere }) {
+function CertCard({ cert, index }: { cert: CertificatMatiere; index: number }) {
   const { t } = useTranslation();
   return (
-    <div className="card kpi" key={cert.id}>
-      <span className="kpi-label">
-        {cert.code} · {cert.type === "mtc" ? t("stocks.mtc") : t("stocks.coc")}
-      </span>
-      <span className="kpi-value">{cert.numero_certificat}</span>
-      <span className="meta muted">
-        {cert.lot_code} · {cert.organisme || "—"}
-        {cert.conforme ? (
-          <span className="badge ok"> {t("stocks.certConforme")}</span>
-        ) : (
-          <span className="badge err"> {t("stocks.certNonConforme")}</span>
-        )}
-      </span>
-    </div>
+    <Kpi
+      label={`${cert.code} · ${cert.type === "mtc" ? t("stocks.mtc") : t("stocks.coc")}`}
+      value={cert.numero_certificat}
+      hint={
+        <>
+          {cert.lot_code} · {cert.organisme || "—"}
+          {cert.conforme ? (
+            <span className="badge ok"> {t("stocks.certConforme")}</span>
+          ) : (
+            <span className="badge err"> {t("stocks.certNonConforme")}</span>
+          )}
+        </>
+      }
+      icon={Package}
+      tone="brand"
+      delay={index * 0.05}
+    />
   );
 }
 
@@ -168,27 +161,22 @@ export function StocksPage() {
     select: (page: Paginated<Inventaire>) => page.results,
   });
 
-  if (lots.isLoading || quants.isLoading)
-    return <p className="muted">{t("common.loading")}</p>;
+  if (lots.isLoading || quants.isLoading) return <BoardSkeleton cols={4} rows={3} />;
   if (lots.isError || quants.isError || !lots.data)
     return (
-      <p>
-        {t("common.error")}{" "}
-        <button
-          className="btn ghost"
-          onClick={() => {
-            void lots.refetch();
-            void quants.refetch();
-            void depots.refetch();
-            void mouvements.refetch();
-            void valorisation.refetch();
-            void certificats.refetch();
-            void inventaires.refetch();
-          }}
-        >
-          {t("common.retry")}
-        </button>
-      </p>
+      <ErrorState
+        message={t("common.error")}
+        onRetry={() => {
+          void lots.refetch();
+          void quants.refetch();
+          void depots.refetch();
+          void mouvements.refetch();
+          void valorisation.refetch();
+          void certificats.refetch();
+          void inventaires.refetch();
+        }}
+        retryLabel={t("common.retry")}
+      />
     );
 
   const groups = lots.data;
@@ -199,89 +187,89 @@ export function StocksPage() {
 
   return (
     <>
-      <h2>{t("stocks.title")}</h2>
+      <PageHeader title={t("stocks.title")} />
 
-      <div className="kpis">
-        <div className="card kpi">
-          <span className="kpi-label">{t("stocks.valeurStock")}</span>
-          <span className="kpi-value">
-            {totalValue === null ? t("stocks.demi") : `${formatNumber(totalValue)} FCFA`}
-          </span>
-          <span className="meta muted">
-            {t("stocks.quants")} · {quantsAll.length}
-          </span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("stocks.depots")}</span>
-          <span className="kpi-value">{depots.data?.length ?? "—"}</span>
-          <span className="meta muted">
-            {(depots.data ?? [])
-              .map((d) => d.code)
-              .slice(0, 3)
-              .join(" · ") || "—"}
-          </span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("stocks.totalLots")}</span>
-          <span className="kpi-value">
-            {Object.values(groups).reduce((s, arr) => s + arr.length, 0)}
-          </span>
-          <span className="meta muted">{t("stocks.perf")} · {certificats.data?.length ?? "—"}</span>
-        </div>
-        <div className="card kpi">
-          <span className="kpi-label">{t("stocks.totalMvt")}</span>
-          <span className="kpi-value">{mouvements.data?.length ?? "—"}</span>
-          <span className="meta muted">{t("stocks.inventaires")} · {inventaires.data?.length ?? "—"}</span>
-        </div>
+      <div className="kpi-grid">
+        <Kpi
+          label={t("stocks.valeurStock")}
+          value={totalValue === null ? t("stocks.demi") : `${formatNumber(totalValue)} FCFA`}
+          hint={`${t("stocks.quants")} · ${quantsAll.length}`}
+          icon={Boxes}
+          tone="brand"
+          delay={0}
+        />
+        <Kpi
+          label={t("stocks.depots")}
+          value={depots.data?.length ?? "—"}
+          hint={(depots.data ?? []).map((d) => d.code).slice(0, 3).join(" · ") || "—"}
+          icon={Warehouse}
+          tone="accent"
+          delay={0.05}
+        />
+        <Kpi
+          label={t("stocks.totalLots")}
+          value={Object.values(groups).reduce((s, arr) => s + arr.length, 0)}
+          hint={`${t("stocks.perf")} · ${certificats.data?.length ?? "—"}`}
+          icon={Package}
+          tone="brand"
+          delay={0.1}
+        />
+        <Kpi
+          label={t("stocks.totalMvt")}
+          value={mouvements.data?.length ?? "—"}
+          hint={`${t("stocks.inventaires")} · ${inventaires.data?.length ?? "—"}`}
+          icon={ArrowLeftRight}
+          tone="warn"
+          delay={0.15}
+        />
       </div>
 
-      <div className="board" style={{ overflowX: "auto" }}>
-        {BOARD_ORDER.map((st) => (
-          <motion.div
-            key={st}
-            layout
-            className="board-col"
-            style={{ minWidth: 260 }}
-            initial={{ opacity: 0, y: motionTokens.distance.sm }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-          >
-            <div className="board-col-head">
-              <span>{t(`stocks.lot_status.${st}`)}</span>
-              <span className={`badge ${STATUS_BADGE[st]}`}>{groups[st].length}</span>
-            </div>
-            {groups[st].length === 0 ? (
-              <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                {t("common.empty")}
-              </p>
-            ) : (
-              groups[st].map((lot) => <LotCard key={lot.id} lot={lot} />)
-            )}
-          </motion.div>
-        ))}
+      <div style={{ overflowX: "auto" }}>
+        <Board>
+          {BOARD_ORDER.map((st, ci) => (
+            <BoardColumn
+              key={st}
+              title={t(`stocks.lot_status.${st}`)}
+              count={groups[st].length}
+              tone={STATUS_BADGE[st]}
+              delay={ci * 0.05}
+              minWidth={260}
+            >
+              {groups[st].length === 0 ? (
+                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
+                  {t("common.empty")}
+                </p>
+              ) : (
+                groups[st].map((lot, i) => <LotCard key={lot.id} lot={lot} index={i} />)
+              )}
+            </BoardColumn>
+          ))}
+        </Board>
       </div>
 
-      {(quantsAll.length > 0 || (valAll.length > 0 && valorisation.isSuccess)) ? (
+      {quantsAll.length > 0 || (valAll.length > 0 && valorisation.isSuccess) ? (
         <>
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("stocks.quants")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="kpi-grid">
             {valAll.map((row, i) => (
-              <div className="card kpi" key={`${row.depot}-${row.article}-${i}`}>
-                <span className="kpi-label">
-                  {row.article} · {row.depot} · {t(`stocks.methods.${row.method}`)}
-                </span>
-                <span className="kpi-value">{formatNumber(row.quantity)}</span>
-                <span className="meta muted">
-                  {row.value === undefined
+              <Kpi
+                key={`${row.depot}-${row.article}-${i}`}
+                label={`${row.article} · ${row.depot} · ${t(`stocks.methods.${row.method}`)}`}
+                value={formatNumber(row.quantity)}
+                hint={
+                  row.value === undefined
                     ? t("stocks.demi")
-                    : `${formatNumber(row.value)} FCFA · ${formatNumber(row.unit_cost)} u.`}
-                </span>
-              </div>
+                    : `${formatNumber(row.value)} FCFA · ${formatNumber(row.unit_cost)} u.`
+                }
+                icon={Boxes}
+                tone="brand"
+                delay={i * 0.05}
+              />
             ))}
             {valAll.length === 0
-              ? quantsAll.map((q) => <QuantCard key={q.id} quant={q} />)
+              ? quantsAll.map((q, i) => <QuantCard key={q.id} quant={q} index={i} />)
               : null}
           </div>
         </>
@@ -292,9 +280,9 @@ export function StocksPage() {
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("stocks.mouvements")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {(mouvements.data ?? []).map((mvt) => (
-              <MvtCard key={mvt.id} mvt={mvt} />
+          <div className="kpi-grid">
+            {(mouvements.data ?? []).map((mvt, i) => (
+              <MvtCard key={mvt.id} mvt={mvt} index={i} />
             ))}
           </div>
         </>
@@ -305,9 +293,9 @@ export function StocksPage() {
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("stocks.certificats")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {(certificats.data ?? []).map((cert) => (
-              <CertCard key={cert.id} cert={cert} />
+          <div className="kpi-grid">
+            {(certificats.data ?? []).map((cert, i) => (
+              <CertCard key={cert.id} cert={cert} index={i} />
             ))}
           </div>
         </>
@@ -318,17 +306,17 @@ export function StocksPage() {
           <h3 className="muted" style={{ marginTop: "2rem" }}>
             {t("stocks.inventaires")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {(inventaires.data ?? []).map((inv) => (
-              <div className="card kpi" key={inv.id}>
-                <span className="kpi-label">
-                  {inv.code} · {inv.depot_label} · {t(`stocks.inv_status.${inv.statut}`)}
-                </span>
-                <span className="kpi-value">{formatDate(inv.date, "fr")}</span>
-                <span className="meta muted">
-                  {t("stocks.ecarts")}: {formatNumber(Number(inv.ecart_total))}
-                </span>
-              </div>
+          <div className="kpi-grid">
+            {(inventaires.data ?? []).map((inv, i) => (
+              <Kpi
+                key={inv.id}
+                label={`${inv.code} · ${inv.depot_label} · ${t(`stocks.inv_status.${inv.statut}`)}`}
+                value={formatDate(inv.date, "fr")}
+                hint={`${t("stocks.ecarts")}: ${formatNumber(Number(inv.ecart_total))}`}
+                icon={Warehouse}
+                tone="accent"
+                delay={i * 0.05}
+              />
             ))}
           </div>
         </>
