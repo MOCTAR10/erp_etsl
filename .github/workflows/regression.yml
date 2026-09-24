@@ -54,7 +54,7 @@ jobs:
         image: minio/minio:latest
         ports: ["9000:9000", "9001:9001"]
         options: >-
-          --health-cmd "mc ready local"
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
           --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
         image: redis:7-alpine
@@ -74,15 +74,23 @@ jobs:
       - name: Create MinIO bucket (etls-documents)
         run: |
           python - <<'EOF'
+          import time
           import boto3
-          boto3.client(
+          client = boto3.client(
               "s3",
               endpoint_url="http://localhost:9000",
               aws_access_key_id="etls_minio",
               aws_secret_access_key="etls_minio_dev_password",
               region_name="us-east-1",
-          ).create_bucket(Bucket="etls-documents")
-          print("bucket etls-documents ok")
+          )
+          for attempt in range(10):
+              try:
+                  client.create_bucket(Bucket="etls-documents")
+                  print("bucket etls-documents ok")
+                  break
+              except Exception as exc:
+                  print(f"tentative {attempt + 1}: {exc}")
+                  time.sleep(2)
           EOF
       - name: Backend tests (coverage report-only, pas de gate)
         working-directory: backend
@@ -139,7 +147,7 @@ jobs:
         image: minio/minio:latest
         ports: ["9000:9000", "9001:9001"]
         options: >-
-          --health-cmd "mc ready local"
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
           --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
         image: redis:7-alpine
@@ -158,15 +166,23 @@ jobs:
       - name: Create MinIO bucket (etls-documents)
         run: |
           python - <<'EOF'
+          import time
           import boto3
-          boto3.client(
+          client = boto3.client(
               "s3",
               endpoint_url="http://localhost:9000",
               aws_access_key_id="etls_minio",
               aws_secret_access_key="etls_minio_dev_password",
               region_name="us-east-1",
-          ).create_bucket(Bucket="etls-documents")
-          print("bucket etls-documents ok")
+          )
+          for attempt in range(10):
+              try:
+                  client.create_bucket(Bucket="etls-documents")
+                  print("bucket etls-documents ok")
+                  break
+              except Exception as exc:
+                  print(f"tentative {attempt + 1}: {exc}")
+                  time.sleep(2)
           EOF
       - name: Migrate + seed (base dediee etls_e2e)
         working-directory: backend
