@@ -55,6 +55,8 @@ export const fr = {
     featureModules: "12 modules métier : commercial → juridique",
     featureSecurity: "Habilitations par rôle & journal d'audit",
     footer: "© ETSL — application interne",
+    modulesTitle: "12 modules métier & couche transverse",
+    modulesSub: "Une application : la couverture métier complète d'ETSL ERP, du commercial au juridique.",
   },
   dashboard: {
     title: "Tableau de bord",
