@@ -119,7 +119,8 @@ class Employe(models.Model):
 
     @property
     def contrat_actif(self):
-        return self.contrats.filter(statut=ContratTravail.Statut.ACTIF).first()
+        # via `.all()` : exploite le prefetch_related("contrats") de la vue (pas de requête par salarié)
+        return next((c for c in self.contrats.all() if c.statut == ContratTravail.Statut.ACTIF), None)
 
     @property
     def solde_conges(self):
@@ -693,15 +694,15 @@ class BulletinPaie(models.Model):
 
     @property
     def total_gains(self):
-        return self.lignes.filter(rubrique__nature=RubriquePaie.Nature.GAIN).aggregate(
-            t=models.Sum("montant")
-        )["t"] or 0
+        return sum(
+            (l.montant for l in self.lignes.all() if l.rubrique.nature == RubriquePaie.Nature.GAIN), 0
+        )
 
     @property
     def total_retenues(self):
-        return self.lignes.filter(rubrique__nature=RubriquePaie.Nature.RETENUE).aggregate(
-            t=models.Sum("montant")
-        )["t"] or 0
+        return sum(
+            (l.montant for l in self.lignes.all() if l.rubrique.nature == RubriquePaie.Nature.RETENUE), 0
+        )
 
 
 class BulletinLigne(models.Model):

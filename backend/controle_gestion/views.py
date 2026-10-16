@@ -10,6 +10,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
+from django.db.models import Prefetch
+
 from .models import Budget, BudgetLigne, BudgetRevision, ClotureGestion
 from .serializers import (
     BudgetLigneSerializer,
@@ -39,7 +41,10 @@ class DjangoValidationMixin:
 class BudgetViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     queryset = Budget.objects.select_related(
         "fiscal_year", "axis", "analytic"
-    ).prefetch_related("lignes", "revisions")
+    ).prefetch_related(
+        Prefetch("lignes", queryset=BudgetLigne.objects.select_related("period__fiscal_year")),
+        "revisions",
+    )
     serializer_class = BudgetSerializer
 
     def get_permissions(self):
@@ -95,7 +100,7 @@ class BudgetViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
 
 class BudgetLigneViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
-    queryset = BudgetLigne.objects.select_related("budget", "period").all()
+    queryset = BudgetLigne.objects.select_related("budget", "period__fiscal_year").all()
     serializer_class = BudgetLigneSerializer
     permission_classes = [CanManageGestion]
 

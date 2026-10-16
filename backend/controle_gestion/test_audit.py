@@ -103,3 +103,19 @@ class RevisionBudgetClotureTests(BaseGestionTest):
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+
+
+class ListeBudgetsSansNPlus1Tests(BaseGestionTest):
+    def test_liste_budgets_requetes_constantes(self):
+        periods = list(Period.objects.filter(fiscal_year__year=2026).order_by("number"))
+        for i in range(4):
+            b = self._budget(montant=Decimal("1200000") + i)
+            for per in periods:
+                BudgetLigne.objects.create(budget=b, period=per, montant=Decimal("100000"))
+        _auth(self.client, "finance@etls.local")
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(f"{BASE}budgets/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data["results"]), 4)
+        # 4 budgets x 12 lignes : sans prefetch/select_related c'était ~27 requêtes par budget
+        self.assertLess(len(ctx), 20, f"{len(ctx)} requêtes pour 4 budgets de 12 lignes (N+1 ?)")

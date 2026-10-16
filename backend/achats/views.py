@@ -101,7 +101,9 @@ class PurchaseOrderViewSet(_CommonViewSet):
     serializer_class = PurchaseOrderSerializer
 
     def get_queryset(self):
-        qs = PurchaseOrder.objects.select_related("supplier", "request", "consultation", "currency")
+        qs = PurchaseOrder.objects.select_related(
+            "supplier", "request", "consultation", "currency"
+        ).prefetch_related("lines__invoice_lines")
         status_ = self.request.query_params.get("status")
         if status_:
             qs = qs.filter(status=status_)

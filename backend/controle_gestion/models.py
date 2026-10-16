@@ -123,11 +123,12 @@ class Budget(models.Model):
 
     @property
     def montant_lignes(self):
-        return self.lignes.aggregate(total=Sum("montant"))["total"] or 0
+        # `.all()` exploite le prefetch_related de la vue (sinon 1 requête) : pas d'aggregate par budget.
+        return sum((l.montant for l in self.lignes.all()), 0)
 
     @property
     def nb_revisions(self):
-        return self.revisions.count()
+        return len(self.revisions.all())
 
 
 class BudgetLigne(models.Model):

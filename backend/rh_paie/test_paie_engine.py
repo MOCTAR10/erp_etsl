@@ -157,3 +157,18 @@ class EcrituresPaieTests(MoteurPaieBase):
         r = self.client.post(f"{BASE}bulletins/{self.b.pk}/comptabiliser/")
         self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
         self.assertTrue(r.data["move_number"])
+
+
+class ListeBulletinsSansNPlus1Tests(MoteurPaieBase):
+    def test_liste_bulletins_requetes_bornees(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        for mois in range(1, 9):
+            self.bulletin((("SAL", "1000000"), ("PRI", "50000"), ("AVA", "10000")), periode=date(2026, mois, 1))
+        _auth(self.client, "admin@etls.local")
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(f"{BASE}bulletins/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data["results"]), 8)
+        self.assertLess(len(ctx), 15, f"{len(ctx)} requêtes pour 8 bulletins (N+1 ?)")
