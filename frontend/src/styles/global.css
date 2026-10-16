@@ -1965,3 +1965,28 @@ kbd {
 .timeline-body { display: flex; flex-direction: column; min-width: 0; }
 .timeline-body strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 600px) { .timeline-item { grid-template-columns: 1fr auto; } .timeline-days { grid-column: 1 / -1; } .hero-value { font-size: 36px; } }
+
+/* -- Barres d'actions de workflow, ITP, baremes -- */
+.btn.danger { background: transparent; color: var(--err); border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); }
+.btn.danger:hover { background: var(--err-soft); }
+.action-bar { margin-top: 0.55rem; }
+.action-bar-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.action-bar .btn, .permis-actions .btn { min-height: 36px; padding: 0 0.8rem; font-size: 13px; }
+.action-error { color: var(--err); font-size: 13px; margin: 0.4rem 0 0; }
+.permis-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: flex-start; }
+.gaz-form, .itp-add, .bareme-form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; width: 100%; }
+.gaz-form input, .itp-add input { flex: 1; min-width: 180px; }
+.bareme-form input, .bareme-form select, .gaz-form select, .gaz-form input, .itp-add input, .itp-add select {
+  min-height: 38px; padding: 0 0.6rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+}
+.itp-list { display: grid; gap: 1rem; }
+.itp { display: grid; gap: 0.6rem; }
+.itp-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; }
+.itp-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.itp-point { display: grid; grid-template-columns: 28px 1fr auto; gap: 0.6rem; align-items: center; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 10px; border-left-width: 4px; }
+.itp-point.leve { border-left-color: var(--ok); }
+.itp-point.non_conforme { border-left-color: var(--err); }
+.itp-point.en_attente { border-left-color: var(--warn); }
+.itp-point .action-bar { grid-column: 2 / -1; margin-top: 0; }
+.itp-num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 13px; }

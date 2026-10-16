@@ -12,6 +12,8 @@ import type {
   Paginated,
   StatutConge,
 } from "../types";
+import { ActionBar } from "../components/ui";
+import { BaremesSection } from "../components/workflow/BaremesSection";
 
 type CongeGroups = Record<StatutConge, DemandeConge[]>;
 
@@ -86,7 +88,41 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
         ) : (
           "••••••"
         )}
+        {b.disponible_le && <span className="badge ok"> {t("baremes.diffuse")}</span>}
+        {b.move_number && <span className="badge brand"> {b.move_number}</span>}
       </span>
+      <ActionBar
+        actions={[
+          ...(b.statut === "brouillon"
+            ? [
+                { label: t("actions.calculer"), path: `/api/rh-paie/bulletins/${b.id}/calculer/`, tone: "ghost" as const },
+                { label: t("actions.valider"), path: `/api/rh-paie/bulletins/${b.id}/valider/` },
+              ]
+            : []),
+          ...((b.statut === "valide" || b.statut === "cloture") && !b.disponible_le
+            ? [{ label: t("actions.diffuser"), path: `/api/rh-paie/bulletins/${b.id}/diffuser/`, tone: "ghost" as const }]
+            : []),
+          ...((b.statut === "valide" || b.statut === "cloture") && !b.move_number
+            ? [
+                {
+                  label: t("actions.comptabiliser"),
+                  path: `/api/rh-paie/bulletins/${b.id}/comptabiliser/`,
+                  confirm: t("actions.confirmComptabiliser"),
+                },
+              ]
+            : []),
+          ...(b.statut === "valide"
+            ? [
+                {
+                  label: t("actions.cloturer"),
+                  path: `/api/rh-paie/bulletins/${b.id}/cloturer/`,
+                  tone: "ghost" as const,
+                  confirm: t("actions.confirmCloturer"),
+                },
+              ]
+            : []),
+        ]}
+      />
     </div>
   );
 }
@@ -206,6 +242,7 @@ export function RhPaiePage() {
           </div>
         </>
       ) : null}
+      <BaremesSection />
     </>
   );
 }

@@ -87,6 +87,28 @@ export const en = {
       typeControle: "Inspection type", pointControle: "Inspected item",
     },
   },
+  actions: {
+    valider: "Approve", refuser: "Reject", demarrer: "Start", cloturer: "Close", testGaz: "Gas test",
+    calculer: "Calculate", diffuser: "Make available", comptabiliser: "Post to ledger",
+    confirmCloturer: "Close permanently?",
+    confirmComptabiliser: "Generate the payroll journal entry? It cannot be edited (reversal only).",
+  },
+  baremes: {
+    title: "Contribution scales",
+    hint: "Rates and ceilings must be entered and validated with ETSL / CNSSG / CNAMGS — no legal value is hard-coded.",
+    none: "No scale: payslips are computed without automatic contributions.",
+    code: "Code", label: "Label", organisme: "Body", nature: "Nature", taux: "Rate (%)", plafond: "Monthly ceiling (F)",
+    effet: "Effective date", salariale: "Employee deduction", patronale: "Employer charge",
+    baseBrut: "Base: gross", baseSalaire: "Base: base salary", add: "Add a scale", save: "Save",
+    patronales: "Employer charges", diffuse: "Published",
+  },
+  itp: {
+    title: "Inspection and test plans (ITP)",
+    arret: "Hold point", observation: "Witness point", add: "Add point",
+    pointPlaceholder: "Inspection point (e.g. fit-up check before welding)",
+    lever: "Release", nonConforme: "Non-conforming", confirmNc: "Mark this point non-conforming?",
+    progress: "{{done}}/{{total}} points released · {{restants}} hold point(s) left",
+  },
   palette: {
     pages: "Pages",
     actions: "Actions",

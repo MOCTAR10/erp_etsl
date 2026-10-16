@@ -42,7 +42,8 @@ class Command(BaseCommand):
             return
 
         if Soudeur.objects.exists():
-            self.stdout.write("Deja seed - rien a faire.")
+            self._seed_itp(qaqc)  # idempotent : complète une base seedée avant l'ajout de l'ITP
+            self.stdout.write("Deja seed - ITP de demo verifie.")
             return
 
         affaire = Affaire.objects.first()
@@ -186,9 +187,36 @@ class Command(BaseCommand):
             notes="Reception apres controles visuels OK.",
         )
 
+        self._seed_itp(qaqc)
+
         self.stdout.write(
             f"OK: {Soudeur.objects.count()} soudeurs, {QualificationSoudeur.objects.count()} quals, "
             f"{WpsWpqr.objects.count()} WPS, {ControleQualite.objects.count()} controles, "
             f"{NonConformite.objects.count()} NC, {ActionCorrective.objects.count()} CAPA, "
             f"{PvControle.objects.count()} PV."
         )
+
+    def _seed_itp(self, qaqc):
+        """ITP de démonstration : 3 points (1 arrêt levé, 1 arrêt en attente, 1 observation)."""
+        from qualite.models import PointInspection
+
+        itp, _ = ControleQualite.objects.get_or_create(
+            type_controle=ControleQualite.TypeControle.ITP,
+            point_controle="ITP soudure ligne A (démo)",
+            defaults={"statut": ControleQualite.Statut.EN_COURS, "created_by": qaqc},
+        )
+        for ordre, desc, type_point in (
+            (1, "Contrôle fit-up avant soudage", "arret"),
+            (2, "Inspection visuelle de la passe de fond", "arret"),
+            (3, "Ressuage final en présence du client", "observation"),
+        ):
+            PointInspection.objects.get_or_create(
+                controle=itp, ordre=ordre, defaults={"description": desc, "type_point": type_point}
+            )
+        premier = PointInspection.objects.get(controle=itp, ordre=1)
+        if premier.statut == PointInspection.Statut.EN_ATTENTE:
+            premier.statut = PointInspection.Statut.LEVE
+            premier.leve_par = qaqc
+            premier.leve_le = timezone.now()
+            premier.commentaire = "Fit-up conforme"
+            premier.save()

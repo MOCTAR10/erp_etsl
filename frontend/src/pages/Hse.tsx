@@ -16,6 +16,7 @@ import type {
   PermisTravail,
   StatutIncident,
 } from "../types";
+import { PermisActions } from "../components/workflow/PermisActions";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
 
@@ -60,6 +61,7 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
           </span>
         )}
       </span>
+      <PermisActions permis={permis} />
     </div>
   );
 }

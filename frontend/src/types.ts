@@ -550,6 +550,39 @@ export interface ControleQualite {
   statut_label: string;
   notes: string;
   created_by_name: string | null;
+  /** ITP : points d'arrêt / d'observation (CL-OM-07). */
+  points?: PointInspection[];
+  points_arret_restants?: number;
+}
+
+export interface PointInspection {
+  id: string;
+  controle: string;
+  ordre: number;
+  description: string;
+  type_point: "arret" | "observation";
+  type_label: string;
+  responsable_levee: string;
+  statut: "en_attente" | "leve" | "non_conforme";
+  statut_label: string;
+  leve_par_name: string | null;
+  leve_le: string | null;
+  commentaire: string;
+}
+
+export interface BaremeCotisation {
+  id: string;
+  code: string;
+  label: string;
+  organisme: string;
+  nature: "salariale" | "patronale";
+  nature_label: string;
+  base: "brut" | "salaire";
+  taux: string;
+  plafond: string | null;
+  date_effet: string;
+  date_fin: string | null;
+  ordre: number;
 }
 
 export type SourceNC = "controle" | "client" | "fournisseur" | "interne";
@@ -1212,6 +1245,11 @@ export interface BulletinLigne {
 }
 
 export interface BulletinPaie {
+  charges_patronales?: string | null;
+  disponible_le?: string | null;
+  consulte_le?: string | null;
+  move?: string | null;
+  move_number?: string | null;
   id: string;
   code: string;
   employe: string;

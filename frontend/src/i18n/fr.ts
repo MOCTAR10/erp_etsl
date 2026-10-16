@@ -87,6 +87,28 @@ export const fr = {
       typeControle: "Type de contrôle", pointControle: "Point contrôlé",
     },
   },
+  actions: {
+    valider: "Valider", refuser: "Refuser", demarrer: "Démarrer", cloturer: "Clôturer", testGaz: "Test gaz",
+    calculer: "Calculer", diffuser: "Mettre à disposition", comptabiliser: "Comptabiliser",
+    confirmCloturer: "Clôturer définitivement ?",
+    confirmComptabiliser: "Générer l'écriture comptable de paie ? Action non modifiable (extourne uniquement).",
+  },
+  baremes: {
+    title: "Barèmes de cotisation",
+    hint: "Taux et plafonds à saisir et valider avec ETSL / CNSSG / CNAMGS — aucune valeur légale n'est codée en dur.",
+    none: "Aucun barème : les bulletins sont calculés sans cotisation automatique.",
+    code: "Code", label: "Libellé", organisme: "Organisme", nature: "Nature", taux: "Taux (%)", plafond: "Plafond mensuel (F)",
+    effet: "Date d'effet", salariale: "Retenue salariale", patronale: "Charge patronale",
+    baseBrut: "Base : brut", baseSalaire: "Base : salaire de base", add: "Ajouter un barème", save: "Enregistrer",
+    patronales: "Charges patronales", diffuse: "Diffusé",
+  },
+  itp: {
+    title: "Plans d'inspection et d'essais (ITP)",
+    arret: "Point d'arrêt", observation: "Point d'observation", add: "Ajouter le point",
+    pointPlaceholder: "Point d'inspection (ex. contrôle fit-up avant soudage)",
+    lever: "Lever", nonConforme: "Non conforme", confirmNc: "Déclarer ce point non conforme ?",
+    progress: "{{done}}/{{total}} points levés · {{restants}} point(s) d'arrêt restant(s)",
+  },
   palette: {
     pages: "Pages",
     actions: "Actions",

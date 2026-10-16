@@ -14,6 +14,7 @@ import type {
   StatutNC,
   WpsWpqr,
 } from "../types";
+import { ItpSection } from "../components/workflow/ItpSection";
 
 type NcGroups = Record<StatutNC, NonConformite[]>;
 
@@ -305,6 +306,7 @@ export function QualitePage() {
           </div>
         </>
       ) : null}
+      <ItpSection />
     </>
   );
 }

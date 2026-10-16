@@ -1,4 +1,6 @@
 export { AnimatedNumber } from "./AnimatedNumber";
+export { ActionBar } from "./ActionBar";
+export type { ActionDef } from "./ActionBar";
 export { Badge } from "./Badge";
 export type { BadgeTone } from "./Badge";
 export { Board, BoardCard, BoardColumn } from "./Board";

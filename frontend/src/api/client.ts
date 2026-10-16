@@ -99,6 +99,8 @@ export const postIdempotent = (path: string, body: unknown, key: string) =>
 
 export const api = {
   get: <T,>(path: string) => raw<T>(path),
+  post: <T,>(path: string, body?: unknown) =>
+    raw<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
   me: () => raw<Me>("/api/users/me/"),
   monProfil: () => raw<import("../types").MonProfil>("/api/rh-paie/mon-espace/profil/"),
   mesBulletins: () => rawList<import("../types").MonBulletin>("/api/rh-paie/mon-espace/bulletins/"),
