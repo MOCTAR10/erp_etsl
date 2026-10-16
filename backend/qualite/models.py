@@ -545,3 +545,58 @@ class PvControle(models.Model):
         if not self.code:
             self.code = QualiteSequence.next_for("PV", "PV")
         return super().save(*args, **kwargs)
+
+
+class PointInspection(models.Model):
+    """Point d'un ITP (plan d'inspection et d'essais) - CL-OM-07.
+
+    Point d'ARRÊT (hold) : les travaux ne continuent pas tant qu'il n'est pas levé.
+    Point d'OBSERVATION (witness) : le contrôle peut se faire en présence du client / organisme,
+    sans bloquer la suite. La levée est tracée (qui, quand, résultat, commentaire).
+    """
+
+    class TypePoint(models.TextChoices):
+        ARRET = "arret", "Point d'arrêt (hold)"
+        OBSERVATION = "observation", "Point d'observation (witness)"
+
+    class Statut(models.TextChoices):
+        EN_ATTENTE = "en_attente", "En attente"
+        LEVE = "leve", "Levé"
+        NON_CONFORME = "non_conforme", "Non conforme"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    controle = models.ForeignKey(
+        ControleQualite, on_delete=models.CASCADE, related_name="points", verbose_name="ITP"
+    )
+    ordre = models.PositiveSmallIntegerField(verbose_name="N° d'ordre dans l'ITP")
+    description = models.CharField(max_length=250, verbose_name="Point d'inspection")
+    type_point = models.CharField(
+        max_length=12, choices=TypePoint.choices, default=TypePoint.ARRET, verbose_name="Type de point"
+    )
+    responsable_levee = models.CharField(
+        max_length=120, blank=True, verbose_name="Levée par (QA/QC, client, organisme...)"
+    )
+    statut = models.CharField(
+        max_length=12, choices=Statut.choices, default=Statut.EN_ATTENTE, verbose_name="Statut"
+    )
+    leve_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="points_itp_leves", verbose_name="Levé par",
+    )
+    leve_le = models.DateTimeField(null=True, blank=True, verbose_name="Levé le")
+    commentaire = models.CharField(max_length=250, blank=True, verbose_name="Commentaire")
+
+    class Meta:
+        ordering = ["controle", "ordre"]
+        verbose_name = "Point d'inspection (ITP)"
+        verbose_name_plural = "Points d'inspection (ITP)"
+        constraints = [
+            models.UniqueConstraint(fields=["controle", "ordre"], name="uniq_itp_point_ordre")
+        ]
+
+    def __str__(self):
+        return f"{self.controle_id} #{self.ordre} {self.get_type_point_display()}"
+
+    def clean(self):
+        if self.controle_id and self.controle.type_controle != ControleQualite.TypeControle.ITP:
+            raise ValidationError({"controle": "Des points d'inspection se rattachent à un contrôle de type ITP."})

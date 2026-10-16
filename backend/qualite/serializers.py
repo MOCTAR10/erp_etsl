@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import (
+    PointInspection,
     ActionCorrective,
     ControleQualite,
     NonConformite,
@@ -99,10 +100,30 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
             "wps", "wps_code", "lot", "lot_code", "point_controle", "exigence",
             "date_controle", "resultat", "resultat_label", "statut", "statut_label",
             "notes", "created_by", "created_by_name", "created_at", "updated_at",
+            "points", "points_arret_restants",
         ]
-        read_only_fields = ["code", "created_by"]
+        read_only_fields = ["code", "created_by", "points", "points_arret_restants"]
+
+    points = serializers.SerializerMethodField()
+    points_arret_restants = serializers.SerializerMethodField()
+
+    def get_points(self, obj):
+        return PointInspectionSerializer(obj.points.all(), many=True, context=self.context).data
+
+    def get_points_arret_restants(self, obj):
+        return obj.points.filter(type_point="arret").exclude(statut="leve").count()
 
     def validate(self, attrs):
+        # Un ITP ne se valide pas tant qu'un point d'ARRÊT n'est pas levé (CL-OM-07).
+        if (
+            self.instance
+            and attrs.get("statut") == ControleQualite.Statut.VALIDE
+            and self.instance.type_controle == ControleQualite.TypeControle.ITP
+            and self.instance.points.filter(type_point="arret").exclude(statut="leve").exists()
+        ):
+            raise serializers.ValidationError(
+                {"statut": "ITP non validable : au moins un point d'arrêt n'est pas levé."}
+            )
         instance = self.instance or self.Meta.model(**attrs)
         if self.instance:
             for key, value in attrs.items():
@@ -193,3 +214,28 @@ class PvControleSerializer(serializers.ModelSerializer):
             "validated_by", "validated_by_name", "notes", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "statut"]
+
+
+class PointInspectionSerializer(serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_point_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    leve_par_name = serializers.CharField(source="leve_par.get_full_name", read_only=True, default=None)
+
+    class Meta:
+        model = PointInspection
+        fields = [
+            "id", "controle", "ordre", "description", "type_point", "type_label",
+            "responsable_levee", "statut", "statut_label", "leve_par", "leve_par_name",
+            "leve_le", "commentaire",
+        ]
+        read_only_fields = ["statut", "leve_par", "leve_le"]
+
+    def validate(self, attrs):
+        controle = attrs.get("controle") or (self.instance.controle if self.instance else None)
+        if controle and controle.type_controle != ControleQualite.TypeControle.ITP:
+            raise serializers.ValidationError(
+                {"controle": "Des points d'inspection se rattachent à un contrôle de type ITP."}
+            )
+        if controle and controle.statut in (ControleQualite.Statut.VALIDE, ControleQualite.Statut.ANNULE):
+            raise serializers.ValidationError({"controle": "ITP validé ou annulé : plan figé."})
+        return attrs

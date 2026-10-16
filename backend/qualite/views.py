@@ -3,9 +3,11 @@
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .models import (
+    PointInspection,
     ActionCorrective,
     ControleQualite,
     NonConformite,
@@ -15,6 +17,7 @@ from .models import (
     WpsWpqr,
 )
 from .serializers import (
+    PointInspectionSerializer,
     ActionCorrectiveSerializer,
     ControleQualiteSerializer,
     NonConformiteSerializer,
@@ -247,3 +250,60 @@ class PvControleViewSet(viewsets.ModelViewSet):
         pv.validated_by = request.user
         pv.save()
         return Response(self.get_serializer(pv).data)
+
+
+class PointInspectionViewSet(viewsets.ModelViewSet):
+    """Points d'un ITP : création/édition tant qu'ils sont en attente ; levée tracée (QA/QC)."""
+
+    queryset = PointInspection.objects.select_related("controle", "leve_par").all()
+    serializer_class = PointInspectionSerializer
+    permission_classes = [CanManageQualite]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if controle := self.request.query_params.get("controle"):
+            qs = qs.filter(controle_id=controle)
+        return qs
+
+    def get_permissions(self):
+        if self.action == "lever":
+            return [CanValidatePv()]
+        return super().get_permissions()
+
+    def _assert_en_attente(self):
+        if self.get_object().statut != PointInspection.Statut.EN_ATTENTE:
+            raise DRFValidationError("Point déjà traité : non modifiable ni supprimable.")
+
+    def update(self, request, *args, **kwargs):
+        self._assert_en_attente()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._assert_en_attente()
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"], url_path="lever")
+    def lever(self, request, pk=None):
+        """Lève un point (conforme) ou le déclare non conforme. Points d'arrêt : dans l'ordre."""
+        point = self.get_object()
+        if point.statut != PointInspection.Statut.EN_ATTENTE:
+            raise DRFValidationError("Point déjà levé ou déclaré non conforme.")
+        resultat = request.data.get("resultat", "conforme")
+        if resultat not in ("conforme", "non_conforme"):
+            raise DRFValidationError({"resultat": "Attendu : conforme ou non_conforme."})
+        if point.type_point == PointInspection.TypePoint.ARRET:
+            precedents = PointInspection.objects.filter(
+                controle=point.controle, type_point=PointInspection.TypePoint.ARRET, ordre__lt=point.ordre
+            ).exclude(statut=PointInspection.Statut.LEVE)
+            if precedents.exists():
+                raise DRFValidationError(
+                    "Levez d'abord les points d'arrêt précédents (l'ITP se déroule dans l'ordre)."
+                )
+        point.statut = (
+            PointInspection.Statut.LEVE if resultat == "conforme" else PointInspection.Statut.NON_CONFORME
+        )
+        point.leve_par = request.user
+        point.leve_le = timezone.now()
+        point.commentaire = str(request.data.get("commentaire", ""))[:250]
+        point.save()
+        return Response(self.get_serializer(point).data)
