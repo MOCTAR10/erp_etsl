@@ -26,13 +26,14 @@ import {
 } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { useAuth } from "../store/auth";
 import { canSeeApp, ROUTE_APP, type ErpApp } from "../lib/modules";
 import { MotionProvider } from "./Pilot";
 import { BrandLogo } from "./BrandLogo";
+import { CommandPalette, type PaletteItem } from "./CommandPalette";
 
 interface NavItem {
   to: string;
@@ -75,9 +76,8 @@ export function Shell() {
   const clear = useAuth((s) => s.clear);
 
   const [theme, setTheme] = useState(() => document.documentElement.getAttribute("data-theme") ?? "light");
-  const [query, setQuery] = useState("");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
   const isDark = theme === "dark";
   const ThemeIcon = isDark ? Sun : Moon;
 
@@ -113,18 +113,35 @@ export function Shell() {
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return [...PILOT_NAV, ...visibleModules]
-      .filter(({ key, to }) => t(key).toLowerCase().includes(q) || to.includes(q))
-      .slice(0, 7);
-  }, [query, t, visibleModules]);
+  // Palette de commandes : pages (déjà filtrées par rôle) + actions rapides.
+  const paletteItems = useMemo<PaletteItem[]>(
+    () => [
+      ...[...PILOT_NAV, ...visibleModules].map(({ to, key, Icon }) => ({
+        id: `go${to === "/" ? "-home" : to.replace(/\//g, "-")}`,
+        label: t(key),
+        group: t("palette.pages"),
+        Icon,
+        keywords: to,
+        run: () => navigate(to),
+      })),
+      { id: "act-theme", label: t("common.theme"), group: t("palette.actions"), Icon: isDark ? Sun : Moon, run: toggleTheme },
+      { id: "act-lang", label: t("common.language"), group: t("palette.actions"), Icon: Languages, run: toggleLang },
+      { id: "act-logout", label: t("common.logout"), group: t("palette.actions"), Icon: LogOut, run: logout },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, visibleModules, isDark, i18n.language],
+  );
 
-  const goSearch = (to: string) => {
-    setQuery("");
-    navigate(to);
-  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const renderNav = (items: NavItem[]) =>
     items.map(({ to, key, Icon }) => (
@@ -178,35 +195,17 @@ export function Shell() {
               <Menu size={18} />
             </button>
             <div className="topbar-search">
-              <div className="search-field">
+              <button
+                type="button"
+                className="search-trigger"
+                aria-label={t("common.search")}
+                aria-haspopup="dialog"
+                onClick={() => setPaletteOpen(true)}
+              >
                 <Search size={15} />
-                <input
-                  ref={searchRef}
-                  type="search"
-                  placeholder={t("common.search")}
-                  aria-label={t("common.search")}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && matches[0]) goSearch(matches[0].to);
-                    if (e.key === "Escape") setQuery("");
-                  }}
-                />
-              </div>
-              {query.trim() !== "" && (
-                <div className="search-pop">
-                  {matches.length === 0 ? (
-                    <div className="search-empty">{t("common.noResult")}</div>
-                  ) : (
-                    matches.map(({ to, key, Icon }) => (
-                      <button key={to} type="button" className="search-item" onClick={() => goSearch(to)}>
-                        <Icon size={15} />
-                        {t(key)}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
+                <span>{t("common.search")}</span>
+                <kbd>Ctrl K</kbd>
+              </button>
             </div>
 
             <div className="actions">
@@ -248,6 +247,13 @@ export function Shell() {
           </main>
         </div>
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        items={paletteItems}
+        placeholder={t("palette.placeholder")}
+        emptyLabel={t("common.noResult")}
+      />
     </MotionProvider>
   );
 }

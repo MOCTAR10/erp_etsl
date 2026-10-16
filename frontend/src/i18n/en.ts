@@ -30,6 +30,11 @@ export const en = {
     outbox: "Outbox",
     direction: "Direction / BI",
   },
+  palette: {
+    pages: "Pages",
+    actions: "Actions",
+    placeholder: "Go to a page or run an action…",
+  },
   common: {
     logout: "Sign out",
     language: "English",

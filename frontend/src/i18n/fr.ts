@@ -30,6 +30,11 @@ export const fr = {
     outbox: "Outbox",
     direction: "Direction / BI",
   },
+  palette: {
+    pages: "Pages",
+    actions: "Actions",
+    placeholder: "Aller à une page ou lancer une action…",
+  },
   common: {
     logout: "Déconnexion",
     language: "Français",
