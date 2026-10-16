@@ -12,6 +12,7 @@ levée de réserve / réception interne portée par le PV (RF-ERP-51/53).
 from rest_framework.permissions import BasePermission
 
 from users.models import User
+from users.rbac import can_read_app
 
 QUALITE_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -58,7 +59,7 @@ class CanManageQualite(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "qualite")
         return can_manage_qualite(getattr(request, "user", None))
 
 
@@ -67,5 +68,5 @@ class CanValidatePv(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "qualite")
         return can_validate_pv(getattr(request, "user", None))

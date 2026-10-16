@@ -4,7 +4,6 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -21,6 +20,7 @@ from .serializers import (
     LectureCompteurSerializer,
     LocationGRSerializer,
 )
+from users.permissions import can_read_module
 from .services import CanManageLogistique, can_see_amount, stats_parc
 
 
@@ -31,7 +31,7 @@ class _CommonViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
-            return [IsAuthenticated()]
+            return [can_read_module("logistique")()]
         return [CanManageLogistique()]
 
     def get_serializer_context(self):

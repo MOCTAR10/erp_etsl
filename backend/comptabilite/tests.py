@@ -10,7 +10,6 @@ from rest_framework.test import APITestCase
 
 from accounting_kernel.models import AccountMove, Journal, Period
 from referentiels.models import Account, Partner
-from users.models import User
 
 from .models import (
     ComptabiliteSequence,
@@ -134,10 +133,16 @@ class ComptesBancairesTests(BaseComptaTest):
 
     def test_lecture_authentifiee(self):
         self._banque()
-        _auth(self.client, "logi@etls.local")
+        _auth(self.client, "finance@etls.local")
         r = self.client.get(f"{BASE}comptes-bancaires/")
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(len(r.data["results"]), 1)
+
+    def test_lecture_refusee_hors_module(self):
+        self._banque()
+        _auth(self.client, "logi@etls.local")  # logistique n'a pas M10
+        r = self.client.get(f"{BASE}comptes-bancaires/")
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_non_authentifie_403(self):
         r = self.client.get(f"{BASE}comptes-bancaires/")
@@ -466,7 +471,12 @@ class DeclarationTvaTests(BaseComptaTest):
         self.assertEqual(r.json()["statut"], "deposee")
 
     def test_montants_masques_hors_roles(self):
-        _auth(self.client, "logi@etls.local")
+        # directeur_projets lit M10 (ecriture) mais hors cercle des montants (RF-59)
+        User.objects.create_user(
+            email="projets@etls.local", password="Etls#Demo2026",
+            role=User.Role.DIRECTEUR_PROJETS, first_name="Projets",
+        )
+        _auth(self.client, "projets@etls.local")
         taux = self._taux_tva()
         declaration = DeclarationTva.objects.create(mois=date(2026, 1, 1), taux_tva=taux)
         r = self.client.get(f"{BASE}declarations-tva/{declaration.pk}/")

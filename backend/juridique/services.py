@@ -16,6 +16,7 @@ from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
 from users.models import User
+from users.rbac import can_read_app
 
 JURIDIQUE_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -78,7 +79,7 @@ class CanManageJuridique(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "juridique")
         return can_manage_juridique(getattr(request, "user", None))
 
 

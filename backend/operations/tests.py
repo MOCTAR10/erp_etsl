@@ -136,9 +136,16 @@ class OperationsAPITests(APITestCase):
         self.assertEqual(resp.data["code"], "PTS00001")
         self.assertEqual(str(resp.data["created_by"]), str(self.chef.id))
 
-    def test_amount_masked_for_chef_service(self):
+    def test_chef_service_cannot_read_module(self):
         self.client.force_authenticate(self.chef_service)
         resp = self.client.get(f"/api/operations/situations/{self.sit.id}/")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_amount_masked_for_reader_outside_amount_circle(self):
+        # chef_atelier lit M3 (execution) mais reste hors du cercle des montants.
+        self.client.force_authenticate(self.chef)
+        resp = self.client.get(f"/api/operations/situations/{self.sit.id}/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data["amount"], None)
 
     def test_amount_visible_for_finance(self):

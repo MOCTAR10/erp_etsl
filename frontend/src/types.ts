@@ -5,6 +5,8 @@ export interface Me {
   last_name: string;
   role: string;
   is_active: boolean;
+  /** Modules ERP lisibles (RF-59) — absent sur une session persistée d'avant. */
+  modules?: string[];
 }
 
 export interface Tokens {

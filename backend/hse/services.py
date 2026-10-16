@@ -10,6 +10,7 @@ authentifiés. Aucun montant financier → pas de masquage.
 from rest_framework.permissions import BasePermission
 
 from users.models import User
+from users.rbac import can_read_app
 
 HSE_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -60,7 +61,7 @@ class CanManageHse(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "hse")
         return can_manage_hse(getattr(request, "user", None))
 
 
@@ -69,5 +70,5 @@ class CanValidateHse(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "hse")
         return can_validate_hse(getattr(request, "user", None))

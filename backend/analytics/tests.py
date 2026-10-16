@@ -8,7 +8,6 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from users.models import User
 
 from .services import alertes_agregees, dashboard_direction, reporting_petrolier
 

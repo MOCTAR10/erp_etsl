@@ -144,6 +144,11 @@ class AchatsAPITests(APITestCase):
             email="chef@etls.local", password="MotDePasse#2026",
             role=User.Role.CHEF_SERVICE,
         )
+        # Lecteur M2 hors cercle des montants achats (RF-59).
+        self.atelier = User.objects.create_user(
+            email="atelier@etls.local", password="MotDePasse#2026",
+            role=User.Role.CHEF_ATELIER,
+        )
         self.currency, self.unit, _ = make_references()
         self.order = PurchaseOrder.objects.create(order_date=timezone.localdate(), status="confirmee")
         PurchaseOrderLine.objects.create(
@@ -157,8 +162,13 @@ class AchatsAPITests(APITestCase):
             resp.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
         )
 
-    def test_authenticated_can_read_filters(self):
+    def test_chef_service_cannot_read_module(self):
         self.client.force_authenticate(self.chef)
+        resp = self.client.get("/api/achats/orders/")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_authorized_reader_can_read_filters(self):
+        self.client.force_authenticate(self.atelier)
         resp = self.client.get("/api/achats/orders/?status=confirmee")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data["count"], 1)
@@ -179,8 +189,8 @@ class AchatsAPITests(APITestCase):
         self.assertEqual(resp.data["code"], "DA00001")
         self.assertEqual(str(resp.data["requester"]), str(self.logistique.id))
 
-    def test_amount_masked_for_chef_service(self):
-        self.client.force_authenticate(self.chef)
+    def test_amount_masked_for_reader_outside_amount_circle(self):
+        self.client.force_authenticate(self.atelier)
         resp = self.client.get(f"/api/achats/orders/{self.order.id}/")
         self.assertIsNone(resp.data["total"])
 

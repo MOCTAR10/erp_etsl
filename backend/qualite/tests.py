@@ -2,7 +2,6 @@
 
 from datetime import date, timedelta
 
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -182,10 +181,15 @@ class ControleQualiteTests(M6BaseTest):
             affaire=self.affaire,
             created_by=self.qaqc,
         )
-        self.auth(self.rh)
+        self.auth(make_user(User.Role.HSE))  # HSE lit M6 ; rh n'a pas ce module
         resp = self.client.get("/api/qualite/controles/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data["count"], 1)
+
+    def test_read_denied_without_module(self):
+        self.auth(self.rh)
+        resp = self.client.get("/api/qualite/controles/")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class NonConformiteTests(M6BaseTest):

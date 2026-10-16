@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -31,6 +30,7 @@ from .serializers import (
     ReleveBancaireSerializer,
     TauxTvaSerializer,
 )
+from users.permissions import can_read_module
 from .services import (
     CanManageCompta,
     CanValidateCompta,
@@ -55,7 +55,7 @@ class TauxTvaViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
-            return [IsAuthenticated()]
+            return [can_read_module("comptabilite")()]
         return [IsComptaAdmin()]
 
 

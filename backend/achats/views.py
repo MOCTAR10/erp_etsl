@@ -1,9 +1,7 @@
 """API module M2 — Achats & Approvisionnements (RF-ERP-10…13)."""
 
-from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -30,6 +28,7 @@ from .serializers import (
     PurchaseRequestLineSerializer,
     PurchaseRequestSerializer,
 )
+from users.permissions import can_read_module
 from .services import CanManageAchats, can_see_amount
 
 
@@ -40,7 +39,7 @@ class _CommonViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
-            return [IsAuthenticated()]
+            return [can_read_module("achats")()]
         return [CanManageAchats()]
 
     def get_serializer_context(self):

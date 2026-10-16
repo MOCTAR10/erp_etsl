@@ -8,7 +8,6 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Budget, BudgetLigne, BudgetRevision, ClotureGestion
@@ -18,6 +17,7 @@ from .serializers import (
     BudgetSerializer,
     ClotureGestionSerializer,
 )
+from users.permissions import can_read_module
 from .services import (
     CanApproveBudget,
     CanManageGestion,
@@ -218,7 +218,7 @@ class ClotureGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 class MargesView(viewsets.ViewSet):
     """Marges par axe analytique (RF-ERP-A2) — coût GR isolé (A4)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [can_read_module("controle_gestion")]
 
     def list(self, request):
         fiscal_year = request.query_params.get("fiscal_year")

@@ -23,7 +23,11 @@ export async function loginAs(page: Page, email: string, password = DEMO_PASSWOR
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page).toHaveURL(/^http:\/\/[^/]+\/$/, { timeout: 20_000 });
+  // La page d'atterrissement dépend du rôle (`src/lib/landing.ts`) : on vérifie
+  // donc que la session est établie — hors /login et shell applicatif monté —
+  // et non plus une URL unique. Chaque spec fait son propre `goto()` ensuite.
+  await expect(page).not.toHaveURL(/\/login$/, { timeout: 20_000 });
+  await expect(page.locator(".sidebar")).toBeVisible({ timeout: 20_000 });
 }
 
 export const test = base.extend<{ role: string }>({

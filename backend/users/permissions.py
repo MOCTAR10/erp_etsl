@@ -3,6 +3,7 @@
 from rest_framework.permissions import BasePermission
 
 from .models import User
+from .rbac import can_read_app
 
 
 class IsRole(BasePermission):
@@ -41,3 +42,14 @@ class IsAdminOrStaff(BasePermission):
         if not user or not user.is_authenticated:
             return False
         return user.is_staff or user.role == User.Role.ADMIN
+
+
+def can_read_module(app: str):
+    """Fabrique une permission de lecture restreinte au module ERP `app`."""
+
+    class _CanReadModule(BasePermission):
+        def has_permission(self, request, view):
+            return can_read_app(getattr(request, "user", None), app)
+
+    _CanReadModule.__name__ = "CanRead" + app.title().replace("_", "")
+    return _CanReadModule

@@ -14,6 +14,7 @@ from django.db.models import Q, Sum
 from rest_framework.permissions import BasePermission
 
 from users.models import User
+from users.rbac import can_read_app
 
 GESTION_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -61,7 +62,7 @@ class CanManageGestion(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "controle_gestion")
         return can_manage_gestion(getattr(request, "user", None))
 
 
@@ -99,7 +100,6 @@ def compute_marges(fiscal_year, axis=None, analytic=None, sens_gr_inclus=("produ
     Retour : liste de dict `{analytic, code_axe, produits, charges, marge,
     taux_marge}` + totaux.
     """
-    from accounting_kernel.models import AccountMoveLine
     from referentiels.models import Account, AnalyticAccount
 
     lines = _posted_lines_qs(fiscal_year)

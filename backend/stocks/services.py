@@ -16,6 +16,7 @@ from django.db import transaction
 from rest_framework.permissions import BasePermission
 
 from users.models import User
+from users.rbac import can_read_app
 
 from .models import Inventaire, InventaireLigne, LotMatiere, MouvementStock, StockQuant
 
@@ -63,9 +64,11 @@ def can_see_amount(user):
 
 
 class CanManageStocks(BasePermission):
-    """Écriture réservée aux rôles Magasin / Opérations / Direction."""
+    """Lecture réservée aux rôles Magasin / Opérations / Direction, écriture idem."""
 
     def has_permission(self, request, view):
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return can_read_app(getattr(request, "user", None), "stocks")
         return can_manage_stocks(getattr(request, "user", None))
 
 
@@ -169,7 +172,6 @@ def valuation(depot_id=None):
     Valeur unitaire = stock_value / quantity (CUMP tenu par `apply_move`) ;
     méthode configurée révélée (FIFO / PEPS / CUMP / PP).
     """
-    from django.db.models import Q
 
     quants = StockQuant.objects.select_related("depot", "article", "article__stock_config")
     if depot_id:

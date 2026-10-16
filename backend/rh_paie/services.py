@@ -8,6 +8,7 @@ Montants (salaire, brut, net) masqués hors rôles autorisés (pattern RF-59).
 from rest_framework.permissions import BasePermission
 
 from users.models import User
+from users.rbac import can_read_app
 
 RH_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -71,7 +72,7 @@ class CanManageRh(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "rh_paie")
         return can_manage_rh(getattr(request, "user", None))
 
 

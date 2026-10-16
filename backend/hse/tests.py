@@ -412,10 +412,13 @@ class SerializerCrudRegressionTests(M7BaseTest):
 
 
 class PermissionsTests(M7BaseTest):
-    def test_lecture_ouverte_a_tous_authentifies(self):
-        self.auth(self.comptable)
+    def test_lecture_reservee_aux_roles_du_module(self):
+        self.auth(self.rh)  # RH lit M7
         res = self.client.get("/api/hse/incidents/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.auth(self.comptable)  # compta n'a pas le module HSE
+        res = self.client.get("/api/hse/incidents/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_ecriture_reservee_roles_hse(self):
         self.auth(self.comptable)

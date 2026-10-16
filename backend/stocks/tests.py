@@ -5,7 +5,7 @@ from datetime import date
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from referentiels.models import Article, Currency, Partner, UnitOfMeasure
+from referentiels.models import Article, Currency, UnitOfMeasure
 from stocks.models import (
     ArticleStock,
     CertificatMatiere,
@@ -317,7 +317,7 @@ class InventaireTests(M5BaseTest):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
         inv_id = resp.data["id"]
         resp = self.client.post(
-            f"/api/stocks/inventaire-lignes/",
+            "/api/stocks/inventaire-lignes/",
             {
                 "inventaire": inv_id,
                 "article": str(self.article.pk),

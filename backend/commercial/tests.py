@@ -6,12 +6,11 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from referentiels.models import Article, Currency, Partner, UnitOfMeasure
+from referentiels.models import Currency, Partner, UnitOfMeasure
 
 from .models import (
     Affaire,
     ClientProfile,
-    CommercialSequence,
     Contract,
     Estimate,
     EstimateLine,
@@ -165,6 +164,11 @@ class CommercialAPITests(APITestCase):
             email="chef@etls.local", password="MotDePasse#2026",
             role=User.Role.CHEF_SERVICE,
         )
+        # Lecteur M1 hors cercle des montants (RF-59) : lit, mais sans montants.
+        self.sg = User.objects.create_user(
+            email="sg@etls.local", password="MotDePasse#2026",
+            role=User.Role.SECRETAIRE_GENERAL,
+        )
         self.client_profile = make_client()
         self.opp = Opportunity.objects.create(
             client=self.client_profile, subject="Opp 1", amount=100_000_000,
@@ -177,8 +181,14 @@ class CommercialAPITests(APITestCase):
             resp.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
         )
 
-    def test_authenticated_can_read_and_filter(self):
+    def test_chef_service_cannot_read_module(self):
+        # Lecture restreinte par module (rbac.py) : chef_service n'a aucun module metier.
         self.client.force_authenticate(self.chef)
+        resp = self.client.get("/api/commercial/opportunities/")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_authorized_reader_can_read_and_filter(self):
+        self.client.force_authenticate(self.sg)
         resp = self.client.get("/api/commercial/opportunities/?stage=qualification")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data["count"], 1)
@@ -202,8 +212,8 @@ class CommercialAPITests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(resp.data["code"], "OPP00002")
 
-    def test_amount_masked_for_chef_service(self):
-        self.client.force_authenticate(self.chef)
+    def test_amount_masked_for_reader_outside_amount_circle(self):
+        self.client.force_authenticate(self.sg)
         resp = self.client.get(f"/api/commercial/opportunities/{self.opp.id}/")
         self.assertIsNone(resp.data["amount"])
 

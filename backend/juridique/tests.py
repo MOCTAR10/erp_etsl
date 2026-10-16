@@ -9,7 +9,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from referentiels.models import Partner
-from users.models import User
 
 from .models import (
     Assurance,
@@ -156,15 +155,21 @@ class ConventionTests(BaseJuridiqueTest):
         resp = self.client.post(
             f"{BASE}conventions/",
             {"type": "maintenance", "titre": "Contrat", "partenaire": self.gr.pk,
-             "montant": "1000000", "date_debut": "2026-01-01", "date_fin": "2026-12-31"},
+             "montant": "1000000",
+             "date_debut": (date.today() - timedelta(days=30)).isoformat(),
+             "date_fin": (date.today() + timedelta(days=400)).isoformat()},
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
         self.assertEqual(resp.data["expiry_status"], "en_cours")
 
-    def test_montant_masque_pour_logistique(self):
+    def test_montant_masque_pour_lecteur_hors_cercle(self):
         conv = self._convention()
-        _auth(self.client, "logi@etls.local")
+        User.objects.create_user(
+            email="projets@etls.local", password="Etls#Demo2026",
+            role=User.Role.DIRECTEUR_PROJETS, first_name="Projets",
+        )
+        _auth(self.client, "projets@etls.local")  # lit M12, hors cercle des montants
         resp = self.client.get(f"{BASE}conventions/{conv.pk}/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIsNone(resp.data["montant"])
@@ -220,8 +225,13 @@ class ContentieuxTests(BaseJuridiqueTest):
 
     def test_montant_enjeu_masque(self):
         c = self._contentieux()
-        _auth(self.client, "logi@etls.local")
+        User.objects.create_user(
+            email="projets@etls.local", password="Etls#Demo2026",
+            role=User.Role.DIRECTEUR_PROJETS, first_name="Projets",
+        )
+        _auth(self.client, "projets@etls.local")  # lit M12, hors cercle des montants
         resp = self.client.get(f"{BASE}contentieux/{c.pk}/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIsNone(resp.data["montant_en_jeu"])
 
 
@@ -398,10 +408,13 @@ class AlertesTests(BaseJuridiqueTest):
         self.assertEqual(alertes["compteurs"]["expiree"], 1)
 
     def test_alertas_lecture_authentifiee(self):
-        _auth(self.client, "logi@etls.local")
+        _auth(self.client, "finance@etls.local")
         resp = self.client.get(f"{BASE}alertes/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIn("compteurs", resp.data)
+        _auth(self.client, "logi@etls.local")  # logistique n'a pas M12
+        resp = self.client.get(f"{BASE}alertes/")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_compute_stats(self):
         self._courrier(Courrier.Statut.ENREGISTRE)

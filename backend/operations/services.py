@@ -6,7 +6,7 @@ Logistique & Direction.
 Montants (situations de travaux) : restreints hors rôles autorisés (RF-59).
 """
 
-from django.db.models import Q, Sum
+from django.db.models import Q
 from rest_framework.permissions import BasePermission
 
 from users.models import User

@@ -5,10 +5,9 @@ from datetime import date as _date
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -29,6 +28,7 @@ from .serializers import (
     DossierGlobalRentalSerializer,
     ReunionSerializer,
 )
+from users.permissions import can_read_module
 from .services import (
     CanManageJuridique,
     CanValidateJuridique,
@@ -364,7 +364,7 @@ class DossierGlobalRentalViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 class AlertesViewSet(viewsets.ViewSet):
     """Alertes J-90 / J-60 / J-30 / expirées (RF-ERP-B0)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [can_read_module("juridique")]
 
     def list(self, request):
         return Response(compute_alertes())

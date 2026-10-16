@@ -1,15 +1,22 @@
 from rest_framework import serializers
 
 from .models import User
+from .rbac import modules_for_role
 
 
 class UserSerializer(serializers.ModelSerializer):
     """Profil utilisateur exposé via l'API."""
 
+    modules = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "role", "is_active"]
-        read_only_fields = ["id", "email", "role", "is_active"]
+        fields = ["id", "email", "first_name", "last_name", "role", "is_active", "modules"]
+        read_only_fields = ["id", "email", "role", "is_active", "modules"]
+
+    def get_modules(self, obj) -> list[str]:
+        """Modules ERP lisibles par l'utilisateur (pilote le menu du SPA)."""
+        return list(modules_for_role(obj.role))
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

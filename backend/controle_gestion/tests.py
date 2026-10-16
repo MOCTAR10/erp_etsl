@@ -9,9 +9,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting_kernel.models import AccountMove, AccountMoveLine, FiscalYear, Journal, Period
-from accounting_kernel.services import period_for_date, post_move
+from accounting_kernel.services import post_move
 from referentiels.models import Account, AnalyticAccount, AnalyticAxis
-from users.models import User
 
 from .models import Budget, BudgetLigne, BudgetRevision, ClotureGestion
 from .services import compute_clotures_stats, compute_marges, compute_variance
@@ -188,14 +187,14 @@ class CrudBudgetTests(BaseGestionTest):
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
-        # Lecture : autorisée mais montants masqués (RF-59).
-        resp = self.client.get(f"{BASE}budgets/")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # Lecture : refusee des la couche module (rbac.py) pour un role hors M11.
+        # (Les lecteurs M11 coincident avec le cercle des montants : le masquage
+        # RF-59 reste une defense en profondeur dans le serializer.)
         budget = self._budget()
+        resp = self.client.get(f"{BASE}budgets/")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
         resp = self.client.get(f"{BASE}budgets/{budget.pk}/")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertIsNone(resp.data["montant"])
-        self.assertFalse(resp.data["has_amount_access"])
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_montant_visible_cercle_financial(self):
         _auth(self.client, "compta@etls.local")

@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.permissions import BasePermission
 
 from users.models import User
+from users.rbac import can_read_app
 
 from .models import Paiement
 
@@ -63,7 +64,7 @@ class CanManageCompta(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return bool(getattr(request, "user", None) and request.user.is_authenticated)
+            return can_read_app(getattr(request, "user", None), "comptabilite")
         return can_manage_compta(getattr(request, "user", None))
 
 
@@ -88,7 +89,7 @@ def build_paiement_move(paiement, user):
     FAQ — la TVA est portée par les écritures de facturation M2 via `integrations`).
     Refacturation intra-groupe : compte de dépense 618000 (M4/M5).
     """
-    from accounting_kernel.models import Journal, Period
+    from accounting_kernel.models import Journal
     from accounting_kernel.services import period_for_date, post_move
     from referentiels.models import Account, Partner
 

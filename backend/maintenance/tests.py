@@ -2,12 +2,11 @@
 
 from datetime import date, timedelta
 
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from logistique.models import EquipementParc
-from maintenance.models import Actif, Inspection, MaintenanceSequence, OrdreTravail
+from maintenance.models import Actif, Inspection, OrdreTravail
 from users.models import User
 
 
@@ -187,7 +186,8 @@ class CostTrackingTests(M8BaseTest):
         self.assertEqual(ot.cout_total, 4 * 1500 + 6000)
 
     def test_montants_masques_hors_roles(self):
-        self.auth(self.rh)
+        # logistique lit M8 mais hors cercle des montants (RF-59)
+        self.auth(make_user(User.Role.LOGISTIQUE))
         ot = OrdreTravail.objects.create(
             actif=self.actif,
             description="Révision",
