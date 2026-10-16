@@ -63,3 +63,11 @@ admin.site.register(
     list_display=("bulletin", "rubrique", "libelle", "montant"),
 )
 admin.site.register(RhPaieSequence, list_display=("kind", "prefix", "padding", "next_number"))
+
+from .models import BaremeCotisation  # noqa: E402
+
+
+@admin.register(BaremeCotisation)
+class BaremeCotisationAdmin(admin.ModelAdmin):
+    list_display = ["code", "label", "organisme", "nature", "taux", "plafond", "date_effet", "date_fin"]
+    list_filter = ["nature", "organisme"]

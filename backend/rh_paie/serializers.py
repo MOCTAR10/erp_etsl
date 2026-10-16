@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import (
+    BaremeCotisation,
     BulletinLigne,
     BulletinPaie,
     ContratTravail,
@@ -251,17 +252,21 @@ class BulletinSerializer(serializers.ModelSerializer):
     total_gains = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
     total_retenues = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
     lignes = BulletinLigneSerializer(many=True, read_only=True)
+    move_number = serializers.CharField(source="move.number", read_only=True, default=None)
     has_amount_access = serializers.SerializerMethodField()
 
     class Meta:
         model = BulletinPaie
         fields = [
             "id", "code", "employe", "employe_nom", "matricule", "periode",
-            "salaire_base", "brut", "net", "total_gains", "total_retenues",
-            "lignes", "statut", "statut_label", "has_amount_access",
+            "salaire_base", "brut", "net", "charges_patronales", "total_gains", "total_retenues",
+            "lignes", "statut", "statut_label", "move", "move_number", "has_amount_access",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "brut", "net", "total_gains", "total_retenues", "lignes", "statut"]
+        read_only_fields = [
+            "code", "brut", "net", "charges_patronales", "total_gains", "total_retenues",
+            "lignes", "statut", "move", "move_number",
+        ]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context["request"].user)
@@ -270,7 +275,9 @@ class BulletinSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         request = self.context.get("request")
         if not can_see_amount(getattr(request, "user", None)):
-            for key in ("salaire_base", "brut", "net", "total_gains", "total_retenues", "lignes"):
+            for key in (
+                "salaire_base", "brut", "net", "charges_patronales", "total_gains", "total_retenues", "lignes",
+            ):
                 data[key] = None
             data["has_amount_access"] = False
         return data
@@ -300,8 +307,21 @@ class BulletinAvecLignesSerializer(BulletinSerializer):
 
     @staticmethod
     def recalculer(bulletin):
-        brut = bulletin.total_gains or 0
-        net = bulletin.total_gains - (bulletin.total_retenues or 0)
-        bulletin.brut = brut
-        bulletin.net = net
-        bulletin.save(update_fields=["brut", "net", "updated_at"])
+        from .services import calculer_bulletin
+
+        calculer_bulletin(bulletin)  # cotisations des barèmes en vigueur + brut/net
+
+
+class BaremeCotisationSerializer(serializers.ModelSerializer):
+    nature_label = serializers.CharField(source="get_nature_display", read_only=True)
+    base_label = serializers.CharField(source="get_base_display", read_only=True)
+
+    class Meta:
+        model = BaremeCotisation
+        fields = [
+            "id", "code", "label", "organisme", "nature", "nature_label", "base", "base_label",
+            "taux", "plafond", "date_effet", "date_fin", "ordre",
+        ]
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs, exclude=())

@@ -570,6 +570,54 @@ class RubriquePaie(models.Model):
         return f"{self.code} — {self.label}"
 
 
+class BaremeCotisation(models.Model):
+    """Barème de cotisation sociale, **versionné par date d'effet** (RF-ERP-82).
+
+    Les taux sont des DONNÉES paramétrables, jamais codées en dur : à renseigner et valider avec
+    ETSL / la CNSSG / la CNAMGS. Une cotisation s'applique à la base (brut ou salaire de base),
+    éventuellement plafonnée (base mensuelle maximale).
+    """
+
+    class Nature(models.TextChoices):
+        SALARIALE = "salariale", "Retenue salariale"
+        PATRONALE = "patronale", "Charge patronale"
+
+    class Base(models.TextChoices):
+        BRUT = "brut", "Brut"
+        SALAIRE = "salaire", "Salaire de base"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, verbose_name="Code")
+    label = models.CharField(max_length=150, verbose_name="Libellé")
+    organisme = models.CharField(max_length=60, blank=True, verbose_name="Organisme (CNSSG, CNAMGS…)")
+    nature = models.CharField(max_length=10, choices=Nature.choices, verbose_name="Nature")
+    base = models.CharField(max_length=10, choices=Base.choices, default=Base.BRUT, verbose_name="Base")
+    taux = models.DecimalField(max_digits=6, decimal_places=3, verbose_name="Taux (%)")
+    plafond = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name="Plafond mensuel de la base (FCFA)",
+    )
+    date_effet = models.DateField(verbose_name="Date d'effet")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin")
+    ordre = models.PositiveSmallIntegerField(default=0, verbose_name="Ordre")
+
+    class Meta:
+        ordering = ["nature", "ordre", "code", "-date_effet"]
+        verbose_name = "Barème de cotisation"
+        verbose_name_plural = "Barèmes de cotisation"
+        constraints = [
+            models.UniqueConstraint(fields=["code", "date_effet"], name="uniq_bareme_code_effet"),
+            models.CheckConstraint(check=models.Q(taux__gte=0), name="bareme_taux_positif"),
+        ]
+
+    def __str__(self):
+        return f"{self.code} {self.taux} % ({self.get_nature_display()}) dès {self.date_effet}"
+
+    def clean(self):
+        if self.date_fin and self.date_fin < self.date_effet:
+            raise ValidationError({"date_fin": "La date de fin précède la date d'effet."})
+
+
 class BulletinPaie(models.Model):
     """Bulletin de paie mensuel — CNSSG / CNAMGS (RF-ERP-82)."""
 
@@ -590,6 +638,15 @@ class BulletinPaie(models.Model):
     )
     brut = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Brut (FCFA)")
     net = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Net à payer (FCFA)")
+    charges_patronales = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, verbose_name="Charges patronales (FCFA)",
+        help_text="Cotisations à la charge de l'employeur (barèmes « patronale ») — hors net du salarié.",
+    )
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="bulletins_paie", verbose_name="Écriture comptable",
+        help_text="Écriture du journal de paie générée par `comptabiliser` (noyau comptable).",
+    )
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut"
     )

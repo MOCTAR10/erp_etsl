@@ -3,6 +3,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
@@ -10,7 +11,10 @@ from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from accounting_kernel.permissions import CanPostAccounting
+
 from .models import (
+    BaremeCotisation,
     BulletinPaie,
     ContratTravail,
     DemandeRecrutement,
@@ -23,6 +27,7 @@ from .models import (
     Sanction,
 )
 from .serializers import (
+    BaremeCotisationSerializer,
     BulletinAvecLignesSerializer,
     BulletinSerializer,
     ContratSerializer,
@@ -35,7 +40,7 @@ from .serializers import (
     SaisieTempsSerializer,
     SanctionSerializer,
 )
-from .services import CanManagePaie, CanManageRh
+from .services import CanManagePaie, CanManageRh, calculer_bulletin, comptabiliser_bulletin
 
 
 class EmployeViewSet(viewsets.ModelViewSet):
@@ -462,15 +467,23 @@ class BulletinViewSet(viewsets.ModelViewSet):
                 {"detail": "Seul un bulletin brouillon peut être recalculé."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        gains, retenues = Decimal("0"), Decimal("0")
-        for ligne in bulletin.lignes.select_related("rubrique"):
-            if ligne.rubrique.nature == RubriquePaie.Nature.GAIN:
-                gains += ligne.montant
-            else:
-                retenues += ligne.montant
-        bulletin.brut = gains
-        bulletin.net = gains - retenues
-        bulletin.save(update_fields=["brut", "net", "updated_at"])
+        bulletin = calculer_bulletin(bulletin)  # barèmes en vigueur + gains/retenues saisis
+        return Response(self.get_serializer(bulletin).data)
+
+    def get_permissions(self):
+        if self.action == "comptabiliser":
+            # Écriture comptable : cercle de la paie ET cercle comptable (admin/comptable/finance/direction).
+            return [CanManagePaie(), CanPostAccounting()]
+        return super().get_permissions()
+
+    @action(detail=True, methods=["post"], url_path="comptabiliser")
+    def comptabiliser(self, request, pk=None):
+        """Génère l'écriture de paie (journal PAI) d'un bulletin validé (RF-ERP-82 → M10)."""
+        try:
+            comptabiliser_bulletin(self.get_object(), user=request.user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        bulletin = self.get_object()
         return Response(self.get_serializer(bulletin).data)
 
     @action(detail=True, methods=["post"], url_path="valider")
@@ -529,3 +542,11 @@ class BulletinViewSet(viewsets.ModelViewSet):
                 "net_total": f"{agg['net_total'] or 0:.2f}",
             }
         )
+
+
+class BaremeCotisationViewSet(viewsets.ModelViewSet):
+    """Barèmes de cotisation versionnés (taux/plafonds = données, à valider avec ETSL)."""
+
+    queryset = BaremeCotisation.objects.all()
+    serializer_class = BaremeCotisationSerializer
+    permission_classes = [CanManagePaie]

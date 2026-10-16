@@ -61,6 +61,7 @@ ACCOUNTS = [
     ("631000", "Frais bancaires", 6, Account.AccountType.EXPENSE),
     ("641000", "Impôts et taxes", 6, Account.AccountType.EXPENSE),
     ("661000", "Charges de personnel", 6, Account.AccountType.EXPENSE),
+    ("664000", "Charges sociales", 6, Account.AccountType.EXPENSE),
     ("681000", "Dotations aux amortissements", 6, Account.AccountType.EXPENSE),
     ("701000", "Ventes de produits", 7, Account.AccountType.INCOME),
     ("706000", "Services vendus / prestations", 7, Account.AccountType.INCOME),
