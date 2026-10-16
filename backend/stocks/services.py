@@ -99,6 +99,7 @@ def apply_move(mouvement):
     """
     if mouvement.executed:
         return mouvement
+    prix = mouvement.prix_unitaire
     if mouvement.source:
         src = _quant(mouvement.source, mouvement.article, mouvement.lot)
         if float(src.quantity) + 1e-9 < float(mouvement.quantite):
@@ -107,6 +108,10 @@ def apply_move(mouvement):
                 f"{float(src.quantity)} dispo pour {float(mouvement.quantite)}."
             )
         unit_cost = src.stock_value / src.quantity if float(src.quantity) > 0 else 0
+        if mouvement.destination:
+            # Transfert : la destination reçoit au COÛT de la source (valeur conservée),
+            # jamais au « prix unitaire » saisi (0 par défaut => valeur détruite).
+            prix = unit_cost
         src.quantity -= mouvement.quantite
         src.stock_value -= mouvement.quantite * unit_cost
         if float(src.quantity) <= 1e-9:
@@ -116,10 +121,10 @@ def apply_move(mouvement):
     if mouvement.destination:
         dst = _quant(mouvement.destination, mouvement.article, mouvement.lot)
         nouveau_qty = dst.quantity + mouvement.quantite
-        if float(dst.quantity) > 0 or float(mouvement.prix_unitaire) <= 0:
-            dst.stock_value += mouvement.quantite * mouvement.prix_unitaire
+        if float(dst.quantity) > 0 or float(prix) <= 0:
+            dst.stock_value += mouvement.quantite * prix
         else:
-            dst.stock_value = mouvement.quantite * mouvement.prix_unitaire
+            dst.stock_value = mouvement.quantite * prix
         dst.quantity = nouveau_qty
         dst.save(update_fields=["quantity", "stock_value", "updated_at"])
     if mouvement.lot:

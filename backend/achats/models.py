@@ -5,6 +5,7 @@ rapprochement 3-way (BL / facture) · circuit intra-groupe GLOBAL RENTAL.
 """
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -280,6 +281,21 @@ class PurchaseOrder(models.Model):
         rows = []
         for line in self.lines.all():
             ordered = line.quantity - line.received_qty
+            anomalies = []
+            if line.received_qty > line.quantity:
+                anomalies.append(
+                    f"Sur-réception : reçu {line.received_qty} > commandé {line.quantity}"
+                )
+            if line.invoiced_qty > line.received_qty:
+                anomalies.append(
+                    f"Facturé {line.invoiced_qty} > reçu {line.received_qty} (facture sans réception)"
+                )
+            for inv in line.invoice_lines.all():
+                if abs(inv.unit_price - line.unit_price) > Decimal("0.01"):
+                    anomalies.append(
+                        f"Écart de prix : facturé {inv.unit_price} vs commandé {line.unit_price}"
+                    )
+                    break
             rows.append(
                 {
                     "label": line.label,
@@ -287,7 +303,8 @@ class PurchaseOrder(models.Model):
                     "remaining": float(ordered),
                     "received": float(line.received_qty),
                     "invoiced": float(line.invoiced_qty),
-                    "ok": float(line.received_qty) <= float(line.quantity),
+                    "anomalies": anomalies,
+                    "ok": not anomalies,
                 }
             )
         return rows
@@ -429,14 +446,22 @@ class GoodsReceiptLine(models.Model):
 
     def save(self, *args, **kwargs):
         with transaction.atomic():
-            line = PurchaseOrderLine.objects.select_for_update().get(
-                pk=self.purchase_order_line_id
+            old = (
+                None
+                if self._state.adding
+                else GoodsReceiptLine.objects.filter(pk=self.pk)
+                .values("quantity", "purchase_order_line_id")
+                .first()
             )
-            if self._state.adding:
-                line.received_qty += self.quantity
-                line.save(update_fields=["received_qty"])
+            order_ids = {_shift_qty(self.purchase_order_line_id, "received_qty", self.quantity)}
+            if old:
+                # modification : on retire l'ancienne quantité (de l'ancienne ligne si elle a changé)
+                order_ids.add(
+                    _shift_qty(old["purchase_order_line_id"], "received_qty", -old["quantity"])
+                )
             result = super().save(*args, **kwargs)
-        _refresh_purchase_order_status(line.purchase_order_id)
+        for order_id in order_ids:
+            _refresh_purchase_order_status(order_id)
         return result
 
 
@@ -458,11 +483,24 @@ def _on_receipt_line_deleted(sender, instance, **kwargs):
     _refresh_purchase_order_status(line.purchase_order_id)
 
 
+def _shift_qty(po_line_id, field, delta):
+    """Ajoute `delta` (peut être négatif) à `received_qty`/`invoiced_qty` d'une ligne de BC, sous verrou.
+
+    Retourne l'id du BC concerné. Jamais négatif (borné à 0).
+    """
+    line = PurchaseOrderLine.objects.select_for_update().get(pk=po_line_id)
+    setattr(line, field, max(Decimal("0"), getattr(line, field) + Decimal(delta)))
+    line.save(update_fields=[field])
+    return line.purchase_order_id
+
+
 def _refresh_purchase_order_status(order_id):
     """Statut du BC selon le solde des réceptions."""
     with transaction.atomic():
         order = PurchaseOrder.objects.select_for_update().get(pk=order_id)
-        if order.status in (PurchaseOrder.Status.ANNULEE, PurchaseOrder.Status.CLOTUREE):
+        # Brouillon et annulé ne bougent pas ; sinon le statut est DÉRIVÉ des réceptions
+        # (il redescend si une réception est corrigée ou supprimée).
+        if order.status in (PurchaseOrder.Status.BROUILLON, PurchaseOrder.Status.ANNULEE):
             return
         lines = list(order.lines.all())
         if not lines:
@@ -470,10 +508,14 @@ def _refresh_purchase_order_status(order_id):
         all_received = all(float(l.received_qty) >= float(l.quantity) for l in lines)
         any_received = any(float(l.received_qty) > 0 for l in lines)
         if all_received:
-            order.status = PurchaseOrder.Status.CLOTUREE
+            new = PurchaseOrder.Status.CLOTUREE
         elif any_received:
-            order.status = PurchaseOrder.Status.PARTIELLE
-        order.save(update_fields=["status"])
+            new = PurchaseOrder.Status.PARTIELLE
+        else:
+            new = PurchaseOrder.Status.CONFIRMEE
+        if new != order.status:
+            order.status = new
+            order.save(update_fields=["status"])
 
 
 class PurchaseInvoice(models.Model):
@@ -571,13 +613,17 @@ class PurchaseInvoiceLine(models.Model):
     def save(self, *args, **kwargs):
         self.price_total = self.quantity * self.unit_price
         with transaction.atomic():
-            line = PurchaseOrderLine.objects.select_for_update().get(
-                pk=self.purchase_order_line_id
+            old = (
+                None
+                if self._state.adding
+                else PurchaseInvoiceLine.objects.filter(pk=self.pk)
+                .values("quantity", "purchase_order_line_id")
+                .first()
             )
-            if self._state.adding:
-                line.invoiced_qty += self.quantity
-                line.save(update_fields=["invoiced_qty"])
-        return super().save(*args, **kwargs)
+            _shift_qty(self.purchase_order_line_id, "invoiced_qty", self.quantity)
+            if old:
+                _shift_qty(old["purchase_order_line_id"], "invoiced_qty", -old["quantity"])
+            return super().save(*args, **kwargs)
 
 
 @receiver(post_delete, sender=PurchaseInvoiceLine)

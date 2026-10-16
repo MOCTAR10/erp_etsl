@@ -80,6 +80,9 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = MouvementStockSerializer
     permission_classes = [CanManageStocks]
+    # Journal de stock : création seule (le mouvement est exécuté immédiatement).
+    # Une erreur se corrige par un mouvement inverse / un ajustement, jamais par PATCH/DELETE.
+    http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
         qs = super().get_queryset()

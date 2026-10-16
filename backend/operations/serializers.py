@@ -203,6 +203,7 @@ class SituationTravauxSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "ordres_count",
             "created_at",
             "updated_at",
+            "status",  # évolue par l'action `validate` uniquement
         ]
 
     def get_created_by_name(self, obj):

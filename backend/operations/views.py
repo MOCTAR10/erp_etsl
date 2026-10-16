@@ -3,6 +3,7 @@
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .models import (
@@ -125,10 +126,29 @@ class SituationTravauxViewSet(_CommonViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    LOCKED = (SituationTravaux.Status.VALIDEE, SituationTravaux.Status.FACTUREE)
+
+    def _assert_unlocked(self):
+        if self.get_object().status in self.LOCKED:
+            raise DRFValidationError("Situation validée ou facturée : non modifiable ni supprimable.")
+
+    def update(self, request, *args, **kwargs):
+        self._assert_unlocked()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._assert_unlocked()
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=["post"], url_path="validate")
     def validate(self, request, pk=None):
-        """Validation d'une situation de travaux (RF-ERP-22)."""
+        """Validation d'une situation de travaux (RF-ERP-22) — une seule fois."""
         situation = self.get_object()
+        if situation.status not in (
+            SituationTravaux.Status.BROUILLON,
+            SituationTravaux.Status.SOUMISE,
+        ):
+            raise DRFValidationError("Situation déjà validée ou facturée.")
         situation.status = SituationTravaux.Status.VALIDEE
         situation.validated_by = request.user
         situation.validated_at = timezone.now()

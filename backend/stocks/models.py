@@ -402,6 +402,11 @@ class MouvementStock(models.Model):
                 {"destination": "Un transfert exige un dépôt source ET destination."}
             )
 
+    def delete(self, *args, **kwargs):
+        if self.executed:
+            raise ValidationError("Mouvement exécuté : suppression interdite (passez un mouvement inverse).")
+        return super().delete(*args, **kwargs)
+
     @property
     def montant_total(self):
         return self.quantite * self.prix_unitaire
