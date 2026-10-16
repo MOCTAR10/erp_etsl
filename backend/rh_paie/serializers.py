@@ -135,7 +135,7 @@ class RecrutementSerializer(serializers.ModelSerializer):
             "responsable", "responsable_name", "date_souhaitee", "statut",
             "statut_label", "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        read_only_fields = ["code", "statut"]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
@@ -177,7 +177,8 @@ class DemandeCongeSerializer(serializers.ModelSerializer):
             "date_debut", "date_fin", "nb_jours", "motif", "statut",
             "statut_label", "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        # Le statut n'evolue que par les actions du workflow (approuver/valider/refuser/annuler).
+        read_only_fields = ["code", "statut"]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
@@ -195,7 +196,7 @@ class SanctionSerializer(serializers.ModelSerializer):
             "faits", "rapport", "date_constat", "date_decision", "statut",
             "statut_label", "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        read_only_fields = ["code", "statut"]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
@@ -283,6 +284,8 @@ class BulletinAvecLignesSerializer(BulletinSerializer):
 
     def validate(self, attrs):
         lignes = attrs.pop("lignes", [])
+        if attrs.get("periode"):
+            attrs["periode"] = attrs["periode"].replace(day=1)
         _apply_and_validate(self, attrs)
         attrs["lignes"] = lignes
         return attrs

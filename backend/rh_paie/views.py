@@ -3,6 +3,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -245,8 +246,40 @@ class DemandeCongeViewSet(viewsets.ModelViewSet):
             qs = qs.exclude(statut__in=[DemandesConge.Statut.VALIDE_RH, DemandesConge.Statut.REFUSE, DemandesConge.Statut.ANNULE])
         return qs
 
+    LOCKED = (
+        DemandesConge.Statut.APPROUVE,
+        DemandesConge.Statut.VALIDE_RH,
+        DemandesConge.Statut.REFUSE,
+        DemandesConge.Statut.ANNULE,
+    )
+
+    def update(self, request, *args, **kwargs):
+        # Une fois la demande instruite, dates/duree ne bougent plus (annuler et ressaisir).
+        if self.get_object().statut in self.LOCKED:
+            return Response(
+                {"detail": "Demande instruite : non modifiable. Annulez-la et ressaisissez-la."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().update(request, *args, **kwargs)
+
+    @staticmethod
+    def _verifier_solde(dc, request):
+        """Conge annuel : refus si la duree depasse le solde restant de l'annee."""
+        solde = dc.employe.solde_conges
+        if dc.type == DemandesConge.Type.ANNUEL and dc.nb_jours > solde:
+            raise serializers.ValidationError(
+                {"detail": f"Solde insuffisant : {solde} jour(s) restant(s), {dc.nb_jours} demande(s)."}
+            )
+
+    @classmethod
+    def _verifier_solde_si_directe(cls, dc, request):
+        # Depuis APPROUVE le solde a deja ete controle ; depuis DEMANDE (validation directe) non.
+        if getattr(dc, "_statut_initial", None) == DemandesConge.Statut.DEMANDE:
+            cls._verifier_solde(dc, request)
+
     def _transition(self, request, pk, target, allowed, message, extra=None):
         dc = self.get_object()
+        dc._statut_initial = dc.statut
         if dc.statut not in allowed:
             return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
         dc.statut = target
@@ -261,6 +294,7 @@ class DemandeCongeViewSet(viewsets.ModelViewSet):
             request, pk, DemandesConge.Statut.APPROUVE,
             allowed=[DemandesConge.Statut.DEMANDE],
             message="Seule une demande 'Demandé' peut être approuvée par la hiérarchie.",
+            extra=self._verifier_solde,
         )
 
     @action(detail=True, methods=["post"], url_path="valider")
@@ -269,6 +303,7 @@ class DemandeCongeViewSet(viewsets.ModelViewSet):
             request, pk, DemandesConge.Statut.VALIDE_RH,
             allowed=[DemandesConge.Statut.APPROUVE, DemandesConge.Statut.DEMANDE],
             message="La demande doit être approuvée (ou au moins demandée) avant validation RH.",
+            extra=self._verifier_solde_si_directe,
         )
 
     @action(detail=True, methods=["post"], url_path="refuser")
@@ -398,7 +433,8 @@ class BulletinViewSet(viewsets.ModelViewSet):
             data=request.data, context=self.get_serializer_context()
         )
         serializer.is_valid(raise_exception=True)
-        bulletin = serializer.save()
+        with transaction.atomic():  # bulletin + lignes : tout ou rien
+            bulletin = serializer.save()
         return Response(
             BulletinSerializer(bulletin, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,

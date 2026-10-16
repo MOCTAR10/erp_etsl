@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Home, Moon } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
@@ -32,9 +32,12 @@ describe("<CommandPalette />", () => {
     );
     return { run, onClose, user: userEvent.setup() };
   };
+  // le focus initial est posé au montage (autoFocus) ; on l'attend pour ne pas dépendre du timing du runner
+  const ready = () => waitFor(() => expect(screen.getByRole("combobox")).toHaveFocus());
 
   it("filtre en tapant puis lance l'entrée avec Entrée et se ferme", async () => {
     const { run, onClose, user } = setup();
+    await ready();
     await user.type(screen.getByRole("combobox"), "jurid");
     expect(screen.getAllByRole("option")).toHaveLength(1);
     await user.keyboard("{Enter}");
@@ -44,6 +47,7 @@ describe("<CommandPalette />", () => {
 
   it("navigue aux flèches (circulaire)", async () => {
     const { run, user } = setup();
+    await ready();
     await user.keyboard("{ArrowUp}{Enter}"); // dernier élément (circulaire)
     expect(run).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("option", { selected: true })).toHaveTextContent("Sombre");
@@ -51,6 +55,7 @@ describe("<CommandPalette />", () => {
 
   it("Échap ferme sans rien lancer", async () => {
     const { run, onClose, user } = setup();
+    await ready();
     await user.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();

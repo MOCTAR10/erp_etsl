@@ -8,6 +8,7 @@ Bulletins de paie CNSSG / CNAMGS, barèmes versionnés par date d'effet (RF-ERP-
 """
 
 import uuid
+from datetime import date
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -116,11 +117,18 @@ class Employe(models.Model):
 
     @property
     def solde_conges(self):
-        """Jours de congé acquis (CON) − pris/validés (8.9 registres)."""
+        """Jours de congé annuel restants de l'année en cours (8.9 registres).
+
+        Acquis (30 j/an, tolérance CNSS) - congés ANNUELS approuvés/validés dont le début
+        tombe dans l'année. Maladie, maternité, sans solde, exceptionnel et rotation
+        n'entament pas le solde de congé annuel.
+        """
         acquis = DemandesConge.DUREE_CONGE_CNSS
         pris = float(
             DemandesConge.objects.filter(
                 employe=self,
+                type=DemandesConge.Type.ANNUEL,
+                date_debut__year=timezone.localdate().year,
                 statut__in=[
                     DemandesConge.Statut.APPROUVE,
                     DemandesConge.Statut.VALIDE_RH,
@@ -407,10 +415,28 @@ class DemandesConge(models.Model):
         return super().save(*args, **kwargs)
 
     def clean(self):
+        if not (self.date_debut and self.date_fin):
+            return
         if self.date_fin < self.date_debut:
             raise ValidationError(
                 {"date_fin": "La date de fin doit être postérieure à la date de début."}
             )
+        duree = (self.date_fin - self.date_debut).days + 1
+        if not self.nb_jours or self.nb_jours < 1 or self.nb_jours > duree:
+            raise ValidationError(
+                {"nb_jours": f"Le nombre de jours doit être compris entre 1 et {duree} (durée de la période)."}
+            )
+        if self.employe_id:
+            chevauche = DemandesConge.objects.filter(
+                employe_id=self.employe_id,
+                statut__in=[self.Statut.DEMANDE, self.Statut.APPROUVE, self.Statut.VALIDE_RH],
+                date_debut__lte=self.date_fin,
+                date_fin__gte=self.date_debut,
+            ).exclude(pk=self.pk)
+            if chevauche.exists():
+                raise ValidationError(
+                    {"date_debut": "Cette période chevauche un autre congé de l'employé."}
+                )
 
 
 class Sanction(models.Model):
@@ -575,7 +601,12 @@ class BulletinPaie(models.Model):
         verbose_name = "Bulletin de paie"
         verbose_name_plural = "Bulletins de paie"
         constraints = [
-            models.UniqueConstraint(fields=["employe", "periode"], name="uniq_employe_periode")
+            # Un bulletin annulé ne bloque pas l'émission d'un nouveau bulletin du mois.
+            models.UniqueConstraint(
+                fields=["employe", "periode"],
+                condition=~models.Q(statut="annule"),
+                name="uniq_employe_periode",
+            )
         ]
 
     def __str__(self):
@@ -584,6 +615,9 @@ class BulletinPaie(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = RhPaieSequence.next_for("BUL", "BUL")
+        # "Periode (1er du mois)" : normalise toute date du mois.
+        if isinstance(self.periode, date):
+            self.periode = self.periode.replace(day=1)
         return super().save(*args, **kwargs)
 
     @property

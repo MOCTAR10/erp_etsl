@@ -113,6 +113,7 @@ export function CommandPalette({ open, onClose, items, placeholder, emptyLabel }
               <Search size={16} aria-hidden="true" />
               <input
                 ref={inputRef}
+                autoFocus
                 type="text"
                 role="combobox"
                 aria-expanded="true"
