@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 
 from .services import (
     alertes_agregees,
+    tendances,
     dashboard_direction,
     reporting_petrolier,
 )
@@ -55,3 +56,14 @@ class AlertesAgregeesView(APIView):
 
     def get(self, request):
         return Response(alertes_agregees(request.user))
+
+
+@extend_schema(
+    responses={200: OpenApiTypes.OBJECT},
+    description="Tendances mensuelles (6 mois) non financières du cockpit Direction, filtrées par droits.",
+)
+class TendancesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(tendances(request.user))

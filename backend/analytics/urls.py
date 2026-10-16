@@ -6,10 +6,12 @@ from .views import (
     AlertesAgregeesView,
     DashboardDirectionView,
     ReportingPetrolierView,
+    TendancesView,
 )
 
 urlpatterns = [
     path("dashboard/", DashboardDirectionView.as_view(), name="analytics-dashboard"),
     path("petrolier/", ReportingPetrolierView.as_view(), name="analytics-petrolier"),
     path("alertes/", AlertesAgregeesView.as_view(), name="analytics-alertes"),
+    path("tendances/", TendancesView.as_view(), name="analytics-tendances"),
 ]

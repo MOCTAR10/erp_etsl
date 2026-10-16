@@ -1870,3 +1870,13 @@ export interface MonConge {
   statut_label: string;
   created_at: string;
 }
+
+/** Tendances mensuelles non financières du cockpit Direction (null = pas de droit de lecture). */
+export interface Tendances {
+  mois: string[];
+  series: {
+    documents: number[] | null;
+    incidents: number[] | null;
+    ordres_travail: number[] | null;
+  };
+}

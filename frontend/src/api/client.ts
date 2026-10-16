@@ -252,6 +252,7 @@ export const api = {
     raw<import("../types").DashboardDirection>("/api/analytics/dashboard/"),
   reportingPetrolier: () =>
     raw<import("../types").ReportingPetrolier>("/api/analytics/petrolier/"),
+  tendances: () => raw<import("../types").Tendances>("/api/analytics/tendances/"),
   alertesAgregees: () =>
     raw<import("../types").AlertesAgregees>("/api/analytics/alertes/"),
 };

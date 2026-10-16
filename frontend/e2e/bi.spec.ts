@@ -23,6 +23,16 @@ test.describe("Régression : Direction / BI (couche D)", () => {
     await expect(alertes).toBeVisible();
   });
 
+  test("cockpit : « À traiter maintenant », tendances et accès direct aux modules", async ({ page }) => {
+    await page.goto("/direction");
+    await expect(page.getByRole("heading", { name: "À traiter maintenant" })).toBeVisible();
+    await expect(page.getByText("Tendances sur 6 mois")).toBeVisible();
+    await expect(page.getByText("Disponibilité du matériel").first()).toBeVisible();
+    // une tuile KPI est un lien vers son module
+    await page.locator("a.kpi-link", { hasText: "HSE M7" }).first().click();
+    await expect(page).toHaveURL(/\/hse$/);
+  });
+
   test("KPIs C1 chargent des valeurs numériques (rétention GED, effectif RH)", async ({ page }) => {
     await page.goto("/direction");
     const docsKpi = page.locator(".kpi", { hasText: "Rétention GED" }).first();

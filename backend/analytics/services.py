@@ -486,3 +486,52 @@ def _can_see_amount(user):
     from documents.services import can_see_amount
 
     return can_see_amount(user) if user and user.is_authenticated else False
+
+
+def _derniers_mois(n=6):
+    """Les `n` derniers mois (le plus ancien d'abord), le dernier étant le mois courant : [(année, mois), ...]."""
+    courant = timezone.localdate().replace(day=1)
+    mois = [courant]
+    for _ in range(n - 1):
+        mois.append((mois[-1] - timezone.timedelta(days=1)).replace(day=1))
+    return [(d.year, d.month) for d in reversed(mois)]
+
+
+def tendances(user, n=6):
+    """Séries mensuelles NON financières du cockpit Direction (documents, incidents HSE, ordres de travail).
+
+    Chaque série respecte les droits de lecture : documents via les ACL de la GED (paie restreinte),
+    incidents / ordres de travail uniquement pour les rôles qui lisent HSE / Maintenance (sinon `None`).
+    """
+    from django.db.models import Count
+    from django.db.models.functions import TruncMonth
+
+    from documents.models import Document
+    from documents.services import visible_documents
+    from hse.models import Incident
+    from maintenance.models import OrdreTravail
+    from users.rbac import can_read_app
+
+    mois = _derniers_mois(n)
+    debut = timezone.make_aware(timezone.datetime(mois[0][0], mois[0][1], 1))
+
+    def serie(queryset, champ):
+        agg = (
+            queryset.filter(**{f"{champ}__gte": debut})
+            .annotate(m=TruncMonth(champ))
+            .values("m")
+            .annotate(c=Count("id"))
+        )
+        par_mois = {(row["m"].year, row["m"].month): row["c"] for row in agg}
+        return [par_mois.get(k, 0) for k in mois]
+
+    return {
+        "mois": [f"{y}-{m:02d}" for y, m in mois],
+        "series": {
+            "documents": serie(visible_documents(user), "created_at"),
+            "incidents": serie(Incident.objects.all(), "date_evenement") if can_read_app(user, "hse") else None,
+            "ordres_travail": serie(OrdreTravail.objects.all(), "created_at")
+            if can_read_app(user, "maintenance")
+            else None,
+        },
+    }

@@ -10,5 +10,6 @@ export { Kpi } from "./Kpi";
 export { PageHeader } from "./PageHeader";
 export { Pressable } from "./Pressable";
 export { ProgressBar } from "./Progress";
+export { Sparkline } from "./Sparkline";
 export { SectionTitle } from "./SectionTitle";
 export { BoardSkeleton, KpiGridSkeleton, KpiSkeleton, Skeleton } from "./Skeleton";
