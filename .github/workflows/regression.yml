@@ -1,10 +1,13 @@
 # régression ETSL — GitHub Actions (gratuit : dépôt public)
 #
-# 3 jobs indépendants, déclenchés à chaque push sur master, chaque nuit à 23h UTC
-# (= 00h à Libreville, UTC+1) et via le bouton manuel :
-#   backend  → suite Django (22 apps, ~400 tests) + rapport de couverture (report-only)
+# Jobs indépendants (parallèles), déclenchés à chaque push sur master, chaque nuit
+# à 23h UTC (= 00h à Libreville, UTC+1) et via le bouton manuel :
+#   quality  → ruff (erreurs réelles), manage.py check, migrations à jour, cohérence RBAC (~1 min)
+#   backend  → suite Django (22 apps, ~420 tests) découpée en 5 shards parallèles
+#              (matrix) + couverture par shard (report-only) : ~10 min au lieu de ~40
 #   frontend → typecheck + build + vitest
-#   e2e      → Playwright chromium/firefox contre une base dédiée seedée (etls_e2e)
+#   e2e      → Playwright (chromium et firefox en parallèle) contre une base dédiée seedée
+#   (aussi déclenché sur pull request vers master)
 #
 # Infra = containers éphémères par job (Postgres / MinIO / Redis) : base neuve à
 # chaque run, aucune mutation possible de la base de dev. Rien à surveiller : le
@@ -14,6 +17,8 @@ name: regression
 
 on:
   push:
+    branches: [master]
+  pull_request:
     branches: [master]
   schedule:
     # régression quotidienne automatique (minuit heure du Gabon = 23h UTC)
@@ -43,10 +48,49 @@ env:
   CELERY_TASK_ALWAYS_EAGER: "True"
 
 jobs:
-  backend:
-    name: Backend (tests + couverture)
+  quality:
+    name: Qualité (lint, check, migrations, RBAC)
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - name: Lint (ruff - erreurs reelles uniquement)
+        working-directory: backend
+        run: ruff check . --select E9,F63,F7,F82,F811 --exclude migrations
+      - name: manage.py check + migrations a jour
+        working-directory: backend
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+      - name: Coherence RBAC (lecture >= ecriture / montants)
+        working-directory: backend
+        run: python check_rbac_coherence.py
+
+  backend:
+    name: Backend ${{ matrix.shard }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Répartition équilibrée par temps : `documents` (uploads MinIO) est le plus lent.
+          - shard: socle-ged
+            apps: "users documents workflow reports referentiels registres"
+          - shard: noyau-bi
+            apps: "accounting_kernel integrations outbox analytics"
+          - shard: m1-m4
+            apps: "commercial achats operations logistique"
+          - shard: m5-m8
+            apps: "stocks qualite hse maintenance"
+          - shard: m9-m12
+            apps: "rh_paie comptabilite controle_gestion juridique"
     services:
       postgres:
         image: postgres:16
@@ -84,15 +128,6 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: Install backend
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
-      - name: Lint (ruff - erreurs reelles uniquement) + migrations a jour
-        working-directory: backend
-        run: |
-          ruff check . --select E9,F63,F7,F82,F811 --exclude migrations
-          python manage.py check
-          python manage.py makemigrations --check --dry-run
-      - name: Coherence RBAC (lecture >= ecriture / montants)
-        working-directory: backend
-        run: python check_rbac_coherence.py
       - name: Create MinIO bucket (etls-documents)
         run: |
           python - <<'EOF'
@@ -114,20 +149,20 @@ jobs:
                   print(f"tentative {attempt + 1}: {exc}")
                   time.sleep(2)
           EOF
-      - name: Backend tests (coverage report-only, pas de gate)
+      - name: Backend tests ${{ matrix.shard }} (coverage report-only, pas de gate)
         working-directory: backend
         env:
           POSTGRES_DB: etls_ci
         run: |
-          coverage run --source='.' manage.py test users documents workflow reports referentiels registres accounting_kernel integrations outbox commercial achats operations logistique stocks qualite hse maintenance rh_paie comptabilite controle_gestion juridique analytics --noinput
+          coverage run --source='.' manage.py test ${{ matrix.apps }} --noinput
           coverage xml -o coverage.xml
-          echo "### Couverture backend" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Couverture backend — ${{ matrix.shard }}" >> "$GITHUB_STEP_SUMMARY"
           coverage report >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-backend
+          name: coverage-backend-${{ matrix.shard }}
           path: backend/coverage.xml
           retention-days: 14
 
@@ -151,9 +186,13 @@ jobs:
       - run: npm run test:unit
 
   e2e:
-    name: E2E Playwright (chromium + firefox)
+    name: E2E Playwright ${{ matrix.browser }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
     services:
       postgres:
         image: postgres:16
@@ -238,13 +277,13 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npx playwright install --with-deps
-          npm run test:e2e
+          npx playwright install --with-deps ${{ matrix.browser }}
+          npx playwright test --project=${{ matrix.browser }}
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.browser }}
           path: |
             frontend/test-results
             frontend/playwright-report
