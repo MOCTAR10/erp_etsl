@@ -1882,3 +1882,39 @@ kbd {
     display: none;
   }
 }
+
+/* ── Saisie terrain / hors-ligne (PWA) : cibles tactiles >= 44 px, lisible au soleil ── */
+.terrain-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+.terrain-status.on { background: var(--ok-soft); color: var(--ok); }
+.terrain-status.off { background: var(--warn-soft); color: var(--warn); }
+.terrain-status span { flex: 1; min-width: 160px; color: var(--text); }
+.terrain-queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.terrain-queue li { display: flex; align-items: center; gap: 0.6rem; }
+.terrain-queue li > div { flex: 1; min-width: 0; }
+.terrain-tabs { display: flex; gap: 0.4rem; overflow-x: auto; margin: 1rem 0; padding-bottom: 0.2rem; }
+.terrain-tabs button {
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.terrain-tabs button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.terrain-toast { color: var(--ok); font-weight: 600; margin: 0 0 0.8rem; }
+.terrain-form { display: grid; gap: 0.9rem; max-width: 560px; }
+.terrain-form .field input,
+.terrain-form .field select { min-height: 46px; font-size: 16px; }
+.terrain-submit { min-height: 50px; font-size: 16px; justify-content: center; }

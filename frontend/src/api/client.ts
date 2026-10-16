@@ -89,6 +89,14 @@ async function authenticatedMe(access: string): Promise<Me> {
   return (await res.json()) as Me;
 }
 
+/** POST rejouable : la clé `Idempotency-Key` évite tout doublon côté serveur (saisies terrain hors-ligne). */
+export const postIdempotent = (path: string, body: unknown, key: string) =>
+  raw<unknown>(path, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Idempotency-Key": key },
+  });
+
 export const api = {
   get: <T,>(path: string) => raw<T>(path),
   me: () => raw<Me>("/api/users/me/"),

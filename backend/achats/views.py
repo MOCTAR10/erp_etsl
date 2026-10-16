@@ -1,5 +1,6 @@
 """API module M2 — Achats & Approvisionnements (RF-ERP-10…13)."""
 
+from integrations.idempotency import idempotent
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -158,6 +159,10 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
         if receipt:
             qs = qs.filter(receipt_id=receipt)
         return qs
+
+    @idempotent
+    def create(self, request, *args, **kwargs):  # réception magasin rejouable (hors-ligne)
+        return super().create(request, *args, **kwargs)
 
 
 class PurchaseInvoiceViewSet(_CommonViewSet):

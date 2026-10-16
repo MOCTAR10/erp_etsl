@@ -98,3 +98,32 @@ class BatchRow(models.Model):
 
     def __str__(self):
         return f"{self.batch} l.{self.row_number} [{self.status}]"
+
+
+class IdempotencyRecord(models.Model):
+    """Réponse mémorisée d'une requête rejouable (saisies terrain hors-ligne, CL-OM-08).
+
+    Clé `Idempotency-Key` générée par le mobile à la saisie : un rejeu (coupure réseau en plein
+    envoi, double synchronisation) renvoie la réponse d'origine au lieu de dupliquer l'effet.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="idempotency_records"
+    )
+    key = models.CharField(max_length=80, verbose_name="Idempotency-Key")
+    method = models.CharField(max_length=8)
+    path = models.CharField(max_length=255)
+    status_code = models.PositiveSmallIntegerField()
+    body = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Requête idempotente"
+        verbose_name_plural = "Requêtes idempotentes"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "key"], name="uniq_idempotency_user_key")
+        ]
+
+    def __str__(self):
+        return f"{self.method} {self.path} [{self.key}]"

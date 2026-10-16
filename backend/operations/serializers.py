@@ -149,6 +149,22 @@ class PointageChantierSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "code", "created_by", "created_at", "updated_at"]
 
+    def validate(self, attrs):
+        # `clean()` du modèle n'est pas appelé par DRF : sans cela un pointage à 0 h ou sans opérateur passait.
+        inst = self.instance
+        hours = attrs.get("hours", getattr(inst, "hours", None))
+        if hours is None or hours <= 0:
+            raise serializers.ValidationError({"hours": "Le nombre d'heures doit être strictement positif."})
+        if hours > 24:
+            raise serializers.ValidationError({"hours": "Un pointage ne peut dépasser 24 h."})
+        worker = attrs.get("worker", getattr(inst, "worker", None))
+        name = attrs.get("worker_name", getattr(inst, "worker_name", ""))
+        if not worker and not name:
+            raise serializers.ValidationError(
+                {"worker": "Le pointage doit être rattaché à un opérateur ou un nom libre."}
+            )
+        return attrs
+
     def get_worker_name_filled(self, obj):
         if obj.worker_name:
             return obj.worker_name

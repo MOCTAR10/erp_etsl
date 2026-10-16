@@ -1,6 +1,7 @@
 """Vues API M6 — Qualité industrielle, Soudage & Contrôle Qualité / Inspection."""
 
 from django.utils import timezone
+from integrations.idempotency import idempotent
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -121,6 +122,10 @@ class ControleQualiteViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @idempotent
+    def create(self, request, *args, **kwargs):  # contrôle / CND saisi sur le terrain, rejouable
+        return super().create(request, *args, **kwargs)
 
 
 class NonConformiteViewSet(viewsets.ModelViewSet):

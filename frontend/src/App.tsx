@@ -19,6 +19,7 @@ const StocksPage = lazy(() => import("./pages/Stocks").then((m) => ({ default: m
 const QualitePage = lazy(() => import("./pages/Qualite").then((m) => ({ default: m.QualitePage })));
 const HsePage = lazy(() => import("./pages/Hse").then((m) => ({ default: m.HsePage })));
 const MaintenancePage = lazy(() => import("./pages/Maintenance").then((m) => ({ default: m.MaintenancePage })));
+const TerrainPage = lazy(() => import("./pages/Terrain").then((m) => ({ default: m.TerrainPage })));
 const MonEspacePage = lazy(() => import("./pages/MonEspace").then((m) => ({ default: m.MonEspacePage })));
 const RhPaiePage = lazy(() => import("./pages/RhPaie").then((m) => ({ default: m.RhPaiePage })));
 const ComptabilitePage = lazy(() => import("./pages/Comptabilite").then((m) => ({ default: m.ComptabilitePage })));
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="qualite" element={pilotPage(<QualitePage />)} />
         <Route path="hse" element={pilotPage(<HsePage />)} />
         <Route path="maintenance" element={pilotPage(<MaintenancePage />)} />
+        <Route path="terrain" element={pilotPage(<TerrainPage />)} />
         <Route path="mon-espace" element={pilotPage(<MonEspacePage />)} />
         <Route path="rh-paie" element={pilotPage(<RhPaiePage />)} />
         <Route path="comptabilite" element={pilotPage(<ComptabilitePage />)} />

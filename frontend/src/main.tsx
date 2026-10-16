@@ -9,6 +9,7 @@ import "./i18n";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/plus-jakarta-sans";
 import "./styles/global.css";
+import { registerServiceWorker, startAutoSync } from "./lib/offline";
 
 const storedTheme = localStorage.getItem("etls.theme");
 if (storedTheme === "dark" || storedTheme === "light") {
@@ -20,6 +21,9 @@ const queryClient = new QueryClient({
     queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
   },
 });
+
+registerServiceWorker();
+startAutoSync();
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
 

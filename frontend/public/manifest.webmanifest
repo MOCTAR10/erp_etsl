@@ -1,0 +1,20 @@
+{
+  "name": "ETSL ERP — Terrain",
+  "short_name": "ETSL Terrain",
+  "description": "Saisies terrain hors-ligne : pointage, réception magasin, permis de travail, contrôles / CND.",
+  "lang": "fr",
+  "start_url": "./terrain",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#12308f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Saisie terrain", "url": "./terrain" }
+  ]
+}

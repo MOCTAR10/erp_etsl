@@ -1,6 +1,7 @@
 """API module M3 — Opérations (Atelier + Chantier) (RF-ERP-20…23)."""
 
 from django.utils import timezone
+from integrations.idempotency import idempotent
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -108,6 +109,10 @@ class PointageChantierViewSet(_CommonViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @idempotent
+    def create(self, request, *args, **kwargs):  # saisie terrain rejouable (hors-ligne)
+        return super().create(request, *args, **kwargs)
 
 
 class SituationTravauxViewSet(_CommonViewSet):

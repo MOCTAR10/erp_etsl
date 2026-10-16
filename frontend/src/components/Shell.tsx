@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShoppingCart,
+  Smartphone,
   SquareKanban,
   Sun,
   Truck,
@@ -53,6 +54,7 @@ const PILOT_NAV: NavItem[] = [
   { to: "/kanban", key: "nav.kanban", Icon: SquareKanban },
   { to: "/circuits", key: "nav.circuits", Icon: GitBranch },
   { to: "/notifications", key: "nav.notifications", Icon: Bell },
+  { to: "/terrain", key: "nav.terrain", Icon: Smartphone },
   { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
 ];
 

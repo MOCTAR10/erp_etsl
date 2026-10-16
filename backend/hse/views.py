@@ -1,6 +1,7 @@
 """Vues API M7 — HSE : Hygiène, Sécurité & Environnement."""
 
 from django.utils import timezone
+from integrations.idempotency import idempotent
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -120,6 +121,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(permis).data)
 
     @action(detail=True, methods=["post"], url_path="test-gaz")
+    @idempotent
     def test_gaz(self, request, pk=None):
         """Enregistre un test d'atmosphère (conforme / non conforme + mesures).
 
