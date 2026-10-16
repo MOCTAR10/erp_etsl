@@ -1,9 +1,18 @@
 from rest_framework import generics, viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import User
 from .permissions import IsAdmin
 from .serializers import UserCreateSerializer, UserSerializer
+
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """Connexion JWT avec limitation de debit anti brute-force (scope `login`)."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
 
 class MeView(generics.RetrieveUpdateAPIView):

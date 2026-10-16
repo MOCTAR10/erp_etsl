@@ -5,6 +5,7 @@ Configuration is env-driven (see ``backend/.env.example``). Local dev reads
 ``backend/.env``; production values are injected at deploy time.
 """
 
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -25,6 +26,27 @@ if env_file.exists():
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure-dev-only-change-me")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+
+_INSECURE_DEFAULT_KEY = "django-insecure-dev-only-change-me"
+if not DEBUG and (SECRET_KEY == _INSECURE_DEFAULT_KEY or len(SECRET_KEY) < 32):
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY doit etre defini (>= 32 caracteres) quand DEBUG=False."
+    )
+
+# En production derriere le proxy Caddy : cookies securises, HSTS, redirection HTTPS.
+# Activable via SECURE_SSL=True (laisse a False pour un deploiement HTTP interne).
+SECURE_SSL = env.bool("SECURE_SSL", default=False)
+if SECURE_SSL and not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
 
 # ── Application definition ──
 INSTALLED_APPS = [
@@ -137,12 +159,28 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "config.exceptions.drf_exception_handler",
+    # Protection brute-force / abus : limites par IP (anonyme) et par utilisateur.
+    # Desactivees pendant `manage.py test` (les suites enchainent des milliers d'appels).
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": (
+        {"anon": "100000/min", "user": "100000/min", "login": "100000/min"}
+        if "test" in sys.argv
+        else {
+            "anon": env("THROTTLE_ANON", default="60/min" if not DEBUG else "100000/min"),
+            "user": env("THROTTLE_USER", default="600/min" if not DEBUG else "100000/min"),
+            "login": env("THROTTLE_LOGIN", default="10/min" if not DEBUG else "100000/min"),
+        }
+    ),
 }
 
 # ── JWT (RF-55 : email + mot de passe) ──
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
