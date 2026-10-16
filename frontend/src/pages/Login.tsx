@@ -2,21 +2,31 @@
 import type { FormEvent } from "react";
 
 import {
+  ArrowLeftRight,
   BadgeCheck,
   Boxes,
   Calculator,
+  ChartNoAxesColumn,
+  CircleAlert,
+  Eye,
+  EyeOff,
   Factory,
+  FolderTree,
   GitBranch,
-  LayoutGrid,
   Layers,
+  LoaderCircle,
+  Lock,
   LogIn,
+  Mail,
   Scale,
+  ScrollText,
   ShieldAlert,
   ShieldCheck,
   ShoppingCart,
   TrendingUp,
   Truck,
   Users,
+  Workflow,
   Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -25,37 +35,48 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { login } from "../api/client";
+import { landingForRole } from "../lib/landing";
 import { useAuth } from "../store/auth";
 import { motionTokens } from "../theme/tokens";
-import { BrandLogo } from "../components/BrandLogo";
 
-type LoginModule = {
-  code: string;
-  labelKey: string;
-  icon: LucideIcon;
-};
+type LoginModule = { code: string; labelKey: string; icon: LucideIcon };
+type LoginLayer = { labelKey: string; icon: LucideIcon };
+type DemoAccount = { email: string; roleKey: string; icon: LucideIcon };
+
+/** Mot de passe commun aux 6 comptes de démonstration (cf. `seed_all_demo`). */
+const DEMO_PASSWORD = "Etls#Demo2026";
 
 const MODULES: LoginModule[] = [
-  { code: "M01", labelKey: "sidebar.commercial", icon: GitBranch },
-  { code: "M02", labelKey: "sidebar.commandes", icon: ShoppingCart },
-  { code: "M03", labelKey: "sidebar.operations", icon: Factory },
-  { code: "M04", labelKey: "sidebar.logistique", icon: Truck },
-  { code: "M05", labelKey: "sidebar.stocks", icon: Boxes },
-  { code: "M06", labelKey: "sidebar.qualite", icon: BadgeCheck },
-  { code: "M07", labelKey: "sidebar.hse", icon: ShieldAlert },
-  { code: "M08", labelKey: "sidebar.maintenance", icon: Wrench },
-  { code: "M09", labelKey: "sidebar.rhPaie", icon: Users },
-  { code: "M10", labelKey: "sidebar.comptabilite", icon: Calculator },
-  { code: "M11", labelKey: "sidebar.controleGestion", icon: TrendingUp },
-  { code: "M12", labelKey: "sidebar.juridique", icon: Scale },
+  { code: "M01", labelKey: "login.modules.m01", icon: GitBranch },
+  { code: "M02", labelKey: "login.modules.m02", icon: ShoppingCart },
+  { code: "M03", labelKey: "login.modules.m03", icon: Factory },
+  { code: "M04", labelKey: "login.modules.m04", icon: Truck },
+  { code: "M05", labelKey: "login.modules.m05", icon: Boxes },
+  { code: "M06", labelKey: "login.modules.m06", icon: BadgeCheck },
+  { code: "M07", labelKey: "login.modules.m07", icon: ShieldAlert },
+  { code: "M08", labelKey: "login.modules.m08", icon: Wrench },
+  { code: "M09", labelKey: "login.modules.m09", icon: Users },
+  { code: "M10", labelKey: "login.modules.m10", icon: Calculator },
+  { code: "M11", labelKey: "login.modules.m11", icon: TrendingUp },
+  { code: "M12", labelKey: "login.modules.m12", icon: Scale },
 ];
 
-const TRANSVERSE_KEYS = [
-  "sidebar.bi",
-  "sidebar.ged",
-  "sidebar.workflows",
-  "sidebar.registres",
-  "sidebar.audit",
+const LAYERS: LoginLayer[] = [
+  { labelKey: "login.modules.ged", icon: FolderTree },
+  { labelKey: "login.modules.workflows", icon: Workflow },
+  { labelKey: "login.modules.registres", icon: ScrollText },
+  { labelKey: "login.modules.bi", icon: ChartNoAxesColumn },
+  { labelKey: "login.modules.audit", icon: ShieldCheck },
+  { labelKey: "login.modules.integrations", icon: ArrowLeftRight },
+];
+
+const DEMO_ACCOUNTS: DemoAccount[] = [
+  { email: "admin@etls.local", roleKey: "login.demo.admin", icon: ShieldCheck },
+  { email: "finance@etls.local", roleKey: "login.demo.finance", icon: Calculator },
+  { email: "logistique@etls.local", roleKey: "login.demo.logistique", icon: Truck },
+  { email: "rh@etls.local", roleKey: "login.demo.rh", icon: Users },
+  { email: "atelier@etls.local", roleKey: "login.demo.atelier", icon: Factory },
+  { email: "qaqc@etls.local", roleKey: "login.demo.qaqc", icon: BadgeCheck },
 ];
 
 export function LoginPage() {
@@ -68,8 +89,9 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revealed, setRevealed] = useState(false);
 
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? "/";
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -78,7 +100,9 @@ export function LoginPage() {
     try {
       const { user, tokens } = await login(email, password);
       setSession(tokens, user);
-      navigate(from, { replace: true });
+      // Une URL profonde demandée avant connexion reste prioritaire ; sinon on
+      // arrive sur la page qui porte le métier du rôle (pas toujours le dashboard).
+      navigate(from || landingForRole(user.role), { replace: true });
     } catch {
       setError(t("login.invalid"));
     } finally {
@@ -86,39 +110,45 @@ export function LoginPage() {
     }
   };
 
-  const enter = {
-    initial: { opacity: 0, y: motionTokens.distance.md },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: motionTokens.duration.base, ease: motionTokens.ease.out },
+  /** Remplit les identifiants d'un profil de démonstration (pas de soumission). */
+  const prefill = (account: DemoAccount) => {
+    setEmail(account.email);
+    setPassword(DEMO_PASSWORD);
+    setError(null);
+    setRevealed(false);
   };
 
   return (
     <div className="login">
-      <motion.aside className="login-panel" {...enter}>
-        <BrandLogo size="lg" />
-
-        <div className="login-hero">
+      <motion.aside
+        className="login-panel"
+        initial={{ opacity: 0, y: motionTokens.distance.md }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
+      >
+        <header className="login-hero">
           <h1>{t("login.welcome")}</h1>
-          <p className="login-sub">{t("login.panelSub")}</p>
-          <ul className="login-features">
-            <li>
-              <GitBranch size={18} />
-              {t("login.featureWorkflow")}
-            </li>
-            <li>
-              <LayoutGrid size={18} />
-              {t("login.featureModules")}
-            </li>
-            <li>
-              <ShieldCheck size={18} />
-              {t("login.featureSecurity")}
-            </li>
-          </ul>
-        </div>
+          <p>{t("login.heroSub")}</p>
+        </header>
 
-        <div className="login-modules">
+        <section className="login-layers">
+          <span className="login-modules-title">
+            <Layers size={13} aria-hidden />
+            {t("login.transverseTitle")}
+          </span>
+          <div className="login-layers-grid">
+            {LAYERS.map((l) => (
+              <div key={l.labelKey} className="login-layer">
+                <l.icon size={13} aria-hidden />
+                <span>{t(l.labelKey)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="login-modules">
           <span className="login-modules-title">{t("login.modulesTitle")}</span>
-          <div className="login-module-grid">
+          <div className="login-modules-grid">
             {MODULES.map((m, i) => (
               <motion.div
                 key={m.code}
@@ -131,83 +161,135 @@ export function LoginPage() {
                   ease: motionTokens.ease.out,
                 }}
               >
-                <m.icon size={15} />
-                <span>
-                  <b>{m.code}</b>
-                  {t(m.labelKey)}
+                <span className="login-module-icon">
+                  <m.icon size={15} aria-hidden />
                 </span>
+                <b>{m.code}</b>
+                <span className="login-module-name">{t(m.labelKey)}</span>
               </motion.div>
             ))}
           </div>
-
-          <div className="login-transverse">
-            <Layers size={15} />
-            <span>
-              <b>{t("login.modulesSub")}</b>
-              <em>{TRANSVERSE_KEYS.map((k) => t(k)).join(" · ")}</em>
-            </span>
-          </div>
-        </div>
+        </section>
 
         <div className="login-foot">{t("login.footer")}</div>
       </motion.aside>
 
-      <div className="login-form">
+      <main className="login-form">
         <motion.div
-          initial={{ opacity: 0, y: motionTokens.distance.md, scale: 0.98 }}
+          className="login-auth"
+          initial={{ opacity: 0, y: motionTokens.distance.md, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{
             duration: motionTokens.duration.base,
             ease: motionTokens.ease.out,
             delay: motionTokens.stagger.quick,
           }}
-          className="card login-card"
         >
-          <div className="login-brand">
-            <BrandLogo size="lg" />
-          </div>
-          <h1>{t("login.title")}</h1>
+          <header className="login-auth-head">
+            <span className="login-auth-mark">
+              <img src={`${import.meta.env.BASE_URL}etsl-logo.jpg`} alt={t("app.logoAlt")} />
+            </span>
+            <span className="login-auth-id">
+              <b>{t("app.brand")}</b>
+              <em>{t("login.brandTagline")}</em>
+            </span>
+          </header>
+
+          <h1 className="login-auth-title">{t("login.title")}</h1>
+          <p className="login-auth-sub">{t("login.formSubtitle")}</p>
+
+          {error && (
+            <p className="login-alert" role="alert">
+              <CircleAlert size={15} aria-hidden />
+              <span>{error}</span>
+            </p>
+          )}
+
           <form onSubmit={submit}>
-            <div className="field">
+            <div className="login-field">
               <label htmlFor="email">{t("login.email")}</label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
+              <div className="login-input">
+                <Mail size={16} aria-hidden />
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  placeholder={t("login.emailPlaceholder")}
+                  spellCheck={false}
+                />
+              </div>
             </div>
-            <div className="field">
+
+            <div className="login-field">
               <label htmlFor="password">{t("login.password")}</label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
+              <div className="login-input">
+                <Lock size={16} aria-hidden />
+                <input
+                  id="password"
+                  type={revealed ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="login-reveal"
+                  onClick={() => setRevealed((v) => !v)}
+                  aria-label={revealed ? t("login.hidePassword") : t("login.showPassword")}
+                  aria-pressed={revealed}
+                >
+                  {revealed ? <EyeOff size={15} aria-hidden /> : <Eye size={15} aria-hidden />}
+                </button>
+              </div>
             </div>
-            {error && (
-              <p className="badge err" style={{ width: "100%", justifyContent: "center" }}>
-                {error}
-              </p>
-            )}
+
             <motion.button
-              className="btn primary"
-              style={{ width: "100%" }}
+              className="login-submit"
               type="submit"
               disabled={busy}
-              whileTap={{ scale: 0.98 }}
+              whileTap={{ scale: 0.99 }}
+              transition={{ duration: motionTokens.duration.fast }}
             >
-              <LogIn size={15} />
+              {busy ? (
+                <LoaderCircle size={16} className="login-spin" aria-hidden />
+              ) : (
+                <LogIn size={16} aria-hidden />
+              )}
               {busy ? t("common.loading") : t("login.submit")}
             </motion.button>
           </form>
+
+          <section className="login-demo">
+            <div className="login-demo-head">
+              <b>{t("login.demoTitle")}</b>
+              <span>{t("login.demoHint")}</span>
+            </div>
+            <div className="login-demo-grid">
+              {DEMO_ACCOUNTS.map((a) => (
+                <div key={a.email} className="login-demo-chip">
+                  <a.icon size={13} aria-hidden />
+                  <button
+                    type="button"
+                    className="login-demo-role"
+                    onClick={() => prefill(a)}
+                    aria-label={`${t(a.roleKey)} - ${a.email}`}
+                  >
+                    {t(a.roleKey)}
+                  </button>
+                  <span className="login-demo-mail">{a.email}</span>
+                </div>
+              ))}
+            </div>
+            <p className="login-demo-pwd">
+              {t("login.demoPassword")} <code>{DEMO_PASSWORD}</code>
+            </p>
+          </section>
         </motion.div>
-      </div>
+      </main>
     </div>
   );
 }

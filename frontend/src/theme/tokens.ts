@@ -2,7 +2,7 @@
  * Design system ETSL frontend — tokens uniques.
  * - motionTokens : mouvement (Motion v13) — BENCHMARK_ODOO_ETSL.md §6.
  * - designTokens : espacement, rayons, tailles, poids, ombres.
- * - palette     : couleurs charte (bleu/orange) exposées en JS (Recharts,
+ * - palette     : couleurs charte (bleu/rouge du logo ETSL) exposées en JS (Recharts,
  *   inline styles) — les valeurs doivent rester SYNCHRONISÉES avec les CSS
  *   custom properties de `src/styles/global.css` (même hex). Source de vérité
  *   unique ici ; le CSS dérive.
@@ -31,7 +31,7 @@ export const designTokens = {
   shadow: {
     card: "0 1px 2px rgb(16 24 40 / 0.05), 0 6px 18px rgb(16 24 40 / 0.05)",
     pop: "0 10px 28px rgb(16 24 40 / 0.12), 0 22px 60px rgb(16 24 40 / 0.10)",
-    brand: "0 6px 18px rgb(11 58 140 / 0.30)",
+    brand: "0 6px 18px rgb(18 48 143 / 0.30)",
   },
   grid: { kpi: "repeat(auto-fit, minmax(190px, 1fr))", board: "repeat(auto-fit, minmax(230px, 1fr))" },
 } as const;
@@ -66,13 +66,13 @@ export const palette = {
     border: "#dde3ec",
     text: "#101828",
     textMuted: "#637083",
-    brand: "#0b3a8c",
-    brandDeep: "#082a62",
-    brandSoft: "#e8eefb",
-    brandTint: "#d9e5fb",
-    ring: "rgba(11, 58, 140, 0.40)",
-    accent: "#f59e0b",
-    accentSoft: "#fdf1da",
+    brand: "#12308f",
+    brandDeep: "#0a1f66",
+    brandSoft: "#e9edfa",
+    brandTint: "#d8e0f7",
+    ring: "rgba(18, 48, 143, 0.40)",
+    accent: "#d4142a",
+    accentSoft: "#fde9ec",
     ok: "#16a34a",
     okSoft: "#e7f6ec",
     warn: "#d97706",
@@ -87,13 +87,13 @@ export const palette = {
     border: "#26304e",
     text: "#e8edf7",
     textMuted: "#95a2c2",
-    brand: "#7aa2ff",
-    brandDeep: "#152a52",
-    brandSoft: "rgba(122, 162, 255, 0.14)",
-    brandTint: "rgba(122, 162, 255, 0.22)",
-    ring: "rgba(122, 162, 255, 0.60)",
-    accent: "#fbbf24",
-    accentSoft: "rgba(251, 191, 36, 0.14)",
+    brand: "#8fa6ff",
+    brandDeep: "#16255c",
+    brandSoft: "rgba(143, 166, 255, 0.14)",
+    brandTint: "rgba(143, 166, 255, 0.22)",
+    ring: "rgba(143, 166, 255, 0.60)",
+    accent: "#ff6b78",
+    accentSoft: "rgba(255, 107, 120, 0.14)",
     ok: "#34d399",
     okSoft: "rgba(52, 211, 153, 0.14)",
     warn: "#fbbf24",

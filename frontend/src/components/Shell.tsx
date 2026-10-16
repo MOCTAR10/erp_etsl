@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LineChart,
   LogOut,
+  Menu,
   Moon,
   PieChart,
   Scale,
@@ -29,6 +30,7 @@ import { useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { useAuth } from "../store/auth";
+import { canSeeApp, ROUTE_APP, type ErpApp } from "../lib/modules";
 import { MotionProvider } from "./Pilot";
 import { BrandLogo } from "./BrandLogo";
 
@@ -36,6 +38,11 @@ interface NavItem {
   to: string;
   key: string;
   Icon: LucideIcon;
+}
+
+/** Entrée de menu rattachée à une application ERP filtrable (RF-59). */
+interface ModuleNavItem extends NavItem {
+  app: ErpApp;
 }
 
 const PILOT_NAV: NavItem[] = [
@@ -46,22 +53,20 @@ const PILOT_NAV: NavItem[] = [
   { to: "/notifications", key: "nav.notifications", Icon: Bell },
 ];
 
-const MODULE_NAV: NavItem[] = [
-  { to: "/pipeline", key: "nav.pipeline", Icon: Filter },
-  { to: "/purchases", key: "nav.purchases", Icon: ShoppingCart },
-  { to: "/operations", key: "nav.operations", Icon: HardHat },
-  { to: "/logistique", key: "nav.logistique", Icon: Truck },
-  { to: "/stocks", key: "nav.stocks", Icon: Boxes },
-  { to: "/qualite", key: "nav.qualite", Icon: ShieldCheck },
-  { to: "/hse", key: "nav.hse", Icon: ShieldAlert },
-  { to: "/maintenance", key: "nav.maintenance", Icon: Wrench },
-  { to: "/rh-paie", key: "nav.rhPaie", Icon: Users },
-  { to: "/comptabilite", key: "nav.comptabilite", Icon: Calculator },
-  { to: "/controle-gestion", key: "nav.controleGestion", Icon: PieChart },
-  { to: "/juridique", key: "nav.juridique", Icon: Scale },
+const MODULE_NAV: ModuleNavItem[] = [
+  { to: "/pipeline", key: "nav.pipeline", Icon: Filter, app: ROUTE_APP["/pipeline"] },
+  { to: "/purchases", key: "nav.purchases", Icon: ShoppingCart, app: ROUTE_APP["/purchases"] },
+  { to: "/operations", key: "nav.operations", Icon: HardHat, app: ROUTE_APP["/operations"] },
+  { to: "/logistique", key: "nav.logistique", Icon: Truck, app: ROUTE_APP["/logistique"] },
+  { to: "/stocks", key: "nav.stocks", Icon: Boxes, app: ROUTE_APP["/stocks"] },
+  { to: "/qualite", key: "nav.qualite", Icon: ShieldCheck, app: ROUTE_APP["/qualite"] },
+  { to: "/hse", key: "nav.hse", Icon: ShieldAlert, app: ROUTE_APP["/hse"] },
+  { to: "/maintenance", key: "nav.maintenance", Icon: Wrench, app: ROUTE_APP["/maintenance"] },
+  { to: "/rh-paie", key: "nav.rhPaie", Icon: Users, app: ROUTE_APP["/rh-paie"] },
+  { to: "/comptabilite", key: "nav.comptabilite", Icon: Calculator, app: ROUTE_APP["/comptabilite"] },
+  { to: "/controle-gestion", key: "nav.controleGestion", Icon: PieChart, app: ROUTE_APP["/controle-gestion"] },
+  { to: "/juridique", key: "nav.juridique", Icon: Scale, app: ROUTE_APP["/juridique"] },
 ];
-
-const ALL_NAV: NavItem[] = [...PILOT_NAV, ...MODULE_NAV];
 
 export function Shell() {
   const { t, i18n } = useTranslation();
@@ -71,6 +76,7 @@ export function Shell() {
 
   const [theme, setTheme] = useState(() => document.documentElement.getAttribute("data-theme") ?? "light");
   const [query, setQuery] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const isDark = theme === "dark";
   const ThemeIcon = isDark ? Sun : Moon;
@@ -94,6 +100,11 @@ export function Shell() {
     navigate("/login", { replace: true });
   };
 
+  const visibleModules = useMemo(
+    () => MODULE_NAV.filter(({ app }) => canSeeApp(user?.modules, app)),
+    [user?.modules],
+  );
+
   const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email || "";
   const initials = (displayName || "?")
     .split(/[\s@._-]+/)
@@ -105,8 +116,10 @@ export function Shell() {
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return ALL_NAV.filter(({ key, to }) => t(key).toLowerCase().includes(q) || to.includes(q)).slice(0, 7);
-  }, [query, t]);
+    return [...PILOT_NAV, ...visibleModules]
+      .filter(({ key, to }) => t(key).toLowerCase().includes(q) || to.includes(q))
+      .slice(0, 7);
+  }, [query, t, visibleModules]);
 
   const goSearch = (to: string) => {
     setQuery("");
@@ -119,6 +132,7 @@ export function Shell() {
         key={to}
         to={to}
         end={to === "/"}
+        onClick={() => setNavOpen(false)}
         className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
       >
         <Icon size={16} />
@@ -129,7 +143,7 @@ export function Shell() {
   return (
     <MotionProvider>
       <div className="app-shell">
-        <aside className="sidebar">
+        <aside className={navOpen ? "sidebar open" : "sidebar"} id="app-sidebar">
           <div className="sidebar-brand">
             <BrandLogo />
           </div>
@@ -140,13 +154,29 @@ export function Shell() {
             </div>
             <div className="nav-group">
               <span className="nav-group-label">{t("nav.groupModules")}</span>
-              {renderNav(MODULE_NAV)}
+              {renderNav(visibleModules)}
             </div>
           </div>
+          <button type="button" className="btn ghost sidebar-logout" onClick={logout}>
+            <LogOut size={15} />
+            {t("common.logout")}
+          </button>
         </aside>
+
+        {navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />}
 
         <div className="main-col">
           <header className="topbar">
+            <button
+              type="button"
+              className="icon-btn nav-toggle"
+              aria-label={t("common.menu")}
+              aria-controls="app-sidebar"
+              aria-expanded={navOpen}
+              onClick={() => setNavOpen((o) => !o)}
+            >
+              <Menu size={18} />
+            </button>
             <div className="topbar-search">
               <div className="search-field">
                 <Search size={15} />

@@ -3,6 +3,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { useAuth } from "./store/auth";
+import { landingForRole } from "./lib/landing";
 import { Shell } from "./components/Shell";
 import { withPilot } from "./components/Pilot";
 import { KpiGridSkeleton } from "./components/ui";
@@ -41,7 +42,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 function GuestOnly({ children }: { children: ReactNode }) {
   const access = useAuth((s) => s.access);
-  if (access) return <Navigate to="/" replace />;
+  const role = useAuth((s) => s.user?.role);
+  if (access) return <Navigate to={landingForRole(role)} replace />;
   return <>{children}</>;
 }
 

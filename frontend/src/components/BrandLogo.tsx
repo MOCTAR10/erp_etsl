@@ -16,7 +16,7 @@ export function BrandLogo({ size = "sm", showTag = true }: BrandLogoProps) {
       </span>
       <div className="brand-text">
         <span className="brand-word">ETSL ERP</span>
-        {showTag && <span className="brand-tag">{t("brand.tagline")}</span>}
+        {showTag && <span className="brand-tag">{t("app.tagline")}</span>}
       </div>
     </div>
   );
