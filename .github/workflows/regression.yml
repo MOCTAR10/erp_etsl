@@ -26,7 +26,11 @@ concurrency:
 
 # Valeurs de dev/démo uniquement (aucun secret ; voir backend/.env.example)
 env:
-  DJANGO_SECRET_KEY: ci-only-dev-key
+  DJANGO_SECRET_KEY: ci-only-not-a-secret-key-0123456789abcdef
+  # Les e2e se connectent des dizaines de fois depuis la meme IP : pas de throttle en CI.
+  THROTTLE_ANON: 100000/min
+  THROTTLE_USER: 100000/min
+  THROTTLE_LOGIN: 100000/min
   DEBUG: "False"
   ALLOWED_HOSTS: localhost,127.0.0.1
   POSTGRES_USER: etls
@@ -80,6 +84,15 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: Install backend
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - name: Lint (ruff - erreurs reelles uniquement) + migrations a jour
+        working-directory: backend
+        run: |
+          ruff check . --select E9,F63,F7,F82,F811 --exclude migrations
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+      - name: Coherence RBAC (lecture >= ecriture / montants)
+        working-directory: backend
+        run: python check_rbac_coherence.py
       - name: Create MinIO bucket (etls-documents)
         run: |
           python - <<'EOF'
