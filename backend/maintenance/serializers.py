@@ -81,8 +81,7 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "code", "cout_main_oeuvre", "cout_total", "date_debut", "date_fin",
-            "decision", "rapport",
-        ]
+            "decision", "rapport", "statut"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context.get("request").user)
@@ -120,7 +119,7 @@ class InspectionSerializer(serializers.ModelSerializer):
             "intervenant_name", "statut", "statut_label", "ot_genere", "ot_genere_code",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "ot_genere"]
+        read_only_fields = ["code", "ot_genere", "statut"]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)

@@ -56,7 +56,7 @@ class PermisTravailSerializer(serializers.ModelSerializer):
             "date_debut", "date_fin", "statut", "statut_label",
             "date_validation", "date_cloture", "notes", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "date_validation", "date_cloture"]
+        read_only_fields = ["code", "date_validation", "date_cloture", "statut"]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
@@ -122,7 +122,7 @@ class IncidentSerializer(serializers.ModelSerializer):
             "enqueteur", "enqueteur_name", "date_ouverture_enquete", "date_rapport",
             "actions_count", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "actions_count", "date_ouverture_enquete"]
+        read_only_fields = ["code", "actions_count", "date_ouverture_enquete", "statut"]
 
     def get_actions_count(self, obj):
         return obj.actions.count()
@@ -148,7 +148,7 @@ class ActionHseSerializer(serializers.ModelSerializer):
             "echeance", "statut", "statut_label", "efficace", "closed_at",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "closed_at"]
+        read_only_fields = ["code", "closed_at", "statut"]
 
 
 class FormationSecuriteSerializer(serializers.ModelSerializer):

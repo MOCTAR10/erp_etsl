@@ -306,4 +306,4 @@ class ControleInterneSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["code", "date_realise"]
+        read_only_fields = ["code", "date_realise", "statut"]

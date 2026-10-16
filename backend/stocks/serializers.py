@@ -182,7 +182,7 @@ class InventaireSerializer(serializers.ModelSerializer):
             "responsable_label", "note", "created_by", "created_by_label",
             "ecart_total", "lignes", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "created_by"]
+        read_only_fields = ["code", "created_by", "statut"]
 
 
 class ArticleStockSerializer(serializers.ModelSerializer):

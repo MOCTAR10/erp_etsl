@@ -135,7 +135,7 @@ class NonConformiteSerializer(serializers.ModelSerializer):
             "statut", "statut_label", "decided_by", "decided_by_name",
             "date_decision", "archive", "actions_count", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "actions_count"]
+        read_only_fields = ["code", "actions_count", "statut"]
 
     def get_actions_count(self, obj):
         return obj.actions_correctives.count()
@@ -171,7 +171,7 @@ class ActionCorrectiveSerializer(serializers.ModelSerializer):
             "description", "responsable", "responsable_name", "echeance", "statut",
             "statut_label", "efficace", "closed_at", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "closed_at"]
+        read_only_fields = ["code", "closed_at", "statut"]
 
 
 class PvControleSerializer(serializers.ModelSerializer):
@@ -192,4 +192,4 @@ class PvControleSerializer(serializers.ModelSerializer):
             "reserve_motif", "levee_reserve", "retention_years", "date_archivage",
             "validated_by", "validated_by_name", "notes", "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        read_only_fields = ["code", "statut"]

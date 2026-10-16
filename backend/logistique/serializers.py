@@ -88,7 +88,7 @@ class DemandeMobilisationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_by", "created_by_name", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "created_by", "created_by_name", "created_at", "updated_at", "statut"]
 
     def get_created_by_name(self, obj):
         if not obj.created_by:
@@ -129,7 +129,7 @@ class AffectationParcSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "created_by", "created_at", "updated_at", "statut"]
 
     def get_responsable_name(self, obj):
         if not obj.responsable:
@@ -196,8 +196,7 @@ class LocationGRSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "lectures_count",
             "consommation",
             "created_at",
-            "updated_at",
-        ]
+            "updated_at", "statut"]
 
     def get_created_by_name(self, obj):
         if not obj.created_by:

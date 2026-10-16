@@ -61,7 +61,7 @@ class EmployeSerializer(serializers.ModelSerializer):
             "site", "statut", "matricule_cnps", "date_embauche", "date_sortie",
             "contrat_actif", "solde_conges", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "nom_complet"]
+        read_only_fields = ["code", "nom_complet", "statut"]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
@@ -261,7 +261,7 @@ class BulletinSerializer(serializers.ModelSerializer):
             "lignes", "statut", "statut_label", "has_amount_access",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "brut", "net", "total_gains", "total_retenues", "lignes"]
+        read_only_fields = ["code", "brut", "net", "total_gains", "total_retenues", "lignes", "statut"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context["request"].user)
