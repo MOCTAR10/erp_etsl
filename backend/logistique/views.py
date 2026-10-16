@@ -1,5 +1,6 @@
 """API module M4 — Logistique ETSL & GLOBAL RENTAL (RF-ERP-30…33)."""
 
+from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -21,6 +22,7 @@ from .serializers import (
     LocationGRSerializer,
 )
 from users.permissions import can_read_module
+from outbox.models import publish
 from .services import CanManageLogistique, can_see_amount, stats_parc
 
 
@@ -167,12 +169,31 @@ class LocationGRViewSet(_CommonViewSet):
     def demarrer(self, request, pk=None):
         """Démarrage location GR : compteur initial + statut actif (RF-ERP-32)."""
         location = self.get_object()
+        if location.statut != LocationGR.Statut.BROUILLON:
+            raise ValidationError(
+                "Seule une prestation en brouillon peut démarrer (déjà active, terminée ou annulée)."
+            )
         lecture = request.data.get("lecture_initiale")
-        if lecture is None:
+        if lecture in (None, ""):
             raise ValidationError({"lecture_initiale": "Compteur de départ requis."})
+        try:
+            lecture = Decimal(str(lecture))
+        except InvalidOperation:
+            raise ValidationError({"lecture_initiale": "Compteur numérique attendu."})
+        if lecture < 0:
+            raise ValidationError({"lecture_initiale": "Le compteur ne peut pas être négatif."})
         location.lecture_initiale = lecture
         location.statut = LocationGR.Statut.ACTIVE
         location.save(update_fields=["lecture_initiale", "statut", "updated_at"])
+        publish(
+            "gr.location.demarree",
+            {
+                "code": location.code, "equipement": location.equipement.code,
+                "reference_bc": location.reference_bc, "reference_bl": location.reference_bl,
+                "date_debut": str(location.date_debut) if location.date_debut else None,
+                "lecture_initiale": str(lecture),
+            },
+        )
         equipement = location.equipement
         if equipement.statut != EquipementParc.Statut.EN_LOCATION:
             equipement.statut = EquipementParc.Statut.EN_LOCATION
@@ -193,6 +214,15 @@ class LocationGRViewSet(_CommonViewSet):
             raise ValidationError("Compteur de retour inférieur au compteur de départ.")
         location.statut = LocationGR.Statut.TERMINEE
         location.save(update_fields=["lecture_finale", "statut", "updated_at"])
+        publish(
+            "gr.location.cloturee",
+            {
+                "code": location.code, "equipement": location.equipement.code,
+                "reference_retour": location.reference_retour,
+                "lecture_finale": str(location.lecture_finale),
+                "consommation": str(location.consommation) if location.consommation is not None else None,
+            },
+        )
         equipement = location.equipement
         if equipement.statut == EquipementParc.Statut.EN_LOCATION:
             equipement.statut = EquipementParc.Statut.DISPONIBLE

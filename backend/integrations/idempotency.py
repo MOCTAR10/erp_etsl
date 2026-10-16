@@ -30,10 +30,12 @@ def idempotent(view_method):
         key = request.headers.get("Idempotency-Key")
         if not key or not request.user.is_authenticated:
             return view_method(self, request, *args, **kwargs)
+        client = getattr(request.user, "api_client", None)  # appel machine (GLOBAL RENTAL…)
+        owner = {"client": client} if client is not None else {"user": request.user}
         if len(key) > MAX_KEY_LENGTH:
             raise ValidationError({"Idempotency-Key": f"{MAX_KEY_LENGTH} caractères maximum."})
 
-        record = IdempotencyRecord.objects.filter(user=request.user, key=key).first()
+        record = IdempotencyRecord.objects.filter(key=key, **owner).first()
         if record:
             return _replay(record)
 
@@ -42,7 +44,7 @@ def idempotent(view_method):
                 response = view_method(self, request, *args, **kwargs)
                 if response.status_code < 400:
                     IdempotencyRecord.objects.create(
-                        user=request.user,
+                        **owner,
                         key=key,
                         method=request.method,
                         path=request.path[:255],
@@ -50,7 +52,7 @@ def idempotent(view_method):
                         body=json.loads(JSONRenderer().render(response.data) or "null"),
                     )
         except IntegrityError:  # deux rejeux simultanés : le second renvoie la réponse du premier
-            record = IdempotencyRecord.objects.filter(user=request.user, key=key).first()
+            record = IdempotencyRecord.objects.filter(key=key, **owner).first()
             if record:
                 return _replay(record)
             raise

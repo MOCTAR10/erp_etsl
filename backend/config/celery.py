@@ -17,9 +17,4 @@ app.conf.beat_schedule = {
         "task": "workflow.tasks.check_overdue_tasks",
         "schedule": crontab(hour=8, minute=0),
     },
-    # RF-04 : ingestion des boîtes mail Outlook (chaque 15 min).
-    "poll-imap-mailboxes": {
-        "task": "ingestion.tasks.poll_imap_mailboxes",
-        "schedule": crontab(minute="*/15"),
-    },
 }

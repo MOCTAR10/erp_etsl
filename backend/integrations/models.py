@@ -109,7 +109,11 @@ class IdempotencyRecord(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="idempotency_records"
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE,
+        related_name="idempotency_records",
+    )
+    client = models.ForeignKey(
+        "ApiClient", null=True, blank=True, on_delete=models.CASCADE, related_name="idempotency_records"
     )
     key = models.CharField(max_length=80, verbose_name="Idempotency-Key")
     method = models.CharField(max_length=8)
@@ -122,8 +126,112 @@ class IdempotencyRecord(models.Model):
         verbose_name = "Requête idempotente"
         verbose_name_plural = "Requêtes idempotentes"
         constraints = [
-            models.UniqueConstraint(fields=["user", "key"], name="uniq_idempotency_user_key")
+            models.UniqueConstraint(
+                fields=["user", "key"], condition=models.Q(user__isnull=False), name="uniq_idempotency_user_key"
+            ),
+            models.UniqueConstraint(
+                fields=["client", "key"], condition=models.Q(client__isnull=False), name="uniq_idempotency_client_key"
+            ),
         ]
 
     def __str__(self):
         return f"{self.method} {self.path} [{self.key}]"
+
+
+class ApiClient(models.Model):
+    """Client d'API externe (ex. système GLOBAL RENTAL) authentifié par jeton (CL-OM-09).
+
+    La clé n'est JAMAIS stockée en clair : seul son SHA-256 l'est (la clé est aléatoire à 256 bits, un
+    hachage rapide suffit). Elle n'est montrée qu'à la création. Droits = `scopes` (ex. `gr:read`, `gr:write`).
+    """
+
+    KEY_PREFIX = "etsl_gr_"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=120, verbose_name="Nom du client")
+    key_prefix = models.CharField(max_length=16, db_index=True, verbose_name="Préfixe de la clé")
+    key_hash = models.CharField(max_length=64, unique=True, verbose_name="Empreinte SHA-256")
+    scopes = models.JSONField(default=list, verbose_name="Droits (scopes)")
+    is_active = models.BooleanField(default=True, verbose_name="Actif")
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="api_clients"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Client d'API"
+        verbose_name_plural = "Clients d'API"
+
+    def __str__(self):
+        return f"{self.name} ({self.key_prefix}…)"
+
+    @staticmethod
+    def hash_key(key):
+        import hashlib
+
+        return hashlib.sha256(key.encode()).hexdigest()
+
+    @classmethod
+    def issue(cls, name, scopes, user=None):
+        """Crée un client et renvoie `(client, clé_en_clair)` — la clé ne sera plus jamais affichée."""
+        import secrets
+
+        key = f"{cls.KEY_PREFIX}{secrets.token_urlsafe(32)}"
+        client = cls.objects.create(
+            name=name, scopes=list(scopes), key_prefix=key[:12], key_hash=cls.hash_key(key), created_by=user
+        )
+        return client, key
+
+    def has_scope(self, scope):
+        return self.is_active and scope in (self.scopes or [])
+
+
+class WebhookEndpoint(models.Model):
+    """Destination d'événements sortants (webhooks signés HMAC-SHA256)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=120)
+    url = models.URLField(max_length=500)
+    secret = models.CharField(max_length=120, verbose_name="Secret de signature")
+    topics = models.JSONField(default=list, verbose_name="Sujets abonnés")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Webhook"
+        verbose_name_plural = "Webhooks"
+
+    def __str__(self):
+        return f"{self.name} → {self.url}"
+
+
+class WebhookDelivery(models.Model):
+    """Une livraison (un événement vers un endpoint), avec reprise bornée."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "En attente"
+        DELIVERED = "delivered", "Livrée"
+        FAILED = "failed", "Abandonnée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    endpoint = models.ForeignKey(WebhookEndpoint, on_delete=models.CASCADE, related_name="deliveries")
+    topic = models.CharField(max_length=60, db_index=True)
+    payload = models.JSONField(default=dict)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    response_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+    next_attempt_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Livraison de webhook"
+        verbose_name_plural = "Livraisons de webhook"
+
+    def __str__(self):
+        return f"{self.topic} → {self.endpoint_id} [{self.status}]"

@@ -45,7 +45,7 @@ def dispatch_outbox(limit=50):
     )
     delivered = failed = 0
     for event in events:
-        handlers = SUBSCRIBERS.get(event.topic, [])
+        handlers = SUBSCRIBERS.get(event.topic, []) + SUBSCRIBERS.get("*", [])
         if not handlers:
             # Pas de souscripteur : l'événement est consommé sans effet de bord.
             event.attempt_count += 1

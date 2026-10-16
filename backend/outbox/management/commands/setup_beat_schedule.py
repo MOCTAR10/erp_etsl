@@ -8,16 +8,20 @@ SCHEDULES = [
         {"minute": "*/1", "hour": "*", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
     ),
     (
+        "ETSL — relance des webhooks (CL-OM-09)",
+        "integrations.tasks.retry_webhook_deliveries",
+        {"minute": "*/1", "hour": "*", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
+    ),
+    (
         "ETSL — relances workflow (RF-35)",
         "workflow.tasks.check_overdue_tasks",
         {"minute": "0", "hour": "8", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
     ),
-    (
-        "ETSL — ingestion IMAP",
-        "ingestion.tasks.poll_imap_mailboxes",
-        {"minute": "*/15", "hour": "*", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
-    ),
 ]
+
+# Tâches périodiques supprimées : l'app `ingestion` (IMAP, RF-04) n'existe pas dans le code ; planifier une tâche
+# inexistante produisait « Received unregistered task » toutes les 15 min. Retirée aussi des bases déjà seedées.
+STALE_NAMES = ["ETSL — ingestion IMAP"]
 
 
 class Command(BaseCommand):
@@ -27,6 +31,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         created = updated = 0
+        PeriodicTask.objects.filter(name__in=STALE_NAMES).delete()
         for name, task, cron_fields in SCHEDULES:
             cron, _ = CrontabSchedule.objects.get_or_create(**cron_fields)
             _, was_created = PeriodicTask.objects.update_or_create(
