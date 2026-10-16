@@ -2,6 +2,11 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    MesBulletinsView,
+    MesCongesView,
+    MonBulletinView,
+    MonCongeAnnulerView,
+    MonProfilView,
     BaremeCotisationViewSet,
     BulletinViewSet,
     ContratViewSet,
@@ -29,5 +34,10 @@ router.register("bulletins", BulletinViewSet, basename="rh-bulletins")
 router.register("baremes", BaremeCotisationViewSet, basename="rh-baremes")
 
 urlpatterns = [
+    path("mon-espace/profil/", MonProfilView.as_view(), name="mon-profil"),
+    path("mon-espace/bulletins/", MesBulletinsView.as_view(), name="mes-bulletins"),
+    path("mon-espace/bulletins/<uuid:pk>/", MonBulletinView.as_view(), name="mon-bulletin"),
+    path("mon-espace/conges/", MesCongesView.as_view(), name="mes-conges"),
+    path("mon-espace/conges/<uuid:pk>/annuler/", MonCongeAnnulerView.as_view(), name="mon-conge-annuler"),
     path("", include(router.urls)),
 ]

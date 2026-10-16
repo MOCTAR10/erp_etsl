@@ -1831,3 +1831,42 @@ export interface AlertesAgregees {
   compteurs: Record<BandeEcheance, number>;
   total: number;
 }
+
+/** Espace libre-service salarié (CL-OM-01 / CL-OM-06). */
+export interface MonProfil {
+  id: string;
+  code: string;
+  nom_complet: string;
+  categorie: string;
+  statut: string;
+  solde_conges: number;
+  acquis_annuel: number;
+}
+
+export interface MonBulletin {
+  id: string;
+  code: string;
+  periode: string;
+  salaire_base: string;
+  brut: string;
+  net: string;
+  statut: string;
+  statut_label: string;
+  disponible_le: string | null;
+  consulte_le: string | null;
+  lignes: { id: number; libelle: string; nature: string; montant: string }[];
+}
+
+export interface MonConge {
+  id: string;
+  code: string;
+  type: string;
+  type_label: string;
+  date_debut: string;
+  date_fin: string;
+  nb_jours: number;
+  motif: string;
+  statut: string;
+  statut_label: string;
+  created_at: string;
+}

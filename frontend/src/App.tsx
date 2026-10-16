@@ -19,6 +19,7 @@ const StocksPage = lazy(() => import("./pages/Stocks").then((m) => ({ default: m
 const QualitePage = lazy(() => import("./pages/Qualite").then((m) => ({ default: m.QualitePage })));
 const HsePage = lazy(() => import("./pages/Hse").then((m) => ({ default: m.HsePage })));
 const MaintenancePage = lazy(() => import("./pages/Maintenance").then((m) => ({ default: m.MaintenancePage })));
+const MonEspacePage = lazy(() => import("./pages/MonEspace").then((m) => ({ default: m.MonEspacePage })));
 const RhPaiePage = lazy(() => import("./pages/RhPaie").then((m) => ({ default: m.RhPaiePage })));
 const ComptabilitePage = lazy(() => import("./pages/Comptabilite").then((m) => ({ default: m.ComptabilitePage })));
 const ControleGestionPage = lazy(() => import("./pages/ControleGestion").then((m) => ({ default: m.ControleGestionPage })));
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="qualite" element={pilotPage(<QualitePage />)} />
         <Route path="hse" element={pilotPage(<HsePage />)} />
         <Route path="maintenance" element={pilotPage(<MaintenancePage />)} />
+        <Route path="mon-espace" element={pilotPage(<MonEspacePage />)} />
         <Route path="rh-paie" element={pilotPage(<RhPaiePage />)} />
         <Route path="comptabilite" element={pilotPage(<ComptabilitePage />)} />
         <Route path="controle-gestion" element={pilotPage(<ControleGestionPage />)} />

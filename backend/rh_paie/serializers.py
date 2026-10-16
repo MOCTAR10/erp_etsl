@@ -59,7 +59,7 @@ class EmployeSerializer(serializers.ModelSerializer):
             "id", "code", "civilite", "nom", "prenom", "nom_complet",
             "date_naissance", "lieu_naissance", "nationalite", "numero_securite_sociale",
             "telephone", "email", "adresse", "categorie", "fonction", "departement",
-            "site", "statut", "matricule_cnps", "date_embauche", "date_sortie",
+            "site", "statut", "matricule_cnps", "date_embauche", "date_sortie", "user",
             "contrat_actif", "solde_conges", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "nom_complet", "statut"]
@@ -325,3 +325,37 @@ class BaremeCotisationSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs, exclude=())
+
+
+class MonBulletinSerializer(serializers.ModelSerializer):
+    """Bulletin vu par le salarié LUI-MÊME : ses montants ne sont jamais masqués (RF-59 vise les tiers)."""
+
+    lignes = BulletinLigneSerializer(many=True, read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+
+    class Meta:
+        model = BulletinPaie
+        fields = [
+            "id", "code", "periode", "salaire_base", "brut", "net", "lignes", "statut",
+            "statut_label", "disponible_le", "consulte_le",
+        ]
+        read_only_fields = fields
+
+
+class MonCongeSerializer(serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+
+    class Meta:
+        model = DemandesConge
+        fields = [
+            "id", "code", "type", "type_label", "date_debut", "date_fin", "nb_jours", "motif",
+            "statut", "statut_label", "created_at",
+        ]
+        read_only_fields = ["code", "statut", "created_at"]
+
+    def validate(self, attrs):
+        # Le salarié ne dépose que pour lui-même ; mêmes règles métier que côté RH
+        # (durée cohérente, pas de chevauchement) via full_clean du modèle.
+        attrs["employe"] = self.context["employe"]
+        return _apply_and_validate(self, attrs)

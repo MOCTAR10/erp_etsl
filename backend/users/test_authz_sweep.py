@@ -34,8 +34,20 @@ def _routes():
     return {p: ops for p, ops in schema["paths"].items() if p.startswith("/api/")}
 
 
-def _concrete(path: str) -> str:
-    return re.sub(r"\{[^}]+\}", "1", path)
+NIL_UUID = "00000000-0000-0000-0000-000000000000"
+
+
+def _concrete(path: str, op: dict | None = None) -> str:
+    """Remplace les paramètres de chemin par une valeur du bon type (sinon un `<uuid:pk>` donne 404)."""
+    types = {p["name"]: p.get("schema", {}) for p in (op or {}).get("parameters", []) if p.get("in") == "path"}
+
+    def value(match):
+        schema = types.get(match.group(1), {})
+        if schema.get("type") == "integer":
+            return "1"
+        return NIL_UUID if schema.get("format") == "uuid" else "1"
+
+    return re.sub(r"\{([^}]+)\}", value, path)
 
 
 class AuthzSweepTests(TestCase):
@@ -61,7 +73,7 @@ class AuthzSweepTests(TestCase):
             for method in METHODS:
                 if method not in ops:
                     continue
-                resp = getattr(client, method)(_concrete(path), {}, format="json")
+                resp = getattr(client, method)(_concrete(path, ops[method]), {}, format="json")
                 if resp.status_code not in (401, 403):
                     leaks.append((method.upper(), path, resp.status_code))
         self.assertEqual(leaks, [], f"routes accessibles sans authentification : {leaks}")

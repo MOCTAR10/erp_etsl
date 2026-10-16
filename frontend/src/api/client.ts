@@ -36,8 +36,9 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
+    throw new ApiError(res.status, await res.json().catch(() => null));
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
@@ -91,6 +92,17 @@ async function authenticatedMe(access: string): Promise<Me> {
 export const api = {
   get: <T,>(path: string) => raw<T>(path),
   me: () => raw<Me>("/api/users/me/"),
+  monProfil: () => raw<import("../types").MonProfil>("/api/rh-paie/mon-espace/profil/"),
+  mesBulletins: () => rawList<import("../types").MonBulletin>("/api/rh-paie/mon-espace/bulletins/"),
+  monBulletin: (id: string) => raw<import("../types").MonBulletin>(`/api/rh-paie/mon-espace/bulletins/${id}/`),
+  mesConges: () => rawList<import("../types").MonConge>("/api/rh-paie/mon-espace/conges/"),
+  deposerConge: (body: Record<string, unknown>) =>
+    raw<import("../types").MonConge>("/api/rh-paie/mon-espace/conges/", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  annulerConge: (id: string) =>
+    raw<import("../types").MonConge>(`/api/rh-paie/mon-espace/conges/${id}/annuler/`, { method: "POST" }),
   dashboard: () => raw<import("../types").DashboardData>("/api/reports/dashboard/"),
   tasks: () => rawList<import("../types").WorkflowTask>("/api/workflow/tasks/"),
   circuits: () => rawList<import("../types").Circuit>("/api/workflow/circuits/"),

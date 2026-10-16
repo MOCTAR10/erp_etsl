@@ -6,6 +6,8 @@ test.describe("Régression : palette de commandes (Ctrl K)", () => {
   test("Ctrl+K ouvre la palette, la recherche tolère les accents, Entrée navigue", async ({ page }) => {
     await loginAs(page, DEMO_USERS.admin);
     await page.goto("/");
+    // le raccourci n'est actif qu'une fois le Shell monté (pages en lazy-loading)
+    await expect(page.getByRole("button", { name: "Rechercher un module…" })).toBeVisible();
     await page.keyboard.press("Control+k");
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -25,6 +27,7 @@ test.describe("Régression : palette de commandes (Ctrl K)", () => {
 
   test("la palette respecte les droits : rh ne trouve pas Comptabilité", async ({ page }) => {
     await loginAs(page, DEMO_USERS.rh);
+    await expect(page.getByRole("button", { name: "Rechercher un module…" })).toBeVisible();
     await page.keyboard.press("Control+k");
     await page.getByRole("combobox").fill("comptabilite");
     await expect(page.getByRole("option")).toHaveCount(0);

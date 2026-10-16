@@ -93,6 +93,12 @@ class Employe(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="fiche_employe", verbose_name="Compte utilisateur",
+        help_text="Lie le salarié à son compte : active son espace libre-service (bulletins, congés).",
+    )
     class Meta:
         ordering = ["nom", "prenom"]
         verbose_name = "Employé (dossier RH)"
@@ -638,6 +644,14 @@ class BulletinPaie(models.Model):
     )
     brut = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Brut (FCFA)")
     net = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Net à payer (FCFA)")
+    disponible_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Mis à disposition le",
+        help_text="Accusé de dépôt horodaté : le bulletin devient visible dans l'espace du salarié.",
+    )
+    consulte_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Première consultation le",
+        help_text="Horodatage de la première ouverture par le salarié (accusé de consultation).",
+    )
     charges_patronales = models.DecimalField(
         max_digits=14, decimal_places=2, default=0, verbose_name="Charges patronales (FCFA)",
         help_text="Cotisations à la charge de l'employeur (barèmes « patronale ») — hors net du salarié.",

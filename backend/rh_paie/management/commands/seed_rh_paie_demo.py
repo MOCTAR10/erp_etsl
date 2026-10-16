@@ -156,6 +156,7 @@ class Command(BaseCommand):
 
         self._seed_rubriques()
         self._seed_bulletins(e1, e2, m1)
+        self._seed_libre_service(e1)
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -164,6 +165,26 @@ class Command(BaseCommand):
                 f"{BulletinPaie.objects.count()} bulletins."
             )
         )
+
+    def _seed_libre_service(self, employe):
+        """Compte salarié de démo lié à une fiche (espace libre-service) + bulletins diffusés."""
+        from django.contrib.auth import get_user_model
+        from django.utils import timezone
+
+        User = get_user_model()
+        user, created = User.objects.get_or_create(
+            email="salarie@etls.local",
+            defaults=dict(role=User.Role.CHEF_SERVICE, first_name="Alain", last_name="NGOUA"),
+        )
+        if created:
+            user.set_password("Etls#Demo2026")
+            user.save()
+        if employe.user_id is None and not Employe.objects.filter(user=user).exists():
+            employe.user = user
+            employe.save(update_fields=["user"])
+        BulletinPaie.objects.filter(
+            employe=employe, statut__in=["valide", "cloture"], disponible_le__isnull=True
+        ).update(disponible_le=timezone.now())
 
     def _seed_rubriques(self):
         rubriques = [

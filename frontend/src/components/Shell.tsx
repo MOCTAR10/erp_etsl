@@ -21,6 +21,7 @@ import {
   SquareKanban,
   Sun,
   Truck,
+  UserRound,
   Users,
   Wrench,
 } from "lucide-react";
@@ -52,6 +53,7 @@ const PILOT_NAV: NavItem[] = [
   { to: "/kanban", key: "nav.kanban", Icon: SquareKanban },
   { to: "/circuits", key: "nav.circuits", Icon: GitBranch },
   { to: "/notifications", key: "nav.notifications", Icon: Bell },
+  { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
 ];
 
 const MODULE_NAV: ModuleNavItem[] = [

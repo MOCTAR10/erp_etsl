@@ -9,6 +9,7 @@ export const DEMO_USERS = {
   rh: "rh@etls.local",
   atelier: "atelier@etls.local",
   qaqc: "qaqc@etls.local",
+  salarie: "salarie@etls.local",
 } as const;
 
 /** Connecte un utilisateur démo via l'UI (SPA : écran pilote). */

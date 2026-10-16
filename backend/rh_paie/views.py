@@ -7,7 +7,11 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
-from rest_framework import serializers, status, viewsets
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
+from rest_framework import generics, serializers, status, viewsets
+from rest_framework.permissions import BasePermission
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -27,6 +31,8 @@ from .models import (
     Sanction,
 )
 from .serializers import (
+    MonBulletinSerializer,
+    MonCongeSerializer,
     BaremeCotisationSerializer,
     BulletinAvecLignesSerializer,
     BulletinSerializer,
@@ -498,6 +504,24 @@ class BulletinViewSet(viewsets.ModelViewSet):
         bulletin.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(bulletin).data)
 
+    @action(detail=True, methods=["post"], url_path="diffuser")
+    def diffuser(self, request, pk=None):
+        """Met le bulletin à disposition du salarié (accusé de dépôt horodaté, CL-OM-06)."""
+        bulletin = self.get_object()
+        if bulletin.statut not in (BulletinPaie.Statut.VALIDE, BulletinPaie.Statut.CLOTURE):
+            return Response(
+                {"detail": "Seul un bulletin validé ou clôturé peut être diffusé."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if bulletin.disponible_le:
+            return Response(
+                {"detail": f"Déjà mis à disposition le {bulletin.disponible_le:%d/%m/%Y %H:%M}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        bulletin.disponible_le = timezone.now()
+        bulletin.save(update_fields=["disponible_le", "updated_at"])
+        return Response(self.get_serializer(bulletin).data)
+
     @action(detail=True, methods=["post"], url_path="cloturer")
     def cloturer(self, request, pk=None):
         bulletin = self.get_object()
@@ -550,3 +574,94 @@ class BaremeCotisationViewSet(viewsets.ModelViewSet):
     queryset = BaremeCotisation.objects.all()
     serializer_class = BaremeCotisationSerializer
     permission_classes = [CanManagePaie]
+
+
+# --------------------------------------------------------------------------------------------
+# Libre-service salarié (CL-OM-01 : inclus dans M9 ; CL-OM-06 : accusé de dépôt horodaté)
+# --------------------------------------------------------------------------------------------
+class IsEmployeLie(BasePermission):
+    """Compte authentifié lié à une fiche salarié : l'espace ne montre que SES données."""
+
+    message = "Aucune fiche salarié n'est liée à ce compte."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        fiche = Employe.objects.filter(user=user).first()
+        request.employe = fiche
+        return fiche is not None
+
+
+class MonProfilView(APIView):
+    permission_classes = [IsEmployeLie]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        e = request.employe
+        return Response(
+            {
+                "id": str(e.pk), "code": e.code, "nom_complet": e.nom_complet,
+                "categorie": e.categorie, "statut": e.statut,
+                "solde_conges": e.solde_conges,
+                "acquis_annuel": DemandesConge.DUREE_CONGE_CNSS,
+            }
+        )
+
+
+class MesBulletinsView(generics.ListAPIView):
+    permission_classes = [IsEmployeLie]
+    serializer_class = MonBulletinSerializer
+
+    def get_queryset(self):
+        return (
+            BulletinPaie.objects.filter(employe=self.request.employe, disponible_le__isnull=False)
+            .prefetch_related("lignes__rubrique")
+            .order_by("-periode")
+        )
+
+
+class MonBulletinView(generics.RetrieveAPIView):
+    permission_classes = [IsEmployeLie]
+    serializer_class = MonBulletinSerializer
+
+    def get_queryset(self):
+        return BulletinPaie.objects.filter(
+            employe=self.request.employe, disponible_le__isnull=False
+        ).prefetch_related("lignes__rubrique")
+
+    def retrieve(self, request, *args, **kwargs):
+        bulletin = self.get_object()
+        if bulletin.consulte_le is None:  # accusé de consultation : première ouverture seulement
+            bulletin.consulte_le = timezone.now()
+            bulletin.save(update_fields=["consulte_le", "updated_at"])
+        return Response(self.get_serializer(bulletin).data)
+
+
+class MesCongesView(generics.ListCreateAPIView):
+    permission_classes = [IsEmployeLie]
+    serializer_class = MonCongeSerializer
+
+    def get_queryset(self):
+        return DemandesConge.objects.filter(employe=self.request.employe).order_by("-created_at")
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["employe"] = getattr(self.request, "employe", None)
+        return ctx
+
+
+class MonCongeAnnulerView(APIView):
+    permission_classes = [IsEmployeLie]
+
+    @extend_schema(request=None, responses=MonCongeSerializer)
+    def post(self, request, pk):
+        demande = generics.get_object_or_404(DemandesConge, pk=pk, employe=request.employe)
+        if demande.statut != DemandesConge.Statut.DEMANDE:
+            return Response(
+                {"detail": "Seule une demande en attente peut être annulée par le salarié."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        demande.statut = DemandesConge.Statut.ANNULE
+        demande.save()
+        return Response(MonCongeSerializer(demande).data)
