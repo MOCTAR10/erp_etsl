@@ -18,7 +18,6 @@ from .models import (
     Version,
 )
 from .permissions import (
-    CanManageACL,
     DocumentPermission,
     DossierPermission,
     IsAdminOrStaff,

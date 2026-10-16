@@ -12,7 +12,6 @@ Montants : pattern RF-59 — masqués (None) hors rôles autorisés
 
 from django.utils import timezone
 
-from users.models import User
 
 
 def _band(days_left):
@@ -56,7 +55,7 @@ def dashboard_direction(user):
     )
     from operations.models import OrdreFabrication
     from logistique.models import EquipementParc, LocationGR
-    from stocks.models import ArticleStock, StockQuant, LotMatiere, MouvementStock, Depot
+    from stocks.models import StockQuant, LotMatiere, MouvementStock, Depot
     from qualite.models import NonConformite, Soudeur, WpsWpqr, PvControle
     from hse.models import Incident, PermisTravail, ActionHse, EvaluationRisque
     from maintenance.models import Actif, OrdreTravail, Inspection

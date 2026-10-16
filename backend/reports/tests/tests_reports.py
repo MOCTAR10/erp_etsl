@@ -1,18 +1,16 @@
 """Tests Increment 10 : exports (RF-98/74), SAGE (RF-68/80), dashboard (RF-94/95/96), rétention (RF-50/51/52)."""
 
 import io
-from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
-from django.utils import timezone
 from openpyxl import load_workbook
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from documents.models import Document, DocumentType
-from workflow.models import Circuit, CircuitStep, Task
+from workflow.models import Circuit
 
 User = get_user_model()
 

@@ -15,7 +15,6 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
-from documents.models import Document, DocumentType
 from documents.services import visible_documents
 from workflow.models import Task
 

@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 
 from referentiels.models import Account
 
-from .models import AccountMove, AccountMoveLine, Journal, Period, Sequence
+from .models import AccountMove, AccountMoveLine, Journal, Period
 from .services import close_period, post_move, reverse_move
 
 User = get_user_model()

@@ -8,7 +8,6 @@ Bulletins de paie CNSSG / CNAMGS, barèmes versionnés par date d'effet (RF-ERP-
 """
 
 import uuid
-from datetime import date, timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError

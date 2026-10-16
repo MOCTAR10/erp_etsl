@@ -30,7 +30,6 @@ from .serializers import (
 from .services import (
     CanManageStocks,
     apply_move,
-    can_see_amount,
     cloturer_inventaire,
     traceabilite,
     valuation,

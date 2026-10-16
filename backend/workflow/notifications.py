@@ -3,7 +3,7 @@
 from django.conf import settings
 from django.core.mail import send_mail
 
-from .models import Notification, Task
+from .models import Notification
 
 
 def notify(user, subject, message, task=None, kind="info"):

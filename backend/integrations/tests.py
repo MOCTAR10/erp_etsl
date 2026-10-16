@@ -4,7 +4,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting_kernel.models import AccountMove, Journal
+from accounting_kernel.models import AccountMove
 from referentiels.models import Account, Currency, Partner
 
 from .importers import run_import

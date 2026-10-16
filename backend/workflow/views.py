@@ -5,7 +5,6 @@ from rest_framework.response import Response
 
 from documents.audit import log_audit, request_ip
 from documents.models import AuditLog, Document
-from documents.permissions import IsAdminOrStaff
 from documents.services import can_write_document, visible_documents
 from users.models import User
 

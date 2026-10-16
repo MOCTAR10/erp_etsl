@@ -15,7 +15,6 @@ from rh_paie.models import (
     Employe,
     Formation,
     Qualification,
-    RhPaieSequence,
     RubriquePaie,
     SaisieTemps,
     Sanction,

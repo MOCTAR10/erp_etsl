@@ -1,7 +1,6 @@
 """Sérialiseurs M6 — Qualité & Contrôle Qualité / Inspection."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.utils import timezone
 from rest_framework import serializers
 
 from .models import (

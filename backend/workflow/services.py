@@ -5,10 +5,10 @@ from datetime import timedelta
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 
-from documents.models import AuditLog, Document
+from documents.models import Document
 from users.models import User
 
-from .models import Circuit, CircuitStep, Task, TaskComment
+from .models import Circuit, Task, TaskComment
 
 
 def _find_assignee(role):
