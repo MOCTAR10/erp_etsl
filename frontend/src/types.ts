@@ -657,6 +657,11 @@ export interface PermisTravail {
   date_validation: string | null;
   date_cloture: string | null;
   notes: string;
+  /** Test d'atmosphère (CL-OM-07) : requis avant démarrage pour chaud / confiné / ATEX / chimique. */
+  gaz_obligatoire?: boolean;
+  test_gaz_resultat?: "" | "conforme" | "non_conforme";
+  test_gaz_valeur?: string;
+  test_gaz_valide?: boolean;
 }
 
 export type CriticiteRisque = "faible" | "moyenne" | "elevee" | "critique";

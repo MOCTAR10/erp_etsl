@@ -117,6 +117,13 @@ class PermisTravailTests(M7BaseTest):
         self.assertEqual(p.validateur, self.hse)
         self.assertIsNotNone(p.date_validation)
 
+        # CL-OM-07 : un permis à risque gaz exige un test d'atmosphère conforme avant démarrage.
+        res = self.client.post(f"/api/hse/permis/{p.pk}/demarrer/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        res = self.client.post(
+            f"/api/hse/permis/{p.pk}/test-gaz/", {"resultat": "conforme", "valeur": "LIE 0 %"}, format="json"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
         res = self.client.post(f"/api/hse/permis/{p.pk}/demarrer/")
         p.refresh_from_db()
         self.assertEqual(p.statut, PermisTravail.Statut.ACTIF)

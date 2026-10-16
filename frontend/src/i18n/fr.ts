@@ -392,6 +392,7 @@ export const fr = {
     interne: "Interne QA/QC",
   },
   hse: {
+    gaz: { conforme: "Test gaz conforme", nonConforme: "Test gaz non conforme", aFaire: "Test gaz à faire" },
     title: "HSE — Hygiène, Sécurité & Environnement (M7)",
     joursSansAccident: "Jours sans accident",
     incidentsOuverts: "incidents ouverts",

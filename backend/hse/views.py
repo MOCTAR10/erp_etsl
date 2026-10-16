@@ -60,7 +60,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="valider")
     def valider(self, request, pk=None):
         permis = self.get_object()
-        if permis.statut not in (PermisTravail.Statut.DEMANDE, PermisTravail.Statut.ANNULE):
+        if permis.statut != PermisTravail.Statut.DEMANDE:
             return Response(
                 {"detail": "Le permis n'est plus en attente de validation."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -68,6 +68,14 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         if not can_validate_hse(request.user):
             return Response(
                 {"detail": "Réservé au HSE et à la hiérarchie."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # Séparation des tâches : on ne valide pas son propre permis (hors admin).
+        if permis.demandeur_id == request.user.id and not (
+            request.user.is_staff or request.user.role == "admin"
+        ):
+            return Response(
+                {"detail": "Le demandeur ne peut pas valider son propre permis."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         accept = _as_bool(request.data.get("accept", True))
@@ -87,7 +95,57 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
                 {"detail": "Seul un permis validé peut être démarré."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        aujourdhui = timezone.localdate()
+        if permis.date_debut > aujourdhui:
+            return Response(
+                {"detail": f"Le permis ne débute que le {permis.date_debut:%d/%m/%Y}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if permis.date_fin and permis.date_fin < aujourdhui:
+            return Response(
+                {"detail": "Permis expiré : sa date de fin est dépassée."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if permis.gaz_obligatoire and not permis.test_gaz_valide:
+            return Response(
+                {"detail": (
+                    "Test gaz conforme requis avant démarrage "
+                    f"(valable {PermisTravail.TEST_GAZ_VALIDITE_HEURES} h) - "
+                    f"type {permis.get_type_permis_display()}."
+                )},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         permis.statut = PermisTravail.Statut.ACTIF
+        permis.save()
+        return Response(self.get_serializer(permis).data)
+
+    @action(detail=True, methods=["post"], url_path="test-gaz")
+    def test_gaz(self, request, pk=None):
+        """Enregistre un test d'atmosphère (conforme / non conforme + mesures).
+
+        Un résultat non conforme sur un permis actif l'arrête (retour à Validé).
+        """
+        permis = self.get_object()
+        if permis.statut not in (PermisTravail.Statut.VALIDE, PermisTravail.Statut.ACTIF):
+            return Response(
+                {"detail": "Test gaz possible uniquement sur un permis validé ou actif."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        resultat = request.data.get("resultat")
+        if resultat not in ("conforme", "non_conforme"):
+            return Response(
+                {"detail": "Résultat attendu : conforme ou non_conforme."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        permis.test_gaz_resultat = resultat
+        permis.test_gaz_valeur = str(request.data.get("valeur", ""))[:120]
+        permis.test_gaz_date = timezone.now()
+        permis.test_gaz_par = request.user
+        if resultat == "non_conforme" and permis.statut == PermisTravail.Statut.ACTIF:
+            permis.statut = PermisTravail.Statut.VALIDE
+            permis.notes = (permis.notes + "\n" if permis.notes else "") + (
+                f"Arrêt : test gaz non conforme ({permis.test_gaz_valeur or 'sans mesure'})."
+            )
         permis.save()
         return Response(self.get_serializer(permis).data)
 

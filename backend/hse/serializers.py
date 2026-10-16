@@ -46,6 +46,8 @@ class PermisTravailSerializer(serializers.ModelSerializer):
     validateur_name = serializers.CharField(
         source="validateur.get_full_name", read_only=True, default=None
     )
+    gaz_obligatoire = serializers.BooleanField(read_only=True)
+    test_gaz_valide = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = PermisTravail
@@ -55,8 +57,13 @@ class PermisTravailSerializer(serializers.ModelSerializer):
             "demandeur", "demandeur_name", "validateur", "validateur_name",
             "date_debut", "date_fin", "statut", "statut_label",
             "date_validation", "date_cloture", "notes", "created_at", "updated_at",
+            "gaz_obligatoire", "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date",
+            "test_gaz_par", "test_gaz_valide",
         ]
-        read_only_fields = ["code", "date_validation", "date_cloture", "statut"]
+        read_only_fields = [
+            "code", "date_validation", "date_cloture", "statut", "gaz_obligatoire",
+            "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date", "test_gaz_par", "test_gaz_valide",
+        ]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)

@@ -116,9 +116,27 @@ class PermisTravail(models.Model):
     )
     date_validation = models.DateTimeField(null=True, blank=True, verbose_name="Validation le")
     date_cloture = models.DateTimeField(null=True, blank=True, verbose_name="Clôture le")
+    # Test d'atmosphère (CL-OM-07) : obligatoire avant démarrage pour les types à risque gaz.
+    test_gaz_resultat = models.CharField(
+        max_length=12, blank=True, choices=[("conforme", "Conforme"), ("non_conforme", "Non conforme")],
+        verbose_name="Test gaz - résultat",
+    )
+    test_gaz_valeur = models.CharField(
+        max_length=120, blank=True, verbose_name="Test gaz - mesures (LIE, O2, H2S...)"
+    )
+    test_gaz_date = models.DateTimeField(null=True, blank=True, verbose_name="Test gaz - le")
+    test_gaz_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="hse_tests_gaz", verbose_name="Test gaz - par",
+    )
     notes = models.TextField(blank=True, verbose_name="Notes")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    #: Types de permis exigeant un test d'atmosphère avant démarrage.
+    GAZ_TYPES = ("chaud", "confine", "atex", "chimique")
+    #: Validité d'un test gaz (heures) - à confirmer avec la procédure HSE d'ETSL.
+    TEST_GAZ_VALIDITE_HEURES = 12
 
     class Meta:
         ordering = ["-created_at"]
@@ -139,6 +157,18 @@ class PermisTravail(models.Model):
             raise ValidationError(
                 {"date_fin": "La date de fin doit être postérieure à la date de début."}
             )
+    @property
+    def gaz_obligatoire(self):
+        return self.type_permis in self.GAZ_TYPES
+
+    @property
+    def test_gaz_valide(self):
+        """Test gaz conforme et encore dans sa duree de validite."""
+        if self.test_gaz_resultat != "conforme" or not self.test_gaz_date:
+            return False
+        age = timezone.now() - self.test_gaz_date
+        return age <= timezone.timedelta(hours=self.TEST_GAZ_VALIDITE_HEURES)
+
 
 
 class EvaluationRisque(models.Model):

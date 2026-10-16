@@ -42,6 +42,23 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
         {formatDate(permis.date_debut, "fr")} → {permis.date_fin ? formatDate(permis.date_fin, "fr") : "…"}
         {permis.affaire_code ? ` · ${permis.affaire_code}` : ""}
         <span className={`badge ${badge}`}> {t(`hse.permis_statut.${permis.statut}`)}</span>
+        {permis.gaz_obligatoire && (
+          <span
+            className={`badge ${
+              permis.test_gaz_resultat === "non_conforme" ? "err" : permis.test_gaz_valide ? "ok" : "warn"
+            }`}
+            title={permis.test_gaz_valeur || undefined}
+          >
+            {" "}
+            {t(
+              permis.test_gaz_resultat === "non_conforme"
+                ? "hse.gaz.nonConforme"
+                : permis.test_gaz_valide
+                  ? "hse.gaz.conforme"
+                  : "hse.gaz.aFaire",
+            )}
+          </span>
+        )}
       </span>
     </div>
   );
