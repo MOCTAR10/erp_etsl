@@ -11,6 +11,7 @@ noyau. Reprise des données SAGE : import par fichiers via `integrations`
 (GLConnector, H-04) — jamais d'écriture directe dans les journaux.
 """
 
+from datetime import date
 from decimal import Decimal
 import uuid
 
@@ -352,7 +353,10 @@ class Engagement(models.Model):
 
     @property
     def total_paye(self):
-        return sum((paiement.montant for paiement in self.paiements.all()), Decimal("0"))
+        """Montant effectivement décaissé : paiements VALIDÉS uniquement (ni brouillons ni annulés)."""
+        return sum(
+            (p.montant for p in self.paiements.filter(statut="valide")), Decimal("0")
+        )
 
     @property
     def solde(self):
@@ -511,6 +515,10 @@ class DeclarationTva(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = ComptabiliteSequence.next_for("TVA", "TVA")
+        # « Premier jour du mois » : normalise toute date du mois (sinon les paiements
+        # antérieurs au jour saisi seraient ignorés du calcul).
+        if isinstance(self.mois, date):
+            self.mois = self.mois.replace(day=1)
         return super().save(*args, **kwargs)
 
 

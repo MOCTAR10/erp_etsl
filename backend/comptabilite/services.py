@@ -11,6 +11,7 @@ et le compte 618 (M4/M5, RF-ERP-93).
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from rest_framework.permissions import BasePermission
 
 from users.models import User
@@ -80,6 +81,17 @@ class CanValidateCompta(BasePermission):
         return is_admin_or_staff(user) or user.role in COMPTA_AMOUNT_ROLES
 
 
+def _account(code):
+    """Compte du plan SYSCOHADA ou erreur métier claire (jamais un 500 DoesNotExist)."""
+    from referentiels.models import Account
+
+    try:
+        return Account.objects.get(code=code)
+    except Account.DoesNotExist:
+        raise ValidationError(f"Compte {code} absent du plan comptable (seed_referentiels).")
+
+
+@transaction.atomic
 def build_paiement_move(paiement, user):
     """Construit et comptabilise l'écriture d'un paiement via le noyau comptable.
 
@@ -93,12 +105,32 @@ def build_paiement_move(paiement, user):
     from accounting_kernel.services import period_for_date, post_move
     from referentiels.models import Account, Partner
 
-    if paiement.move_id:
+    # Verrou : deux clics / deux utilisateurs simultanés ne produisent qu'une écriture.
+    Paiement.objects.select_for_update().get(pk=paiement.pk)
+    paiement.refresh_from_db()  # l'instance de l'appelant reflète l'état verrouillé
+    if paiement.move_id or paiement.statut == Paiement.Statut.VALIDE:
         raise ValidationError("Paiement déjà comptabilisé.")
+    if paiement.statut == Paiement.Statut.ANNULE:
+        raise ValidationError("Paiement annulé — comptabilisation impossible.")
+    if paiement.montant is None or paiement.montant <= 0:
+        raise ValidationError("Le montant du paiement doit être strictement positif.")
+    if paiement.engagement_id:
+        from .models import Engagement
+
+        eng = paiement.engagement
+        if eng.statut != Engagement.Statut.APPROUVE:
+            raise ValidationError("Engagement non approuvé — paiement impossible (proc. 4.3).")
+        if paiement.sens == paiement.Sens.SORTIE and paiement.montant > eng.solde:
+            raise ValidationError(
+                f"Dépassement de l'engagement : solde disponible {eng.solde}, paiement {paiement.montant}."
+            )
 
     banque = paiement.compte_bancaire.compte_comptable
     journal_codes = {"especes": "CAI", "cheque": "BQ", "virement": "BQ", "cfonb": "BQ", "autre": "OD"}
-    journal = Journal.objects.get(code=journal_codes[paiement.mode])
+    try:
+        journal = Journal.objects.get(code=journal_codes[paiement.mode])
+    except Journal.DoesNotExist:
+        raise ValidationError(f"Journal {journal_codes[paiement.mode]} absent (seed_accounting).")
     try:
         period = period_for_date(paiement.date)
     except ValidationError as exc:
@@ -108,19 +140,15 @@ def build_paiement_move(paiement, user):
     tiers = paiement.tiers
     if paiement.sens == paiement.Sens.SORTIE:
         if paiement.imputation_618:
-            compte_depense = Account.objects.get(code="618000")
+            compte_depense = _account("618000")
         elif paiement.engagement_id:
             compte_depense = paiement.engagement.compte_depense
         elif tiers and tiers.kind in (Partner.Kind.FOURNISSEUR, Partner.Kind.BOTH):
-            compte_depense = Account.objects.get(
-                code="401100" if tiers.is_global_rental else "401000"
-            )
+            compte_depense = _account("401100" if tiers.is_global_rental else "401000")
         else:
-            compte_depense = Account.objects.get(code="601000")
+            compte_depense = _account("601000")
     else:
-        compte_depense = Account.objects.get(
-            code="411100" if (tiers and tiers.is_global_rental) else "411000"
-        )
+        compte_depense = _account("411100" if (tiers and tiers.is_global_rental) else "411000")
 
     montant = Decimal(paiement.montant)
     from accounting_kernel.models import AccountMove, AccountMoveLine

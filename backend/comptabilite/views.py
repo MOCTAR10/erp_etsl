@@ -1,7 +1,8 @@
 """API module M10 — Comptabilité & Trésorerie (RF-ERP-90…94)."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework import status, viewsets
+from django.utils import timezone
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
@@ -155,12 +156,43 @@ class RapprochementBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet)
         return Response(self.get_serializer(rapprochement).data)
 
 
-class EngagementViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+class LockedAfterMixin:
+    """Interdit modification/suppression d'une pièce figée (écriture comptable liée, dépôt…).
+
+    `locked_statuses` : statuts à partir desquels la pièce est immuable ; seules les
+    actions dédiées (approuver, comptabiliser, annuler…) font évoluer son statut.
+    """
+
+    locked_statuses: tuple = ()
+    locked_message = "Pièce figée : modification et suppression impossibles."
+
+    def _assert_unlocked(self):
+        if self.get_object().statut in self.locked_statuses:
+            raise DRFValidationError(self.locked_message)
+
+    def update(self, request, *args, **kwargs):
+        self._assert_unlocked()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._assert_unlocked()
+        return super().destroy(request, *args, **kwargs)
+
+
+class EngagementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelViewSet):
     """Engagements de dépense — circuit RF-ERP-W1 (visa → engagement)."""
 
     queryset = Engagement.objects.select_related("compte_depense", "fournisseur", "demande_par").all()
     serializer_class = EngagementSerializer
-    permission_classes = [CanManageCompta]
+    locked_statuses = (Engagement.Statut.SOUMIS, Engagement.Statut.APPROUVE, Engagement.Statut.ANNULE)
+    locked_message = "Engagement soumis, approuvé ou annulé : non modifiable (proc. 4.3)."
+
+    def get_permissions(self):
+        # Le visa d'un engagement engage la société : cercle de validation (RF-33),
+        # pas tous les rôles qui peuvent saisir.
+        if self.action == "approuver":
+            return [CanValidateCompta()]
+        return [CanManageCompta()]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -186,8 +218,14 @@ class EngagementViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         engagement = self.get_object()
         if engagement.statut != Engagement.Statut.SOUMIS:
             raise DRFValidationError("Seul un engagement soumis peut être approuvé (RF-ERP-W1).")
+        raw_date = request.data.get("date_engagement")
+        try:
+            engagement.date_engagement = (
+                serializers.DateField().run_validation(raw_date) if raw_date else timezone.localdate()
+            )
+        except serializers.ValidationError as exc:
+            raise DRFValidationError({"date_engagement": exc.detail})
         engagement.statut = Engagement.Statut.APPROUVE
-        engagement.date_engagement = request.data.get("date_engagement")
         engagement.save(update_fields=["statut", "date_engagement", "updated_at"])
         return Response(self.get_serializer(engagement).data)
 
@@ -201,11 +239,13 @@ class EngagementViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         return Response(self.get_serializer(engagement).data)
 
 
-class PaiementViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+class PaiementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelViewSet):
     """Paiements / encaissements — comptabilisation via le noyau (RF-ERP-90)."""
 
     queryset = Paiement.objects.select_related("compte_bancaire", "engagement", "tiers", "facture", "move").all()
     serializer_class = PaiementSerializer
+    locked_statuses = (Paiement.Statut.VALIDE, Paiement.Statut.ANNULE)
+    locked_message = "Paiement validé ou annulé : non modifiable (écriture comptable liée)."
 
     def get_permissions(self):
         if self.action in ("comptabiliser", "annuler"):
@@ -247,10 +287,12 @@ class PaiementViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         return Response(self.get_serializer(paiement).data)
 
 
-class DeclarationTvaViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+class DeclarationTvaViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelViewSet):
     queryset = DeclarationTva.objects.select_related("taux_tva").all()
     serializer_class = DeclarationTvaSerializer
     permission_classes = [CanManageCompta]
+    locked_statuses = (DeclarationTva.Statut.DEPOSEE,)
+    locked_message = "Déclaration déposée : non modifiable ni supprimable."
 
     @action(detail=True, methods=["post"])
     def calculer(self, request, pk=None):

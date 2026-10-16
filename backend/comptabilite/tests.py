@@ -303,9 +303,17 @@ class EngagementTests(BaseComptaTest):
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_solde_engagement(self):
-        engagement = self._engagement()
-        self._paiement(engagement=engagement, sens="sortie", montant="100000.00")
-        self._paiement(engagement=engagement, sens="sortie", montant="50000.00")
+        from .services import build_paiement_move
+
+        engagement = self._engagement(statut=Engagement.Statut.APPROUVE)
+        banque = self._banque()
+        for montant in ("100000.00", "50000.00"):
+            p = self._paiement(
+                engagement=engagement, sens="sortie", montant=montant, compte_bancaire=banque
+            )
+            build_paiement_move(p, self.finance)
+        # seuls les paiements VALIDÉS comptent comme « payé »
+        self._paiement(engagement=engagement, sens="sortie", montant="10000.00", compte_bancaire=banque)
         self.assertEqual(engagement.total_paye, Decimal("150000.00"))
         self.assertEqual(engagement.solde, Decimal("100000.00"))
 

@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from users.permissions import IsAdminOrStaff
+from users.permissions import IsAdminOrStaff, can_read_module
 
 from .models import AccountMove, AccountMoveLine, FiscalYear, Journal, Period, Sequence
 from .permissions import CanPostAccounting
@@ -98,9 +98,11 @@ class AccountMoveViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     serializer_class = AccountMoveSerializer
 
     def get_permissions(self):
-        if self.action in ("post", "reverse"):
-            return [CanPostAccounting()]
-        return [IsAuthenticated()]
+        # Grand livre = données financières sensibles (dont journal de paie) :
+        # lecture = lecteurs du module M10 ; écriture/comptabilisation = cercle comptable.
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        return [CanPostAccounting()]
 
     def get_queryset(self):
         qs = AccountMove.objects.select_related("journal", "period").prefetch_related(
@@ -148,6 +150,11 @@ class AccountMoveViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
 class AccountMoveLineViewSet(AdminWriteMixin, viewsets.ModelViewSet):
     serializer_class = AccountMoveLineSerializer
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        return super().get_permissions()
 
     def get_queryset(self):
         qs = AccountMoveLine.objects.select_related("account", "move").all()

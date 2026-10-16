@@ -10,7 +10,7 @@ utilisateurs authentifiés. Les marges et les écarts sont agréés depuis les
 
 from decimal import Decimal
 
-from django.db.models import Q, Sum
+from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
 from rest_framework.permissions import BasePermission
 
 from users.models import User
@@ -78,16 +78,26 @@ class CanApproveBudget(BasePermission):
         return is_admin_or_staff(user) or user.role in GESTION_AMOUNT_ROLES
 
 
+def _net(cond, plus, minus):
+    """Expression SQL : (plus - minus) si `cond`, sinon 0 — somme en NET d'un côté du grand livre."""
+    return Case(
+        When(cond, then=F(plus) - F(minus)),
+        default=Value(ZERO),
+        output_field=DecimalField(max_digits=18, decimal_places=2),
+    )
+
+
 def _posted_lines_qs(fiscal_year):
     """Lignes d'écritures comptabilisées (POSTED, non extournées) d'un exercice."""
     from accounting_kernel.models import AccountMove, AccountMoveLine
 
+    # POSTED **et** REVERSED : une extourne = écriture d'origine + contre-écriture, qui
+    # s'annulent en net. Exclure l'originale ne retirerait que la moitié de la paire.
     posted_ids = AccountMove.objects.filter(
-        period__fiscal_year_id=fiscal_year, status=AccountMove.Status.POSTED
+        period__fiscal_year_id=fiscal_year,
+        status__in=(AccountMove.Status.POSTED, AccountMove.Status.REVERSED),
     ).values_list("id", flat=True)
-    return AccountMoveLine.objects.filter(
-        move_id__in=posted_ids
-    ).select_related("account")
+    return AccountMoveLine.objects.filter(move_id__in=posted_ids)
 
 
 def compute_marges(fiscal_year, axis=None, analytic=None, sens_gr_inclus=("produit", "618")):
@@ -102,57 +112,45 @@ def compute_marges(fiscal_year, axis=None, analytic=None, sens_gr_inclus=("produ
     """
     from referentiels.models import Account, AnalyticAccount
 
-    lines = _posted_lines_qs(fiscal_year)
-
-    accounts = {
-        (acc.code, acc.account_type) for acc in Account.objects.filter(
-            account_class__in=(6, 7)
-        )
-    }
-    produits_accounts = {
-        code for code, atype in accounts if atype == Account.AccountType.INCOME
-    }
-    charges_accounts = {
-        code for code, atype in accounts if atype == Account.AccountType.EXPENSE
-    }
-    qs = lines.filter(account__code__in=produits_accounts | charges_accounts)
+    qs = _posted_lines_qs(fiscal_year).filter(account__account_class__in=(6, 7))
     if axis:
         qs = qs.filter(analytic_account__axis_id=axis)
     if analytic:
         qs = qs.filter(analytic_account_id=analytic)
 
-    gr_lines = qs.filter(account__code="618000")
-    cout_gr = {
-        "debit": gr_lines.aggregate(t=Sum("debit"))["t"] or ZERO,
-        "credit": gr_lines.aggregate(t=Sum("credit"))["t"] or ZERO,
-    }
+    # NET : produits = crédit - débit (classe 7), charges = débit - crédit (classe 6),
+    # de sorte que avoirs et extournes viennent en déduction au lieu d'être ignorés.
+    is_income = Q(account__account_type=Account.AccountType.INCOME)
+    is_gr = Q(account__code="618000")
+    is_charge = Q(account__account_type=Account.AccountType.EXPENSE) & ~is_gr
 
-    rows = []
-    by_analytic = {}
-    for line in qs.exclude(account__code="618000"):
-        key = line.analytic_account_id
-        row = by_analytic.setdefault(
-            key,
-            {
-                "analytic": key,
-                "code_axe": "",
-                "libelle": "",
-                "produits": ZERO,
-                "charges": ZERO,
-            },
+    gr = qs.filter(is_gr).aggregate(t=Sum(F("debit") - F("credit")))["t"] or ZERO
+    cout_gr = {"debit": gr, "credit": ZERO}
+
+    grouped = (
+        qs.exclude(is_gr)
+        .values("analytic_account_id")
+        .annotate(
+            produits=Sum(_net(is_income, "credit", "debit")),
+            charges=Sum(_net(is_charge, "debit", "credit")),
         )
-        if line.account_id and line.account.code in produits_accounts:
-            row["produits"] += line.credit
-        if line.account_id and line.account.code in charges_accounts:
-            row["charges"] += line.debit
-
+    )
     analytics = {
         a.id: a
         for a in AnalyticAccount.objects.filter(
-            id__in=list(by_analytic.keys()) or [0]
+            id__in=[g["analytic_account_id"] for g in grouped if g["analytic_account_id"]]
         ).select_related("axis")
     }
-    for key, row in by_analytic.items():
+    rows = []
+    for g in grouped:
+        key = g["analytic_account_id"]
+        row = {
+            "analytic": key,
+            "code_axe": "",
+            "libelle": "",
+            "produits": g["produits"] or ZERO,
+            "charges": g["charges"] or ZERO,
+        }
         anal = analytics.get(key)
         if anal:
             row["code_axe"] = anal.axis.code if anal.axis else ""
@@ -191,34 +189,27 @@ def compute_variance(budget, fiscal_year=None):
     de charges) filtrées sur l'axe / la valeur analytique du budget. Retour :
     `{lignes: [{period, montant, realise, ecart, taux}], totals}`.
     """
-    from accounting_kernel.models import AccountMove, AccountMoveLine
     from referentiels.models import Account
 
     year = fiscal_year or budget.fiscal_year_id
-    move_ids = AccountMove.objects.filter(
-        period__fiscal_year_id=year, status=AccountMove.Status.POSTED
-    ).values_list("id", flat=True)
-    qs = AccountMoveLine.objects.filter(move_id__in=move_ids)
+    qs = _posted_lines_qs(year)
     if budget.axis_id:
         qs = qs.filter(analytic_account__axis_id=budget.axis_id)
     if budget.analytic_id:
         qs = qs.filter(analytic_account_id=budget.analytic_id)
 
     if budget.type_budget == budget.TypeBudget.PRODUIT:
-        account_q = Q(account__account_type=Account.AccountType.INCOME)
-        sign_field = "credit"
+        expr = _net(Q(account__account_type=Account.AccountType.INCOME), "credit", "debit")
     else:
-        account_q = Q(account__account_type=Account.AccountType.EXPENSE) & ~Q(
-            account__code="618000"
+        expr = _net(
+            Q(account__account_type=Account.AccountType.EXPENSE) & ~Q(account__code="618000"),
+            "debit",
+            "credit",
         )
-        sign_field = "debit"
-
-    realised_by_period = {}
-    for line in qs.filter(account_q):
-        period_id = line.move.period_id
-        realised_by_period[period_id] = (
-            realised_by_period.get(period_id, ZERO) + getattr(line, sign_field)
-        )
+    realised_by_period = {
+        r["move__period_id"]: r["total"] or ZERO
+        for r in qs.values("move__period_id").annotate(total=Sum(expr))
+    }
 
     rows = []
     total_budget = ZERO

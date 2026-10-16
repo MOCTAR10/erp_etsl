@@ -145,6 +145,7 @@ class AccountMove(models.Model):
         "label",
         "source",
         "source_ref",
+        "number",
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -216,12 +217,21 @@ class AccountMove(models.Model):
     def save(self, *args, **kwargs):
         if not self._state.adding:
             old = AccountMove.objects.filter(pk=self.pk).values().first()
-            if old and old["status"] == self.Status.POSTED:
+            # Comptabilisée OU extournée : seule transition permise = POSTED -> REVERSED
+            # (posée par `reverse_move`) ; aucun champ figé ne bouge, aucun retour arrière.
+            if old and old["status"] in (self.Status.POSTED, self.Status.REVERSED):
                 for field in self.IMMUTABLE_FIELDS:
                     if old[field] != getattr(self, field):
                         raise ValidationError(
                             "Écriture comptabilisée immuable — corrigez par extourne."
                         )
+                allowed = {old["status"]}
+                if old["status"] == self.Status.POSTED:
+                    allowed.add(self.Status.REVERSED)
+                if self.status not in allowed:
+                    raise ValidationError(
+                        "Statut d'une écriture comptabilisée non modifiable."
+                    )
         return super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -283,7 +293,7 @@ class AccountMoveLine(models.Model):
             AccountMove.objects.filter(pk=self.move_id)
             .values_list("status", flat=True)
             .first()
-            == AccountMove.Status.POSTED
+            in (AccountMove.Status.POSTED, AccountMove.Status.REVERSED)
         )
 
     def save(self, *args, **kwargs):

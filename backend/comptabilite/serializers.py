@@ -164,6 +164,11 @@ class EngagementSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["code", "statut", "date_engagement", "demande_par"]
 
+    def validate_montant(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError("Le montant doit être strictement positif.")
+        return value
+
 
 class PaiementSerializer(serializers.ModelSerializer):
     sens_label = serializers.CharField(source="get_sens_display", read_only=True)
@@ -208,6 +213,11 @@ class PaiementSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["code", "statut", "move", "move_number"]
+
+    def validate_montant(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError("Le montant doit être strictement positif.")
+        return value
 
     def get_has_amount_access(self, obj):
         from .services import can_see_amount

@@ -127,6 +127,8 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         budget = serializer.validated_data.get("budget")
+        if budget.statut == Budget.Statut.CLOTURE:
+            raise DRFValidationError("Budget clôturé : aucune révision possible.")
         numero = budget.revisions.count() + 1
         if numero > 4:
             raise DRFValidationError(
@@ -149,6 +151,8 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         if revision.statut != BudgetRevision.Statut.BROUILLON:
             raise DRFValidationError("Révision déjà appliquée ou annulée.")
         budget = revision.budget
+        if budget.statut == Budget.Statut.CLOTURE:
+            raise DRFValidationError("Budget clôturé : révision non applicable.")
         budget.montant = revision.nouveau_montant
         budget.save(update_fields=["montant", "updated_at"])
         revision.statut = BudgetRevision.Statut.APPLIQUEE

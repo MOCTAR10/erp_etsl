@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from .models import AccountMove, AccountMoveLine, Period, Sequence
+from .models import AccountMove, AccountMoveLine, FiscalYear, Period, Sequence
 
 ZERO = Decimal("0")
 
@@ -52,6 +52,8 @@ def post_move(move, user=None):
         raise ValidationError("Journal inactif.")
     if not move.period.is_open:
         raise ValidationError("Période clôturée — comptabilisation impossible.")
+    if move.period.fiscal_year.status != FiscalYear.Status.OPEN:
+        raise ValidationError("Exercice clôturé — comptabilisation impossible.")
     validate_move(move)
     move.number = Sequence.next_for(move.journal)
     move.status = AccountMove.Status.POSTED
@@ -102,6 +104,12 @@ def reverse_move(move, user=None, date=None, reference="", label=""):
 @transaction.atomic
 def close_period(period):
     period = Period.objects.select_for_update().get(pk=period.pk)
+    drafts = AccountMove.objects.filter(period=period, status=AccountMove.Status.DRAFT).count()
+    if drafts:
+        raise ValidationError(
+            f"Clôture impossible : {drafts} écriture(s) en brouillon dans la période "
+            "(comptabilisez-les ou supprimez-les d'abord)."
+        )
     period.status = Period.Status.CLOSED
     period.save(update_fields=["status"])
     return period
