@@ -358,12 +358,23 @@ def reporting_petrolier(user):
     }
 
 
-def alertes_agregees():
+def alertes_agregees(user=None):
     """Alertes J-90/J-60/J-30/expirées transverses (C3).
 
     Agrège : rétention GED (documents), conventions/cautions/assurances
     (juridique, RF-ERP-B0), contrats & qualifications RH, permis/ATEX/EPI HSE.
+
+    Avec `user`, chaque famille respecte les droits de lecture : documents via les ACL de la
+    GED (paie restreinte RF-33), RH / juridique / maintenance via la matrice de lecture
+    par module — une alerte nominative n'est jamais servie à un rôle sans accès au module.
+    `user=None` = usage interne (tâches, tests) : tout est agrégé.
     """
+    from documents.services import visible_documents
+    from users.rbac import can_read_app
+
+    def _allowed(app):
+        return user is None or can_read_app(user, app)
+
     from juridique.services import compute_alertes
     from rh_paie.models import ContratTravail, Qualification
     from maintenance.models import Actif
@@ -388,7 +399,8 @@ def alertes_agregees():
         return base + timezone.timedelta(days=365 * years) if years else None
 
     horizon = timezone.localdate() + timezone.timedelta(days=90)
-    for doc in Document.objects.filter(type__retention_years__gt=0).select_related("type"):
+    docs = visible_documents(user) if user is not None else Document.objects.all()
+    for doc in docs.filter(type__retention_years__gt=0).select_related("type"):
         end = _retention_end(doc)
         if end is None or end > horizon:
             continue
@@ -403,10 +415,17 @@ def alertes_agregees():
         }
         document_liste.append(item)
 
-    juridique = compute_alertes()
+    juridique = (
+        compute_alertes()
+        if _allowed("juridique")
+        else {"conventions": [], "cautions": [], "assurances": [], "compteurs": _zero()}
+    )
     rh_liste = []
-    for contrat in ContratTravail.objects.filter(statut=ContratTravail.Statut.ACTIF,
-                                                 date_fin__lte=horizon):
+    for contrat in (
+        ContratTravail.objects.filter(statut=ContratTravail.Statut.ACTIF, date_fin__lte=horizon)
+        if _allowed("rh_paie")
+        else ContratTravail.objects.none()
+    ):
         jours = (contrat.date_fin - timezone.localdate()).days
         rh_liste.append({
             "type": "contrat_rh",
@@ -417,7 +436,11 @@ def alertes_agregees():
             "jours": jours,
             "statut": contrat.statut,
         })
-    for qualif in Qualification.objects.filter(date_validite__lte=horizon):
+    for qualif in (
+        Qualification.objects.filter(date_validite__lte=horizon)
+        if _allowed("rh_paie")
+        else Qualification.objects.none()
+    ):
         jours = (qualif.date_validite - timezone.localdate()).days
         rh_liste.append({
             "type": "qualification_rh",
@@ -430,8 +453,10 @@ def alertes_agregees():
         })
 
     maintenance_liste = []
-    for actif in Actif.objects.filter(
-        statut__in=[Actif.Statut.EN_MAINTENANCE, Actif.Statut.EN_PANNE]
+    for actif in (
+        Actif.objects.filter(statut__in=[Actif.Statut.EN_MAINTENANCE, Actif.Statut.EN_PANNE])
+        if _allowed("maintenance")
+        else Actif.objects.none()
     ):
         maintenance_liste.append({
             "type": "actif_arret",

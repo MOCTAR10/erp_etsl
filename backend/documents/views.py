@@ -5,6 +5,7 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .audit import log_audit, request_ip
@@ -242,7 +243,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
             request_ip(self.request),
         )
 
+    FROZEN = (Document.Status.ARCHIVED, Document.Status.IN_VALIDATION)
+
+    def _assert_content_editable(self, document):
+        """Contenu figé : archivé (rétention légale) ou en cours de validation."""
+        if document.status in self.FROZEN:
+            raise DRFValidationError(
+                "Document archivé ou en validation : contenu non modifiable "
+                "(les validateurs et la rétention légale s'appuient sur la version soumise)."
+            )
+
     def perform_destroy(self, instance):
+        if instance.status in self.FROZEN:
+            raise DRFValidationError(
+                "Suppression interdite : document archivé (rétention légale) ou en validation."
+            )
         log_audit(
             self.request.user,
             AuditLog.Action.DELETE,
@@ -356,6 +371,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def new_version(self, request, pk=None):
         """Ajoute une version (RF-42) — verrouillé tant que check-out (RF-44)."""
         document = self.get_object()
+        self._assert_content_editable(document)
         serializer = NewVersionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -396,6 +412,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def rollback(self, request, pk=None):
         """Restaure une version antérieure comme version courante (RF-43)."""
         document = self.get_object()
+        self._assert_content_editable(document)
+        if document.is_checked_out and document.checked_out_by_id != request.user.id:
+            raise PermissionDenied("Document verrouillé (check-out) par un autre utilisateur (RF-44).")
         version_id = request.data.get("version_id")
         version = document.versions.filter(id=version_id).first()
         if version is None:

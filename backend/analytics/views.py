@@ -54,4 +54,4 @@ class AlertesAgregeesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(alertes_agregees())
+        return Response(alertes_agregees(request.user))

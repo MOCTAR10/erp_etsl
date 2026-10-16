@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.utils import timezone
 
 from documents.models import Document
@@ -20,6 +21,23 @@ def _find_assignee(role):
     )
 
 
+def _assert_can_act(task, user, verb):
+    """Seul l'assigné agit sur une tâche ; sans assigné, seul un utilisateur du rôle de l'étape.
+
+    (Sans cette seconde règle, une étape « PDG » sans titulaire pouvait être validée par
+    n'importe quel utilisateur authentifié.) Admin / staff : toujours autorisés.
+    """
+    if user.is_staff or user.is_superuser or user.role == User.Role.ADMIN:
+        return
+    if task.assigned_to_id:
+        if task.assigned_to_id != user.id:
+            raise PermissionDenied(f"Seul l'assigné peut {verb} cette tâche.")
+    elif user.role != task.step.actor_role:
+        raise PermissionDenied(
+            f"Tâche non assignée : seul un utilisateur du rôle « {task.step.actor_role} » peut {verb}."
+        )
+
+
 def _create_task(document, circuit, step, assigned_by):
     return Task.objects.create(
         document=document,
@@ -32,8 +50,10 @@ def _create_task(document, circuit, step, assigned_by):
     )
 
 
+@transaction.atomic
 def start_circuit(document, user):
     """Soumission d'un brouillon : démarre le circuit (RF-29 à 31, RF-40)."""
+    document = Document.objects.select_for_update().get(pk=document.pk)  # une seule soumission
     if document.status != Document.Status.DRAFT:
         raise ValidationError("Seul un document brouillon peut être soumis au circuit.")
     circuit = None
@@ -57,12 +77,13 @@ def start_circuit(document, user):
     return task
 
 
+@transaction.atomic
 def complete_task(task, user):
     """Termine l'étape courante : avance au circuit suivant ou archive (RF-40)."""
+    task = Task.objects.select_for_update().select_related("step", "circuit", "document").get(pk=task.pk)
     if task.status != Task.Status.PENDING:
         raise ValidationError("Cette tâche n'est pas en attente.")
-    if task.assigned_to_id and task.assigned_to_id != user.id and not user.is_staff:
-        raise PermissionDenied("Seul l'assigné peut terminer cette tâche.")
+    _assert_can_act(task, user, "terminer")
 
     task.status = Task.Status.DONE
     task.completed_at = timezone.now()
@@ -81,12 +102,13 @@ def complete_task(task, user):
     return _create_task(task.document, task.circuit, next_step, user)
 
 
+@transaction.atomic
 def reject_task(task, user, reason):
     """Rejet motivé : retour au statut rejeté, tâches en attente fermées (RF-39/41)."""
+    task = Task.objects.select_for_update().select_related("step", "document").get(pk=task.pk)
     if task.status != Task.Status.PENDING:
         raise ValidationError("Cette tâche n'est pas en attente.")
-    if task.assigned_to_id and task.assigned_to_id != user.id and not user.is_staff:
-        raise PermissionDenied("Seul l'assigné peut rejeter cette tâche.")
+    _assert_can_act(task, user, "rejeter")
     if not reason:
         raise ValidationError("Le motif de rejet est obligatoire (RF-39).")
 
@@ -105,12 +127,13 @@ def reject_task(task, user, reason):
     return document
 
 
+@transaction.atomic
 def delegate_task(task, user, to_user):
     """Délégation / transfert de tâche (RF-36)."""
+    task = Task.objects.select_for_update().select_related("step").get(pk=task.pk)
     if task.status != Task.Status.PENDING:
         raise ValidationError("Seule une tâche en attente peut être déléguée.")
-    if task.assigned_to_id and task.assigned_to_id != user.id and not user.is_staff:
-        raise PermissionDenied("Seul l'assigné peut déléguer cette tâche.")
+    _assert_can_act(task, user, "déléguer")
     if to_user is None:
         raise ValidationError("L'utilisateur destinataire est obligatoire.")
 
