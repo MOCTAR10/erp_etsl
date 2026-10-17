@@ -7,6 +7,7 @@ import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTab
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
+  AnalyseEcart,
   Budget,
   BudgetRevision,
   ClotureGestion,
@@ -171,6 +172,12 @@ export function ControleGestionPage() {
     enabled: Boolean(fy.data),
   });
 
+  const analyses = useQuery({
+    queryKey: ["cg-analyses-ecart"],
+    queryFn: () => api.get<Paginated<AnalyseEcart>>("/api/controle-gestion/analyses-ecart/?statut=a_analyser&page_size=50"),
+    select: (page: Paginated<AnalyseEcart>) => page.results,
+  });
+
   const cloturesStats = useQuery({
     queryKey: ["cg-clotures-stats", fy.data?.id],
     queryFn: () => api.cgCloturesStats(yearParam),
@@ -248,6 +255,35 @@ export function ControleGestionPage() {
             columns={margeColumns(t)}
             caption={t("controleGestion.marges")}
           />
+        </SectionCard>
+      )}
+
+      {(analyses.data?.length ?? 0) > 0 && (
+        <SectionCard title={`${t("controleGestion.analysesEcart")} · ${analyses.data?.length}`}>
+          {analyses.data?.map((a) => (
+            <div key={a.id} className="card" style={{ marginBottom: "0.5rem" }}>
+              <div className="title">
+                {a.code} · {a.budget_code} — {a.period_label}{" "}
+                <Badge tone={a.en_retard ? "err" : "warn"}>
+                  {Number(a.ecart_pct) > 0 ? "+" : ""}
+                  {a.ecart_pct} %
+                </Badge>
+              </div>
+              <div className="meta">
+                {a.budget_label} · {t("controleGestion.echeanceAnalyse")} {formatDate(a.echeance)}
+                {a.en_retard ? ` · ${t("controleGestion.enRetard")}` : ""}
+              </div>
+              <ActionBar
+                actions={[
+                  {
+                    label: t("controleGestion.analyser"),
+                    path: `/api/controle-gestion/analyses-ecart/${a.id}/analyser/`,
+                    prompt: { name: "analyse", label: t("controleGestion.analyseLabel") },
+                  },
+                ]}
+              />
+            </div>
+          ))}
         </SectionCard>
       )}
 

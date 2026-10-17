@@ -15,6 +15,8 @@ from django.utils import timezone
 
 from rest_framework.permissions import BasePermission
 
+from config.echeances import BANDES as EXPIRY_LABELS  # noqa: F401 (réexport)
+from config.echeances import bande as _band
 from users.models import User
 from users.rbac import can_read_app
 
@@ -109,19 +111,6 @@ class CanValidateJuridique(BasePermission):
         return can_validate_juridique(user)
 
 
-EXPIRY_LABELS = ("expiree", "j30", "j60", "j90")
-
-
-def _band(days_left):
-    if days_left < 0:
-        return "expiree"
-    if days_left <= 30:
-        return "j30"
-    if days_left <= 60:
-        return "j60"
-    if days_left <= 90:
-        return "j90"
-    return "en_cours"
 
 
 def compute_alertes():

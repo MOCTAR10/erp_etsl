@@ -102,6 +102,7 @@ class AccountMoveSerializer(serializers.ModelSerializer):
             "status",
             "source",
             "source_ref",
+            "motif",
             "reversed_by",
             "created_by",
             "posted_at",
@@ -114,11 +115,27 @@ class AccountMoveSerializer(serializers.ModelSerializer):
             "id",
             "number",
             "status",
+            "source",
+            "source_ref",
             "reversed_by",
             "created_by",
             "posted_at",
             "created_at",
         ]
+
+    def validate(self, attrs):
+        # Saisie manuelle restreinte (RG-M10.01) : l'API ne crée que des écritures manuelles, au journal OD,
+        # motivées ; les écritures des modules passent par leurs services (source M5, M9, M10…).
+        attrs = super().validate(attrs)
+        if self.instance is None:
+            journal = attrs.get("journal")
+            if journal and journal.journal_type != Journal.JournalType.OD:
+                raise serializers.ValidationError(
+                    {"journal": "Saisie manuelle autorisée au seul journal des opérations diverses (OD)."}
+                )
+            if not (attrs.get("motif") or "").strip():
+                raise serializers.ValidationError({"motif": "Motif obligatoire pour une écriture manuelle."})
+        return attrs
 
     def validate_lines(self, value):
         if len(value) < 2:

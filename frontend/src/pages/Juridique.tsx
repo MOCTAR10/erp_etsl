@@ -31,9 +31,11 @@ const BANDE_BADGE: Record<BandeEcheance, "ok" | "warn" | "err"> = {
   j90: "ok",
   j60: "warn",
   j30: "warn",
+  j15: "err",
+  j0: "err",
   expiree: "err",
 };
-const BANDES: BandeEcheance[] = ["expiree", "j30", "j60", "j90"];
+const BANDES: BandeEcheance[] = ["expiree", "j0", "j15", "j30", "j60", "j90"];
 
 function ConventionCard({ c, index }: { c: Convention; index: number }) {
   const { t } = useTranslation();
@@ -333,6 +335,8 @@ export function JuridiquePage() {
           hint={
             <>
               <span className="badge err">{a.compteurs["expiree"]}</span> {t("juridique.echeanceExpi")}
+              {" · "}
+              <span className="badge err">{(a.compteurs["j0"] ?? 0) + (a.compteurs["j15"] ?? 0)}</span> {t("juridique.echeanceJ15")}
               {" · "}
               <span className="badge warn">{a.compteurs["j30"]}</span> {t("juridique.echeanceJ30")}
               {" · "}

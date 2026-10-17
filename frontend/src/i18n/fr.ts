@@ -509,6 +509,8 @@ export const fr = {
     interne: "Interne QA/QC",
   },
   hse: {
+    trir: "TRIR (année)",
+    joursPerdus: "jours perdus",
     visaAttendu: "Visa attendu", niveaux: { superviseur: "superviseur", hse: "HSE", dg: "Direction Générale" },
     act: { enquete: "Ouvrir l'enquête", rapport: "Rapport d'enquête (obligatoire pour un accident ou un événement majeur/critique) :" },
     form: { title: "Déclarer un incident", date: "Date et heure de l'événement", description: "Description des faits" },
@@ -916,6 +918,11 @@ export const fr = {
     pendingNote: "Comptabilité SYSCOHADA révisée : écritures validées par le noyau (immuables, extournes). Règles de conservation proc. 4.3–4.8, refacturations GR au compte 618 (RF-ERP-90…94).",
   },
   controleGestion: {
+    analysesEcart: "Écarts > 10 % à analyser",
+    echeanceAnalyse: "analyse attendue avant le",
+    enRetard: "en retard",
+    analyser: "Rendre l'analyse",
+    analyseLabel: "Explication de l'écart",
     act: { approuver: "Approuver", realiser: "Marquer réalisée", appliquer: "Appliquer" },
     col: { axe: "Axe analytique", taux: "Taux de marge", code: "Code", periode: "Période", dateCloture: "Date de clôture", delai: "Délai", statut: "Statut", budget: "Budget · révision", nouveauMontant: "Nouveau montant", auteur: "Auteur", commentaire: "Commentaire" },
     title: "Contrôle de gestion — Budgets, marges, écarts & clôtures (M11)",
@@ -978,6 +985,7 @@ export const fr = {
     dossiersGr: "Dossiers GLOBAL RENTAL ouverts",
     alertes: "Alertes d'échéance",
     echeanceExpi: "expiré",
+    echeanceJ15: "≤ 15 j",
     echeanceJ30: "≤ 30 j",
     echeanceJ60: "≤ 60 j",
     echeanceJ90: "≤ 90 j",
@@ -1033,6 +1041,8 @@ export const fr = {
     },
     bande: {
       expiree: "Expirée",
+      j0: "Aujourd'hui",
+      j15: "≤ 15 j",
       j30: "≤ 30 j",
       j60: "≤ 60 j",
       j90: "≤ 90 j",
@@ -1064,6 +1074,7 @@ export const fr = {
     urgentNone: "Rien d'urgent : aucun point critique ouvert.",
     urgentItems: {
       expirees: "échéance(s) dépassée(s)",
+      j15: "échéance(s) à 15 jours ou moins",
       j30: "échéance(s) à moins de 30 jours",
       ncCritiques: "non-conformité(s) critique(s)",
       incidents: "incident(s) HSE ouvert(s)",

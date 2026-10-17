@@ -11,6 +11,7 @@ utilisateurs authentifiés. Les marges et les écarts sont agréés depuis les
 from decimal import Decimal
 
 from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
+from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
 from users.models import User
@@ -282,3 +283,44 @@ def compute_clotures_stats(fiscal_year=None):
         "en_attente": n_en_attente,
         "max_jours_ecoulement": max_jours,
     }
+
+
+def detecter_ecarts(budgets=None, today=None):
+    """Ouvre une analyse (échéance J+5) pour chaque période écoulée d'un budget approuvé dont le réalisé
+    s'écarte de plus de 10 % du budget, et prévient le contrôle de gestion (lot 15, CDC M11 §4.4)."""
+    from datetime import timedelta
+
+    from accounting_kernel.models import Period
+    from workflow.notifications import notify
+
+    from .models import AnalyseEcart, Budget
+
+    today = today or timezone.localdate()
+    budgets = budgets if budgets is not None else Budget.objects.filter(statut=Budget.Statut.APPROUVE)
+    destinataires = list(User.objects.filter(role__in=(User.Role.FINANCE, User.Role.DGA), is_active=True))
+    crees = []
+    for budget in budgets:
+        deja = set(budget.analyses_ecart.values_list("period_id", flat=True))
+        for ligne in compute_variance(budget)["lignes"]:
+            if not ligne["montant"] or ligne["period"] in deja:
+                continue
+            if Period.objects.get(pk=ligne["period"]).end_date >= today:
+                continue  # période non écoulée
+            pct = ((ligne["realise"] - ligne["montant"]) * 100 / ligne["montant"]).quantize(Decimal("0.01"))
+            if abs(pct) <= AnalyseEcart.SEUIL_PCT:
+                continue
+            analyse = AnalyseEcart.objects.create(
+                budget=budget, period_id=ligne["period"], montant_budget=ligne["montant"],
+                realise=ligne["realise"], ecart_pct=pct, detecte_le=today,
+                echeance=today + timedelta(days=AnalyseEcart.DELAI_JOURS),
+            )
+            crees.append(analyse)
+            for user in destinataires:
+                notify(
+                    user,
+                    f"Écart budgétaire {pct:+} % : {budget.code} — {ligne['period_label']}",
+                    f"Le budget « {budget.label} » ({budget.code}) s'écarte de {pct:+} % sur {ligne['period_label']}. "
+                    f"Analyse obligatoire avant le {analyse.echeance:%d/%m/%Y} ({analyse.code}).",
+                    kind="reminder",
+                )
+    return crees

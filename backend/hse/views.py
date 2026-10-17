@@ -3,6 +3,7 @@
 from django.db import transaction
 from django.utils import timezone
 from integrations.idempotency import idempotent
+from config.inputs import date_input, positive_decimal
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -264,6 +265,21 @@ class IncidentViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         escalader_si_grave(serializer.save())
+
+    @action(detail=False, methods=["get"], url_path="indicateurs")
+    def indicateurs(self, request):
+        """TRIR / LTIR / LTIFR de la période (défaut : année en cours) — lot 15, CDC M7 §9.7."""
+        from .indicateurs import indicateurs_frequence
+
+        today = timezone.localdate()
+        params = request.query_params
+        debut = date_input(params.get("debut"), "debut", default=today.replace(month=1, day=1))
+        fin = date_input(params.get("fin"), "fin", default=today)
+        heures = params.get("heures")
+        heures = positive_decimal(heures, "heures") if heures not in (None, "") else None
+        if fin < debut:
+            raise serializers.ValidationError({"fin": "La fin doit suivre le début."})
+        return Response(indicateurs_frequence(debut, fin, heures))
 
     def get_queryset(self):
         qs = super().get_queryset()

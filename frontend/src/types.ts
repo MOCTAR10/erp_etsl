@@ -1576,7 +1576,7 @@ export type StatutCaution = "en_cours" | "levee" | "appelee" | "expiree";
 export type StatutAssurance = "active" | "a_renouveler" | "expiree" | "resiliee";
 export type StatutReunion = "planifiee" | "tenue" | "cloturee";
 export type StatutDossierGR = "brouillon" | "ouvert" | "cloture";
-export type BandeEcheance = "expiree" | "j30" | "j60" | "j90";
+export type BandeEcheance = "expiree" | "j0" | "j15" | "j30" | "j60" | "j90";
 
 export interface Courrier {
   id: string;
@@ -1954,4 +1954,32 @@ export interface SignatureCertificate {
   valid: boolean;
   method: string;
   signatures: { order: number; signer: string; email: string; signed_at: string; ip: string | null; seal: string; seal_valid: boolean }[];
+}
+
+/** TRIR / LTIR / LTIFR (lot 15, CDC M7 §9.7) — taux en chaîne décimale, null sans heures travaillées. */
+export interface IndicateursHse {
+  debut: string;
+  fin: string;
+  heures: string;
+  enregistrables: number;
+  avec_arret: number;
+  jours_perdus: number;
+  trir: string | null;
+  ltir: string | null;
+  ltifr: string | null;
+}
+
+/** Analyse d'écart budget / réalisé > 10 % à rendre sous 5 jours (lot 15, CDC M11 §4.4). */
+export interface AnalyseEcart {
+  id: string;
+  code: string;
+  budget_code: string;
+  budget_label: string;
+  period_label: string;
+  ecart_pct: string;
+  echeance: string;
+  en_retard: boolean;
+  statut: "a_analyser" | "analysee";
+  statut_label: string;
+  analyse: string;
 }

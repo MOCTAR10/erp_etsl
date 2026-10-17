@@ -113,7 +113,7 @@ class AccountingAPITests(APITestCase):
             email="chef@etls.local", password="MotDePasse#2026",
             role=User.Role.CHEF_SERVICE,
         )
-        self.journal = Journal.objects.get(code="VTE")
+        self.journal = Journal.objects.get(code="OD")  # saisie manuelle = journal OD (RG-M10.01)
         self.account_a = Account.objects.create(
             code="411000", label="Clients", account_class=4,
             account_type=Account.AccountType.ASSET,
@@ -128,7 +128,7 @@ class AccountingAPITests(APITestCase):
             "journal": self.journal.id,
             "date": "2026-01-15",
             "label": "Facture",
-            "source": "M10",
+            "motif": "Régularisation",
             "lines": [
                 {"account": self.account_a.id, "debit": debit, "credit": "0"},
                 {"account": self.account_b.id, "debit": "0", "credit": credit},
@@ -151,7 +151,7 @@ class AccountingAPITests(APITestCase):
         resp = self.client.post(f"/api/accounting/moves/{move_id}/post/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         self.assertEqual(resp.data["status"], "posted")
-        self.assertEqual(resp.data["number"], "VTE00001")
+        self.assertEqual(resp.data["number"], "OD00001")
 
     def test_post_forbidden_for_non_accounting_role(self):
         self.client.force_authenticate(self.admin)
@@ -187,4 +187,4 @@ class AccountingAPITests(APITestCase):
         self.client.post(f"/api/accounting/moves/{move_id}/post/")
         resp = self.client.post(f"/api/accounting/moves/{move_id}/reverse/", {}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
-        self.assertEqual(resp.data["reference"], "Extourne VTE00001")
+        self.assertEqual(resp.data["reference"], "Extourne OD00001")

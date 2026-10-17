@@ -122,13 +122,15 @@ class IncidentSerializer(serializers.ModelSerializer):
         source="enqueteur.get_full_name", read_only=True, default=None
     )
     actions_count = serializers.SerializerMethodField()
+    consequence_humaine_label = serializers.CharField(source="get_consequence_humaine_display", read_only=True)
 
     class Meta:
         model = Incident
         fields = [
             "id", "code", "type_incident", "type_label", "gravite", "gravite_label",
             "date_evenement", "lieu", "description", "personnes_impliquees",
-            "cause_immediate", "cause_profonde", "consequences", "rapport",
+            "cause_immediate", "cause_profonde", "consequences", "consequence_humaine",
+            "consequence_humaine_label", "jours_arret", "rapport",
             "statut", "statut_label", "archive", "declared_by", "declared_by_name",
             "enqueteur", "enqueteur_name", "date_ouverture_enquete", "date_rapport",
             "actions_count", "created_at", "updated_at",

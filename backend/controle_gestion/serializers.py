@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from accounting_kernel.models import FiscalYear
 
-from .models import Budget, BudgetLigne, BudgetRevision, ClotureGestion
+from .models import AnalyseEcart, Budget, BudgetLigne, BudgetRevision, ClotureGestion
 
 
 class BudgetLigneSerializer(serializers.ModelSerializer):
@@ -183,3 +183,21 @@ class ClotureGestionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["created_by", "code", "statut"]
+
+
+class AnalyseEcartSerializer(serializers.ModelSerializer):
+    budget_code = serializers.CharField(source="budget.code", read_only=True)
+    budget_label = serializers.CharField(source="budget.label", read_only=True)
+    period_label = serializers.CharField(source="period.__str__", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    en_retard = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = AnalyseEcart
+        fields = [
+            "id", "code", "budget", "budget_code", "budget_label", "period", "period_label",
+            "montant_budget", "realise", "ecart_pct", "detecte_le", "echeance", "en_retard",
+            "analyse", "actions", "statut", "statut_label", "analyse_par", "analyse_le",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = fields

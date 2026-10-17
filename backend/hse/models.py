@@ -367,6 +367,18 @@ class Incident(models.Model):
         PLAN_ACTION = "plan_action", "Plan d'action"
         CLOTURE = "cloture", "Clôturé"
 
+    class ConsequenceHumaine(models.TextChoices):
+        AUCUNE = "aucune", "Aucune blessure"
+        PREMIERS_SECOURS = "premiers_secours", "Premiers secours"
+        SOINS_MEDICAUX = "soins_medicaux", "Soins médicaux"
+        RESTRICTION = "restriction", "Travail restreint / poste aménagé"
+        ARRET = "arret", "Arrêt de travail"
+        DECES = "deces", "Décès"
+
+    # TRIR : cas enregistrables (au-delà des premiers secours) ; LTIR / LTIFR : cas avec arrêt (lot 15, CDC M7 §9.7).
+    CONSEQUENCES_ENREGISTRABLES = ("soins_medicaux", "restriction", "arret", "deces")
+    CONSEQUENCES_AVEC_ARRET = ("arret", "deces")
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
     type_incident = models.CharField(
@@ -385,6 +397,11 @@ class Incident(models.Model):
     cause_immediate = models.TextField(blank=True, verbose_name="Cause immédiate")
     cause_profonde = models.TextField(blank=True, verbose_name="Cause profonde / racine")
     consequences = models.TextField(blank=True, verbose_name="Conséquences / blessures")
+    consequence_humaine = models.CharField(
+        max_length=16, choices=ConsequenceHumaine.choices, default=ConsequenceHumaine.AUCUNE,
+        verbose_name="Conséquence humaine (TRIR / LTIR)",
+    )
+    jours_arret = models.PositiveIntegerField(default=0, verbose_name="Jours d'arrêt (jours perdus)")
     rapport = models.TextField(blank=True, verbose_name="Rapport d'enquête")
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.DECLARE, verbose_name="Statut"
@@ -432,6 +449,10 @@ class Incident(models.Model):
     def clean(self):
         if not self.description.strip():
             raise ValidationError({"description": "La description est requise."})
+        if self.jours_arret and self.consequence_humaine not in self.CONSEQUENCES_AVEC_ARRET:
+            raise ValidationError(
+                {"jours_arret": "Des jours d'arrêt supposent une conséquence « arrêt de travail » ou « décès »."}
+            )
 
     @property
     def est_grave(self):

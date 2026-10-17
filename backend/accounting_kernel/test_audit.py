@@ -105,9 +105,10 @@ class LedgerAccessTests(KernelAuditBase):
         resp = self.client.post(
             "/api/accounting/moves/",
             {
-                "journal": self.journal.pk,
+                "journal": Journal.objects.get(code="OD").pk,
                 "date": "2026-01-20",
                 "label": "OD",
+                "motif": "Reclassement",
                 "lines": [
                     {"account": self.a411.pk, "debit": "10.00", "credit": "0"},
                     {"account": self.a701.pk, "debit": "0", "credit": "10.00"},

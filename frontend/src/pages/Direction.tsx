@@ -29,11 +29,13 @@ import { useThemeMode } from "../lib/useThemeMode";
 import { motionTokens, paletteFor } from "../theme/tokens";
 import type { AlerteEcheanceItem, AlertesAgregees, DashboardDirection, ReportingPetrolier, Tendances } from "../types";
 
-const BANDE_ORDER = ["j90", "j60", "j30", "expiree"] as const;
+const BANDE_ORDER = ["j90", "j60", "j30", "j15", "j0", "expiree"] as const;
 const BANDE_TONE: Record<string, "ok" | "warn" | "err" | "brand"> = {
   j90: "ok",
   j60: "warn",
   j30: "warn",
+  j15: "err",
+  j0: "err",
   expiree: "err",
 };
 
@@ -101,6 +103,7 @@ function DirectionInner() {
   const urgents: Urgent[] = (
     [
       { key: "expirees", count: a.compteurs.expiree ?? 0, tone: "err", to: "#echeances", Icon: CalendarDays },
+      { key: "j15", count: (a.compteurs.j0 ?? 0) + (a.compteurs.j15 ?? 0), tone: "err", to: "#echeances", Icon: CalendarDays },
       { key: "ncCritiques", count: p.qualite.nc_critiques, tone: "err", to: "/qualite", Icon: AlertTriangle },
       { key: "incidents", count: d.hse.incidents_ouverts, tone: "err", to: "/hse", Icon: ShieldAlert },
       { key: "atex", count: p.hse.equipements_atex_quarantaine, tone: "err", to: "/hse", Icon: Flame },

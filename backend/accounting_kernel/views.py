@@ -1,6 +1,9 @@
 """API du noyau comptable (M10/M9/M5) — écritures, journaux, périodes, extournes."""
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -130,7 +133,25 @@ class AccountMoveViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user, source=AccountMove.SOURCE_MANUELLE, source_ref="")
+
+    @action(detail=False, methods=["get"], url_path="taux-saisie-manuelle")
+    def taux_saisie_manuelle(self, request):
+        """Part des écritures comptabilisées saisies à la main (RG-M10.01 : 95 % issues des modules)."""
+        exercice = request.query_params.get("exercice") or str(timezone.localdate().year)
+        if not exercice.isdigit():
+            raise DRFValidationError({"exercice": "Année attendue."})
+        posted = AccountMove.objects.filter(
+            period__fiscal_year__year=int(exercice),
+            status__in=[AccountMove.Status.POSTED, AccountMove.Status.REVERSED],
+        )
+        total = posted.count()
+        manuelles = posted.filter(source=AccountMove.SOURCE_MANUELLE).count()
+        taux = (Decimal(manuelles) * 100 / total).quantize(Decimal("0.01")) if total else Decimal("0.00")
+        return Response({
+            "exercice": int(exercice), "total": total, "manuelles": manuelles,
+            "taux": str(taux), "seuil": "5.00", "alerte": taux > 5,
+        })
 
     @action(detail=True, methods=["post"])
     def post(self, request, pk=None):

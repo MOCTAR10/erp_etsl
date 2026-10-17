@@ -679,19 +679,10 @@ class Contract(models.Model):
 
     @property
     def expiry_status(self):
-        """Alerte contrat : EXPIRED / J-90 / J-60 / J-30 / OK (alignée M12)."""
-        days = self.days_to_expiry
-        if days is None:
-            return "OK"
-        if days < 0:
-            return "EXPIRED"
-        if days <= 30:
-            return "J30"
-        if days <= 60:
-            return "J60"
-        if days <= 90:
-            return "J90"
-        return "OK"
+        """Alerte contrat : EXPIRED / J0 / J15 / J30 / J60 / J90 / OK (alignée M12, EX-G-05)."""
+        from config.echeances import bande
+
+        return {"en_cours": "OK", "expiree": "EXPIRED"}.get(b := bande(self.days_to_expiry), b.upper())
 
 
 class ContractService(models.Model):

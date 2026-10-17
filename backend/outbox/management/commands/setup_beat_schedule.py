@@ -22,6 +22,16 @@ SCHEDULES = [
         "maintenance.tasks.declencher_plans_preventifs",
         {"minute": "0", "hour": "6", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
     ),
+    (
+        "ETSL — notifications d'échéance J-90/J-30/J-15/J-0 (lot 15, EX-G-05)",
+        "analytics.tasks.notifier_echeances",
+        {"minute": "30", "hour": "7", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
+    ),
+    (
+        "ETSL — écarts budgétaires > 10 % (lot 15, CDC M11 §4.4)",
+        "controle_gestion.tasks.detecter_ecarts_budgetaires",
+        {"minute": "0", "hour": "7", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
+    ),
 ]
 
 # Tâches périodiques supprimées : l'app `ingestion` (IMAP, RF-04) n'existe pas dans le code ; planifier une tâche

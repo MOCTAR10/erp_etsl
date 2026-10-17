@@ -145,8 +145,11 @@ class AccountMove(models.Model):
         "label",
         "source",
         "source_ref",
+        "motif",
         "number",
     )
+
+    SOURCE_MANUELLE = "MANUEL"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     journal = models.ForeignKey(
@@ -172,6 +175,10 @@ class AccountMove(models.Model):
         max_length=20, blank=True, verbose_name="Module source", help_text="Ex. M10, M9, M5."
     )
     source_ref = models.CharField(max_length=60, blank=True, verbose_name="Réf. source")
+    motif = models.CharField(
+        max_length=250, blank=True, verbose_name="Motif de la saisie manuelle",
+        help_text="Obligatoire pour une écriture saisie à la main (source MANUEL, RG-M10.01).",
+    )
     reversed_by = models.OneToOneField(
         "self",
         null=True,

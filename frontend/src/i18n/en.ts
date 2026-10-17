@@ -509,6 +509,8 @@ export const en = {
     interne: "Internal QA/QC",
   },
   hse: {
+    trir: "TRIR (year)",
+    joursPerdus: "lost days",
     visaAttendu: "Awaiting sign-off", niveaux: { superviseur: "supervisor", hse: "HSE", dg: "Managing Director" },
     act: { enquete: "Open investigation", rapport: "Investigation report (required for an accident or a major/critical event):" },
     form: { title: "Report an incident", date: "Event date and time", description: "Description of the facts" },
@@ -916,6 +918,11 @@ export const en = {
     pendingNote: "SYSCOHADA-revised accounting: entries validated by the kernel (immutable, reversals). Retention rules proc. 4.3–4.8, inter-company refactoring to account 618 (RF-ERP-90…94).",
   },
   controleGestion: {
+    analysesEcart: "Variances > 10 % to analyse",
+    echeanceAnalyse: "analysis due by",
+    enRetard: "overdue",
+    analyser: "Submit analysis",
+    analyseLabel: "Variance explanation",
     act: { approuver: "Approve", realiser: "Mark as done", appliquer: "Apply" },
     col: { axe: "Analytic axis", taux: "Margin rate", code: "Code", periode: "Period", dateCloture: "Closing date", delai: "Lead time", statut: "Status", budget: "Budget · revision", nouveauMontant: "New amount", auteur: "Author", commentaire: "Comment" },
     title: "Management control — Budgets, margins, variances & closings (M11)",
@@ -978,6 +985,7 @@ export const en = {
     dossiersGr: "Open GLOBAL RENTAL files",
     alertes: "Due-date alerts",
     echeanceExpi: "expired",
+    echeanceJ15: "≤ 15 d",
     echeanceJ30: "≤ 30 d",
     echeanceJ60: "≤ 60 d",
     echeanceJ90: "≤ 90 d",
@@ -1033,6 +1041,8 @@ export const en = {
     },
     bande: {
       expiree: "Expired",
+      j0: "Today",
+      j15: "≤ 15 d",
       j30: "≤ 30 d",
       j60: "≤ 60 d",
       j90: "≤ 90 d",
@@ -1064,6 +1074,7 @@ export const en = {
     urgentNone: "Nothing urgent: no critical item open.",
     urgentItems: {
       expirees: "overdue deadline(s)",
+      j15: "deadline(s) within 15 days",
       j30: "deadline(s) within 30 days",
       ncCritiques: "critical non-conformity(ies)",
       incidents: "open HSE incident(s)",

@@ -266,4 +266,4 @@ class CommercialAPITests(APITestCase):
             status="actif", months=12,
         )
         resp = self.client.get(f"/api/commercial/contracts/{c.id}/")
-        self.assertEqual(resp.data["expiry_status"], "J30")
+        self.assertEqual(resp.data["expiry_status"], "J15")

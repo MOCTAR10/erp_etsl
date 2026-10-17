@@ -14,8 +14,9 @@ from rest_framework.response import Response
 
 from django.db.models import Prefetch
 
-from .models import Budget, BudgetLigne, BudgetRevision, ClotureGestion
+from .models import AnalyseEcart, Budget, BudgetLigne, BudgetRevision, ClotureGestion
 from .serializers import (
+    AnalyseEcartSerializer,
     BudgetLigneSerializer,
     BudgetRevisionSerializer,
     BudgetSerializer,
@@ -28,6 +29,7 @@ from .services import (
     compute_clotures_stats,
     compute_marges,
     compute_variance,
+    detecter_ecarts,
 )
 
 
@@ -283,3 +285,43 @@ class MargesView(viewsets.ViewSet):
             raise DRFValidationError("Paramètre `analytic` doit être un entier (id de compte analytique).")
         result = compute_marges(fiscal_year, axis=axis, analytic=analytic)
         return Response(result, status=status.HTTP_200_OK)
+
+
+class AnalyseEcartViewSet(viewsets.ReadOnlyModelViewSet):
+    """Analyses d'écart > 10 % (lot 15, CDC M11 §4.4) : ouvertes par la détection, rendues par `analyser`."""
+
+    queryset = AnalyseEcart.objects.select_related("budget", "period", "analyse_par").all()
+    serializer_class = AnalyseEcartSerializer
+    permission_classes = [CanManageGestion]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        if statut := params.get("statut"):
+            qs = qs.filter(statut=statut)
+        if budget := params.get("budget"):
+            qs = qs.filter(budget_id=budget)
+        if params.get("en_retard") == "1":
+            qs = qs.filter(statut=AnalyseEcart.Statut.A_ANALYSER, echeance__lt=timezone.localdate())
+        return qs
+
+    @action(detail=False, methods=["post"])
+    def detecter(self, request):
+        return Response({"analyses": [a.code for a in detecter_ecarts()]})
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def analyser(self, request, pk=None):
+        analyse = AnalyseEcart.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if analyse.statut != AnalyseEcart.Statut.A_ANALYSER:
+            raise DRFValidationError("Analyse déjà rendue.")
+        texte = str(request.data.get("analyse") or "").strip()
+        if not texte:
+            raise DRFValidationError({"analyse": "Explication de l'écart obligatoire."})
+        analyse.analyse = texte
+        analyse.actions = str(request.data.get("actions") or "").strip()
+        analyse.statut = AnalyseEcart.Statut.ANALYSEE
+        analyse.analyse_par = request.user
+        analyse.analyse_le = timezone.now()
+        analyse.save()
+        return Response(self.get_serializer(analyse).data)

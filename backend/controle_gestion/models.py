@@ -11,10 +11,12 @@ distribue par période via `BudgetLigne`. App `controle_gestion` + reporting
 """
 
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Sum
+from django.utils import timezone
 
 
 class ControleGestionSequence(models.Model):
@@ -302,3 +304,60 @@ class ClotureGestion(models.Model):
         if self.statut != self.Statut.REALISEE or self.jours_ecoulement is None:
             return False
         return self.jours_ecoulement <= 4
+
+
+class AnalyseEcart(models.Model):
+    """Analyse d'écart budget / réalisé > 10 % — à rendre sous 5 jours (lot 15, CDC M11 §4.4).
+
+    Ouverte automatiquement par `controle_gestion.services.detecter_ecarts` (une par budget et période) ;
+    rendue par l'action `analyser` (explication + actions, auteur et date tracés).
+    """
+
+    SEUIL_PCT = 10
+    DELAI_JOURS = 5
+
+    class Statut(models.TextChoices):
+        A_ANALYSER = "a_analyser", "À analyser"
+        ANALYSEE = "analysee", "Analysée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="analyses_ecart", verbose_name="Budget")
+    period = models.ForeignKey(
+        "accounting_kernel.Period", on_delete=models.PROTECT, related_name="analyses_ecart", verbose_name="Période"
+    )
+    montant_budget = models.DecimalField(max_digits=18, decimal_places=2, verbose_name="Budget de la période")
+    realise = models.DecimalField(max_digits=18, decimal_places=2, verbose_name="Réalisé")
+    ecart_pct = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Écart (%)")
+    detecte_le = models.DateField(default=timezone.localdate, verbose_name="Détecté le")
+    echeance = models.DateField(verbose_name="Analyse attendue avant le")
+    analyse = models.TextField(blank=True, verbose_name="Analyse de l'écart")
+    actions = models.TextField(blank=True, verbose_name="Actions correctives")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.A_ANALYSER, verbose_name="Statut")
+    analyse_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="analyses_ecart", verbose_name="Analysée par",
+    )
+    analyse_le = models.DateTimeField(null=True, blank=True, verbose_name="Analysée le")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["statut", "echeance"]
+        verbose_name = "Analyse d'écart budgétaire"
+        verbose_name_plural = "Analyses d'écart budgétaire"
+        constraints = [models.UniqueConstraint(fields=["budget", "period"], name="uniq_analyse_ecart_budget_periode")]
+
+    def __str__(self):
+        return f"{self.code} — {self.budget.code} P{self.period.number} ({self.ecart_pct} %)"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ControleGestionSequence.next_for("AEC", "AEC")
+        if not self.echeance:
+            self.echeance = self.detecte_le + timedelta(days=self.DELAI_JOURS)
+        return super().save(*args, **kwargs)
+
+    @property
+    def en_retard(self):
+        return self.statut == self.Statut.A_ANALYSER and timezone.localdate() > self.echeance

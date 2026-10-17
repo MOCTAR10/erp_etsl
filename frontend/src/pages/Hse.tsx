@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Flame, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Activity, Flame, Gauge, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
@@ -7,6 +7,7 @@ import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTab
 import type { Column } from "../components/ui";
 import { formatDate } from "../lib/format";
 import type {
+  IndicateursHse,
   BordereauDechet,
   Epi,
   EquipementAtex,
@@ -205,6 +206,11 @@ export function HsePage() {
     queryFn: api.hseStats,
   });
 
+  const frequence = useQuery({
+    queryKey: ["hse-indicateurs"],
+    queryFn: () => api.get<IndicateursHse>("/api/hse/incidents/indicateurs/"),
+  });
+
   const permis = useQuery({
     queryKey: ["hse-permis"],
     queryFn: () => api.permis(`?page_size=50`),
@@ -322,6 +328,14 @@ export function HsePage() {
         <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${t("hse.risquesCritiques")} · ${s.risques_critiques}`} icon={ShieldCheck} tone="brand" delay={0.05} />
         <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${t("hse.actionsOuvertes")} · ${s.actions_ouvertes}`} icon={Flame} tone="warn" delay={0.1} />
         <Kpi label={t("hse.epiRenouveler")} value={aRenouveler || s.epi_a_renouveler} hint={`${t("hse.formationsPrevues")} · ${s.formations_prevues} · ${t("hse.bsdAttente")} · ${s.bsd_en_attente}`} icon={Activity} tone="warn" delay={0.15} />
+        <Kpi
+          label={t("hse.trir")}
+          value={frequence.data?.trir ?? "—"}
+          hint={`LTIR ${frequence.data?.ltir ?? "—"} · LTIFR ${frequence.data?.ltifr ?? "—"} · ${t("hse.joursPerdus")} ${frequence.data?.jours_perdus ?? 0}`}
+          icon={Gauge}
+          tone="brand"
+          delay={0.2}
+        />
       </div>
 
       <div style={{ overflowX: "auto" }}>

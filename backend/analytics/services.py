@@ -12,23 +12,11 @@ Montants : pattern RF-59 — masqués (None) hors rôles autorisés
 
 from django.utils import timezone
 
+from config.echeances import BANDES as BAND_ORDER
+from config.echeances import bande as _band
 
 
-def _band(days_left):
-    if days_left is None:
-        return "en_cours"
-    if days_left < 0:
-        return "expiree"
-    if days_left <= 30:
-        return "j30"
-    if days_left <= 60:
-        return "j60"
-    if days_left <= 90:
-        return "j90"
-    return "en_cours"
 
-
-BAND_ORDER = ("expiree", "j30", "j60", "j90")
 
 
 def _zero():
@@ -270,6 +258,13 @@ def _jours_sans_accident():
     return max((timezone.now() - last.date_evenement).days, 0)
 
 
+def _frequence_annee():
+    from hse.indicateurs import indicateurs_frequence
+
+    today = timezone.localdate()
+    return indicateurs_frequence(today.replace(month=1, day=1), today)
+
+
 def _compute_conformite_j4(fiscal_year_id):
     from accounting_kernel.models import Period
     from controle_gestion.models import ClotureGestion
@@ -325,6 +320,8 @@ def reporting_petrolier(user):
         },
         "hse": {
             "jours_sans_accident": _jours_sans_accident(),
+            # TRIR / LTIR / LTIFR de l'année en cours sur les heures pointées (lot 15, CDC M7 §9.7).
+            "frequence": _frequence_annee(),
             "incidents": Incident.objects.count(),
             "incidents_ouverts": Incident.objects.exclude(statut=Incident.Statut.CLOTURE).count(),
             "accidents": Incident.objects.filter(
@@ -359,7 +356,7 @@ def reporting_petrolier(user):
 
 
 def alertes_agregees(user=None):
-    """Alertes J-90/J-60/J-30/expirées transverses (C3).
+    """Alertes J-90/J-60/J-30/J-15/J-0/expirées transverses (C3, EX-G-05).
 
     Agrège : rétention GED (documents), conventions/cautions/assurances
     (juridique, RF-ERP-B0), contrats & qualifications RH, permis/ATEX/EPI HSE.

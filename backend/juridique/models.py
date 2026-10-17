@@ -19,6 +19,8 @@ from django.conf import settings
 from django.db import models, transaction
 from django.utils import timezone
 
+from config.echeances import bande
+
 
 class JuridiqueSequence(models.Model):
     """Numérotation séquentielle M12 (COU, CON, LIT, CAU, ASS, REU, GRD)."""
@@ -234,17 +236,8 @@ class Convention(models.Model):
 
     @property
     def expiry_status(self):
-        """Créneau d'échéance : expiree / j30 / j60 / j90 / en_cours (RF-ERP-B0)."""
-        d = self.days_left
-        if d < 0:
-            return "expiree"
-        if d <= 30:
-            return "j30"
-        if d <= 60:
-            return "j60"
-        if d <= 90:
-            return "j90"
-        return "en_cours"
+        """Créneau d'échéance : expiree / j0 / j15 / j30 / j60 / j90 / en_cours (RF-ERP-B0, EX-G-05)."""
+        return bande(self.days_left)
 
     @property
     def a_renouveler(self):
@@ -448,16 +441,7 @@ class Caution(models.Model):
 
     @property
     def expiry_status(self):
-        d = self.days_left
-        if d < 0:
-            return "expiree"
-        if d <= 30:
-            return "j30"
-        if d <= 60:
-            return "j60"
-        if d <= 90:
-            return "j90"
-        return "en_cours"
+        return bande(self.days_left)
 
     def lever(self):
         if self.statut != self.Statut.EN_COURS:
@@ -554,16 +538,7 @@ class Assurance(models.Model):
 
     @property
     def expiry_status(self):
-        d = self.days_left
-        if d < 0:
-            return "expiree"
-        if d <= 30:
-            return "j30"
-        if d <= 60:
-            return "j60"
-        if d <= 90:
-            return "j90"
-        return "en_cours"
+        return bande(self.days_left)
 
     def renouveler(self, date_echeance=None):
         if self.statut == self.Statut.RESILIEE:
