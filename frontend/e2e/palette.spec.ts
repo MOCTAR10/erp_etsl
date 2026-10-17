@@ -30,6 +30,6 @@ test.describe("Régression : palette de commandes (Ctrl K)", () => {
     await expect(page.getByRole("button", { name: "Rechercher un module…" })).toBeVisible();
     await page.keyboard.press("Control+k");
     await page.getByRole("dialog").getByRole("combobox").fill("comptabilite");
-    await expect(page.getByRole("option")).toHaveCount(0);
+    await expect(page.getByRole("dialog").getByRole("option")).toHaveCount(0);
   });
 });

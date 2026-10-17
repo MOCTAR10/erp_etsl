@@ -1,0 +1,78 @@
+﻿{
+    "date":  "2026-10-17T01:46:58",
+    "base":  "etls",
+    "taille_sauvegarde_mo":  0.65,
+    "duree_sauvegarde_s":  2.92,
+    "duree_restauration_s":  47.23,
+    "ecritures_desequilibrees":  0,
+    "tables":  [
+                   {
+                       "table":  "users_user",
+                       "source":  21,
+                       "restauree":  21,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "documents_document",
+                       "source":  0,
+                       "restauree":  0,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "documents_version",
+                       "source":  0,
+                       "restauree":  0,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "accounting_kernel_accountmove",
+                       "source":  1,
+                       "restauree":  1,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "accounting_kernel_accountmoveline",
+                       "source":  2,
+                       "restauree":  2,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "rh_paie_employe",
+                       "source":  3,
+                       "restauree":  3,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "rh_paie_bulletinpaie",
+                       "source":  4,
+                       "restauree":  4,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "stocks_mouvementstock",
+                       "source":  3,
+                       "restauree":  3,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "achats_purchaseorder",
+                       "source":  2,
+                       "restauree":  2,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "hse_permistravail",
+                       "source":  5,
+                       "restauree":  5,
+                       "identique":  true
+                   },
+                   {
+                       "table":  "workflow_task",
+                       "source":  0,
+                       "restauree":  0,
+                       "identique":  true
+                   }
+               ],
+    "resultat":  "OK",
+    "cibles":  "RPO \u003c= 24 h (sauvegarde quotidienne) ; RTO \u003c= 8 h (CL-OM-11)"
+}

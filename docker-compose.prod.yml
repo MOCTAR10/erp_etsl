@@ -115,5 +115,33 @@ services:
     entrypoint: ["dbt"]
     command: ["build"]
 
+  # Rafraîchissement BI planifié (CL-OM-12 : datamarts à jour toutes les heures, extensible au temps réel).
+  # Boucle `dbt build` sur le RÉPLICA (jamais le primaire) toutes les DBT_REFRESH_SECONDS (3600 par défaut).
+  # Usage : docker compose -f docker-compose.prod.yml --profile bi --env-file .env up -d dbt-scheduler
+  dbt-scheduler:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.8.9
+    profiles: ["bi"]
+    restart: unless-stopped
+    working_dir: /usr/app
+    volumes:
+      - ./dbt:/usr/app
+      - ./dbt/profiles.yml:/root/.dbt/profiles.yml:ro
+    environment:
+      DBT_HOST: ${POSTGRES_REPLICA_HOST:?set POSTGRES_REPLICA_HOST}
+      DBT_PORT: ${POSTGRES_PORT:-5432}
+      DBT_USER: ${POSTGRES_USER:-etls}
+      DBT_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      DBT_DBNAME: ${POSTGRES_DB:-etls}
+      DBT_SCHEMA: ${DBT_SCHEMA:-dbt}
+      DBT_REFRESH_SECONDS: ${DBT_REFRESH_SECONDS:-3600}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          echo "[$(date -u +%FT%TZ)] dbt build"
+          dbt build || echo "dbt build en echec (nouvelle tentative au prochain cycle)"
+          sleep "$${DBT_REFRESH_SECONDS}"
+        done
+
 volumes:
   redis_data:
