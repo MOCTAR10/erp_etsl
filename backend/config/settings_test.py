@@ -18,5 +18,8 @@ STORAGES = {
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
+# MFA non imposée par défaut : les tests qui l'exercent posent `MFA_ROLES` par `override_settings`.
+MFA_ROLES = []
+
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True

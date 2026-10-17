@@ -66,6 +66,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    # MFA TOTP (lot 15b, CDC §8.2) : le secret ne sort jamais par l'API ; `mfa_dernier_pas` interdit le rejeu d'un code.
+    mfa_secret = models.CharField(max_length=64, blank=True, editable=False, verbose_name="Secret TOTP")
+    mfa_active = models.BooleanField(default=False, verbose_name="MFA activée")
+    mfa_active_le = models.DateTimeField(null=True, blank=True, verbose_name="MFA activée le")
+    mfa_dernier_pas = models.BigIntegerField(null=True, blank=True, editable=False)
 
     objects = UserManager()
 
@@ -87,3 +92,48 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class JournalAcces(models.Model):
+    """Journal des accès inaltérable (EX-G-10) : connexions, tentatives, étapes MFA, exports — conservé 5 ans."""
+
+    class Evenement(models.TextChoices):
+        CONNEXION = "connexion", "Connexion réussie"
+        ECHEC_CONNEXION = "echec_connexion", "Tentative de connexion échouée"
+        CONNEXION_BLOQUEE = "connexion_bloquee", "Tentative bloquée (limite de débit)"
+        MFA_ENROLEMENT = "mfa_enrolement", "Enrôlement MFA"
+        MFA_SUCCES = "mfa_succes", "Code MFA accepté"
+        MFA_ECHEC = "mfa_echec", "Code MFA refusé"
+        MFA_REINITIALISATION = "mfa_reinitialisation", "MFA réinitialisée"
+        EXPORT = "export", "Export / téléchargement de données"
+
+    RETENTION_ANS = 5
+
+    id = models.BigAutoField(primary_key=True)
+    evenement = models.CharField(max_length=24, choices=Evenement.choices, db_index=True, verbose_name="Événement")
+    user = models.ForeignKey(
+        "users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="journal_acces",
+        verbose_name="Utilisateur",
+    )
+    email = models.CharField(max_length=254, blank=True, db_index=True, verbose_name="Identifiant saisi")
+    ip = models.GenericIPAddressField(null=True, blank=True, verbose_name="Adresse IP")
+    user_agent = models.CharField(max_length=255, blank=True, verbose_name="Navigateur")
+    chemin = models.CharField(max_length=255, blank=True, verbose_name="Ressource")
+    details = models.JSONField(default=dict, blank=True, verbose_name="Détails")
+    cree_le = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Horodatage")
+
+    class Meta:
+        ordering = ["-cree_le"]
+        verbose_name = "Entrée du journal des accès"
+        verbose_name_plural = "Journal des accès"
+
+    def __str__(self):
+        return f"{self.cree_le:%Y-%m-%d %H:%M:%S} {self.evenement} {self.email}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("Journal des accès inaltérable : aucune modification.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Journal des accès inaltérable : aucune suppression.")

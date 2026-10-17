@@ -1,7 +1,9 @@
 from rest_framework import serializers
 
 
-from .models import Circuit, CircuitStep, Notification, Task, TaskComment
+from config.serializers import ModelCleanMixin
+
+from .models import Circuit, CircuitStep, Delegation, Notification, Task, TaskComment
 
 
 class CircuitStepSerializer(serializers.ModelSerializer):
@@ -113,3 +115,22 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+class DelegationSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    delegant_email = serializers.EmailField(source="delegant.email", read_only=True)
+    delegataire_email = serializers.EmailField(source="delegataire.email", read_only=True)
+    active = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Delegation
+        fields = [
+            "id", "code", "delegant", "delegant_email", "delegataire", "delegataire_email", "date_debut",
+            "date_fin", "motif", "active", "annulee_le", "annulee_par", "created_by", "created_at",
+        ]
+        read_only_fields = ["id", "code", "delegant", "active", "annulee_le", "annulee_par", "created_by", "created_at"]
+
+    def validate(self, attrs):
+        if self.instance is None:
+            attrs["delegant"] = self.context["delegant"]
+        return super().validate(attrs)

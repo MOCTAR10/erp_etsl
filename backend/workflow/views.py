@@ -1,6 +1,7 @@
 from django.core.exceptions import PermissionDenied, ValidationError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from documents.audit import log_audit, request_ip
@@ -8,11 +9,15 @@ from documents.models import AuditLog, Document
 from documents.services import can_write_document, visible_documents
 from users.models import User
 
-from .models import Circuit, Notification, Task
+from django.db.models import Q
+from django.utils import timezone
+
+from .models import Circuit, Delegation, Notification, Task
 from .serializers import (
     CircuitSerializer,
     CommentSerializer,
     DelegateSerializer,
+    DelegationSerializer,
     NotificationSerializer,
     RejectSerializer,
     SubmitSerializer,
@@ -48,7 +53,9 @@ class TaskViewSet(viewsets.ReadOnlyModelViewSet):
         )
         # Visibilité : un utilisateur ne voit que ses tâches (ou tout si admin).
         if not (user.is_staff or user.role == User.Role.ADMIN):
-            queryset = queryset.filter(assigned_to=user)
+            # Ses tâches + celles des titulaires qui lui délèguent en ce moment (EX-G-02).
+            delegants = Delegation.actives().filter(delegataire=user).values_list("delegant_id", flat=True)
+            queryset = queryset.filter(Q(assigned_to=user) | Q(assigned_to_id__in=delegants))
         # Un utilisateur ne voit pas les tâches de documents invisibles (RF-33).
         queryset = queryset.filter(
             document_id__in=visible_documents(user).values_list("id", flat=True)
@@ -227,3 +234,42 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     def mark_all_read(self, request):
         updated = self.get_queryset().update(is_read=True)
         return Response({"updated": updated})
+
+
+class DelegationViewSet(viewsets.ModelViewSet):
+    """Délégations temporaires (EX-G-02) : chacun délègue ses propres validations ; l'admin voit tout."""
+
+    serializer_class = DelegationSerializer
+    http_method_names = ["get", "post"]
+
+    def _admin(self):
+        user = self.request.user
+        return user.is_staff or user.role == User.Role.ADMIN
+
+    def get_queryset(self):
+        qs = Delegation.objects.select_related("delegant", "delegataire")
+        if not self._admin():
+            user = self.request.user
+            qs = qs.filter(Q(delegant=user) | Q(delegataire=user))
+        if self.request.query_params.get("actives") == "1":
+            jour = timezone.localdate()
+            qs = qs.filter(annulee_le__isnull=True, date_debut__lte=jour, date_fin__gte=jour)
+        return qs
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["delegant"] = self.request.user
+        return context
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def annuler(self, request, pk=None):
+        delegation = self.get_object()
+        if delegation.delegant_id != request.user.id and not self._admin():
+            raise PermissionDenied("Seul le titulaire ou l'administrateur annule une délégation.")
+        if delegation.annulee_le:
+            raise DRFValidationError("Délégation déjà annulée.")
+        delegation.annuler(request.user)
+        return Response(self.get_serializer(delegation).data)

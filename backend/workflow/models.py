@@ -1,7 +1,9 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from users.models import User
 
@@ -147,3 +149,84 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"[{self.kind}] {self.subject} → {self.user_id}"
+
+
+class Delegation(models.Model):
+    """Délégation temporaire des validations d'un titulaire absent (lot 15b, CDC EX-G-02).
+
+    Pendant la période : les nouvelles tâches de circuit du délégant sont assignées au délégataire (trace dans les
+    commentaires) et le délégataire peut agir sur les tâches déjà assignées au délégant. Les droits de lecture des
+    documents (ACL GED, paie RF-33) ne sont pas étendus. Une délégation se termine à sa date de fin ou par annulation.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, editable=False, verbose_name="Code")
+    delegant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="delegations_donnees", verbose_name="Titulaire"
+    )
+    delegataire = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="delegations_recues", verbose_name="Délégataire"
+    )
+    date_debut = models.DateField(verbose_name="Du")
+    date_fin = models.DateField(verbose_name="Au")
+    motif = models.CharField(max_length=200, verbose_name="Motif")
+    annulee_le = models.DateTimeField(null=True, blank=True, verbose_name="Annulée le")
+    annulee_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Annulée par",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Créée par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_debut"]
+        verbose_name = "Délégation temporaire"
+        verbose_name_plural = "Délégations temporaires"
+
+    def __str__(self):
+        return f"{self.code} — {self.delegant} → {self.delegataire} ({self.date_debut} → {self.date_fin})"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            dernier = Delegation.objects.order_by("-created_at").values_list("code", flat=True).first()
+            numero = int(dernier[3:]) + 1 if dernier and dernier[3:].isdigit() else 1
+            self.code = f"DEL{numero:05d}"
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.delegant_id and self.delegant_id == self.delegataire_id:
+            raise ValidationError({"delegataire": "On ne se délègue pas à soi-même."})
+        if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
+            raise ValidationError({"date_fin": "La fin doit suivre le début."})
+        if self.delegataire_id and not self.delegataire.is_active:
+            raise ValidationError({"delegataire": "Le délégataire doit être un compte actif."})
+        if self.delegant_id and self.date_debut and self.date_fin:
+            chevauchement = Delegation.objects.filter(
+                delegant_id=self.delegant_id, annulee_le__isnull=True,
+                date_debut__lte=self.date_fin, date_fin__gte=self.date_debut,
+            ).exclude(pk=self.pk)
+            if chevauchement.exists():
+                raise ValidationError({"date_debut": "Une délégation de ce titulaire couvre déjà cette période."})
+
+    @property
+    def active(self):
+        return self.annulee_le is None and self.date_debut <= timezone.localdate() <= self.date_fin
+
+    def annuler(self, user):
+        self.annulee_le = timezone.now()
+        self.annulee_par = user
+        self.save(update_fields=["annulee_le", "annulee_par"])
+
+    @classmethod
+    def actives(cls, jour=None):
+        jour = jour or timezone.localdate()
+        return cls.objects.filter(annulee_le__isnull=True, date_debut__lte=jour, date_fin__gte=jour)
+
+    @classmethod
+    def active_pour(cls, delegant):
+        if delegant is None:
+            return None
+        return cls.actives().filter(delegant=delegant, delegataire__is_active=True).select_related("delegataire").first()
