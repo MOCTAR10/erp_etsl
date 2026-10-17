@@ -3,7 +3,7 @@ import { ClipboardCheck, Coins, Hammer, Inbox, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import { formatDate } from "../lib/format";
 import type {
   Actif,
@@ -39,6 +39,19 @@ function inspectionTone(i: Inspection): "ok" | "warn" | "err" | "brand" {
   return i.resultat === "non_conforme" ? "err" : i.resultat === "sous_reserve" ? "warn" : "ok";
 }
 
+function otActions(ot: OrdreTravail, t: (k: string) => string) {
+  const base = `/api/maintenance/ordres/${ot.id}`;
+  const out: { label: string; path: string; tone?: "primary" | "ghost" | "danger"; confirm?: string }[] = [];
+  if (ot.statut === "demande") out.push({ label: t("maintenance.act.planifier"), path: `${base}/planifier/`, tone: "ghost" });
+  if (ot.statut === "demande" || ot.statut === "planifie") out.push({ label: t("actions.demarrer"), path: `${base}/demarrer/` });
+  if (ot.statut === "en_cours") out.push({ label: t("maintenance.act.terminer"), path: `${base}/terminer/` });
+  if (ot.statut === "termine")
+    out.push({ label: t("actions.cloturer"), path: `${base}/cloturer/`, confirm: t("actions.confirmCloturer") });
+  if (!["cloture", "annule"].includes(ot.statut))
+    out.push({ label: t("maintenance.act.annuler"), path: `${base}/annuler/`, tone: "danger", confirm: t("maintenance.act.confirmAnnuler") });
+  return out;
+}
+
 function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
   const { t } = useTranslation();
   return (
@@ -59,6 +72,7 @@ function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
           {ot.has_amount_access && ot.cout_total !== null ? ` · ${ot.cout_total} F` : ""}
         </span>
       </div>
+      <ActionBar actions={otActions(ot, t)} />
     </BoardCard>
   );
 }
@@ -121,6 +135,37 @@ export function MaintenancePage() {
   return (
     <>
       <PageHeader title={t("maintenance.title")} />
+      <QuickForm
+        title={t("maintenance.form.title")}
+        endpoint="/api/maintenance/ordres/"
+        fields={[
+          {
+            name: "actif",
+            label: t("maintenance.form.actif"),
+            type: "select",
+            required: true,
+            options: actifsAll.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
+          },
+          {
+            name: "type_ot",
+            label: t("maintenance.col.type"),
+            type: "select",
+            required: true,
+            defaultValue: "correctif",
+            options: ["correctif", "preventif", "urgence", "inspection"].map((v) => ({ value: v, label: t(`maintenance.ot_types.${v}`) })),
+          },
+          {
+            name: "priorite",
+            label: t("maintenance.form.priorite"),
+            type: "select",
+            required: true,
+            defaultValue: "moyenne",
+            options: ["basse", "moyenne", "haute", "critique"].map((v) => ({ value: v, label: t(`maintenance.ot_priorites.${v}`) })),
+          },
+          { name: "date_planifiee", label: t("maintenance.form.datePlanifiee"), type: "date" },
+          { name: "description", label: t("maintenance.form.description"), type: "textarea", required: true },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("maintenance.otOuverts")} value={s.ot_ouverts} hint={`${t("maintenance.enCours")} · ${s.ot_en_cours} · ${t("maintenance.critiques")} · ${s.ot_critiques}`} icon={Wrench} tone="brand" delay={0} />

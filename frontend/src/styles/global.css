@@ -2085,3 +2085,20 @@ kbd {
   outline: 2px solid var(--brand);
   outline-offset: -2px;
 }
+
+/* Formulaires de saisie rapide (QuickForm) */
+.quick-form { margin-bottom: 1.25rem; }
+.quick-form-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
+.quick-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 0 1rem; }
+.quick-form-grid .field.wide { grid-column: 1 / -1; }
+.quick-form-grid select,
+.quick-form-grid textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.7rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.quick-form-actions { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+.quick-form-ok { color: var(--ok-text); font-weight: 600; margin: 0; }

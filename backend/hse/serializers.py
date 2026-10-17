@@ -60,7 +60,7 @@ class PermisTravailSerializer(serializers.ModelSerializer):
             "gaz_obligatoire", "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date",
             "test_gaz_par", "test_gaz_valide",
         ]
-        read_only_fields = [
+        read_only_fields = ["demandeur", 
             "code", "date_validation", "date_cloture", "statut", "gaz_obligatoire",
             "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date", "test_gaz_par", "test_gaz_valide",
         ]

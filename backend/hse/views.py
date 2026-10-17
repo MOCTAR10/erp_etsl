@@ -47,6 +47,11 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
     serializer_class = PermisTravailSerializer
     permission_classes = [CanValidateHse]
 
+    def perform_create(self, serializer):
+        # Le demandeur est toujours l'auteur de la demande : sinon la séparation des tâches (le demandeur ne valide
+        # pas son propre permis) se contourne en créant le permis « au nom » d'un collègue.
+        serializer.save(demandeur=self.request.user)
+
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params

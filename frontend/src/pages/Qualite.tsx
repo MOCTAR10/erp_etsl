@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import type {
   ControleQualite,
@@ -56,7 +56,14 @@ function wpsColumns(t: T): Column<WpsWpqr>[] {
     {
       key: "statut",
       header: t("qualite.col.statut"),
-      render: (w) => <Badge tone={w.statut === "valide" ? "ok" : "brand"}>{t(`qualite.wps_status.${w.statut}`)}</Badge>,
+      render: (w) => (
+        <>
+          <Badge tone={w.statut === "valide" ? "ok" : "brand"}>{t(`qualite.wps_status.${w.statut}`)}</Badge>
+          {w.statut === "brouillon" && (
+            <ActionBar actions={[{ label: t("actions.valider"), path: `/api/qualite/wps/${w.id}/valider/` }]} />
+          )}
+        </>
+      ),
     },
   ];
 }

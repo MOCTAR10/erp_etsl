@@ -132,6 +132,7 @@ export const en = {
     actions: "Actions",
     placeholder: "Go to a page or run an action…",
   },
+  quickForm: { created: "Saved.", save: "Save", close: "Close form" },
   common: {
     skipToContent: "Skip to content",
     mainNav: "Main navigation",
@@ -325,6 +326,7 @@ export const en = {
     prelevement: "Readings",
   },
   stocks: {
+    form: { title: "New stock movement", source: "Source warehouse", destination: "Destination warehouse", reference: "Document reference (delivery note, WO…)" },
     col: { article: "Article", depot: "Warehouse", method: "Valuation", qty: "Quantity", unitCost: "Unit cost", value: "Value", code: "Code", type: "Type", flow: "Flow", date: "Date", certNo: "Certificate no.", lot: "Lot", organisme: "Body", status: "Status" },
     title: "Stocks & Materials traceability (M5)",
     depots: "Warehouses & stores",
@@ -626,6 +628,8 @@ export const en = {
     },
   },
   maintenance: {
+    act: { planifier: "Schedule", terminer: "Complete", annuler: "Cancel", confirmAnnuler: "Cancel this work order?" },
+    form: { title: "New work order", actif: "Equipment", priorite: "Priority", datePlanifiee: "Planned date", description: "Work description" },
     col: { code: "Code", designation: "Designation", category: "Category", site: "Site", status: "Status", type: "Type", date: "Date", ot: "Generated WO" },
     title: "Maintenance & CMMS — Machinery & equipment fleet (M8)",
     otOuverts: "Open work orders",
@@ -828,6 +832,8 @@ export const en = {
     pendingNote: "Payroll restricted to the HR circle (RF-33): salaries and pay slips hidden outside HR/Finance/Management (RF-59).",
   },
   comptabilite: {
+    act: { soumettre: "Submit", approuver: "Approve", annuler: "Cancel", confirmAnnuler: "Cancel this document?", confirmComptabiliser: "Post this payment? The generated entry can no longer be edited (reversal only)." },
+    form: { title: "New payment", engagement: "Approved commitment", reference: "Reference (cheque, transfer no.…)" },
     col: { code: "Code", date: "Date", bank: "Bank account", period: "Period", debit: "Debit", credit: "Credit", status: "Status", direction: "Direction", mode: "Mode", party: "Counterparty", amount: "Amount", entry: "Entry" },
     title: "Accounting — Treasury, commitments, VAT & internal controls (M10)",
     banques: "Bank accounts",

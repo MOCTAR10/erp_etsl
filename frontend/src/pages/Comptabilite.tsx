@@ -3,7 +3,7 @@ import { BadgePercent, ClipboardList, CreditCard, Inbox, Landmark } from "lucide
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
   CompteBancaire,
@@ -55,6 +55,19 @@ function EngagementCard({ e, index }: { e: Engagement; index: number }) {
         {formatNumber(e.montant)} F · {t("comptabilite.totalDepenses")} {formatNumber(e.total_paye)} F
         {e.fournisseur_name ? ` · ${e.fournisseur_name}` : ""}
       </div>
+      <ActionBar
+        actions={[
+          ...(e.statut === "brouillon"
+            ? [{ label: t("comptabilite.act.soumettre"), path: `/api/comptabilite/engagements/${e.id}/soumettre/`, tone: "ghost" as const }]
+            : []),
+          ...(e.statut === "soumis"
+            ? [{ label: t("comptabilite.act.approuver"), path: `/api/comptabilite/engagements/${e.id}/approuver/` }]
+            : []),
+          ...(e.statut === "brouillon" || e.statut === "soumis"
+            ? [{ label: t("comptabilite.act.annuler"), path: `/api/comptabilite/engagements/${e.id}/annuler/`, tone: "danger" as const, confirm: t("comptabilite.act.confirmAnnuler") }]
+            : []),
+        ]}
+      />
     </BoardCard>
   );
 }
@@ -186,6 +199,43 @@ export function ComptabilitePage() {
   return (
     <>
       <PageHeader title={t("comptabilite.title")} />
+      <QuickForm
+        title={t("comptabilite.form.title")}
+        endpoint="/api/comptabilite/paiements/"
+        fields={[
+          {
+            name: "sens",
+            label: t("comptabilite.col.direction"),
+            type: "select",
+            required: true,
+            defaultValue: "sortie",
+            options: ["sortie", "entree"].map((v) => ({ value: v, label: t(`comptabilite.sens_${v}`) })),
+          },
+          {
+            name: "mode",
+            label: t("comptabilite.col.mode"),
+            type: "select",
+            required: true,
+            defaultValue: "virement",
+            options: ["virement", "cheque", "especes", "cfonb", "autre"].map((v) => ({ value: v, label: t(`comptabilite.mode_${v}`) })),
+          },
+          { name: "montant", label: t("comptabilite.col.amount"), type: "number", required: true, min: 0, step: "0.01" },
+          { name: "date", label: t("comptabilite.col.date"), type: "date", required: true, defaultValue: new Date().toLocaleDateString("sv-SE") },
+          {
+            name: "compte_bancaire",
+            label: t("comptabilite.col.bank"),
+            type: "select",
+            options: banquesAll.map((b) => ({ value: b.id, label: `${b.code} · ${b.label}` })),
+          },
+          {
+            name: "engagement",
+            label: t("comptabilite.form.engagement"),
+            type: "select",
+            options: groups.approuve.map((e) => ({ value: e.id, label: `${e.code} · ${e.objet}` })),
+          },
+          { name: "reference", label: t("comptabilite.form.reference") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("comptabilite.banques")} value={banquesAll.length} hint={`512 · ${t("comptabilite.compte")}`} icon={Landmark} tone="brand" delay={0} />
@@ -300,6 +350,14 @@ export function ComptabilitePage() {
                       <Badge tone={p.statut === "valide" ? "ok" : p.statut === "annule" ? "err" : "warn"}>
                         {t(`comptabilite.paiement_statut.${p.statut}`)}
                       </Badge>
+                      {p.statut === "brouillon" && (
+                        <ActionBar
+                          actions={[
+                            { label: t("actions.comptabiliser"), path: `/api/comptabilite/paiements/${p.id}/comptabiliser/`, confirm: t("comptabilite.act.confirmComptabiliser") },
+                            { label: t("comptabilite.act.annuler"), path: `/api/comptabilite/paiements/${p.id}/annuler/`, tone: "danger" },
+                          ]}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -142,9 +142,15 @@ class WpsTests(M6BaseTest):
             },
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
-        # le statut est fourni tel quel en création (create ne déclenche pas perform_update)
+        # Audit lot 7 : le statut client est ignoré ; la validation passe par l'action `valider` (QA/QC).
         wps = WpsWpqr.objects.get(pk=resp.data["id"])
+        self.assertEqual(wps.statut, WpsWpqr.Statut.BROUILLON)
+        resp = self.client.post(f"/api/qualite/wps/{wps.pk}/valider/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        wps.refresh_from_db()
         self.assertEqual(wps.statut, WpsWpqr.Statut.VALIDE)
+        self.assertIsNotNone(wps.date_validation)
+        self.assertIsNotNone(wps.validated_by)
 
 
 class ControleQualiteTests(M6BaseTest):

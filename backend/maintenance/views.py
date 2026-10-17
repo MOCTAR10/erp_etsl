@@ -1,15 +1,34 @@
 """Vues API M8 — Maintenance & GMAO (parc machines & équipements)."""
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Actif, Inspection, OrdreTravail
 from .serializers import ActifSerializer, InspectionSerializer, OrdreTravailSerializer
 from .services import CanManageMaintenance
+
+
+def _montant_positif(raw, field):
+    """Décimal >= 0 saisi dans une transition (heures, coûts) : 400 explicite au lieu d'une erreur 500."""
+    try:
+        value = Decimal(str(raw).replace(",", "."))
+    except (InvalidOperation, ValueError):
+        raise ValidationError({field: "Nombre attendu."})
+    if not value.is_finite() or value < 0:
+        raise ValidationError({field: "Valeur positive attendue."})
+    return value
+
+
+def _choix(raw, choices, field):
+    if raw not in choices.values:
+        raise ValidationError({field: f"Valeur inconnue : {raw!r}."})
+    return raw
 
 
 class ActifViewSet(viewsets.ModelViewSet):
@@ -36,6 +55,12 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
     serializer_class = OrdreTravailSerializer
     permission_classes = [CanManageMaintenance]
 
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, demandeur=self.request.user)
+
+    def _locked(self):
+        return OrdreTravail.objects.select_for_update().select_related("actif").get(pk=self.get_object().pk)
+
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
@@ -52,8 +77,9 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         return qs
 
     @action(detail=True, methods=["post"], url_path="planifier")
+    @transaction.atomic
     def planifier(self, request, pk=None):
-        ot = self.get_object()
+        ot = self._locked()
         if ot.statut != OrdreTravail.Statut.DEMANDE:
             return Response(
                 {"detail": "Seul un OT demandé peut être planifié."},
@@ -65,13 +91,14 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         if request.data.get("technicien"):
             ot.technicien_id = request.data.get("technicien")
         if request.data.get("priorite"):
-            ot.priorite = request.data.get("priorite")
+            ot.priorite = _choix(request.data.get("priorite"), OrdreTravail.Priorite, "priorite")
         ot.save()
         return Response(self.get_serializer(ot).data)
 
     @action(detail=True, methods=["post"], url_path="demarrer")
+    @transaction.atomic
     def demarrer(self, request, pk=None):
-        ot = self.get_object()
+        ot = self._locked()
         if ot.statut not in (OrdreTravail.Statut.PLANIFIE, OrdreTravail.Statut.DEMANDE):
             return Response(
                 {"detail": "L'OT doit être planifié ou demandé pour démarrer."},
@@ -87,31 +114,34 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(ot).data)
 
     @action(detail=True, methods=["post"], url_path="terminer")
+    @transaction.atomic
     def terminer(self, request, pk=None):
-        ot = self.get_object()
+        ot = self._locked()
         if ot.statut != OrdreTravail.Statut.EN_COURS:
             return Response(
                 {"detail": "Seul un OT en cours peut être terminé."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Saisies validées AVANT tout changement d'état.
+        heures_mo = request.data.get("heures_mo")
+        if heures_mo not in (None, ""):
+            ot.heures_mo = _montant_positif(heures_mo, "heures_mo")
+        cout_pieces = request.data.get("cout_pieces")
+        if cout_pieces not in (None, ""):
+            ot.cout_pieces = _montant_positif(cout_pieces, "cout_pieces")
+        if request.data.get("decision"):
+            ot.decision = _choix(request.data.get("decision"), OrdreTravail.Decision, "decision")
         ot.statut = OrdreTravail.Statut.TERMINE
         ot.date_fin = timezone.now()
         if request.data.get("rapport"):
             ot.rapport = request.data.get("rapport")
-        heures_mo = request.data.get("heures_mo")
-        if heures_mo not in (None, ""):
-            ot.heures_mo = Decimal(str(heures_mo))
-        cout_pieces = request.data.get("cout_pieces")
-        if cout_pieces not in (None, ""):
-            ot.cout_pieces = Decimal(str(cout_pieces))
-        if request.data.get("decision"):
-            ot.decision = request.data.get("decision")
         ot.save()
         return Response(self.get_serializer(ot).data)
 
     @action(detail=True, methods=["post"], url_path="cloturer")
+    @transaction.atomic
     def cloturer(self, request, pk=None):
-        ot = self.get_object()
+        ot = self._locked()
         if ot.statut not in (OrdreTravail.Statut.TERMINE, OrdreTravail.Statut.EN_COURS):
             return Response(
                 {"detail": "L'OT n'est pas clôturable."},
@@ -131,15 +161,25 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(ot).data)
 
     @action(detail=True, methods=["post"], url_path="annuler")
+    @transaction.atomic
     def annuler(self, request, pk=None):
-        ot = self.get_object()
+        ot = self._locked()
         if ot.statut in (OrdreTravail.Statut.CLOTURE, OrdreTravail.Statut.ANNULE):
             return Response(
                 {"detail": "L'OT est déjà clos ou annulé."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        etait_en_cours = ot.statut == OrdreTravail.Statut.EN_COURS
         ot.statut = OrdreTravail.Statut.ANNULE
         ot.save()
+        # L'OT avait mis l'équipement en maintenance : l'annulation le libère, sauf autre OT en cours dessus.
+        if (
+            etait_en_cours
+            and ot.actif.statut == Actif.Statut.EN_MAINTENANCE
+            and not ot.actif.ordres_travail.filter(statut=OrdreTravail.Statut.EN_COURS).exclude(pk=ot.pk).exists()
+        ):
+            ot.actif.statut = Actif.Statut.OPERATIONNEL
+            ot.actif.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(ot).data)
 
     @action(detail=False, methods=["get"], url_path="stats")

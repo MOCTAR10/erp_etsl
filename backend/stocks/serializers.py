@@ -123,7 +123,7 @@ class MouvementStockSerializer(serializers.ModelSerializer):
             "montant_total", "has_amount_access", "created_by", "notes",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "executed", "montant_total"]
+        read_only_fields = ["created_by", "code", "executed", "montant_total"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context.get("request").user)

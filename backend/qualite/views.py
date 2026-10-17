@@ -87,15 +87,20 @@ class WpsWpqrViewSet(viewsets.ModelViewSet):
             qs = qs.filter(statut=WpsWpqr.Statut.VALIDE)
         return qs
 
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        if (
-            instance.statut == WpsWpqr.Statut.VALIDE
-            and instance.date_validation is None
-        ):
-            instance.date_validation = timezone.localdate()
-            instance.validated_by = self.request.user
-            instance.save(update_fields=["date_validation", "validated_by", "updated_at"])
+    @action(detail=True, methods=["post"], permission_classes=[CanValidatePv])
+    def valider(self, request, pk=None):
+        """Validation d'un WPS/WPQR : QA/QC + hiérarchie ; date et validateur posés par le serveur."""
+        wps = self.get_object()
+        if wps.statut != WpsWpqr.Statut.BROUILLON:
+            return Response(
+                {"detail": f"WPS {wps.get_statut_display().lower()} : validation impossible."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        wps.statut = WpsWpqr.Statut.VALIDE
+        wps.date_validation = timezone.localdate()
+        wps.validated_by = request.user
+        wps.save(update_fields=["statut", "date_validation", "validated_by", "updated_at"])
+        return Response(self.get_serializer(wps).data)
 
 
 class ControleQualiteViewSet(viewsets.ModelViewSet):

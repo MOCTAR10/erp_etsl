@@ -76,7 +76,7 @@ class WpsWpqrSerializer(serializers.ModelSerializer):
             "validated_by", "validated_by_name", "date_validation",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        read_only_fields = ["statut", "validated_by", "date_validation", "code"]
 
 
 class ControleQualiteSerializer(serializers.ModelSerializer):
@@ -213,7 +213,7 @@ class PvControleSerializer(serializers.ModelSerializer):
             "reserve_motif", "levee_reserve", "retention_years", "date_archivage",
             "validated_by", "validated_by_name", "notes", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "statut"]
+        read_only_fields = ["validated_by", "levee_reserve", "code", "statut"]
 
 
 class PointInspectionSerializer(serializers.ModelSerializer):

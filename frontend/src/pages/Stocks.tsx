@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import type {
   CertificatMatiere,
   Depot,
@@ -87,6 +87,12 @@ export function StocksPage() {
     },
   });
 
+  const articles = useQuery({
+    queryKey: ["articles-stock"],
+    queryFn: () => api.get<Paginated<{ id: string; code: string; label: string }>>("/api/referentiels/articles/?page_size=500"),
+    select: (page) => page.results,
+  });
+
   const depots = useQuery({
     queryKey: ["depots"],
     queryFn: () => api.depots(`?active=1&page_size=100`),
@@ -149,6 +155,50 @@ export function StocksPage() {
   return (
     <>
       <PageHeader title={t("stocks.title")} />
+      <QuickForm
+        title={t("stocks.form.title")}
+        endpoint="/api/stocks/mouvements/"
+        fields={[
+          {
+            name: "type_mouvement",
+            label: t("stocks.col.type"),
+            type: "select",
+            required: true,
+            defaultValue: "reception",
+            options: ["reception", "transfert", "consommation", "retour"].map((v) => ({ value: v, label: t(`stocks.type_labels.${v}`) })),
+          },
+          {
+            name: "article",
+            label: t("stocks.col.article"),
+            type: "select",
+            required: true,
+            options: (articles.data ?? []).map((a) => ({ value: a.id, label: `${a.code} · ${a.label}` })),
+          },
+          { name: "quantite", label: t("stocks.col.qty"), type: "number", required: true, min: 0, step: "0.001" },
+          { name: "prix_unitaire", label: t("stocks.col.unitCost"), type: "number", min: 0, step: "0.01" },
+          {
+            name: "source",
+            label: t("stocks.form.source"),
+            type: "select",
+            options: (depots.data ?? []).map((d) => ({ value: d.id, label: `${d.code} · ${d.label}` })),
+          },
+          {
+            name: "destination",
+            label: t("stocks.form.destination"),
+            type: "select",
+            options: (depots.data ?? []).map((d) => ({ value: d.id, label: `${d.code} · ${d.label}` })),
+          },
+          {
+            name: "lot",
+            label: t("stocks.col.lot"),
+            type: "select",
+            options: Object.values(groups)
+              .flat()
+              .map((l) => ({ value: l.id, label: `${l.code} · ${l.numero_lot}` })),
+          },
+          { name: "document_reference", label: t("stocks.form.reference") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi

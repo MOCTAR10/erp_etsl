@@ -132,6 +132,7 @@ export const fr = {
     actions: "Actions",
     placeholder: "Aller à une page ou lancer une action…",
   },
+  quickForm: { created: "Enregistré.", save: "Enregistrer", close: "Fermer le formulaire" },
   common: {
     skipToContent: "Aller au contenu",
     mainNav: "Navigation principale",
@@ -325,6 +326,7 @@ export const fr = {
     prelevement: "Relevés",
   },
   stocks: {
+    form: { title: "Nouveau mouvement de stock", source: "Dépôt source", destination: "Dépôt destination", reference: "Référence document (BL, OF…)" },
     col: { article: "Article", depot: "Dépôt", method: "Valorisation", qty: "Quantité", unitCost: "Coût unitaire", value: "Valeur", code: "Code", type: "Type", flow: "Flux", date: "Date", certNo: "N° certificat", lot: "Lot", organisme: "Organisme", status: "Statut" },
     title: "Stocks & Traçabilité matière (M5)",
     depots: "Dépôts & magasins",
@@ -626,6 +628,8 @@ export const fr = {
     },
   },
   maintenance: {
+    act: { planifier: "Planifier", terminer: "Terminer", annuler: "Annuler", confirmAnnuler: "Annuler cet ordre de travail ?" },
+    form: { title: "Nouvel ordre de travail", actif: "Équipement", priorite: "Priorité", datePlanifiee: "Date planifiée", description: "Description de l'intervention" },
     col: { code: "Code", designation: "Désignation", category: "Catégorie", site: "Site", status: "Statut", type: "Type", date: "Date", ot: "OT généré" },
     title: "Maintenance & GMAO — Parc machines & équipements (M8)",
     otOuverts: "OT ouverts",
@@ -828,6 +832,8 @@ export const fr = {
     pendingNote: "Paie restreinte au cercle RH (RF-33) : salaires et bulletins masqués hors RH/Finance/Direction (RF-59).",
   },
   comptabilite: {
+    act: { soumettre: "Soumettre", approuver: "Approuver", annuler: "Annuler", confirmAnnuler: "Annuler cette pièce ?", confirmComptabiliser: "Comptabiliser ce paiement ? L'écriture générée ne se modifie plus (extourne uniquement)." },
+    form: { title: "Nouveau paiement", engagement: "Engagement approuvé", reference: "Référence (n° chèque, virement…)" },
     col: { code: "Code", date: "Date", bank: "Compte bancaire", period: "Période", debit: "Débit", credit: "Crédit", status: "Statut", direction: "Sens", mode: "Mode", party: "Tiers", amount: "Montant", entry: "Écriture" },
     title: "Comptabilité — Trésorerie, engagements, TVA & contrôles (M10)",
     banques: "Comptes bancaires",

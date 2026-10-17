@@ -79,7 +79,7 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
             "has_amount_access", "decision", "decision_label", "rapport", "statut",
             "statut_label", "created_by", "created_at", "updated_at",
         ]
-        read_only_fields = [
+        read_only_fields = ["created_by", "demandeur", 
             "code", "cout_main_oeuvre", "cout_total", "date_debut", "date_fin",
             "decision", "rapport", "statut"]
 
