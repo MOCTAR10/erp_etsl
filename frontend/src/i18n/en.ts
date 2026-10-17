@@ -265,7 +265,28 @@ export const en = {
     tasks: "tasks",
     task: "task",
   },
+  commercial: {
+    offres: "Quotes (versions)",
+    affaires: "Deals",
+    contrats: "Contracts (CLM)",
+    marges: "Margins by axis (planned / actual)",
+    axe: { client: "Customer", profil: "Contract profile", affaire: "Deal", responsable: "Deal owner" },
+    col: {
+      code: "Code", titre: "Title", client: "Customer", montant: "Amount", statut: "Status", responsable: "Owner",
+      profil: "Profile", montantActuel: "Amount (incl. amendments)", echeance: "Expiry", avenants: "Amendments",
+      affaires: "Deals", caPrevu: "Planned revenue", margePrevue: "Planned margin", produits: "Actual revenue",
+      charges: "Actual costs", margeReelle: "Actual margin",
+    },
+    act: {
+      soumettre: "Submit", annuler: "Cancel", confirmAnnuler: "Cancel this quote?", gagner: "Won",
+      reviser: "Revise (new version)", perdre: "Lost", motifPerte: "Reason for loss", confirmer: "Confirm",
+      activer: "Activate (signed contract)", documentSigne: "Signed DMS document id", suspendre: "Suspend",
+      reprendre: "Resume",
+    },
+  },
   pipeline: {
+    pipePondere: "Weighted pipeline",
+    pipePondereHint: "signed 90% · ongoing 60% · prospect 25% → M11 budget",
     echeance: "due",
     title: "Sales pipeline (M1)",
     prospection: "Prospecting",

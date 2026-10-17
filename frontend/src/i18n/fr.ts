@@ -265,7 +265,28 @@ export const fr = {
     tasks: "tâches",
     task: "tâche",
   },
+  commercial: {
+    offres: "Offres (versions)",
+    affaires: "Affaires",
+    contrats: "Contrats (CLM)",
+    marges: "Marges par axe (prévues / réelles)",
+    axe: { client: "Client", profil: "Profil contractuel", affaire: "Affaire", responsable: "Responsable d'affaire" },
+    col: {
+      code: "Code", titre: "Intitulé", client: "Client", montant: "Montant", statut: "Statut", responsable: "Responsable",
+      profil: "Profil", montantActuel: "Montant (avenants inclus)", echeance: "Échéance", avenants: "Avenants",
+      affaires: "Affaires", caPrevu: "CA prévu", margePrevue: "Marge prévue", produits: "Produits réels",
+      charges: "Charges réelles", margeReelle: "Marge réelle",
+    },
+    act: {
+      soumettre: "Soumettre", annuler: "Annuler", confirmAnnuler: "Annuler cette offre ?", gagner: "Gagnée",
+      reviser: "Réviser (nouvelle version)", perdre: "Perdue", motifPerte: "Motif de la perte", confirmer: "Confirmer",
+      activer: "Activer (contrat signé)", documentSigne: "Identifiant du document GED signé", suspendre: "Suspendre",
+      reprendre: "Reprendre",
+    },
+  },
   pipeline: {
+    pipePondere: "Pipe pondéré",
+    pipePondereHint: "signé 90 % · en cours 60 % · prospect 25 % → budget M11",
     echeance: "éch.",
     title: "Pipeline commercial (M1)",
     prospection: "Prospection",
