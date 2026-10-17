@@ -1,5 +1,6 @@
 """API des intégrations par fichiers (H-04) — upload idempotent + journal des lots."""
 
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
