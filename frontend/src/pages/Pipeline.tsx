@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
-import { Layers, Target, TrendingUp } from "lucide-react";
+import { Layers, Scale, Target, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
+import { CommercialSections } from "../components/commercial/CommercialSections";
 import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type { Opportunity, OpportunityStage, Paginated } from "../types";
 
@@ -75,6 +76,16 @@ export function PipelinePage() {
           <Kpi label={t("pipeline.wonTotal")} value={s.won_total} icon={TrendingUp} tone="ok" delay={0} />
           <Kpi label={t("pipeline.conversion")} value={`${(s.conversion_rate * 100).toFixed(1)}%`} icon={Target} tone="accent" delay={0.05} />
           <Kpi label={t("pipeline.activeSegments")} value={Object.keys(s.margin_by_segment).length} icon={Layers} tone="brand" delay={0.1} />
+          {s.pipe_pondere ? (
+            <Kpi
+              label={t("pipeline.pipePondere")}
+              value={formatNumber(s.pipe_pondere.total)}
+              hint={t("pipeline.pipePondereHint")}
+              icon={Scale}
+              tone="accent"
+              delay={0.15}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -98,6 +109,8 @@ export function PipelinePage() {
           ))}
         </Board>
       </div>
+
+      <CommercialSections />
     </>
   );
 }

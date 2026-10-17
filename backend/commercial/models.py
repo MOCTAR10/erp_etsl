@@ -186,9 +186,19 @@ class Estimate(models.Model):
         GAGNEE = "gagnee", "Gagnée"
         PERDUE = "perdue", "Perdue"
         ANNULEE = "annulee", "Annulée"
+        REMPLACEE = "remplacee", "Remplacée par une révision"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    # Versioning des offres (clôture M1, CDC §3.5) : une révision crée une nouvelle version, l'ancienne est scellée.
+    version = models.PositiveSmallIntegerField(default=1, editable=False, verbose_name="Version")
+    version_precedente = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="revisions",
+        editable=False, verbose_name="Version précédente",
+    )
+    soumise_le = models.DateTimeField(null=True, blank=True, editable=False, verbose_name="Soumise le")
+    decision_le = models.DateTimeField(null=True, blank=True, editable=False, verbose_name="Décision le")
+    motif_perte = models.CharField(max_length=250, blank=True, editable=False, verbose_name="Motif de perte")
     opportunity = models.ForeignKey(
         Opportunity,
         null=True,
@@ -247,6 +257,39 @@ class Estimate(models.Model):
         if not self.code:
             self.code = CommercialSequence.next_for("EST", "EST")
         return super().save(*args, **kwargs)
+
+    @property
+    def montant_offre(self):
+        """Montant chiffré : option retenue, sinon meilleure option, sinon somme des lignes, sinon total saisi."""
+        options = list(self.options.all())
+        retenue = next((o for o in options if o.is_selected), None)
+        if retenue:
+            return retenue.amount
+        if options:
+            return max(o.amount for o in options)
+        lignes = sum((ligne.price_total for ligne in self.lines.all()), Decimal("0"))
+        return lignes or self.total
+
+    @transaction.atomic
+    def reviser(self, user):
+        """Nouvelle version en brouillon (options et lignes copiées) ; la version courante est remplacée."""
+        options, lignes = list(self.options.all()), list(self.lines.all())
+        ancienne = self.pk
+        nouvelle = Estimate.objects.get(pk=ancienne)
+        nouvelle.pk, nouvelle.id, nouvelle.code = None, uuid.uuid4(), ""
+        nouvelle._state.adding = True
+        nouvelle.version = self.version + 1
+        nouvelle.version_precedente_id = ancienne
+        nouvelle.status = self.Status.BROUILLON
+        nouvelle.soumise_le = nouvelle.decision_le = None
+        nouvelle.created_by = user
+        nouvelle.save()
+        for objet in options + lignes:
+            objet.pk, objet.id, objet.estimate = None, uuid.uuid4(), nouvelle
+            objet._state.adding = True
+            objet.save()
+        Estimate.objects.filter(pk=ancienne).update(status=self.Status.REMPLACEE, decision_le=timezone.now())
+        return nouvelle
 
 
 class EstimateOption(models.Model):
@@ -457,6 +500,15 @@ class Affaire(models.Model):
     start_date = models.DateField(null=True, blank=True, verbose_name="Début")
     end_date = models.DateField(null=True, blank=True, verbose_name="Fin")
     is_global_rental = models.BooleanField(default=False, verbose_name="GLOBAL RENTAL")
+    # Pilotage (clôture M1, CDC §3.4 « marge par responsable d'affaire ») et lien analytique vers M10 / M11.
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="affaires_responsable", verbose_name="Responsable d'affaire",
+    )
+    analytic = models.ForeignKey(
+        "referentiels.AnalyticAccount", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="affaires", editable=False, verbose_name="Compte analytique (axe projet)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -471,11 +523,26 @@ class Affaire(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = CommercialSequence.next_for("AFF", "AFF")
+        if self.responsable_id is None and self.opportunity_id and self.opportunity.owner_id:
+            self.responsable_id = self.opportunity.owner_id
         return super().save(*args, **kwargs)
 
     def clean(self):
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValidationError({"end_date": "La date de fin doit être postérieure au début."})
+
+    def assurer_compte_analytique(self):
+        """Compte analytique de l'affaire sur l'axe « projet » (créé à la confirmation) : clé des coûts et marges."""
+        from referentiels.models import AnalyticAccount, AnalyticAxis
+
+        if self.analytic_id:
+            return self.analytic
+        axe = AnalyticAxis.objects.filter(axis_type=AnalyticAxis.AxisType.PROJET).order_by("code").first()
+        if axe is None:
+            axe = AnalyticAxis.objects.create(code="AFFAIRES", label="Affaires", axis_type=AnalyticAxis.AxisType.PROJET)
+        self.analytic, _ = AnalyticAccount.objects.get_or_create(axis=axe, code=self.code, defaults={"label": self.title[:200]})
+        self.save(update_fields=["analytic", "updated_at"])
+        return self.analytic
 
 
 
@@ -560,6 +627,9 @@ class Milestone(models.Model):
     status = models.CharField(
         max_length=12, choices=Status.choices, default=Status.EN_ATTENTE, verbose_name="Statut"
     )
+    # Échéancier contractuel (clôture M1 → M10) : un jalon réalisé devient « à facturer ».
+    montant = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Montant facturable")
+    facture_le = models.DateField(null=True, blank=True, editable=False, verbose_name="Facturé le")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -648,8 +718,20 @@ class Contract(models.Model):
     )
     is_global_rental = models.BooleanField(default=False, verbose_name="GLOBAL RENTAL")
     notes = models.TextField(blank=True, verbose_name="Notes")
+    # Signature électronique + archivage GED 10 ans exigés à l'activation (clôture M1, CDC §3.5 / §3.11).
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="contrats_commerciaux",
+        editable=False, verbose_name="Contrat signé (GED)",
+    )
+    signe_le = models.DateTimeField(null=True, blank=True, editable=False, verbose_name="Activé (signé) le")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Champs figés une fois le contrat signé : toute modification passe par un avenant.
+    CHAMPS_CONTRACTUELS = (
+        "client", "affaire", "profile", "start_date", "end_date", "months", "amount_initial", "currency",
+        "sla", "retenue_rate", "indexation", "penalty", "is_global_rental",
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -672,6 +754,11 @@ class Contract(models.Model):
             raise ValidationError({"end_date": "La date de fin doit être postérieure au début."})
 
     @property
+    def montant_actuel(self):
+        signes = self.avenants.filter(statut=Avenant.Statut.SIGNE).aggregate(t=models.Sum("delta_montant"))["t"]
+        return self.amount_initial + (signes or 0)
+
+    @property
     def days_to_expiry(self):
         if not self.end_date:
             return None
@@ -683,6 +770,54 @@ class Contract(models.Model):
         from config.echeances import bande
 
         return {"en_cours": "OK", "expiree": "EXPIRED"}.get(b := bande(self.days_to_expiry), b.upper())
+
+
+class Avenant(models.Model):
+    """Avenant à un contrat actif (clôture M1, CDC §3.5 « versioning des avenants ») : seule voie de modification
+    d'un contrat signé. Signé électroniquement et archivé 10 ans, il ajuste montant et échéance ; puis il est scellé."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        SIGNE = "signe", "Signé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contract = models.ForeignKey(Contract, on_delete=models.PROTECT, related_name="avenants", verbose_name="Contrat")
+    numero = models.PositiveSmallIntegerField(editable=False, verbose_name="N° d'avenant")
+    objet = models.CharField(max_length=250, verbose_name="Objet")
+    delta_montant = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Variation de montant")
+    nouvelle_date_fin = models.DateField(null=True, blank=True, verbose_name="Nouvelle date de fin")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="avenants",
+        editable=False, verbose_name="Avenant signé (GED)",
+    )
+    signe_le = models.DateTimeField(null=True, blank=True, editable=False, verbose_name="Signé le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créé par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["contract", "numero"]
+        verbose_name = "Avenant"
+        verbose_name_plural = "Avenants"
+        constraints = [models.UniqueConstraint(fields=["contract", "numero"], name="uniq_avenant_numero")]
+
+    def __str__(self):
+        return f"{self.contract.code} — avenant n° {self.numero}"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.numero:
+            dernier = Avenant.objects.filter(contract_id=self.contract_id).aggregate(m=models.Max("numero"))["m"]
+            self.numero = (dernier or 0) + 1
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.contract_id and self.contract.status not in (Contract.Status.ACTIF, Contract.Status.SUSPENDU):
+            raise ValidationError({"contract": "Un avenant porte sur un contrat signé (actif ou suspendu)."})
+        if self.nouvelle_date_fin and self.contract_id and self.nouvelle_date_fin < self.contract.start_date:
+            raise ValidationError({"nouvelle_date_fin": "La nouvelle échéance précède le début du contrat."})
 
 
 class ContractService(models.Model):

@@ -8,6 +8,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .models import (
+    Avenant,
     Affaire,
     ClientProfile,
     Contract,
@@ -22,6 +23,7 @@ from .models import (
     TenderReview,
 )
 from .serializers import (
+    AvenantSerializer,
     AffaireSerializer,
     ClientProfileSerializer,
     ContractSerializer,
@@ -37,7 +39,18 @@ from .serializers import (
 )
 from users.models import User
 from users.permissions import can_read_module
-from .services import CanManageCommercial, can_see_amount, pipeline_stats
+from config.inputs import fk_input
+from documents.models import Document
+
+from .services import (
+    MARGE_AXES,
+    CanManageCommercial,
+    can_see_amount,
+    controle_crrl,
+    controle_document_contractuel,
+    marges_affaires,
+    pipeline_stats,
+)
 
 
 class _CommonViewSet(viewsets.ModelViewSet):
@@ -108,6 +121,62 @@ class EstimateViewSet(_CommonViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        if instance.status != Estimate.Status.BROUILLON:
+            raise DRFValidationError({"detail": "Offre émise : non supprimable (traçabilité des versions)."})
+        instance.delete()
+
+    def _offre(self):
+        return Estimate.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+
+    def _decider(self, offre, depuis, vers, **champs):
+        if offre.status not in depuis:
+            raise DRFValidationError({"detail": f"Offre {offre.get_status_display().lower()} : action impossible."})
+        offre.status = vers
+        for nom, valeur in champs.items():
+            setattr(offre, nom, valeur)
+        offre.save()
+        return Response(self.get_serializer(offre).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def soumettre(self, request, pk=None):
+        """Émission au client : l'offre doit être chiffrée (option ou ligne) ; elle devient une version scellée."""
+        offre = self._offre()
+        if not offre.montant_offre:
+            raise DRFValidationError({"detail": "Offre non chiffrée : ajoutez au moins une option ou une ligne."})
+        return self._decider(offre, (Estimate.Status.BROUILLON,), Estimate.Status.SOUMISE, soumise_le=timezone.now())
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def reviser(self, request, pk=None):
+        """Révision d'une offre émise : nouvelle version brouillon (CDC M1 §3.5), l'ancienne est remplacée."""
+        offre = self._offre()
+        if offre.status != Estimate.Status.SOUMISE:
+            raise DRFValidationError({"detail": "Seule une offre soumise se révise (un brouillon se modifie directement)."})
+        nouvelle = offre.reviser(request.user)
+        return Response(self.get_serializer(nouvelle).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def gagner(self, request, pk=None):
+        return self._decider(self._offre(), (Estimate.Status.SOUMISE,), Estimate.Status.GAGNEE, decision_le=timezone.now())
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def perdre(self, request, pk=None):
+        motif = str(request.data.get("motif") or "").strip()
+        if not motif:
+            raise DRFValidationError({"motif": "Motif de perte obligatoire (retour d'expérience commercial)."})
+        return self._decider(self._offre(), (Estimate.Status.SOUMISE,), Estimate.Status.PERDUE,
+                             decision_le=timezone.now(), motif_perte=motif[:250])
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def annuler(self, request, pk=None):
+        return self._decider(self._offre(), (Estimate.Status.BROUILLON, Estimate.Status.SOUMISE), Estimate.Status.ANNULEE,
+                             decision_le=timezone.now())
+
 
 class EstimateOptionViewSet(_CommonViewSet):
     serializer_class = EstimateOptionSerializer
@@ -119,6 +188,11 @@ class EstimateOptionViewSet(_CommonViewSet):
             qs = qs.filter(estimate_id=estimate)
         return qs
 
+    def perform_destroy(self, instance):
+        if instance.estimate.status != Estimate.Status.BROUILLON:
+            raise DRFValidationError({"detail": "Offre émise : version scellée."})
+        instance.delete()
+
 
 class EstimateLineViewSet(_CommonViewSet):
     serializer_class = EstimateLineSerializer
@@ -129,6 +203,11 @@ class EstimateLineViewSet(_CommonViewSet):
         if estimate:
             qs = qs.filter(estimate_id=estimate)
         return qs
+
+    def perform_destroy(self, instance):
+        if instance.estimate.status != Estimate.Status.BROUILLON:
+            raise DRFValidationError({"detail": "Offre émise : version scellée."})
+        instance.delete()
 
 
 class TenderReviewViewSet(_CommonViewSet):
@@ -199,14 +278,24 @@ class AffaireViewSet(_CommonViewSet):
         affaire, erreur = self._transition(Affaire.Status.BROUILLON, Affaire.Status.CONFIRMEE, controle_revue_commande)
         if erreur:
             return erreur
+        affaire.assurer_compte_analytique()
         generer_of(affaire, request.user)
         return Response(self.get_serializer(affaire).data)
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def demarrer(self, request, pk=None):
-        affaire, erreur = self._transition(Affaire.Status.CONFIRMEE, Affaire.Status.EN_COURS)
+        """Démarrage : CRRL (réunion de lancement tenue, compte-rendu en GED) exigé — CDC M1 §3.6."""
+        affaire, erreur = self._transition(Affaire.Status.CONFIRMEE, Affaire.Status.EN_COURS, controle_crrl)
         return erreur or Response(self.get_serializer(affaire).data)
+
+    @action(detail=False, methods=["get"])
+    def marges(self, request):
+        """Marges prévues / réelles par client, profil, affaire ou responsable (CDC M1 §3.4 / §3.7)."""
+        par = request.query_params.get("par", "client")
+        if par not in MARGE_AXES:
+            raise DRFValidationError({"par": f"Valeurs possibles : {', '.join(MARGE_AXES)}."})
+        return Response(marges_affaires(par, can_see_amount(request.user)))
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -224,6 +313,12 @@ class MilestoneViewSet(_CommonViewSet):
         if affaire:
             qs = qs.filter(affaire_id=affaire)
         return qs
+
+    @action(detail=False, methods=["get"], url_path="a-facturer")
+    def a_facturer(self, request):
+        """Sortie vers M10 : jalons réalisés, valorisés et non encore facturés (échéancier contractuel)."""
+        qs = self.get_queryset().filter(status=Milestone.Status.FAIT, montant__gt=0, facture_le__isnull=True)
+        return Response(self.get_serializer(qs, many=True).data)
 
 
 class ContractViewSet(_CommonViewSet):
@@ -247,6 +342,85 @@ class ContractViewSet(_CommonViewSet):
             active = self.request.query_params["active"].lower() in ("1", "true", "yes")
             qs = qs.filter(status=Contract.Status.ACTIF if active else Contract.Status.BROUILLON)
         return qs
+
+    def _contrat(self):
+        return Contract.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+
+    def _passer(self, contrat, depuis, vers):
+        if contrat.status not in depuis:
+            raise DRFValidationError({"detail": f"Contrat {contrat.get_status_display().lower()} : action impossible."})
+        contrat.status = vers
+        contrat.save()
+        return Response(self.get_serializer(contrat).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def activer(self, request, pk=None):
+        """Activation = contrat signé électroniquement et archivé 10 ans (CDC M1 §3.5 / §3.11) ; il est ensuite scellé."""
+        contrat = self._contrat()
+        if contrat.status != Contract.Status.BROUILLON:
+            raise DRFValidationError({"detail": "Seul un contrat en brouillon s'active."})
+        document = fk_input(request.data.get("document"), Document.objects.select_related("type", "current_version"), "document")
+        motif = controle_document_contractuel(document)
+        if motif:
+            raise DRFValidationError({"document": motif})
+        contrat.document, contrat.signe_le = document, timezone.now()
+        return self._passer(contrat, (Contract.Status.BROUILLON,), Contract.Status.ACTIF)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def suspendre(self, request, pk=None):
+        return self._passer(self._contrat(), (Contract.Status.ACTIF,), Contract.Status.SUSPENDU)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def reprendre(self, request, pk=None):
+        return self._passer(self._contrat(), (Contract.Status.SUSPENDU,), Contract.Status.ACTIF)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def cloturer(self, request, pk=None):
+        return self._passer(self._contrat(), (Contract.Status.ACTIF, Contract.Status.SUSPENDU), Contract.Status.CLOTURE)
+
+
+class AvenantViewSet(_CommonViewSet):
+    """Avenants (versioning contractuel) : brouillon modifiable, signature = application au contrat puis scellement."""
+
+    serializer_class = AvenantSerializer
+
+    def get_queryset(self):
+        qs = Avenant.objects.select_related("contract")
+        if contract := self.request.query_params.get("contract"):
+            qs = qs.filter(contract_id=contract)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.statut == Avenant.Statut.SIGNE:
+            raise DRFValidationError({"detail": "Avenant signé : pièce scellée."})
+        instance.delete()
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def signer(self, request, pk=None):
+        avenant = Avenant.objects.select_for_update(of=("self",)).select_related("contract").get(pk=self.get_object().pk)
+        if avenant.statut != Avenant.Statut.BROUILLON:
+            raise DRFValidationError({"detail": "Avenant déjà signé."})
+        document = fk_input(request.data.get("document"), Document.objects.select_related("type", "current_version"), "document")
+        motif = controle_document_contractuel(document)
+        if motif:
+            raise DRFValidationError({"document": motif})
+        contrat = Contract.objects.select_for_update().get(pk=avenant.contract_id)
+        if contrat.status not in (Contract.Status.ACTIF, Contract.Status.SUSPENDU):
+            raise DRFValidationError({"detail": "Le contrat n'est plus en vigueur."})
+        if avenant.nouvelle_date_fin:
+            contrat.end_date = avenant.nouvelle_date_fin
+            contrat.save(update_fields=["end_date", "updated_at"])
+        avenant.statut, avenant.document, avenant.signe_le = Avenant.Statut.SIGNE, document, timezone.now()
+        avenant.save()
+        return Response(self.get_serializer(avenant).data)
 
 
 class ContractServiceViewSet(_CommonViewSet):

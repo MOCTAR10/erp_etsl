@@ -126,6 +126,8 @@ export interface PipelineStats {
   conversion_rate: number;
   won_total: number;
   margin_by_segment: Record<string, { count: number; total_margin: number; total_amount: number }>;
+  /** Pipe pondéré 90 / 60 / 25 % (signé / en cours / prospect) publié vers M11 (clôture M1). */
+  pipe_pondere?: { signe: number; en_cours: number; prospect: number; total: number };
 }
 
 export type PoStatus =

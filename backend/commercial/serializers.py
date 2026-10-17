@@ -3,6 +3,7 @@ from rest_framework import serializers
 from config.serializers import ModelCleanMixin
 
 from .models import (
+    Avenant,
     Affaire,
     ClientProfile,
     Contract,
@@ -107,12 +108,19 @@ class EstimateSerializer(AmountMaskMixin, serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     options_total = serializers.IntegerField(source="options.count", read_only=True)
     lines_total = serializers.IntegerField(source="lines.count", read_only=True)
+    montant_offre = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = Estimate
         fields = [
             "id",
             "code",
+            "version",
+            "version_precedente",
+            "soumise_le",
+            "decision_le",
+            "motif_perte",
+            "montant_offre",
             "opportunity",
             "opportunity_code",
             "client",
@@ -131,7 +139,22 @@ class EstimateSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "created_by", "created_at", "updated_at", "status", "version",
+                            "version_precedente", "soumise_le", "decision_le", "motif_perte"]
+
+    def validate(self, attrs):
+        if self.instance and self.instance.status != Estimate.Status.BROUILLON:
+            raise serializers.ValidationError(
+                {"detail": "Offre émise : version scellée. Utilisez « réviser » pour créer une nouvelle version."}
+            )
+        return attrs
+
+
+def _offre_modifiable(estimate):
+    if estimate and estimate.status != Estimate.Status.BROUILLON:
+        raise serializers.ValidationError(
+            {"estimate": "Offre émise : version scellée (options et lignes non modifiables). Révisez l'offre."}
+        )
 
 
 class EstimateOptionSerializer(serializers.ModelSerializer):
@@ -148,6 +171,10 @@ class EstimateOptionSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+    def validate(self, attrs):
+        _offre_modifiable(attrs.get("estimate") or getattr(self.instance, "estimate", None))
+        return attrs
 
 
 class EstimateLineSerializer(serializers.ModelSerializer):
@@ -169,6 +196,10 @@ class EstimateLineSerializer(serializers.ModelSerializer):
             "price_total",
         ]
         read_only_fields = ["id", "price_total"]
+
+    def validate(self, attrs):
+        _offre_modifiable(attrs.get("estimate") or getattr(self.instance, "estimate", None))
+        return attrs
 
 
 class TenderReviewSerializer(serializers.ModelSerializer):
@@ -232,10 +263,12 @@ class MilestoneSerializer(serializers.ModelSerializer):
             "progress",
             "status",
             "status_label",
+            "montant",
+            "facture_le",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "facture_le", "created_at", "updated_at"]
 
 
 class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
@@ -248,6 +281,8 @@ class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeria
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     type_label = serializers.CharField(source="get_affaire_type_display", read_only=True)
     milestones_total = serializers.IntegerField(source="milestones.count", read_only=True)
+    responsable_email = serializers.EmailField(source="responsable.email", read_only=True, default=None)
+    analytic_code = serializers.CharField(source="analytic.code", read_only=True, default=None)
 
     class Meta:
         model = Affaire
@@ -271,14 +306,20 @@ class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeria
             "end_date",
             "is_global_rental",
             "milestones_total",
+            "responsable",
+            "responsable_email",
+            "analytic",
+            "analytic_code",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "analytic", "created_at", "updated_at"]
 
 
 class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
-    amount_fields = ["amount_initial", "penalty"]
+    amount_fields = ["amount_initial", "penalty", "montant_actuel"]
+    montant_actuel = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+    avenants_total = serializers.IntegerField(source="avenants.count", read_only=True)
 
     client_name = serializers.CharField(source="client.partner.name", read_only=True, default=None)
     profile_label = serializers.CharField(source="get_profile_display", read_only=True)
@@ -313,6 +354,10 @@ class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeri
             "days_to_expiry",
             "expiry_status",
             "services_total",
+            "montant_actuel",
+            "avenants_total",
+            "document",
+            "signe_le",
             "created_at",
             "updated_at",
         ]
@@ -321,9 +366,40 @@ class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeri
             "code",
             "days_to_expiry",
             "expiry_status",
+            "status",
+            "document",
+            "signe_le",
             "created_at",
             "updated_at",
         ]
+
+    def validate(self, attrs):
+        if self.instance and self.instance.status != Contract.Status.BROUILLON:
+            figes = [f for f in Contract.CHAMPS_CONTRACTUELS if f in attrs and attrs[f] != getattr(self.instance, f)]
+            if figes:
+                raise serializers.ValidationError(
+                    {f: "Contrat signé : modification uniquement par avenant." for f in figes}
+                )
+        return super().validate(attrs)
+
+
+class AvenantSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
+    amount_fields = ["delta_montant"]
+    contract_code = serializers.CharField(source="contract.code", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+
+    class Meta:
+        model = Avenant
+        fields = [
+            "id", "contract", "contract_code", "numero", "objet", "delta_montant", "nouvelle_date_fin",
+            "statut", "statut_label", "document", "signe_le", "created_by", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "numero", "statut", "document", "signe_le", "created_by", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        if self.instance and self.instance.statut == Avenant.Statut.SIGNE:
+            raise serializers.ValidationError({"detail": "Avenant signé : pièce scellée."})
+        return super().validate(attrs)
 
 
 class ContractServiceSerializer(serializers.ModelSerializer):
