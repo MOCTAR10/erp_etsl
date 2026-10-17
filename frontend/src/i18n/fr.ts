@@ -296,6 +296,7 @@ export const fr = {
     },
   },
   logistique: {
+    col: { code: "Code", equipement: "Équipement", partenaire: "Partenaire", periodicite: "Périodicité", consommation: "Consommation", montant: "Montant estimé", statut: "Statut", besoin: "Besoin", departement: "Département", affaire: "Affaire" },
     title: "Logistique — Parc & GLOBAL RENTAL (M4)",
     parc: "Parc ETSL",
     equipements: "équipements",
@@ -380,6 +381,7 @@ export const fr = {
     totalMvt: "Mouvements",
   },
   qualite: {
+    col: { code: "Code", soudeur: "Soudeur", norme: "Norme", procede: "Procédé · position", validite: "Validité", statut: "Statut", type: "Type", reference: "Référence", materiau: "Matériau", point: "Point de contrôle", objet: "Affaire / OF / lot", organisme: "Organisme agréé", resultat: "Résultat", date: "Date", retention: "Conservation", ans: "ans" },
     title: "Qualité industrielle & Soudage (M6)",
     soudeurs: "Soudeurs",
     qualifs: "Qualifications",
@@ -492,6 +494,7 @@ export const fr = {
     interne: "Interne QA/QC",
   },
   hse: {
+    col: { code: "Code", lieux: "Lieux", score: "Score P×G", criticite: "Criticité", statut: "Statut", designation: "Désignation", zone: "Zone ATEX", certificat: "Certificat", theme: "Thème", type: "Type", date: "Date", participants: "Participants", beneficiaire: "Bénéficiaire", numeroBsd: "N° BSD", quantite: "Quantité", transporteur: "Transporteur" },
     gaz: { conforme: "Test gaz conforme", nonConforme: "Test gaz non conforme", aFaire: "Test gaz à faire" },
     title: "HSE — Hygiène, Sécurité & Environnement (M7)",
     joursSansAccident: "Jours sans accident",
@@ -889,6 +892,7 @@ export const fr = {
     pendingNote: "Comptabilité SYSCOHADA révisée : écritures validées par le noyau (immuables, extournes). Règles de conservation proc. 4.3–4.8, refacturations GR au compte 618 (RF-ERP-90…94).",
   },
   controleGestion: {
+    col: { axe: "Axe analytique", taux: "Taux de marge", code: "Code", periode: "Période", dateCloture: "Date de clôture", delai: "Délai", statut: "Statut", budget: "Budget · révision", nouveauMontant: "Nouveau montant", auteur: "Auteur", commentaire: "Commentaire" },
     title: "Contrôle de gestion — Budgets, marges, écarts & clôtures (M11)",
     budgets: "Budgets",
     charges: "Charges",
@@ -929,6 +933,7 @@ export const fr = {
     pendingNote: "Marges et écarts agrégés depuis les écritures comptabilisées (noyau comptable) ; coût GLOBAL RENTAL isolé au compte 618 (RF-ERP-A4). Clôtures de gestion < J+4 (RF-ERP-A3), budgets & révisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    col: { code: "Code", type: "Type", beneficiaire: "Bénéficiaire", montant: "Montant", echeance: "Échéance", reste: "Reste", statut: "Statut", police: "N° police", assureur: "Assureur", prime: "Prime annuelle", objet: "Objet", partieAdverse: "Partie adverse", phase: "Phase", enjeu: "Montant en jeu", partenaire: "Partenaire", sens: "Sens", tiers: "Tiers", date: "Date", decisions: "Décisions" },
     title: "Juridique & GED — Courrier, contrats, cautions, assurances, contentieux & réunions (M12)",
     courriers: "Courriers",
     courriersAClasser: "à classer",

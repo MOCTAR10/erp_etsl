@@ -262,7 +262,6 @@ input {
   letter-spacing: 0.07em;
   color: var(--text-muted);
   padding: 0.6rem 0.65rem 0.3rem;
-  opacity: 0.85;
 }
 
 .nav-link {
@@ -1322,7 +1321,6 @@ input {
 .login-demo-head span {
   font-size: 11px;
   color: var(--text-muted);
-  opacity: 0.85;
 }
 
 .login-demo-grid {
@@ -2075,6 +2073,12 @@ kbd {
   top: 1rem;
 }
 
-.main:focus {
+/* Zone défilante atteignable au clavier (axe scrollable-region-focusable) : anneau seulement au clavier. */
+.main:focus:not(:focus-visible) {
   outline: none;
+}
+
+.main:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
 }

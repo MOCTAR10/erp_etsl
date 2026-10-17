@@ -3,12 +3,14 @@ import { CalendarCheck, Coins, Inbox, PieChart, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
-import { formatNumber } from "../lib/format";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import type { Column } from "../components/ui";
+import { formatDate, formatNumber } from "../lib/format";
 import type {
   Budget,
   BudgetRevision,
   ClotureGestion,
+  MargeRow,
   FiscalYear,
   MargesResult,
   Paginated,
@@ -44,46 +46,75 @@ function BudgetCard({ b, index }: { b: Budget; index: number }) {
   );
 }
 
-function RevisionCard({ r }: { r: BudgetRevision }) {
-  const { t } = useTranslation();
-  const badge = r.statut === "appliquee" ? "ok" : r.statut === "annulee" ? "err" : "warn";
-  return (
-    <div className="card kpi" key={r.id}>
-      <span className="kpi-label">
-        {r.code} · R{r.numero} · {r.budget_code}{" "}
-        <span className={`badge ${badge}`}>{t(`controleGestion.revision_statut.${r.statut}`)}</span>
-      </span>
-      <span className="kpi-value">
-        {r.has_amount_access && r.nouveau_montant !== null ? formatNumber(r.nouveau_montant) : "••••••"} F
-      </span>
-      <span className="meta muted">
-        {r.created_by_name ?? "—"} · {r.commentaire || "—"}
-      </span>
-    </div>
-  );
+type T = (key: string) => string;
+type MargeLigne = MargeRow & { id: string };
+
+const money = (access: boolean, v: string | number | null) => (access && v !== null ? `${formatNumber(v)} F` : "••••••");
+
+function margeColumns(t: T): Column<MargeLigne>[] {
+  return [
+    {
+      key: "axe",
+      header: t("controleGestion.col.axe"),
+      render: (r) => (
+        <>
+          {r.libelle || "—"} <span className="muted">({r.code_axe})</span>
+        </>
+      ),
+    },
+    { key: "produits", header: t("controleGestion.produits"), num: true, render: (r) => `${formatNumber(r.produits)} F` },
+    { key: "charges", header: t("controleGestion.charges"), num: true, render: (r) => `${formatNumber(r.charges)} F` },
+    { key: "marge", header: t("controleGestion.marge"), num: true, render: (r) => `${formatNumber(r.marge)} F` },
+    {
+      key: "taux",
+      header: t("controleGestion.col.taux"),
+      num: true,
+      render: (r) => (r.taux_marge !== null ? `${formatNumber(r.taux_marge)} %` : "—"),
+    },
+  ];
 }
 
-function ClotureCard({ c }: { c: ClotureGestion }) {
-  const { t } = useTranslation();
-  const badge = c.statut === "realisee" ? (c.conforme_j4 ? "ok" : "err") : "warn";
-  return (
-    <div className="card kpi" key={c.id}>
-      <span className="kpi-label">
-        {c.code} · {c.period_label}{" "}
-        <span className={`badge ${badge}`}>
-          {c.statut === "realisee"
-            ? c.conforme_j4
-              ? t("controleGestion.conformeJ4")
-              : t("controleGestion.horsJ4")
-            : t(`controleGestion.cloture_statut.${c.statut}`)}
-        </span>
-      </span>
-      <span className="kpi-value">
-        {c.jours_ecoulement !== null ? `${c.jours_ecoulement} ${t("controleGestion.jours")}` : t("controleGestion.enAttente")}
-      </span>
-      <span className="meta muted">{c.date_cloture ?? "—"}</span>
-    </div>
-  );
+function clotureColumns(t: T): Column<ClotureGestion>[] {
+  return [
+    { key: "code", header: t("controleGestion.col.code"), render: (c) => c.code },
+    { key: "periode", header: t("controleGestion.col.periode"), render: (c) => c.period_label },
+    { key: "date", header: t("controleGestion.col.dateCloture"), render: (c) => (c.date_cloture ? formatDate(c.date_cloture) : "—") },
+    {
+      key: "delai",
+      header: t("controleGestion.col.delai"),
+      num: true,
+      render: (c) => (c.jours_ecoulement !== null ? `${c.jours_ecoulement} ${t("controleGestion.jours")}` : t("controleGestion.enAttente")),
+    },
+    {
+      key: "statut",
+      header: t("controleGestion.col.statut"),
+      render: (c) =>
+        c.statut === "realisee" ? (
+          <Badge tone={c.conforme_j4 ? "ok" : "err"}>{c.conforme_j4 ? t("controleGestion.conformeJ4") : t("controleGestion.horsJ4")}</Badge>
+        ) : (
+          <Badge tone="warn">{t(`controleGestion.cloture_statut.${c.statut}`)}</Badge>
+        ),
+    },
+  ];
+}
+
+function revisionColumns(t: T): Column<BudgetRevision>[] {
+  return [
+    { key: "code", header: t("controleGestion.col.code"), render: (r) => r.code },
+    { key: "budget", header: t("controleGestion.col.budget"), render: (r) => `${r.budget_code} · R${r.numero}` },
+    { key: "montant", header: t("controleGestion.col.nouveauMontant"), num: true, render: (r) => money(r.has_amount_access, r.nouveau_montant) },
+    { key: "auteur", header: t("controleGestion.col.auteur"), render: (r) => r.created_by_name ?? "—" },
+    { key: "comment", header: t("controleGestion.col.commentaire"), render: (r) => r.commentaire || "—" },
+    {
+      key: "statut",
+      header: t("controleGestion.col.statut"),
+      render: (r) => (
+        <Badge tone={r.statut === "appliquee" ? "ok" : r.statut === "annulee" ? "err" : "warn"}>
+          {t(`controleGestion.revision_statut.${r.statut}`)}
+        </Badge>
+      ),
+    },
+  ];
 }
 
 export function ControleGestionPage() {
@@ -194,56 +225,27 @@ export function ControleGestionPage() {
         </Board>
       </div>
 
-      {m && m.rows.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("controleGestion.marges")} · {m.rows.length}
-          </h3>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t("controleGestion.produits")}</th>
-                <th>{t("controleGestion.charges")}</th>
-                <th>{t("controleGestion.marge")}</th>
-                <th>%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {m.rows.map((r) => (
-                <tr key={r.analytic ?? r.libelle}>
-                  <td>{r.libelle || "—"} <span className="muted">({r.code_axe})</span></td>
-                  <td>{formatNumber(r.produits)} F</td>
-                  <td>{formatNumber(r.charges)} F</td>
-                  <td>{formatNumber(r.marge)} F</td>
-                  <td>{r.taux_marge !== null ? formatNumber(r.taux_marge) : "—"} %</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      ) : null}
+      {m && m.rows.length > 0 && (
+        <SectionCard title={`${t("controleGestion.marges")} · ${m.rows.length}`}>
+          <DataTable
+            rows={m.rows.map((r, i) => ({ ...r, id: String(r.analytic ?? `${r.code_axe}-${i}`) }))}
+            columns={margeColumns(t)}
+            caption={t("controleGestion.marges")}
+          />
+        </SectionCard>
+      )}
 
-      {closed.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("controleGestion.clotures")} · {closed.length}
-          </h3>
-          <div className="card-list">
-            {closed.map((c) => <ClotureCard key={c.id} c={c} />)}
-          </div>
-        </>
-      ) : null}
+      {closed.length > 0 && (
+        <SectionCard title={`${t("controleGestion.clotures")} · ${closed.length}`}>
+          <DataTable rows={closed} columns={clotureColumns(t)} caption={t("controleGestion.clotures")} />
+        </SectionCard>
+      )}
 
-      {revs.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("controleGestion.revisions")} · {revs.length}
-          </h3>
-          <div className="card-list">
-            {revs.map((r) => <RevisionCard key={r.id} r={r} />)}
-          </div>
-        </>
-      ) : null}
+      {revs.length > 0 && (
+        <SectionCard title={`${t("controleGestion.revisions")} · ${revs.length}`}>
+          <DataTable rows={revs} columns={revisionColumns(t)} caption={t("controleGestion.revisions")} />
+        </SectionCard>
+      )}
 
       <p className="muted" style={{ marginTop: "0.5rem" }}>
         {t("controleGestion.pendingNote")}

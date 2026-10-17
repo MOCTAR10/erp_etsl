@@ -296,6 +296,7 @@ export const en = {
     },
   },
   logistique: {
+    col: { code: "Code", equipement: "Equipment", partenaire: "Partner", periodicite: "Billing period", consommation: "Usage", montant: "Estimated amount", statut: "Status", besoin: "Need", departement: "Department", affaire: "Project" },
     title: "Logistics — Fleet & GLOBAL RENTAL (M4)",
     parc: "ETSL fleet",
     equipements: "assets",
@@ -380,6 +381,7 @@ export const en = {
     totalMvt: "Moves",
   },
   qualite: {
+    col: { code: "Code", soudeur: "Welder", norme: "Standard", procede: "Process · position", validite: "Valid until", statut: "Status", type: "Type", reference: "Reference", materiau: "Material", point: "Check point", objet: "Project / WO / lot", organisme: "Accredited body", resultat: "Result", date: "Date", retention: "Retention", ans: "yrs" },
     title: "Industrial Quality & Welding (M6)",
     soudeurs: "Welders",
     qualifs: "Qualifications",
@@ -492,6 +494,7 @@ export const en = {
     interne: "Internal QA/QC",
   },
   hse: {
+    col: { code: "Code", lieux: "Locations", score: "Score P×S", criticite: "Criticality", statut: "Status", designation: "Designation", zone: "ATEX zone", certificat: "Certificate", theme: "Topic", type: "Type", date: "Date", participants: "Participants", beneficiaire: "Holder", numeroBsd: "Waste slip no.", quantite: "Quantity", transporteur: "Carrier" },
     gaz: { conforme: "Gas test OK", nonConforme: "Gas test failed", aFaire: "Gas test required" },
     title: "HSE — Health, Safety & Environment (M7)",
     joursSansAccident: "Days without accident",
@@ -889,6 +892,7 @@ export const en = {
     pendingNote: "SYSCOHADA-revised accounting: entries validated by the kernel (immutable, reversals). Retention rules proc. 4.3–4.8, inter-company refactoring to account 618 (RF-ERP-90…94).",
   },
   controleGestion: {
+    col: { axe: "Analytic axis", taux: "Margin rate", code: "Code", periode: "Period", dateCloture: "Closing date", delai: "Lead time", statut: "Status", budget: "Budget · revision", nouveauMontant: "New amount", auteur: "Author", commentaire: "Comment" },
     title: "Management control — Budgets, margins, variances & closings (M11)",
     budgets: "Budgets",
     charges: "Expenses",
@@ -929,6 +933,7 @@ export const en = {
     pendingNote: "Margins and variances aggregated from posted entries (accounting kernel); GLOBAL RENTAL cost isolated to account 618 (RF-ERP-A4). Period closings < J+4 (RF-ERP-A3), budgets & revisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    col: { code: "Code", type: "Type", beneficiaire: "Beneficiary", montant: "Amount", echeance: "Due date", reste: "Remaining", statut: "Status", police: "Policy no.", assureur: "Insurer", prime: "Annual premium", objet: "Subject", partieAdverse: "Opposing party", phase: "Stage", enjeu: "Amount at stake", partenaire: "Partner", sens: "Direction", tiers: "Party", date: "Date", decisions: "Decisions" },
     title: "Legal & DMS — Mail registry, contracts, guarantees, insurance, disputes & meetings (M12)",
     courriers: "Mail items",
     courriersAClasser: "to file",

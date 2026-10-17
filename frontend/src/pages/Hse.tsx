@@ -3,7 +3,8 @@ import { Activity, Flame, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import type { Column } from "../components/ui";
 import { formatDate } from "../lib/format";
 import type {
   BordereauDechet,
@@ -66,95 +67,102 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
   );
 }
 
-function RisqueCard({ risque }: { risque: EvaluationRisque }) {
-  const { t } = useTranslation();
-  const badge = risque.criticite === "critique" ? "err" : risque.criticite === "elevee" ? "warn" : "brand";
-  return (
-    <div className="card kpi" key={risque.id}>
-      <span className="kpi-label">{risque.code} · {t(`hse.criticite.${risque.criticite}`)}</span>
-      <span className="kpi-value">{risque.lieux}</span>
-      <span className="meta muted">
-        P{risque.probabilite} × G{risque.gravite} = {risque.score}
-        <span className={`badge ${badge}`}> {t(`hse.statut_risque.${risque.statut}`)}</span>
-      </span>
-    </div>
-  );
+type T = (key: string) => string;
+
+function risqueColumns(t: T): Column<EvaluationRisque>[] {
+  return [
+    { key: "code", header: t("hse.col.code"), render: (r) => r.code },
+    { key: "lieux", header: t("hse.col.lieux"), render: (r) => r.lieux },
+    { key: "score", header: t("hse.col.score"), num: true, render: (r) => `P${r.probabilite} × G${r.gravite} = ${r.score}` },
+    {
+      key: "crit",
+      header: t("hse.col.criticite"),
+      render: (r) => (
+        <Badge tone={r.criticite === "critique" ? "err" : r.criticite === "elevee" ? "warn" : "brand"}>
+          {t(`hse.criticite.${r.criticite}`)}
+        </Badge>
+      ),
+    },
+    { key: "statut", header: t("hse.col.statut"), render: (r) => t(`hse.statut_risque.${r.statut}`) },
+  ];
 }
 
-function AtexCard({ eq }: { eq: EquipementAtex }) {
-  const { t } = useTranslation();
-  const badge = eq.statut === "ecarte" ? "err" : eq.statut === "quarantaine" ? "warn" : "ok";
-  return (
-    <div className="card kpi" key={eq.id}>
-      <span className="kpi-label">{eq.code} · {t(`hse.atx_statut.${eq.statut}`)}</span>
-      <span className="kpi-value">{eq.designation}</span>
-      <span className="meta muted">
-        {eq.zone_atex || "—"} · {eq.certificat || "—"}
-        {eq.certificat_expire ? (
-          <span className="badge err"> {t("hse.atx_expire")}</span>
+function atexColumns(t: T): Column<EquipementAtex>[] {
+  return [
+    { key: "code", header: t("hse.col.code"), render: (e) => e.code },
+    { key: "designation", header: t("hse.col.designation"), render: (e) => e.designation },
+    { key: "zone", header: t("hse.col.zone"), render: (e) => e.zone_atex || "—" },
+    { key: "cert", header: t("hse.col.certificat"), render: (e) => e.certificat || "—" },
+    {
+      key: "statut",
+      header: t("hse.col.statut"),
+      render: (e) =>
+        e.certificat_expire ? (
+          <Badge tone="err">{t("hse.atx_expire")}</Badge>
         ) : (
-          <span className={`badge ${badge}`}> {t(`hse.atx_statut.${eq.statut}`)}</span>
-        )}
-      </span>
-    </div>
-  );
+          <Badge tone={e.statut === "ecarte" ? "err" : e.statut === "quarantaine" ? "warn" : "ok"}>
+            {t(`hse.atx_statut.${e.statut}`)}
+          </Badge>
+        ),
+    },
+  ];
 }
 
-function FormCard({ form }: { form: FormationSecurite }) {
-  const { t } = useTranslation();
-  return (
-    <div className="card kpi" key={form.id}>
-      <span className="kpi-label">
-        {form.code} · {t(`hse.formation_types.${form.type_session}`)}
-      </span>
-      <span className="kpi-value">{form.theme}</span>
-      <span className="meta muted">
-        {formatDate(form.date_session)}
-        {form.nb_participants > 0 ? ` · ${form.nb_participants}${t("hse.participants")}` : ""}
-        <span className={`badge ${form.statut === "realisee" ? "ok" : form.statut === "annulee" ? "err" : "brand"}`}>
-          {" "}{t(`hse.formation_statut.${form.statut}`)}
-        </span>
-      </span>
-    </div>
-  );
+function formationColumns(t: T): Column<FormationSecurite>[] {
+  return [
+    { key: "code", header: t("hse.col.code"), render: (f) => f.code },
+    { key: "theme", header: t("hse.col.theme"), render: (f) => f.theme },
+    { key: "type", header: t("hse.col.type"), render: (f) => t(`hse.formation_types.${f.type_session}`) },
+    { key: "date", header: t("hse.col.date"), render: (f) => formatDate(f.date_session) },
+    { key: "nb", header: t("hse.col.participants"), num: true, render: (f) => f.nb_participants },
+    {
+      key: "statut",
+      header: t("hse.col.statut"),
+      render: (f) => (
+        <Badge tone={f.statut === "realisee" ? "ok" : f.statut === "annulee" ? "err" : "brand"}>
+          {t(`hse.formation_statut.${f.statut}`)}
+        </Badge>
+      ),
+    },
+  ];
 }
 
-function EpiCard({ epi }: { epi: Epi }) {
-  const { t } = useTranslation();
-  return (
-    <div className="card kpi" key={epi.id}>
-      <span className="kpi-label">{epi.code} · {t(`hse.epi_types.${epi.type_epi}`)}</span>
-      <span className="kpi-value">{epi.designation}</span>
-      <span className="meta muted">
-        {epi.beneficiaire_name ?? "—"}
-        {epi.a_renouveler ? (
-          <span className="badge warn"> {t("hse.epi_renouveler")}</span>
+function epiColumns(t: T): Column<Epi>[] {
+  return [
+    { key: "code", header: t("hse.col.code"), render: (e) => e.code },
+    { key: "designation", header: t("hse.col.designation"), render: (e) => e.designation },
+    { key: "type", header: t("hse.col.type"), render: (e) => t(`hse.epi_types.${e.type_epi}`) },
+    { key: "benef", header: t("hse.col.beneficiaire"), render: (e) => e.beneficiaire_name ?? "—" },
+    {
+      key: "statut",
+      header: t("hse.col.statut"),
+      render: (e) =>
+        e.a_renouveler ? (
+          <Badge tone="warn">{t("hse.epi_renouveler")}</Badge>
         ) : (
-          <span className={`badge ${epi.statut === "en_usage" ? "brand" : "ok"}`}>
-            {" "}{t(`hse.epi_statut.${epi.statut}`)}
-          </span>
-        )}
-      </span>
-    </div>
-  );
+          <Badge tone={e.statut === "en_usage" ? "brand" : "ok"}>{t(`hse.epi_statut.${e.statut}`)}</Badge>
+        ),
+    },
+  ];
 }
 
-function BsdCard({ bsd }: { bsd: BordereauDechet }) {
-  const { t } = useTranslation();
-  const badge =
-    bsd.statut === "traite" ? "ok" : bsd.statut === "emis" ? "brand" : "warn";
-  return (
-    <div className="card kpi" key={bsd.id}>
-      <span className="kpi-label">{bsd.code} · {t(`hse.dechet_types.${bsd.type_dechet}`)}</span>
-      <span className="kpi-value">
-        {bsd.numero_bsd || "—"} · {bsd.quantite} {bsd.unite_label}
-      </span>
-      <span className="meta muted">
-        {bsd.transporteur_name ?? "—"}
-        <span className={`badge ${badge}`}> {t(`hse.bsd_statut.${bsd.statut}`)}</span>
-      </span>
-    </div>
-  );
+function bsdColumns(t: T): Column<BordereauDechet>[] {
+  return [
+    { key: "code", header: t("hse.col.code"), render: (b) => b.code },
+    { key: "numero", header: t("hse.col.numeroBsd"), render: (b) => b.numero_bsd || "—" },
+    { key: "type", header: t("hse.col.type"), render: (b) => t(`hse.dechet_types.${b.type_dechet}`) },
+    { key: "qty", header: t("hse.col.quantite"), num: true, render: (b) => `${b.quantite} ${b.unite_label}` },
+    { key: "transp", header: t("hse.col.transporteur"), render: (b) => b.transporteur_name ?? "—" },
+    {
+      key: "statut",
+      header: t("hse.col.statut"),
+      render: (b) => (
+        <Badge tone={b.statut === "traite" ? "ok" : b.statut === "emis" ? "brand" : "warn"}>
+          {t(`hse.bsd_statut.${b.statut}`)}
+        </Badge>
+      ),
+    },
+  ];
 }
 
 function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
@@ -317,40 +325,31 @@ export function HsePage() {
         </>
       ) : null}
 
-      {risquesAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("hse.risques")}
-          </h3>
-          <div className="card-list">
-            {risquesAll.map((r) => <RisqueCard key={r.id} risque={r} />)}
-          </div>
-        </>
-      ) : null}
-
-      {(atexAll.length > 0 || formAll.length > 0) ? (
-        <>
-          <h3 className="section-heading">
-            {t("hse.atex")} · {t("hse.formations")}
-          </h3>
-          <div className="card-list">
-            {atexAll.map((eq) => <AtexCard key={eq.id} eq={eq} />)}
-            {formAll.map((f) => <FormCard key={f.id} form={f} />)}
-          </div>
-        </>
-      ) : null}
-
-      {(epiAll.length > 0 || bsdAll.length > 0) ? (
-        <>
-          <h3 className="section-heading">
-            {t("hse.epi")} · {t("hse.bsd")}
-          </h3>
-          <div className="card-list">
-            {epiAll.map((e) => <EpiCard key={e.id} epi={e} />)}
-            {bsdAll.map((b) => <BsdCard key={b.id} bsd={b} />)}
-          </div>
-        </>
-      ) : null}
+      {risquesAll.length > 0 && (
+        <SectionCard title={`${t("hse.risques")} · ${risquesAll.length}`}>
+          <DataTable rows={risquesAll} columns={risqueColumns(t)} caption={t("hse.risques")} />
+        </SectionCard>
+      )}
+      {atexAll.length > 0 && (
+        <SectionCard title={`${t("hse.atex")} · ${atexAll.length}`}>
+          <DataTable rows={atexAll} columns={atexColumns(t)} caption={t("hse.atex")} />
+        </SectionCard>
+      )}
+      {formAll.length > 0 && (
+        <SectionCard title={`${t("hse.formations")} · ${formAll.length}`}>
+          <DataTable rows={formAll} columns={formationColumns(t)} caption={t("hse.formations")} />
+        </SectionCard>
+      )}
+      {epiAll.length > 0 && (
+        <SectionCard title={`${t("hse.epi")} · ${epiAll.length}`}>
+          <DataTable rows={epiAll} columns={epiColumns(t)} caption={t("hse.epi")} />
+        </SectionCard>
+      )}
+      {bsdAll.length > 0 && (
+        <SectionCard title={`${t("hse.bsd")} · ${bsdAll.length}`}>
+          <DataTable rows={bsdAll} columns={bsdColumns(t)} caption={t("hse.bsd")} />
+        </SectionCard>
+      )}
     </>
   );
 }

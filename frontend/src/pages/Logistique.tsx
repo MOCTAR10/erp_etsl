@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import type { Column } from "../components/ui";
 import type {
   DemandeMobilisation,
   EquipementParc,
@@ -62,37 +63,47 @@ function EquipementCard({ eq, index }: { eq: EquipementParc; index: number }) {
   );
 }
 
-function LocationCard({ loc, index }: { loc: LocationGR; index: number }) {
-  const { t } = useTranslation();
-  const masked = loc.montant_estime === null;
-  return (
-    <Kpi
-      label={`${loc.code} · ${loc.statut_label}${loc.imputation_618 ? ` · 618` : ""}`}
-      value={masked ? t("logistique.masked") : formatNumber(Number(loc.montant_estime))}
-      hint={`${loc.equipement_code} — ${loc.partenaire_name} · ${loc.periodicite_label} · ${
-        loc.consommation === null ? "—" : `${formatNumber(Number(loc.consommation))}`
-      }`}
-      icon={MapPin}
-      tone="warn"
-      delay={index * 0.05}
-    />
-  );
+type T = (key: string) => string;
+
+function locationColumns(t: T): Column<LocationGR>[] {
+  return [
+    { key: "code", header: t("logistique.col.code"), render: (l) => l.code },
+    { key: "equip", header: t("logistique.col.equipement"), render: (l) => l.equipement_code },
+    { key: "partner", header: t("logistique.col.partenaire"), render: (l) => l.partenaire_name },
+    { key: "period", header: t("logistique.col.periodicite"), render: (l) => l.periodicite_label },
+    {
+      key: "conso",
+      header: t("logistique.col.consommation"),
+      num: true,
+      render: (l) => (l.consommation === null ? "—" : formatNumber(Number(l.consommation))),
+    },
+    {
+      key: "montant",
+      header: t("logistique.col.montant"),
+      num: true,
+      render: (l) => (l.montant_estime === null ? t("logistique.masked") : `${formatNumber(Number(l.montant_estime))} F`),
+    },
+    {
+      key: "statut",
+      header: t("logistique.col.statut"),
+      render: (l) => (
+        <>
+          <Badge tone="brand">{l.statut_label}</Badge> {l.imputation_618 && <Badge tone="warn">618</Badge>}
+        </>
+      ),
+    },
+  ];
 }
 
-function DemandeCard({ demande, index }: { demande: DemandeMobilisation; index: number }) {
-  const { t } = useTranslation();
-  return (
-    <Kpi
-      label={`${demande.code} · ${demande.statut_label}`}
-      value={demande.label}
-      hint={`${demande.departement}${demande.date_debut ? ` · ${t("logistique.debut")} ${formatDate(demande.date_debut)}` : ""}${
-        demande.affaire_code ? ` · ${demande.affaire_code}` : ""
-      }`}
-      icon={ClipboardList}
-      tone="brand"
-      delay={index * 0.05}
-    />
-  );
+function demandeColumns(t: T): Column<DemandeMobilisation>[] {
+  return [
+    { key: "code", header: t("logistique.col.code"), render: (d) => d.code },
+    { key: "label", header: t("logistique.col.besoin"), render: (d) => d.label },
+    { key: "dept", header: t("logistique.col.departement"), render: (d) => d.departement || "—" },
+    { key: "debut", header: t("logistique.debut"), render: (d) => (d.date_debut ? formatDate(d.date_debut) : "—") },
+    { key: "affaire", header: t("logistique.col.affaire"), render: (d) => d.affaire_code ?? "—" },
+    { key: "statut", header: t("logistique.col.statut"), render: (d) => <Badge tone="brand">{d.statut_label}</Badge> },
+  ];
 }
 
 export function LogistiquePage() {
@@ -204,29 +215,16 @@ export function LogistiquePage() {
         </Board>
       </div>
 
-      {(locations.data ?? []).length > 0 ? (
-        <h3 className="section-heading">
-          {t("logistique.locationsActives")} — GLOBAL RENTAL
-        </h3>
-      ) : null}
-      <div className="kpi-grid">
-        {(locations.data ?? []).map((loc, i) => (
-          <LocationCard key={loc.id} loc={loc} index={i} />
-        ))}
-      </div>
-
-      {(demandes.data ?? []).length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("logistique.demandes")}
-          </h3>
-          <div className="kpi-grid">
-            {(demandes.data ?? []).map((demande, i) => (
-              <DemandeCard key={demande.id} demande={demande} index={i} />
-            ))}
-          </div>
-        </>
-      ) : null}
+      {(locations.data ?? []).length > 0 && (
+        <SectionCard title={`${t("logistique.locationsActives")} — GLOBAL RENTAL`}>
+          <DataTable rows={locations.data ?? []} columns={locationColumns(t)} caption={t("logistique.locationsActives")} />
+        </SectionCard>
+      )}
+      {(demandes.data ?? []).length > 0 && (
+        <SectionCard title={`${t("logistique.demandes")} · ${(demandes.data ?? []).length}`}>
+          <DataTable rows={demandes.data ?? []} columns={demandeColumns(t)} caption={t("logistique.demandes")} />
+        </SectionCard>
+      )}
     </>
   );
 }

@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Award, ClipboardCheck, FileCheck2, FileText, ShieldAlert } from "lucide-react";
+import { Award, ClipboardCheck, FileCheck2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import type { Column } from "../components/ui";
 import type {
   ControleQualite,
   NonConformite,
@@ -27,70 +28,79 @@ const NC_BADGE: Record<StatutNC, "ok" | "warn" | "err" | "brand"> = {
 const NC_ORDER: StatutNC[] = ["signalee", "analysee", "en_traitement", "cloturee"];
 const NC_VALID = new Set<StatutNC>(NC_ORDER);
 
-function QualifCard({ qual, index }: { qual: QualificationSoudeur; index: number }) {
-  const { t } = useTranslation();
-  const expired = qual.statut === "expiree";
-  return (
-    <Kpi
-      label={`${qual.code} · ${qual.soudeur_code} · ${t(`qualite.norms.${qual.norme}`)}`}
-      value={qual.soudeur_name}
-      hint={
-        <>
-          {qual.procede_label} · {qual.position || "—"} · {formatDate(qual.date_validite)}
-          {expired ? (
-            <span className="badge err"> {t("qualite.expiree")}</span>
-          ) : (
-            <span className="badge ok"> {t("qualite.valide")}</span>
-          )}
-        </>
-      }
-      icon={Award}
-      tone={expired ? "warn" : "ok"}
-      delay={index * 0.05}
-    />
-  );
+type T = (key: string) => string;
+
+function qualifColumns(t: T): Column<QualificationSoudeur>[] {
+  return [
+    { key: "code", header: t("qualite.col.code"), render: (q) => q.code },
+    { key: "soudeur", header: t("qualite.col.soudeur"), render: (q) => `${q.soudeur_name} (${q.soudeur_code})` },
+    { key: "norme", header: t("qualite.col.norme"), render: (q) => t(`qualite.norms.${q.norme}`) },
+    { key: "procede", header: t("qualite.col.procede"), render: (q) => `${q.procede_label} · ${q.position || "—"}` },
+    { key: "validite", header: t("qualite.col.validite"), render: (q) => formatDate(q.date_validite) },
+    {
+      key: "statut",
+      header: t("qualite.col.statut"),
+      render: (q) =>
+        q.statut === "expiree" ? <Badge tone="err">{t("qualite.expiree")}</Badge> : <Badge tone="ok">{t("qualite.valide")}</Badge>,
+    },
+  ];
 }
 
-function WpsCard({ wps, index }: { wps: WpsWpqr; index: number }) {
-  const { t } = useTranslation();
-  return (
-    <Kpi
-      label={`${wps.code} · ${t(`qualite.wps_type.${wps.type}`)}`}
-      value={wps.reference || "—"}
-      hint={
-        <>
-          {wps.procede_label} · {wps.materiau || "—"} ·{" "}
-          <span className={`badge ${wps.statut === "valide" ? "ok" : "brand"}`}>
-            {t(`qualite.wps_status.${wps.statut}`)}
-          </span>
-        </>
-      }
-      icon={FileCheck2}
-      tone={wps.statut === "valide" ? "ok" : "brand"}
-      delay={index * 0.05}
-    />
-  );
+function wpsColumns(t: T): Column<WpsWpqr>[] {
+  return [
+    { key: "code", header: t("qualite.col.code"), render: (w) => w.code },
+    { key: "type", header: t("qualite.col.type"), render: (w) => t(`qualite.wps_type.${w.type}`) },
+    { key: "ref", header: t("qualite.col.reference"), render: (w) => w.reference || "—" },
+    { key: "procede", header: t("qualite.col.procede"), render: (w) => w.procede_label },
+    { key: "materiau", header: t("qualite.col.materiau"), render: (w) => w.materiau || "—" },
+    {
+      key: "statut",
+      header: t("qualite.col.statut"),
+      render: (w) => <Badge tone={w.statut === "valide" ? "ok" : "brand"}>{t(`qualite.wps_status.${w.statut}`)}</Badge>,
+    },
+  ];
 }
 
-function CtrlCard({ ctrl, index }: { ctrl: ControleQualite; index: number }) {
-  const { t } = useTranslation();
-  const badge: "ok" | "warn" | "err" = ctrl.resultat === "conforme" ? "ok" : ctrl.resultat === "reserve" ? "warn" : "err";
-  return (
-    <Kpi
-      label={`${ctrl.code} · ${t(`qualite.ctrl_types.${ctrl.type_controle}`)}`}
-      value={ctrl.point_controle || ctrl.type_label}
-      hint={
-        <>
-          {ctrl.affaire_code ?? ctrl.ordre_code ?? ctrl.lot_code ?? "—"}
-          {ctrl.organisme === "agrege" ? ` · ${ctrl.organisme_libelle || t("qualite.agrege")}` : ""}
-          <span className={`badge ${badge}`}> {t(`qualite.ctrl_result.${ctrl.resultat}`)}</span>
-        </>
-      }
-      icon={ClipboardCheck}
-      tone={badge}
-      delay={index * 0.05}
-    />
-  );
+function ctrlColumns(t: T): Column<ControleQualite>[] {
+  return [
+    { key: "code", header: t("qualite.col.code"), render: (c) => c.code },
+    { key: "type", header: t("qualite.col.type"), render: (c) => t(`qualite.ctrl_types.${c.type_controle}`) },
+    { key: "point", header: t("qualite.col.point"), render: (c) => c.point_controle || c.type_label },
+    { key: "objet", header: t("qualite.col.objet"), render: (c) => c.affaire_code ?? c.ordre_code ?? c.lot_code ?? "—" },
+    {
+      key: "organisme",
+      header: t("qualite.col.organisme"),
+      render: (c) => (c.organisme === "agrege" ? c.organisme_libelle || t("qualite.agrege") : "—"),
+    },
+    {
+      key: "resultat",
+      header: t("qualite.col.resultat"),
+      render: (c) => (
+        <Badge tone={c.resultat === "conforme" ? "ok" : c.resultat === "reserve" ? "warn" : "err"}>
+          {t(`qualite.ctrl_result.${c.resultat}`)}
+        </Badge>
+      ),
+    },
+  ];
+}
+
+function pvColumns(t: T): Column<PvControle>[] {
+  return [
+    { key: "code", header: t("qualite.col.code"), render: (p) => p.code },
+    { key: "intitule", header: t("qualite.intitule"), render: (p) => p.intitule },
+    { key: "affaire", header: t("qualite.col.objet"), render: (p) => p.affaire_code ?? "—" },
+    { key: "date", header: t("qualite.col.date"), render: (p) => formatDate(p.date_pv) },
+    { key: "retention", header: t("qualite.col.retention"), num: true, render: (p) => `${p.retention_years} ${t("qualite.col.ans")}` },
+    {
+      key: "statut",
+      header: t("qualite.col.statut"),
+      render: (p) => (
+        <Badge tone={p.statut === "receptionne" ? "ok" : p.statut === "reserve" ? "warn" : p.statut === "rejete" ? "err" : "brand"}>
+          {t(`qualite.pv_statut.${p.statut}`)}
+        </Badge>
+      ),
+    },
+  ];
 }
 
 function NcCard({ nc, index }: { nc: NonConformite; index: number }) {
@@ -112,27 +122,6 @@ function NcCard({ nc, index }: { nc: NonConformite; index: number }) {
         {nc.actions_count > 0 ? ` · ${t("qualite.capa")} ×${nc.actions_count}` : ""}
       </div>
     </BoardCard>
-  );
-}
-
-function PvCard({ pv, index }: { pv: PvControle; index: number }) {
-  const { t } = useTranslation();
-  const badge: "ok" | "warn" | "err" | "brand" = pv.statut === "receptionne" ? "ok" : pv.statut === "reserve" ? "warn" : pv.statut === "rejete" ? "err" : "brand";
-  return (
-    <Kpi
-      label={`${pv.code} · ${t("qualite.intitule")}`}
-      value={pv.intitule}
-      hint={
-        <>
-          {pv.affaire_code ?? "—"} · {formatDate(pv.date_pv)}
-          <span className={`badge ${badge}`}> {t(`qualite.pv_statut.${pv.statut}`)}</span>
-          <span className="badge brand"> {pv.retention_years}y</span>
-        </>
-      }
-      icon={FileText}
-      tone={badge}
-      delay={index * 0.05}
-    />
   );
 }
 
@@ -273,39 +262,26 @@ export function QualitePage() {
         </Board>
       </div>
 
-      {qualifsAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("qualite.qualifs")}
-          </h3>
-          <div className="kpi-grid">
-            {qualifsAll.map((q, i) => <QualifCard key={q.id} qual={q} index={i} />)}
-          </div>
-        </>
-      ) : null}
-
-      {wpsAll.length > 0 || ctrlAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("qualite.wps")} · {t("qualite.controles")}
-          </h3>
-          <div className="kpi-grid">
-            {wpsAll.map((w, i) => <WpsCard key={w.id} wps={w} index={i} />)}
-            {ctrlAll.map((c, i) => <CtrlCard key={c.id} ctrl={c} index={i} />)}
-          </div>
-        </>
-      ) : null}
-
-      {pvAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("qualite.pvs")}
-          </h3>
-          <div className="kpi-grid">
-            {pvAll.map((pv, i) => <PvCard key={pv.id} pv={pv} index={i} />)}
-          </div>
-        </>
-      ) : null}
+      {qualifsAll.length > 0 && (
+        <SectionCard title={`${t("qualite.qualifs")} · ${qualifsAll.length}`}>
+          <DataTable rows={qualifsAll} columns={qualifColumns(t)} caption={t("qualite.qualifs")} />
+        </SectionCard>
+      )}
+      {wpsAll.length > 0 && (
+        <SectionCard title={`${t("qualite.wps")} · ${wpsAll.length}`}>
+          <DataTable rows={wpsAll} columns={wpsColumns(t)} caption={t("qualite.wps")} />
+        </SectionCard>
+      )}
+      {ctrlAll.length > 0 && (
+        <SectionCard title={`${t("qualite.controles")} · ${ctrlAll.length}`}>
+          <DataTable rows={ctrlAll} columns={ctrlColumns(t)} caption={t("qualite.controles")} />
+        </SectionCard>
+      )}
+      {pvAll.length > 0 && (
+        <SectionCard title={`${t("qualite.pvs")} · ${pvAll.length}`}>
+          <DataTable rows={pvAll} columns={pvColumns(t)} caption={t("qualite.pvs")} />
+        </SectionCard>
+      )}
       <ItpSection />
     </>
   );

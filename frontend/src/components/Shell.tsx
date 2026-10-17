@@ -144,6 +144,8 @@ export function Shell() {
         e.preventDefault();
         setPaletteOpen((o) => !o);
       }
+      // Tiroir de navigation mobile : Échap le referme (comportement attendu au clavier).
+      if (e.key === "Escape") setNavOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -251,7 +253,7 @@ export function Shell() {
             </div>
           </header>
 
-          <main className="main" id="main-content" tabIndex={-1}>
+          <main className="main" id="main-content" tabIndex={0}>
             <Outlet />
           </main>
         </div>

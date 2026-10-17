@@ -3,8 +3,9 @@ import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
-import { formatNumber } from "../lib/format";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import type { Column } from "../components/ui";
+import { formatDate, formatNumber } from "../lib/format";
 import type {
   AlertesResult,
   Assurance,
@@ -19,7 +20,11 @@ import type {
   Reunion,
   StatutAssurance,
   StatutCaution,
+  StatutContentieux,
   StatutConvention,
+  StatutCourrier,
+  StatutDossierGR,
+  StatutReunion,
 } from "../types";
 
 const BANDE_BADGE: Record<BandeEcheance, "ok" | "warn" | "err"> = {
@@ -54,7 +59,7 @@ function ConventionCard({ c, index }: { c: Convention; index: number }) {
         <span className={`badge ${badge}`}>{t(`juridique.statut_convention.${c.statut}`)}</span>{" "}
         {c.date_fin ? (
           <span className="muted">
-            {c.date_fin} · {c.days_left !== null ? `${c.days_left} ${t("juridique.jours")}` : "—"}
+            {c.date_fin ? formatDate(c.date_fin) : "—"} · {c.days_left !== null ? `${c.days_left} ${t("juridique.jours")}` : "—"}
           </span>
         ) : null}
       </div>
@@ -62,51 +67,123 @@ function ConventionCard({ c, index }: { c: Convention; index: number }) {
   );
 }
 
-function CautionCard({ c }: { c: Caution }) {
-  const { t } = useTranslation();
-  const badge: Record<StatutCaution, "ok" | "warn" | "err"> = {
-    en_cours: "ok",
-    levee: "warn",
-    appelee: "err",
-    expiree: "err",
-  };
-  return (
-    <div className="card kpi" key={c.id}>
-      <span className="kpi-label">
-        {c.code} · {c.type_label} <span className={`badge ${badge[c.statut]}`}>{t(`juridique.statut_caution.${c.statut}`)}</span>
-      </span>
-      <span className="kpi-value">
-        {c.has_amount_access && c.montant !== null ? formatNumber(c.montant) : "••••••"} F
-      </span>
-      <span className="meta muted">
-        {c.beneficiaire} · {c.date_echeance} · {c.days_left !== null ? `${c.days_left} ${t("juridique.jours")}` : "—"}
-      </span>
-    </div>
-  );
+type T = (key: string, opts?: Record<string, unknown>) => string;
+type Tone = "ok" | "warn" | "err" | "brand";
+
+const CAUTION_TONE: Record<StatutCaution, Tone> = { en_cours: "ok", levee: "brand", appelee: "err", expiree: "err" };
+const ASSURANCE_TONE: Record<StatutAssurance, Tone> = { active: "ok", a_renouveler: "warn", expiree: "err", resiliee: "err" };
+const CONTENTIEUX_TONE: Record<StatutContentieux, Tone> = {
+  ouvert: "warn",
+  en_instruction: "brand",
+  gagne: "ok",
+  perdu: "err",
+  transaction: "ok",
+  cloture: "brand",
+};
+const COURRIER_TONE: Record<StatutCourrier, Tone> = { recu: "warn", enregistre: "brand", classe: "ok", archive: "ok" };
+const REUNION_TONE: Record<StatutReunion, Tone> = { planifiee: "warn", tenue: "ok", cloturee: "brand" };
+const GR_TONE: Record<StatutDossierGR, Tone> = { brouillon: "warn", ouvert: "brand", cloture: "ok" };
+
+const amount = (access: boolean, value: string | number | null) =>
+  access && value !== null ? `${formatNumber(value)} F` : "••••••";
+const dateOr = (iso: string | null | undefined) => (iso ? formatDate(iso) : "—");
+const daysLeft = (t: T, d: number | null) => (d === null ? "—" : `${d} ${t("juridique.jours")}`);
+
+function cautionColumns(t: T): Column<Caution>[] {
+  return [
+    { key: "code", header: t("juridique.col.code"), render: (c) => c.code },
+    { key: "type", header: t("juridique.col.type"), render: (c) => c.type_label },
+    { key: "benef", header: t("juridique.col.beneficiaire"), render: (c) => c.beneficiaire || "—" },
+    { key: "montant", header: t("juridique.col.montant"), num: true, render: (c) => amount(c.has_amount_access, c.montant) },
+    { key: "ech", header: t("juridique.col.echeance"), render: (c) => dateOr(c.date_echeance) },
+    { key: "reste", header: t("juridique.col.reste"), num: true, render: (c) => daysLeft(t, c.days_left) },
+    {
+      key: "statut",
+      header: t("juridique.col.statut"),
+      render: (c) => <Badge tone={CAUTION_TONE[c.statut]}>{t(`juridique.statut_caution.${c.statut}`)}</Badge>,
+    },
+  ];
 }
 
-function AssuranceCard({ a }: { a: Assurance }) {
-  const { t } = useTranslation();
-  const badge: Record<StatutAssurance, "ok" | "warn" | "err"> = {
-    active: "ok",
-    a_renouveler: "warn",
-    expiree: "err",
-    resiliee: "err",
-  };
-  return (
-    <div className="card kpi" key={a.id}>
-      <span className="kpi-label">
-        {a.code} · {a.type_label} · {a.numero_police}{" "}
-        <span className={`badge ${badge[a.statut]}`}>{t(`juridique.statut_assurance.${a.statut}`)}</span>
-      </span>
-      <span className="kpi-value">
-        {a.has_amount_access && a.prime_annuelle !== null ? formatNumber(a.prime_annuelle) : "••••••"} F
-      </span>
-      <span className="meta muted">
-        {a.assureur_name ?? "—"} · {a.date_echeance} · {a.days_left !== null ? `${a.days_left} ${t("juridique.jours")}` : "—"}
-      </span>
-    </div>
-  );
+function assuranceColumns(t: T): Column<Assurance>[] {
+  return [
+    { key: "code", header: t("juridique.col.code"), render: (a) => a.code },
+    { key: "type", header: t("juridique.col.type"), render: (a) => a.type_label },
+    { key: "police", header: t("juridique.col.police"), render: (a) => a.numero_police || "—" },
+    { key: "assureur", header: t("juridique.col.assureur"), render: (a) => a.assureur_name ?? "—" },
+    { key: "prime", header: t("juridique.col.prime"), num: true, render: (a) => amount(a.has_amount_access, a.prime_annuelle) },
+    { key: "ech", header: t("juridique.col.echeance"), render: (a) => dateOr(a.date_echeance) },
+    { key: "reste", header: t("juridique.col.reste"), num: true, render: (a) => daysLeft(t, a.days_left) },
+    {
+      key: "statut",
+      header: t("juridique.col.statut"),
+      render: (a) => <Badge tone={ASSURANCE_TONE[a.statut]}>{t(`juridique.statut_assurance.${a.statut}`)}</Badge>,
+    },
+  ];
+}
+
+function contentieuxColumns(t: T): Column<Contentieux>[] {
+  return [
+    { key: "code", header: t("juridique.col.code"), render: (l) => l.code },
+    { key: "objet", header: t("juridique.col.objet"), render: (l) => l.objet },
+    { key: "partie", header: t("juridique.col.partieAdverse"), render: (l) => l.partie_adverse ?? "—" },
+    { key: "phase", header: t("juridique.col.phase"), render: (l) => l.phase_label },
+    { key: "enjeu", header: t("juridique.col.enjeu"), num: true, render: (l) => amount(l.has_amount_access, l.montant_en_jeu) },
+    {
+      key: "statut",
+      header: t("juridique.col.statut"),
+      render: (l) => <Badge tone={CONTENTIEUX_TONE[l.statut]}>{t(`juridique.statut_contentieux.${l.statut}`)}</Badge>,
+    },
+  ];
+}
+
+function grColumns(t: T): Column<DossierGlobalRental>[] {
+  return [
+    { key: "code", header: t("juridique.col.code"), render: (g) => g.code },
+    { key: "objet", header: t("juridique.col.objet"), render: (g) => g.objet },
+    { key: "partner", header: t("juridique.col.partenaire"), render: (g) => g.partenaire_gr_name },
+    { key: "montant", header: t("juridique.col.montant"), num: true, render: (g) => amount(g.has_amount_access, g.montant_estime) },
+    {
+      key: "statut",
+      header: t("juridique.col.statut"),
+      render: (g) => (
+        <>
+          <Badge tone={GR_TONE[g.statut]}>{t(`juridique.statut_gr.${g.statut}`)}</Badge>{" "}
+          {g.signe_618 && <Badge tone="warn">618</Badge>}
+        </>
+      ),
+    },
+  ];
+}
+
+function courrierColumns(t: T): Column<Courrier>[] {
+  return [
+    { key: "code", header: t("juridique.col.code"), render: (c) => c.code },
+    { key: "sens", header: t("juridique.col.sens"), render: (c) => c.sens_label },
+    { key: "objet", header: t("juridique.col.objet"), render: (c) => c.objet },
+    { key: "tiers", header: t("juridique.col.tiers"), render: (c) => c.tiers_name ?? "—" },
+    { key: "date", header: t("juridique.col.date"), render: (c) => dateOr(c.date_reception ?? c.date_courrier) },
+    {
+      key: "statut",
+      header: t("juridique.col.statut"),
+      render: (c) => <Badge tone={COURRIER_TONE[c.statut]}>{t(`juridique.statut_courrier.${c.statut}`)}</Badge>,
+    },
+  ];
+}
+
+function reunionColumns(t: T): Column<Reunion>[] {
+  return [
+    { key: "code", header: t("juridique.col.code"), render: (r) => r.code },
+    { key: "type", header: t("juridique.col.type"), render: (r) => r.type_label },
+    { key: "objet", header: t("juridique.col.objet"), render: (r) => r.objet },
+    { key: "date", header: t("juridique.col.date"), render: (r) => dateOr(r.date_reunion) },
+    { key: "decisions", header: t("juridique.col.decisions"), num: true, render: (r) => r.nb_decisions },
+    {
+      key: "statut",
+      header: t("juridique.col.statut"),
+      render: (r) => <Badge tone={REUNION_TONE[r.statut]}>{t(`juridique.statut_reunion.${r.statut}`)}</Badge>,
+    },
+  ];
 }
 
 export function JuridiquePage() {
@@ -243,7 +320,7 @@ export function JuridiquePage() {
                     </span>
                     <span className="kpi-value">{el.libelle}</span>
                     <span className="meta muted">
-                      {el.date_echeance} · {el.jours} {t("juridique.jours")}
+                      {formatDate(el.date_echeance)} · {el.jours} {t("juridique.jours")}
                     </span>
                   </div>
                 ))
@@ -282,145 +359,36 @@ export function JuridiquePage() {
         </>
       ) : null}
 
-      {cautionsList.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("juridique.cautions")} · {cautionsList.length}
-          </h3>
-          <div className="card-list">
-            {cautionsList.map((c) => (
-              <CautionCard key={c.id} c={c} />
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      {assurancesList.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("juridique.assurances")} · {assurancesList.length}
-          </h3>
-          <div className="card-list">
-            {assurancesList.map((aPolicy) => (
-              <AssuranceCard key={aPolicy.id} a={aPolicy} />
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      {litiges.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("juridique.contentieux")} · {litiges.length}
-          </h3>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>{t("juridique.contentieuxType")}</th>
-                <th>{t("juridique.cautionEchEntrant")}</th>
-                <th>{t("juridique.statut_contentieux")}</th>
-                <th>•</th>
-              </tr>
-            </thead>
-            <tbody>
-              {litiges.map((l) => (
-                <tr key={l.id}>
-                  <td>{l.code}</td>
-                  <td>
-                    {l.objet} <span className="muted">· {l.partie_adverse ?? "—"}</span>
-                  </td>
-                  <td>{l.phase_label}</td>
-                  <td>
-                    <span className="badge warn">{t(`juridique.statut_contentieux.${l.statut}`)}</span>
-                  </td>
-                  <td>{l.has_amount_access && l.montant_en_jeu !== null ? `${formatNumber(l.montant_en_jeu)} F` : "••••••"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      ) : null}
-
-      {grs.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            GLOBAL RENTAL · {grs.length}
-          </h3>
-          <div className="card-list">
-            {grs.map((g) => (
-              <div className="card kpi" key={g.id}>
-                <span className="kpi-label">
-                  {g.code} · {g.signe_618 ? "618" : "—"} ·{" "}
-                  <span className="badge warn">{t(`juridique.statut_gr.${g.statut}`)}</span>
-                </span>
-                <span className="kpi-value">
-                  {g.has_amount_access && g.montant_estime !== null ? formatNumber(g.montant_estime) : "••••••"} F
-                </span>
-                <span className="meta muted">{g.objet} · {g.partenaire_gr_name}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      {courts.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("juridique.courriers")} · {courts.length}
-          </h3>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>{t("juridique.courier")}</th>
-                <th>Tiers</th>
-                <th>{t("juridique.statut_courrier")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {courts.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.code}</td>
-                  <td>{c.objet}</td>
-                  <td>{c.tiers_name ?? "—"}</td>
-                  <td>
-                    <span className="badge ok">{t(`juridique.statut_courrier.${c.statut}`)}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      ) : null}
-
-      {reunionsList.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("juridique.reunions")} · {reunionsList.length}
-          </h3>
-          <div className="card-list">
-            {reunionsList.map((r) => (
-              <div className="card kpi" key={r.id}>
-                <span className="kpi-label">
-                  {r.code} · {r.type_label} ·{" "}
-                  <span className={`badge ${r.statut === "tenue" ? "ok" : r.statut === "cloturee" ? "err" : "warn"}`}>
-                    {t(`juridique.statut_reunion.${r.statut}`)}
-                  </span>
-                </span>
-                <span className="kpi-value">{r.objet}</span>
-                <span className="meta muted">
-                  {r.date_reunion} · {r.nb_decisions} décisions
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      <p className="muted" style={{ marginTop: "0.5rem" }}>
-        {t("juridique.pendingNote")}
-      </p>
+      {cautionsList.length > 0 && (
+        <SectionCard title={`${t("juridique.cautions")} · ${cautionsList.length}`}>
+          <DataTable rows={cautionsList} columns={cautionColumns(t)} caption={t("juridique.cautions")} />
+        </SectionCard>
+      )}
+      {assurancesList.length > 0 && (
+        <SectionCard title={`${t("juridique.assurances")} · ${assurancesList.length}`}>
+          <DataTable rows={assurancesList} columns={assuranceColumns(t)} caption={t("juridique.assurances")} />
+        </SectionCard>
+      )}
+      {litiges.length > 0 && (
+        <SectionCard title={`${t("juridique.contentieux")} · ${litiges.length}`}>
+          <DataTable rows={litiges} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} />
+        </SectionCard>
+      )}
+      {grs.length > 0 && (
+        <SectionCard title={`GLOBAL RENTAL · ${grs.length}`}>
+          <DataTable rows={grs} columns={grColumns(t)} caption="GLOBAL RENTAL" />
+        </SectionCard>
+      )}
+      {courts.length > 0 && (
+        <SectionCard title={`${t("juridique.courriers")} · ${courts.length}`}>
+          <DataTable rows={courts} columns={courrierColumns(t)} caption={t("juridique.courriers")} />
+        </SectionCard>
+      )}
+      {reunionsList.length > 0 && (
+        <SectionCard title={`${t("juridique.reunions")} · ${reunionsList.length}`}>
+          <DataTable rows={reunionsList} columns={reunionColumns(t)} caption={t("juridique.reunions")} />
+        </SectionCard>
+      )}
     </>
   );
 }
