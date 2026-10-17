@@ -281,6 +281,7 @@ class ReunionSerializer(serializers.ModelSerializer):
             "participants_names",
             "compte_rendu",
             "compte_rendu_title",
+            "affaire",
             "statut",
             "statut_label",
             "decisions",

@@ -574,6 +574,7 @@ class Reunion(models.Model):
         REVUE_QUALITE = "revue_qualite", "Revue qualité"
         SECURITE = "securite", "Réunion sécurité (HSE)"
         RETROPLANNING = "retroplanning", "Revue planning / rétroplanning"
+        LANCEMENT = "lancement", "Réunion de lancement d'affaire (CRRL)"
         AUTRE = "autre", "Autre"
 
     class Statut(models.TextChoices):
@@ -608,6 +609,11 @@ class Reunion(models.Model):
         on_delete=models.SET_NULL,
         related_name="reunions_juridique",
         verbose_name="Compte rendu (GED)",
+    )
+    # Réunion de lancement : rattachée à l'affaire (CRRL exigé au démarrage, clôture M1).
+    affaire = models.ForeignKey(
+        "commercial.Affaire", blank=True, null=True, on_delete=models.SET_NULL,
+        related_name="reunions", verbose_name="Affaire",
     )
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.PLANIFIEE, verbose_name="Statut"

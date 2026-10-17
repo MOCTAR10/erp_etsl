@@ -66,6 +66,8 @@ def dashboard_direction(user):
             "taux_conversion": stats.get("conversion_rate"),
             "ca_gagne": won,
             "affaires_actives": Affaire.objects.exclude(status="cloturee").count(),
+            # Pipe pondéré 90/60/25 publié vers M11 / Couche D (clôture M1, CDC §3.11).
+            "pipe_pondere": stats["pipe_pondere"]["total"] if see_amount else None,
         }
         if not see_amount:
             result["ca_gagne"] = None
