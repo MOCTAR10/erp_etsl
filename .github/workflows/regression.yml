@@ -194,7 +194,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox]
+        # Chromium à chaque push / PR ; Firefox en plus dans la régression nocturne et au lancement manuel.
+        browser: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["chromium","firefox"]' || '["chromium"]') }}
     services:
       postgres:
         image: postgres:16
@@ -259,12 +260,12 @@ jobs:
         run: |
           python manage.py migrate
           python manage.py seed_all_demo
-      - name: Start Django backend (127.0.0.1:8000)
+      - name: Start Django backend (127.0.0.1:8000, gunicorn 4 workers)
         working-directory: backend
         env:
           POSTGRES_DB: etls_e2e
         run: |
-          python manage.py runserver 127.0.0.1:8000 > /tmp/runserver.log 2>&1 &
+          gunicorn config.wsgi:application -b 127.0.0.1:8000 -w 4 --timeout 120 > /tmp/runserver.log 2>&1 &
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:8000/api/health/ >/dev/null && break
             sleep 2
@@ -275,8 +276,18 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Cache navigateurs Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('frontend/package-lock.json') }}
       - name: E2E Playwright
         working-directory: frontend
+        env:
+          # Tests indépendants (fullyParallel) répartis sur 4 navigateurs ; build de production servi par vite preview
+          # (pas de compilation à la demande, vrai service worker PWA testé). Mesuré : 8,2 min → 2,4 min (Chromium).
+          PW_WORKERS: "4"
+          PW_WEB_CMD: "npx vite build --logLevel error && npx vite preview --host 127.0.0.1 --port 5173 --strictPort"
         run: |
           npm ci
           npx playwright install --with-deps ${{ matrix.browser }}
