@@ -72,6 +72,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
+
+    # Absentes d'AbstractBaseUser : une trentaine de serializers (`demandeur_name`, `created_by_name`…)
+    # s'appuient sur `get_full_name` et affichaient donc des noms vides.
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
+
+    def get_short_name(self):
+        return self.first_name
+
     class Meta:
         verbose_name = "Utilisateur"
         verbose_name_plural = "Utilisateurs"

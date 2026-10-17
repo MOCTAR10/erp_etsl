@@ -42,3 +42,15 @@ class WorkflowStatusReadOnlyTests(SimpleTestCase):
             if not serializer.fields[field].read_only:
                 writable.append(f"{app}.{name}.{field}")
         self.assertEqual(writable, [], f"statut modifiable hors workflow : {writable}")
+
+
+class NomsAffichesTests(SimpleTestCase):
+    """`get_full_name` existe : les champs `*_name` des serializers ne sont plus systématiquement vides."""
+
+    def test_get_full_name(self):
+        from users.models import User
+
+        u = User(email="a@etls.ga", first_name="Rachel", last_name="MBADINGA")
+        self.assertEqual(u.get_full_name(), "Rachel MBADINGA")
+        self.assertEqual(User(email="b@etls.ga").get_full_name(), "")
+        self.assertEqual(u.get_short_name(), "Rachel")

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
+from django.utils import timezone
 
 
 class DocumentType(models.Model):
@@ -326,3 +327,76 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} {self.object_type}:{self.object_id} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+class SignatureRequest(models.Model):
+    """Demande de signature électronique avancée d'une version de document (CL-OM-06).
+
+    Signataires ordonnés ; l'empreinte SHA-256 de la version est FIGÉE à la création : toute altération du
+    document avant ou après signature est détectée (identification du signataire + intégrité du document).
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "En cours"
+        COMPLETED = "completed", "Signée"
+        REFUSED = "refused", "Refusée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = models.ForeignKey(Version, on_delete=models.PROTECT, related_name="signature_requests")
+    title = models.CharField(max_length=200, blank=True)
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    document_sha256 = models.CharField(max_length=64, verbose_name="Empreinte figée de la version")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="signature_requests"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Demande de signature"
+        verbose_name_plural = "Demandes de signature"
+
+    def __str__(self):
+        return f"{self.title or self.version_id} [{self.status}]"
+
+    @property
+    def is_expired(self):
+        return self.status == self.Status.PENDING and timezone.now() > self.expires_at
+
+
+class Signer(models.Model):
+    """Signataire d'une demande : authentification forte (mot de passe + code e-mail) et scellé de preuve."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "En attente"
+        SIGNED = "signed", "A signé"
+        REFUSED = "refused", "A refusé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    request = models.ForeignKey(SignatureRequest, on_delete=models.CASCADE, related_name="signers")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="signatures")
+    order = models.PositiveSmallIntegerField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    otp_hash = models.CharField(max_length=64, blank=True)
+    otp_sent_at = models.DateTimeField(null=True, blank=True)
+    otp_expires_at = models.DateTimeField(null=True, blank=True)
+    otp_attempts = models.PositiveSmallIntegerField(default=0)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    document_sha256 = models.CharField(max_length=64, blank=True)
+    refusal_reason = models.CharField(max_length=300, blank=True)
+    seal = models.CharField(max_length=64, blank=True, verbose_name="Sceau HMAC chaîné")
+
+    class Meta:
+        ordering = ["request", "order"]
+        constraints = [
+            models.UniqueConstraint(fields=["request", "order"], name="uniq_signer_order"),
+            models.UniqueConstraint(fields=["request", "user"], name="uniq_signer_user"),
+        ]
+
+    def __str__(self):
+        return f"{self.request_id} #{self.order} {self.user_id} [{self.status}]"

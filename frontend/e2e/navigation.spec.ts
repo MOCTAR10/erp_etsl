@@ -17,6 +17,9 @@ const ROUTES: { path: string; heading: RegExp }[] = [
   { path: "/controle-gestion", heading: /Contrôle de gestion/ },
   { path: "/juridique", heading: /Juridique/ },
   { path: "/direction", heading: /Direction \/ BI/ },
+  { path: "/signatures", heading: /Signatures électroniques/ },
+  { path: "/terrain", heading: /Saisie terrain/ },
+  { path: "/mon-espace", heading: /Mon espace salarié/ },
 ];
 
 test.describe("Régression : navigation (smoke)", () => {

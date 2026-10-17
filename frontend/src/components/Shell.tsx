@@ -3,6 +3,7 @@ import {
   Boxes,
   Calculator,
   CircleUser,
+  FileSignature,
   Filter,
   GitBranch,
   HardHat,
@@ -54,6 +55,7 @@ const PILOT_NAV: NavItem[] = [
   { to: "/kanban", key: "nav.kanban", Icon: SquareKanban },
   { to: "/circuits", key: "nav.circuits", Icon: GitBranch },
   { to: "/notifications", key: "nav.notifications", Icon: Bell },
+  { to: "/signatures", key: "nav.signatures", Icon: FileSignature },
   { to: "/terrain", key: "nav.terrain", Icon: Smartphone },
   { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
 ];

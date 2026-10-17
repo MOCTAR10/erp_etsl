@@ -34,7 +34,7 @@ test.describe("Régression : mobile (tiroir de navigation)", () => {
   const ROUTES = [
     "/", "/direction", "/kanban", "/circuits", "/notifications", "/pipeline", "/purchases",
     "/operations", "/logistique", "/stocks", "/qualite", "/hse", "/maintenance", "/rh-paie",
-    "/comptabilite", "/controle-gestion", "/juridique", "/terrain", "/mon-espace",
+    "/comptabilite", "/controle-gestion", "/juridique", "/terrain", "/mon-espace", "/signatures",
   ];
   for (const route of ROUTES) {
     test(`${route} : aucun débordement horizontal du contenu`, async ({ page }) => {

@@ -6,6 +6,7 @@ export const en = {
     logoAlt: "ETSL logo",
   },
   nav: {
+    signatures: "Signatures",
     terrain: "Field",
     monEspace: "My space",
     groupPilotage: "Overview",
@@ -108,6 +109,20 @@ export const en = {
     pointPlaceholder: "Inspection point (e.g. fit-up check before welding)",
     lever: "Release", nonConforme: "Non-conforming", confirmNc: "Mark this point non-conforming?",
     progress: "{{done}}/{{total}} points released · {{restants}} hold point(s) left",
+  },
+  signatures: {
+    title: "Electronic signatures",
+    subtitle: "Advanced electronic signature: signer identification (password + e-mail code) and document integrity.",
+    none: "No signature request.",
+    toSign: "To sign",
+    all: "Requests",
+    explain: "Your turn: get a code by e-mail, then sign with that code and your password.",
+    sendCode: "Get the code", resend: "Resend code", code: "6-digit code", password: "Password",
+    sign: "Sign", reason: "Reason for refusal", refuse: "Refuse", until: "until", expired: "Expired",
+    certificate: "Signature certificate", chainOk: "Proof chain valid", chainKo: "Chain tampered",
+    docOk: "Document intact", docKo: "Document modified", sealOk: "Seal valid", sealKo: "Seal invalid",
+    status: { pending: "Pending", completed: "Signed", refused: "Refused" },
+    signer: { pending: "Waiting", signed: "Signed", refused: "Refused" },
   },
   palette: {
     pages: "Pages",

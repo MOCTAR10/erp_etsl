@@ -1918,3 +1918,38 @@ export interface Tendances {
     ordres_travail: number[] | null;
   };
 }
+
+/** Signature électronique avancée (CL-OM-06). */
+export interface SignatureRequestItem {
+  id: string;
+  title: string;
+  document_title: string;
+  version_number: number;
+  status: "pending" | "completed" | "refused";
+  expired: boolean;
+  expires_at: string;
+  completed_at: string | null;
+  a_mon_tour: boolean;
+  signataires: {
+    id: string;
+    name: string;
+    email: string;
+    order: number;
+    status: "pending" | "signed" | "refused";
+    signed_at: string | null;
+    refusal_reason: string;
+  }[];
+}
+
+export interface SignatureCertificate {
+  request: string;
+  title: string;
+  status: string;
+  document: string;
+  version: number;
+  document_sha256: string;
+  document_intact: boolean;
+  valid: boolean;
+  method: string;
+  signatures: { order: number; signer: string; email: string; signed_at: string; ip: string | null; seal: string; seal_valid: boolean }[];
+}
