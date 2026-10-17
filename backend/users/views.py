@@ -4,6 +4,8 @@ import io
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import AuthenticationFailed, ValidationError
@@ -83,6 +85,7 @@ class _EtapeMfaView(APIView):
 class MfaEnrolementView(_EtapeMfaView):
     """Premier passage : clé secrète TOTP à enregistrer dans l'application d'authentification."""
 
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
     def post(self, request):
         user = self.utilisateur(request)
         if user.mfa_active:
@@ -97,19 +100,22 @@ class MfaEnrolementView(_EtapeMfaView):
 class MfaVerificationView(_EtapeMfaView):
     """Code TOTP valide (non rejoué) → activation au premier passage + délivrance des jetons JWT."""
 
-    @transaction.atomic
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
     def post(self, request):
-        user = self.utilisateur(request, verrou=True)
-        pas = mfa.verifier(user.mfa_secret, request.data.get("code"), user.mfa_dernier_pas)
-        if pas is None:
+        # Verrou sur le compte : deux soumissions simultanées du même code ne passent pas toutes les deux.
+        with transaction.atomic():
+            user = self.utilisateur(request, verrou=True)
+            pas = mfa.verifier(user.mfa_secret, request.data.get("code"), user.mfa_dernier_pas)
+            if pas is not None:
+                user.mfa_dernier_pas = pas
+                champs = ["mfa_dernier_pas"]
+                if not user.mfa_active:
+                    user.mfa_active, user.mfa_active_le = True, timezone.now()
+                    champs += ["mfa_active", "mfa_active_le"]
+                user.save(update_fields=champs)
+        if pas is None:  # journalisé hors transaction : l'échec reste tracé malgré le refus
             journaliser(request, Evt.MFA_ECHEC, user=user)
             raise ValidationError({"code": "Code invalide ou expiré."})
-        user.mfa_dernier_pas = pas
-        champs = ["mfa_dernier_pas"]
-        if not user.mfa_active:
-            user.mfa_active, user.mfa_active_le = True, timezone.now()
-            champs += ["mfa_active", "mfa_active_le"]
-        user.save(update_fields=champs)
         journaliser(request, Evt.MFA_SUCCES, user=user)
         journaliser(request, Evt.CONNEXION, user=user, details={"mfa": True})
         return Response(_jetons(user))
