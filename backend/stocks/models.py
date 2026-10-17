@@ -360,6 +360,14 @@ class MouvementStock(models.Model):
         related_name="mouvements_stock",
         verbose_name="Ordre de fabrication",
     )
+    analytic = models.ForeignKey(
+        "referentiels.AnalyticAccount", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="mouvements_stock", verbose_name="Compte analytique (M11)",
+        help_text="Imputation de la consommation ; reprise de l'affaire de l'OF si non renseigné.",
+    )
+    cout_unitaire = models.DecimalField(
+        max_digits=16, decimal_places=4, default=0, editable=False, verbose_name="Coût unitaire appliqué (CUMP)"
+    )
     document_reference = models.CharField(
         max_length=60, blank=True, verbose_name="Réf. document (BC / BL / INV)"
     )
@@ -437,6 +445,15 @@ class Inventaire(models.Model):
         related_name="inventaires",
         verbose_name="Dépôt",
     )
+    class Type(models.TextChoices):
+        COMPLET = "complet", "Inventaire complet"
+        TOURNANT = "tournant", "Inventaire tournant"
+
+    type = models.CharField(max_length=10, choices=Type.choices, default=Type.COMPLET, verbose_name="Type")
+    plan = models.ForeignKey(
+        "PlanInventaireTournant", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="inventaires", verbose_name="Plan tournant",
+    )
     date = models.DateField(verbose_name="Date d'inventaire")
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut"
@@ -510,6 +527,10 @@ class InventaireLigne(models.Model):
     quantite_reelle = models.DecimalField(
         max_digits=14, decimal_places=2, verbose_name="Quantité réelle"
     )
+    comptee = models.BooleanField(
+        default=True, verbose_name="Comptée",
+        help_text="Faux sur les lignes préparées par un plan tournant tant que le comptage n'est pas saisi.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -524,3 +545,67 @@ class InventaireLigne(models.Model):
     def clean(self):
         if self.quantite_reelle < 0:
             raise ValidationError({"quantite_reelle": "La quantité réelle ne peut être négative."})
+
+
+class PlanInventaireTournant(models.Model):
+    """Plan d'inventaire tournant d'un dépôt (CDC M5 §7.11) : chaque passage compte une tranche d'articles."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    depot = models.ForeignKey(Depot, on_delete=models.PROTECT, related_name="plans_inventaire", verbose_name="Dépôt")
+    periodicite_jours = models.PositiveIntegerField(default=30, verbose_name="Périodicité (jours)")
+    articles_par_passage = models.PositiveIntegerField(default=10, verbose_name="Articles par passage")
+    curseur = models.PositiveIntegerField(default=0, editable=False, verbose_name="Position dans la rotation")
+    prochaine_date = models.DateField(verbose_name="Prochain passage")
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="stocks_plans_inventaire", verbose_name="Responsable",
+    )
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["prochaine_date"]
+        verbose_name = "Plan d'inventaire tournant"
+        verbose_name_plural = "Plans d'inventaire tournant"
+
+    def __str__(self):
+        return f"{self.code} — {self.depot.label}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = StocksSequence.next_for("PLT", "PLT")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.periodicite_jours < 1 or self.articles_par_passage < 1:
+            raise ValidationError("Périodicité et nombre d'articles par passage doivent être positifs.")
+
+
+class ValorisationMensuelle(models.Model):
+    """Valorisation du stock d'un dépôt figée à la clôture mensuelle (CDC M5 §7.11 → M11), non modifiable."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    periode = models.CharField(max_length=7, verbose_name="Période (AAAA-MM)")
+    depot = models.ForeignKey(Depot, on_delete=models.PROTECT, related_name="valorisations", verbose_name="Dépôt")
+    quantite = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Quantité en stock")
+    valeur_stock = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Valeur du stock (CUMP)")
+    consommation = models.DecimalField(
+        max_digits=18, decimal_places=2, default=0, verbose_name="Consommations du mois (OF, affaires)"
+    )
+    ventilation = models.JSONField(default=list, verbose_name="Consommations par compte analytique")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+", verbose_name="Figée par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-periode", "depot__code"]
+        verbose_name = "Valorisation mensuelle"
+        verbose_name_plural = "Valorisations mensuelles"
+        constraints = [models.UniqueConstraint(fields=["periode", "depot"], name="stocks_valorisation_unique")]
+
+    def __str__(self):
+        return f"{self.periode} — {self.depot.code}"

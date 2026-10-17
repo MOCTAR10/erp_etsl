@@ -13,7 +13,9 @@ from .models import (
     InventaireLigne,
     LotMatiere,
     MouvementStock,
+    PlanInventaireTournant,
     StockQuant,
+    ValorisationMensuelle,
 )
 from .serializers import (
     ArticleStockSerializer,
@@ -23,10 +25,13 @@ from .serializers import (
     InventaireSerializer,
     LotMatiereSerializer,
     MouvementStockSerializer,
+    PlanInventaireTournantSerializer,
     StockQuantSerializer,
     TraceabiliteEntrySerializer,
     ValorisationEntrySerializer,
+    ValorisationMensuelleSerializer,
 )
+from .cloture import figer_valorisation_mensuelle, generer_inventaire_tournant
 from .services import (
     CanManageStocks,
     apply_move,
@@ -197,3 +202,40 @@ class ArticleStockViewSet(viewsets.ModelViewSet):
         if self.request.query_params.get("active") == "1":
             qs = qs.filter(is_active=True)
         return qs
+
+
+class PlanInventaireTournantViewSet(viewsets.ModelViewSet):
+    """Plans d'inventaire tournant (clôture M5) : `generer` prépare le passage sans attendre l'échéance."""
+
+    queryset = PlanInventaireTournant.objects.select_related("depot", "responsable").all()
+    serializer_class = PlanInventaireTournantSerializer
+    permission_classes = [CanManageStocks]
+
+    @action(detail=True, methods=["post"], url_path="generer")
+    def generer(self, request, pk=None):
+        inventaire = generer_inventaire_tournant(self.get_object())
+        if inventaire is None:
+            return Response({"detail": "Aucun article en stock dans ce dépôt."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(InventaireSerializer(inventaire, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
+class ValorisationMensuelleViewSet(viewsets.ReadOnlyModelViewSet):
+    """Valorisations mensuelles figées, publiées à M11 (non modifiables)."""
+
+    queryset = ValorisationMensuelle.objects.select_related("depot").all()
+    serializer_class = ValorisationMensuelleSerializer
+    permission_classes = [CanManageStocks]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if periode := self.request.query_params.get("periode"):
+            qs = qs.filter(periode=periode)
+        return qs
+
+    @action(detail=False, methods=["post"], url_path="figer")
+    def figer(self, request):
+        try:
+            lignes = figer_valorisation_mensuelle(request.data.get("periode", ""), request.user)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.get_serializer(lignes, many=True).data, status=status.HTTP_201_CREATED)

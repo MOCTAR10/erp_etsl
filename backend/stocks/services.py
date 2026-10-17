@@ -129,6 +129,7 @@ def apply_move(mouvement):
         return mouvement
     controler_sortie_lot(mouvement)
     prix = mouvement.prix_unitaire
+    cout = prix
     if mouvement.source:
         src = _quant(mouvement.source, mouvement.article, mouvement.lot)
         if float(src.quantity) + 1e-9 < float(mouvement.quantite):
@@ -141,6 +142,7 @@ def apply_move(mouvement):
             # Transfert : la destination reçoit au COÛT de la source (valeur conservée),
             # jamais au « prix unitaire » saisi (0 par défaut => valeur détruite).
             prix = unit_cost
+        cout = unit_cost
         src.quantity -= mouvement.quantite
         src.stock_value -= mouvement.quantite * unit_cost
         if float(src.quantity) <= 1e-9:
@@ -166,8 +168,11 @@ def apply_move(mouvement):
             lot.quantite_restante = 0
         lot.refresh_statut()
         lot.save(update_fields=["quantite_restante", "statut", "updated_at"])
+    mouvement.cout_unitaire = cout
+    if not mouvement.analytic_id and mouvement.ordre_id and mouvement.ordre.affaire_id:
+        mouvement.analytic = mouvement.ordre.affaire.assurer_compte_analytique()
     mouvement.executed = True
-    mouvement.save(update_fields=["executed", "updated_at"])
+    mouvement.save(update_fields=["executed", "cout_unitaire", "analytic", "updated_at"])
     return mouvement
 
 
@@ -177,6 +182,8 @@ def cloturer_inventaire(inventaire, user):
     inventaire = Inventaire.objects.select_for_update().get(pk=inventaire.pk)
     if inventaire.statut == Inventaire.Statut.CLOTURE:
         return inventaire
+    if InventaireLigne.objects.filter(inventaire=inventaire, comptee=False).exists():
+        raise ValueError("Des lignes de l'inventaire n'ont pas encore été comptées : clôture impossible.")
     for ligne in InventaireLigne.objects.filter(inventaire=inventaire).select_related(
         "article", "lot", "inventaire__depot"
     ):

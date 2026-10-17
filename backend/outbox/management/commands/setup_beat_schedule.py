@@ -18,6 +18,11 @@ SCHEDULES = [
         {"minute": "0", "hour": "8", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
     ),
     (
+        "ETSL — inventaires tournants (clôture M5, CDC M5 §7.11)",
+        "stocks.tasks.planifier_inventaires",
+        {"minute": "15", "hour": "6", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
+    ),
+    (
         "ETSL — maintenance préventive (lot 14, CDC M8 §13.4)",
         "maintenance.tasks.declencher_plans_preventifs",
         {"minute": "0", "hour": "6", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},

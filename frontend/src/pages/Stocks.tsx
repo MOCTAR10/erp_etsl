@@ -13,7 +13,9 @@ import type {
   LotStatut,
   MouvementStock,
   Paginated,
+  PlanInventaireTournant,
   StockQuant,
+  ValorisationMensuelle,
   ValorisationRow,
 } from "../types";
 
@@ -126,6 +128,18 @@ export function StocksPage() {
     queryKey: ["inventaires"],
     queryFn: () => api.inventaires(`?page_size=20`),
     select: (page: Paginated<Inventaire>) => page.results,
+  });
+
+  const valoMensuelles = useQuery({
+    queryKey: ["valorisations-mensuelles"],
+    queryFn: () => api.valorisationsMensuelles(),
+    select: (page: Paginated<ValorisationMensuelle>) => page.results,
+  });
+
+  const plans = useQuery({
+    queryKey: ["plans-inventaire"],
+    queryFn: () => api.plansInventaire(),
+    select: (page: Paginated<PlanInventaireTournant>) => page.results,
   });
 
   if (lots.isLoading || quants.isLoading) return <BoardSkeleton cols={4} rows={3} />;
@@ -395,6 +409,68 @@ export function StocksPage() {
                       )}
                     </td>
                     <td className="num">{formatNumber(Number(inv.ecart_total))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title={t("stocks.valoMensuelle")}>
+        <ActionBar
+          actions={[{ label: t("stocks.figer"), path: "/api/stocks/valorisations/figer/", confirm: t("stocks.figerConfirm"), prompt: { name: "periode", label: t("stocks.figerPrompt") } }]}
+        />
+        {(valoMensuelles.data ?? []).length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("stocks.periode")}</th>
+                  <th>{t("stocks.col.depot")}</th>
+                  <th className="num">{t("stocks.col.value")}</th>
+                  <th className="num">{t("stocks.consoMois")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(valoMensuelles.data ?? []).map((v) => (
+                  <tr key={v.id}>
+                    <td>{v.periode}</td>
+                    <td>{v.depot_code}</td>
+                    <td className="num">{v.valeur_stock === null ? t("stocks.demi") : `${formatNumber(Number(v.valeur_stock))} FCFA`}</td>
+                    <td className="num">{v.consommation === null ? t("stocks.demi") : `${formatNumber(Number(v.consommation))} FCFA`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      {(plans.data ?? []).length > 0 && (
+        <SectionCard title={t("stocks.plansTournants")}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("stocks.col.code")}</th>
+                  <th>{t("stocks.col.depot")}</th>
+                  <th className="num">{t("stocks.periodicite")}</th>
+                  <th className="num">{t("stocks.parPassage")}</th>
+                  <th>{t("stocks.prochainPassage")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(plans.data ?? []).map((plan) => (
+                  <tr key={plan.id}>
+                    <td>{plan.code}</td>
+                    <td>{plan.depot_label}</td>
+                    <td className="num">{plan.periodicite_jours}</td>
+                    <td className="num">{plan.articles_par_passage}</td>
+                    <td>
+                      {formatDate(plan.prochaine_date, i18n.language)}
+                      <ActionBar actions={[{ label: t("stocks.generer"), path: `/api/stocks/plans-inventaire/${plan.id}/generer/` }]} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

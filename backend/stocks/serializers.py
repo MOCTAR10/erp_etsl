@@ -13,7 +13,9 @@ from .models import (
     InventaireLigne,
     LotMatiere,
     MouvementStock,
+    PlanInventaireTournant,
     StockQuant,
+    ValorisationMensuelle,
 )
 from .services import can_see_amount
 
@@ -121,7 +123,7 @@ class MouvementStockSerializer(serializers.ModelSerializer):
             "id", "code", "type_mouvement", "type_label", "article", "article_code",
             "article_label", "quantite", "prix_unitaire", "devise", "source",
             "source_code", "destination", "destination_code", "lot", "lot_code",
-            "ordre", "ordre_code", "document_reference", "date", "executed",
+            "ordre", "ordre_code", "analytic", "document_reference", "date", "executed",
             "montant_total", "has_amount_access", "created_by", "notes",
             "created_at", "updated_at",
         ]
@@ -162,8 +164,17 @@ class InventaireLigneSerializer(ModelCleanMixin, serializers.ModelSerializer):
         model = InventaireLigne
         fields = [
             "id", "inventaire", "article", "article_code", "article_label", "lot",
-            "lot_code", "quantite_systeme", "quantite_reelle", "ecart", "updated_at",
+            "lot_code", "quantite_systeme", "quantite_reelle", "comptee", "ecart", "updated_at",
         ]
+        read_only_fields = ["comptee"]
+
+    def create(self, validated_data):
+        return super().create({**validated_data, "comptee": True})
+
+    def update(self, instance, validated_data):
+        if "quantite_reelle" in validated_data:
+            validated_data["comptee"] = True  # la saisie du comptage vaut pointage
+        return super().update(instance, validated_data)
 
 
 class InventaireSerializer(serializers.ModelSerializer):
@@ -180,11 +191,11 @@ class InventaireSerializer(serializers.ModelSerializer):
     class Meta:
         model = Inventaire
         fields = [
-            "id", "code", "depot", "depot_label", "date", "statut", "responsable",
+            "id", "code", "type", "plan", "depot", "depot_label", "date", "statut", "responsable",
             "responsable_label", "note", "created_by", "created_by_label",
             "ecart_total", "lignes", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "created_by", "statut"]
+        read_only_fields = ["code", "created_by", "statut", "type", "plan"]
 
 
 class ArticleStockSerializer(serializers.ModelSerializer):
@@ -224,3 +235,37 @@ class TraceabiliteEntrySerializer(serializers.Serializer):
     lot = serializers.CharField(allow_null=True)
     ordre = serializers.CharField(allow_null=True)
     reference = serializers.CharField()
+
+
+class PlanInventaireTournantSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    depot_label = serializers.CharField(source="depot.label", read_only=True, default=None)
+
+    class Meta:
+        model = PlanInventaireTournant
+        fields = [
+            "id", "code", "depot", "depot_label", "periodicite_jours", "articles_par_passage",
+            "curseur", "prochaine_date", "responsable", "actif", "created_at", "updated_at",
+        ]
+        read_only_fields = ["code", "curseur"]
+
+
+class ValorisationMensuelleSerializer(serializers.ModelSerializer):
+    depot_code = serializers.CharField(source="depot.code", read_only=True)
+    has_amount_access = serializers.SerializerMethodField()
+
+    def get_has_amount_access(self, obj):
+        return can_see_amount(self.context["request"].user)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data["has_amount_access"]:  # RF-59 : valeurs masquées hors rôles autorisés
+            data["valeur_stock"] = data["consommation"] = None
+            data["ventilation"] = [{**v, "valeur": None} for v in data["ventilation"]]
+        return data
+
+    class Meta:
+        model = ValorisationMensuelle
+        fields = [
+            "id", "periode", "depot", "depot_code", "quantite", "valeur_stock",
+            "consommation", "ventilation", "has_amount_access", "created_at",
+        ]
