@@ -7,6 +7,24 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from users.permissions import IsAdminOrStaff
+from users.rbac import can_read_app
+
+# Registre -> module dont les droits de lecture s'appliquent (les autres kinds restent lisibles par tout authentifié).
+KIND_MODULE = {
+    "caisse_appro": "comptabilite", "factures_paiements": "comptabilite",
+    "contrats_echeances": "juridique", "courrier": "juridique",
+    "incidents_hse": "hse", "formations": "hse", "stock_magasin": "stocks",
+    "conges_rotations": "rh_paie", "non_conformites": "qualite",
+}
+
+
+def readable_kinds(user):
+    return [k for k, app in KIND_MODULE.items() if can_read_app(user, app)]
+
+
+def restrict_by_kind(qs, user, field):
+    denied = [k for k in KIND_MODULE if k not in readable_kinds(user)]
+    return qs.exclude(**{f"{field}__in": denied}) if denied else qs
 
 from .models import Registre, RegistreEntry
 from .serializers import RegistreEntrySerializer, RegistreSerializer
@@ -25,7 +43,7 @@ class RegistreViewSet(viewsets.ModelViewSet):
         return [IsAdminOrStaff()]
 
     def get_queryset(self):
-        qs = Registre.objects.prefetch_related("entries").all()
+        qs = restrict_by_kind(Registre.objects.prefetch_related("entries").all(), self.request.user, "kind")
         kind = self.request.query_params.get("kind")
         year = self.request.query_params.get("year")
         active = self.request.query_params.get("active")
@@ -44,7 +62,9 @@ class RegistreEntryViewSet(viewsets.ModelViewSet):
     serializer_class = RegistreEntrySerializer
 
     def get_queryset(self):
-        qs = RegistreEntry.objects.select_related("registre", "document").all()
+        qs = restrict_by_kind(
+            RegistreEntry.objects.select_related("registre", "document").all(), self.request.user, "registre__kind"
+        )
         registre = self.request.query_params.get("registre")
         kind = self.request.query_params.get("kind")
         date_from = self.request.query_params.get("date_from")

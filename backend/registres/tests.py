@@ -55,7 +55,7 @@ class RegistreAPITests(APITestCase):
         )
         self.chef = User.objects.create_user(
             email="chef@etls.local", password="MotDePasse#2026",
-            role=User.Role.CHEF_SERVICE,
+            role=User.Role.SECRETAIRE_GENERAL,
         )
         self.registre = Registre.objects.create(kind=Registre.Kind.COURRIER, year=2026)
 
@@ -128,3 +128,27 @@ class RegistreAPITests(APITestCase):
         self.client.force_authenticate(self.chef)
         resp = self.client.get("/api/registres/entries/export/?export=pdf")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class RegistreReadScopeTests(APITestCase):
+    """Lecture des registres bornée par le module du registre (audit lot 6)."""
+
+    def setUp(self):
+        call_command("seed_registres", year=2026)
+        self.hse = User.objects.create_user(email="hse@t.local", password="x", role="hse")
+        self.admin = User.objects.create_user(email="adm@t.local", password="x", role="admin")
+
+    def _kinds(self, user):
+        self.client.force_authenticate(user)
+        resp = self.client.get("/api/registres/registres/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        rows = resp.data["results"] if isinstance(resp.data, dict) else resp.data
+        return {r["kind"] for r in rows}
+
+    def test_hse_does_not_see_accounting_registers(self):
+        kinds = self._kinds(self.hse)
+        self.assertNotIn("factures_paiements", kinds)
+        self.assertNotIn("caisse_appro", kinds)
+
+    def test_admin_sees_all(self):
+        self.assertEqual(len(self._kinds(self.admin)), 9)

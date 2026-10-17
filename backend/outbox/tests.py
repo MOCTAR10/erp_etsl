@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django_celery_beat.models import PeriodicTask
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -84,6 +84,11 @@ class OutboxAPITests(APITestCase):
             resp.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
         )
 
+    def test_non_admin_forbidden(self):
+        user = User.objects.create_user(email="cs@etls.local", password="x", role="chef_service")
+        self.client.force_authenticate(user)
+        self.assertEqual(self.client.get("/api/outbox/events/").status_code, status.HTTP_403_FORBIDDEN)
+
     def test_list_filters_by_status(self):
         publish("accounting.move.posted", {"number": "VTE00001"})
         self.client.force_authenticate(self.admin)
@@ -92,3 +97,44 @@ class OutboxAPITests(APITestCase):
         self.assertEqual(resp.data["count"], 1)
         resp = self.client.get("/api/outbox/events/?status=delivered")
         self.assertEqual(resp.data["count"], 0)
+
+class DispatchConcurrentTests(TransactionTestCase):
+    """Deux workers simultanés ne livrent jamais le même événement deux fois (skip_locked)."""
+
+    def test_pas_de_double_livraison(self):
+        import threading
+        import time
+
+        from django.db import connection
+
+        from .subscribers import SUBSCRIBERS, subscriber
+        from .tasks import dispatch_outbox
+
+        livres = []
+
+        @subscriber("test.concurrent")
+        def handler(event):
+            time.sleep(0.15)  # laisse l'autre worker tenter de prendre le même événement
+            livres.append(str(event.id))
+
+        try:
+            for i in range(6):
+                OutboxEvent.objects.create(topic="test.concurrent", payload={"i": i})
+
+            def worker():
+                try:
+                    dispatch_outbox()
+                finally:
+                    connection.close()
+
+            threads = [threading.Thread(target=worker) for _ in range(2)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=60)
+        finally:
+            SUBSCRIBERS.pop("test.concurrent", None)
+
+        self.assertEqual(len(livres), 6, livres)
+        self.assertEqual(len(set(livres)), 6, "un événement a été livré deux fois")
+        self.assertEqual(OutboxEvent.objects.filter(status=OutboxEvent.Status.DELIVERED).count(), 6)
