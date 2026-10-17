@@ -4,7 +4,7 @@ import { Layers, Target, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { formatNumber } from "../lib/format";
+import { formatDate, formatNumber } from "../lib/format";
 import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type { Opportunity, OpportunityStage, Paginated } from "../types";
 
@@ -31,14 +31,14 @@ function groupByStage(pages: Paginated<Opportunity>[]): Record<OpportunityStage,
 }
 
 function OppCard({ opp, index }: { opp: Opportunity; index: number }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
         <span className="muted">{opp.code}</span> · {opp.subject}
       </div>
       <div className="meta">
-        {opp.client_name ?? "—"} {opp.expected_close ? `· éch. ${new Date(opp.expected_close).toLocaleDateString(i18n.language)}` : ""}
+        {opp.client_name ?? "—"} {opp.expected_close ? `· ${t("pipeline.echeance")} ${formatDate(opp.expected_close)}` : ""}
       </div>
       <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span className="badge brand">{opp.probability}%</span>

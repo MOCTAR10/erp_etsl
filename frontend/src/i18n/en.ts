@@ -202,6 +202,7 @@ export const en = {
     },
   },
   dashboard: {
+    date: "Date",
     title: "Dashboard",
     subtitle: "At a glance view of documents, workflow and retention deadlines.",
     documents: "Documents",
@@ -230,6 +231,7 @@ export const en = {
     task: "task",
   },
   pipeline: {
+    echeance: "due",
     title: "Sales pipeline (M1)",
     prospection: "Prospecting",
     qualification: "Qualification",
@@ -1014,6 +1016,8 @@ export const en = {
     permisAtex: "ATEX permits",
     epiRenouveler: "PPE to renew",
     u: {
+      courriers_one: "{{count}} letter", courriers_other: "{{count}} letters",
+      budgets_one: "{{count}} approved budget", budgets_other: "{{count}} approved budgets",
       accidents_one: "{{count}} accident", accidents_other: "{{count}} accidents",
       dossiers_one: "{{count}} folder", dossiers_other: "{{count}} folders",
       bulletins_one: "{{count}} payslip", bulletins_other: "{{count}} payslips",

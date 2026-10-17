@@ -202,6 +202,7 @@ export const fr = {
     },
   },
   dashboard: {
+    date: "Date",
     title: "Tableau de bord",
     subtitle: "Vue d'ensemble des documents, du flux de travail et des échéances de rétention.",
     documents: "Documents",
@@ -230,6 +231,7 @@ export const fr = {
     task: "tâche",
   },
   pipeline: {
+    echeance: "éch.",
     title: "Pipeline commercial (M1)",
     prospection: "Prospection",
     qualification: "Qualification",
@@ -1014,6 +1016,8 @@ export const fr = {
     permisAtex: "Permis ATEX",
     epiRenouveler: "EPI à renouveler",
     u: {
+      courriers_one: "{{count}} courrier", courriers_other: "{{count}} courriers",
+      budgets_one: "{{count}} budget approuvé", budgets_other: "{{count}} budgets approuvés",
       accidents_one: "{{count}} accident", accidents_other: "{{count}} accidents",
       dossiers_one: "{{count}} dossier", dossiers_other: "{{count}} dossiers",
       bulletins_one: "{{count}} bulletin", bulletins_other: "{{count}} bulletins",

@@ -76,7 +76,7 @@ export function DashboardPage() {
                 <thead>
                   <tr>
                     <th>{t("dashboard.documents")}</th>
-                    <th>Date</th>
+                    <th>{t("dashboard.date")}</th>
                   </tr>
                 </thead>
                 <tbody>

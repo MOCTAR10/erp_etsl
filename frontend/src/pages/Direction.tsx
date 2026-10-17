@@ -258,10 +258,10 @@ function DirectionInner() {
           <Kpi label={t("direction.annuel")} value={`${j4.conformes}/${j4.periodes}`} hint={`${j4Taux}% J+4`} icon={CalendarDays} tone="ok" delay={delay(5)} />
         </KpiLink>
         <KpiLink to="/juridique">
-          <Kpi label={t("nav.juridique")} value={d.juridique.contentieux_ouverts} hint={`${d.juridique.courriers} courriers`} icon={Scale} tone="err" delay={delay(6)} />
+          <Kpi label={t("nav.juridique")} value={d.juridique.contentieux_ouverts} hint={t("direction.u.courriers", { count: d.juridique.courriers })} icon={Scale} tone="err" delay={delay(6)} />
         </KpiLink>
         <KpiLink to="/controle-gestion">
-          <Kpi label={t("nav.controleGestion")} value={d.controle_gestion.clotures_realisees} hint={`${d.controle_gestion.budgets_approuves} budgets`} icon={CheckCircle2} tone="brand" delay={delay(7)} />
+          <Kpi label={t("nav.controleGestion")} value={d.controle_gestion.clotures_realisees} hint={t("direction.u.budgets", { count: d.controle_gestion.budgets_approuves })} icon={CheckCircle2} tone="brand" delay={delay(7)} />
         </KpiLink>
       </div>
 
