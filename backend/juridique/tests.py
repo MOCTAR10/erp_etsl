@@ -48,6 +48,10 @@ class BaseJuridiqueTest(APITestCase):
             email="finance@etls.local", password="Etls#Demo2026",
             role=User.Role.FINANCE, first_name="Finance",
         )
+        self.dg = User.objects.create_user(
+            email="dg@etls.local", password="Etls#Demo2026",
+            role=User.Role.PDG, first_name="DG",
+        )
         self.logistique = User.objects.create_user(
             email="logi@etls.local", password="Etls#Demo2026",
             role=User.Role.LOGISTIQUE, first_name="Logi",
@@ -238,7 +242,7 @@ class ContentieuxTests(BaseJuridiqueTest):
 class CautionTests(BaseJuridiqueTest):
     def test_lever_caution(self):
         caution = self._caution()
-        _auth(self.client, "finance@etls.local")
+        _auth(self.client, "dg@etls.local")  # CDC M12 §14.8 : acte réservé au DG
         resp = self.client.post(f"{BASE}cautions/{caution.pk}/lever/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         caution.refresh_from_db()
@@ -246,7 +250,7 @@ class CautionTests(BaseJuridiqueTest):
 
     def test_appeler_caution_exige_en_cours(self):
         caution = self._caution(statut=Caution.Statut.LEVEE)
-        _auth(self.client, "finance@etls.local")
+        _auth(self.client, "dg@etls.local")  # CDC M12 §14.8 : acte réservé au DG
         resp = self.client.post(f"{BASE}cautions/{caution.pk}/appeler/")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -259,7 +263,7 @@ class CautionTests(BaseJuridiqueTest):
 class AssuranceTests(BaseJuridiqueTest):
     def test_renouveler_assurance(self):
         a = self._assurance()
-        _auth(self.client, "sg@etls.local")
+        _auth(self.client, "dg@etls.local")  # CDC M12 §14.8 : acte réservé au DG
         resp = self.client.post(
             f"{BASE}assurances/{a.pk}/renouveler/",
             {"date_echeance": str(date.today() + timedelta(days=365))}, format="json",

@@ -206,8 +206,12 @@ class CrudBudgetTests(BaseGestionTest):
     def test_approuver_puis_cloturer(self):
         _auth(self.client, "admin@etls.local")
         budget = self._budget()
-        r1 = self.client.post(f"{BASE}budgets/{budget.pk}/approuver/")
+        r1 = self.client.post(f"{BASE}budgets/{budget.pk}/approuver/", {"visa": "daf"}, format="json")
         self.assertEqual(r1.status_code, status.HTTP_200_OK, r1.data)
+        _auth(self.client, "finance@etls.local")  # double visa DAF + CG (CDC M11) : seconde personne
+        r1 = self.client.post(f"{BASE}budgets/{budget.pk}/approuver/", {"visa": "cg"}, format="json")
+        self.assertEqual(r1.status_code, status.HTTP_200_OK, r1.data)
+        _auth(self.client, "admin@etls.local")
         budget.refresh_from_db()
         self.assertEqual(budget.statut, Budget.Statut.APPROUVE)
         r2 = self.client.post(f"{BASE}budgets/{budget.pk}/cloturer/")
@@ -236,7 +240,9 @@ class RevisionTests(BaseGestionTest):
         self.assertEqual(r.data["statut"], BudgetRevision.Statut.BROUILLON)
 
         _auth(self.client, "admin@etls.local")
-        r2 = self.client.post(f"{BASE}revisions/{r.data['id']}/appliquer/")
+        self.client.post(f"{BASE}revisions/{r.data['id']}/appliquer/", {"visa": "daf"}, format="json")
+        _auth(self.client, "finance@etls.local")  # second visa par une autre personne
+        r2 = self.client.post(f"{BASE}revisions/{r.data['id']}/appliquer/", {"visa": "cg"}, format="json")
         self.assertEqual(r2.status_code, status.HTTP_200_OK, r2.data)
         budget.refresh_from_db()
         self.assertEqual(budget.montant, Decimal("16500000"))
@@ -254,8 +260,12 @@ class RevisionTests(BaseGestionTest):
             self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.data)
             ids.append(r.data["id"])
         _auth(self.client, "admin@etls.local")
-        self.assertEqual(self.client.post(f"{BASE}revisions/{ids[0]}/appliquer/").status_code, status.HTTP_200_OK)
-        r2 = self.client.post(f"{BASE}revisions/{ids[1]}/appliquer/")
+        self.client.post(f"{BASE}revisions/{ids[0]}/appliquer/", {"visa": "daf"}, format="json")
+        self.client.post(f"{BASE}revisions/{ids[1]}/appliquer/", {"visa": "daf"}, format="json")
+        _auth(self.client, "finance@etls.local")
+        self.assertEqual(self.client.post(f"{BASE}revisions/{ids[0]}/appliquer/", {"visa": "cg"}, format="json").status_code,
+                         status.HTTP_200_OK)
+        r2 = self.client.post(f"{BASE}revisions/{ids[1]}/appliquer/", {"visa": "cg"}, format="json")
         self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST, r2.data)
         budget.refresh_from_db()
         self.assertEqual(budget.montant, Decimal("16500000"))

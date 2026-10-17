@@ -1,7 +1,10 @@
 """API module M2 — Achats & Approvisionnements (RF-ERP-10…13)."""
 
 from integrations.idempotency import idempotent
+from decimal import Decimal
+
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -31,7 +34,9 @@ from .serializers import (
     PurchaseRequestSerializer,
 )
 from users.permissions import can_read_module
-from .services import CanApproveDa, CanManageAchats, can_see_amount
+from controle_gestion import budget_control
+
+from .services import CanApproveDa, CanManageAchats, can_see_amount, can_viser_dg
 
 
 class _CommonViewSet(viewsets.ModelViewSet):
@@ -71,13 +76,21 @@ class PurchaseRequestViewSet(_CommonViewSet):
     def perform_create(self, serializer):
         serializer.save(requester=self.request.user)
 
-    def _transition(self, frm, to, extra_note=None):
+    def _transition(self, frm, to, extra_note=None, controle_budget=False):
         da = PurchaseRequest.objects.select_for_update().get(pk=self.get_object().pk)
         if da.status != frm:
             return Response(
                 {"detail": f"DA {da.get_status_display().lower()} : action impossible."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if controle_budget:
+            # RG-M2.08 : > 100 % du budget consommé → blocage de la DA (sauf visa exceptionnel DG).
+            blocage = budget_control.controler(
+                da.analytic, timezone.localdate(), da.montant_estime, budget_control.SEUIL_DA,
+                f"la DA {da.code}", visa_dg=bool(da.visa_dg_par_id),
+            )
+            if blocage:
+                return Response({"budget": blocage}, status=status.HTTP_400_BAD_REQUEST)
         da.status = to
         fields = ["status", "updated_at"]
         if extra_note:
@@ -89,12 +102,12 @@ class PurchaseRequestViewSet(_CommonViewSet):
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def soumettre(self, request, pk=None):
-        return self._transition(PurchaseRequest.Status.BROUILLON, PurchaseRequest.Status.SOUMISE)
+        return self._transition(PurchaseRequest.Status.BROUILLON, PurchaseRequest.Status.SOUMISE, controle_budget=True)
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def approuver(self, request, pk=None):
-        return self._transition(PurchaseRequest.Status.SOUMISE, PurchaseRequest.Status.APPROUVEE)
+        return self._transition(PurchaseRequest.Status.SOUMISE, PurchaseRequest.Status.APPROUVEE, controle_budget=True)
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -106,6 +119,22 @@ class PurchaseRequestViewSet(_CommonViewSet):
         return self._transition(
             PurchaseRequest.Status.SOUMISE, PurchaseRequest.Status.REJETEE, f"Rejet ({who}) : {motif}"
         )
+
+    @action(detail=True, methods=["post"], url_path="visa-dg")
+    @transaction.atomic
+    def visa_dg(self, request, pk=None):
+        """Visa exceptionnel du DG : lève les blocages budgétaires RG-M2.08 pour cette pièce (motif obligatoire)."""
+        if not can_viser_dg(request.user):
+            return Response({"detail": "Visa exceptionnel réservé à la Direction Générale."}, status=status.HTTP_403_FORBIDDEN)
+        motif = (request.data.get("motif") or "").strip()
+        if not motif:
+            return Response({"motif": "Motif du visa exceptionnel obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
+        obj = self.get_queryset().model.objects.select_for_update().get(pk=self.get_object().pk)
+        obj.visa_dg_par = request.user
+        obj.visa_dg_motif = motif
+        obj.visa_dg_le = timezone.now()
+        obj.save(update_fields=["visa_dg_par", "visa_dg_motif", "visa_dg_le", "updated_at"])
+        return Response(self.get_serializer(obj).data)
 
 
 class PurchaseRequestLineViewSet(_CommonViewSet):
@@ -158,9 +187,69 @@ class PurchaseOrderViewSet(_CommonViewSet):
             qs = qs.filter(is_global_rental=gr)
         return qs
 
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def confirmer(self, request, pk=None):
+        """Engagement du BC : contrôles CDC M2 avant émission vers le fournisseur."""
+        order = PurchaseOrder.objects.select_for_update(of=("self",)).select_related("supplier").get(pk=self.get_object().pk)
+        if order.status != PurchaseOrder.Status.BROUILLON:
+            return Response({"detail": f"BC {order.get_status_display().lower()} : confirmation impossible."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not order.lines.exists():
+            return Response({"detail": "BC sans ligne : rien à engager."}, status=status.HTTP_400_BAD_REQUEST)
+        jour = timezone.localdate()
+        # M2 §5.8 : aucun BC émis vers un fournisseur non agréé qualité / HSE.
+        if order.supplier is None or not order.supplier.agrement_valide(jour):
+            nom = order.supplier.name if order.supplier else "non renseigné"
+            return Response({"supplier": f"Fournisseur {nom} non agréé qualité / HSE (ou agrément expiré) : BC non émis."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        # RG-M2.08 : > 110 % du budget consommé → aucun engagement (sauf visa exceptionnel DG).
+        blocage = budget_control.controler(
+            order.analytic, jour, order.total, budget_control.SEUIL_ENGAGEMENT, f"le BC {order.code}",
+            visa_dg=bool(order.visa_dg_par_id),
+        )
+        if blocage:
+            return Response({"budget": blocage}, status=status.HTTP_400_BAD_REQUEST)
+        order.status = PurchaseOrder.Status.CONFIRMEE
+        order.save(update_fields=["status"])
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def annuler(self, request, pk=None):
+        order = PurchaseOrder.objects.select_for_update().get(pk=self.get_object().pk)
+        if order.status not in (PurchaseOrder.Status.BROUILLON, PurchaseOrder.Status.CONFIRMEE):
+            return Response({"detail": "Seul un BC brouillon ou confirmé sans réception s'annule."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if order.lines.filter(received_qty__gt=0).exists():
+            return Response({"detail": "Réception enregistrée : annulez d'abord les réceptions."}, status=status.HTTP_400_BAD_REQUEST)
+        order.status = PurchaseOrder.Status.ANNULEE
+        order.save(update_fields=["status"])
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=True, methods=["post"], url_path="visa-dg")
+    @transaction.atomic
+    def visa_dg(self, request, pk=None):
+        """Visa exceptionnel du DG : lève les blocages budgétaires RG-M2.08 pour cette pièce (motif obligatoire)."""
+        if not can_viser_dg(request.user):
+            return Response({"detail": "Visa exceptionnel réservé à la Direction Générale."}, status=status.HTTP_403_FORBIDDEN)
+        motif = (request.data.get("motif") or "").strip()
+        if not motif:
+            return Response({"motif": "Motif du visa exceptionnel obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
+        obj = self.get_queryset().model.objects.select_for_update().get(pk=self.get_object().pk)
+        obj.visa_dg_par = request.user
+        obj.visa_dg_motif = motif
+        obj.visa_dg_le = timezone.now()
+        obj.save(update_fields=["visa_dg_par", "visa_dg_motif", "visa_dg_le", "updated_at"])
+        return Response(self.get_serializer(obj).data)
+
     @transaction.atomic
     def perform_create(self, serializer):
         order = serializer.save(created_by=self.request.user)
+        # Le BC hérite de l'imputation analytique de sa DA (sinon le contrôle budgétaire RG-M2.08 serait contourné).
+        if order.request_id and not order.analytic_id and order.request.analytic_id:
+            order.analytic_id = order.request.analytic_id
+            order.save(update_fields=["analytic"])
         # La DA approuvée à l'origine du BC est désormais « convertie en commande ».
         if order.request_id and order.request.status == PurchaseRequest.Status.APPROUVEE:
             order.request.status = PurchaseRequest.Status.CONVERTIE
@@ -222,6 +311,32 @@ class PurchaseInvoiceViewSet(_CommonViewSet):
         if purchase_order:
             qs = qs.filter(purchase_order_id=purchase_order)
         return qs
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def rapprocher(self, request, pk=None):
+        """Rapprochement 3-way BR / BC / facture (CDC M2 §5.8) : préalable obligatoire à la comptabilisation."""
+        invoice = PurchaseInvoice.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if invoice.status != PurchaseInvoice.Status.EN_ATTENTE:
+            return Response({"detail": f"Facture {invoice.get_status_display().lower()} : rapprochement impossible."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        lignes = list(invoice.lines.select_related("purchase_order_line"))
+        if not lignes:
+            return Response({"detail": "Facture sans ligne : rien à rapprocher."}, status=status.HTTP_400_BAD_REQUEST)
+        anomalies = []
+        for inv_line in lignes:
+            po_line = inv_line.purchase_order_line
+            if po_line.purchase_order_id != invoice.purchase_order_id:
+                anomalies.append(f"{po_line.label} : ligne d'un autre BC.")
+            if po_line.invoiced_qty > po_line.received_qty:
+                anomalies.append(f"{po_line.label} : facturé {po_line.invoiced_qty} > reçu {po_line.received_qty}.")
+            if abs(inv_line.unit_price - po_line.unit_price) > Decimal("0.01"):
+                anomalies.append(f"{po_line.label} : prix facturé {inv_line.unit_price} ≠ commandé {po_line.unit_price}.")
+        if anomalies:
+            return Response({"three_way": anomalies}, status=status.HTTP_400_BAD_REQUEST)
+        invoice.status = PurchaseInvoice.Status.RAPPROCHEE
+        invoice.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(invoice).data)
 
 
 class PurchaseInvoiceLineViewSet(_CommonViewSet):

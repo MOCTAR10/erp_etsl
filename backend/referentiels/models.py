@@ -170,9 +170,21 @@ class Partner(models.Model):
     is_global_rental = models.BooleanField(
         default=False, verbose_name="Intra-groupe GLOBAL RENTAL"
     )
+    # Agrément fournisseur (CDC M2 §5.4/5.8) : qualité (M6) et HSE (M7), avec date de fin de validité.
+    agree_qualite_jusqu = models.DateField(null=True, blank=True, verbose_name="Agrément qualité valide jusqu'au")
+    agree_hse_jusqu = models.DateField(null=True, blank=True, verbose_name="Agrément HSE valide jusqu'au")
     is_active = models.BooleanField(default=True, verbose_name="Actif")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def agrement_valide(self, jour):
+        """Agréé qualité ET HSE à la date `jour` (l'intra-groupe GLOBAL RENTAL relève de la convention de groupe)."""
+        if self.is_global_rental:
+            return True
+        return bool(
+            self.agree_qualite_jusqu and self.agree_qualite_jusqu >= jour
+            and self.agree_hse_jusqu and self.agree_hse_jusqu >= jour
+        )
 
     class Meta:
         ordering = ["name"]

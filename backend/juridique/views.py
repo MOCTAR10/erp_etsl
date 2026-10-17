@@ -1,5 +1,6 @@
 """API module M12 — Juridique & GED (RF-ERP-B0...B4)."""
 
+from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
@@ -29,6 +30,7 @@ from .serializers import (
 from config.inputs import date_input
 from users.permissions import can_read_module
 from .services import (
+    CanValidateDg,
     CanManageJuridique,
     CanValidateJuridique,
     compute_alertes,
@@ -197,9 +199,19 @@ class CautionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     serializer_class = CautionSerializer
 
     def get_permissions(self):
-        if self.action in ("lever", "appeler"):
-            return [CanValidateJuridique()]
+        if self.action in ("lever", "appeler", "valider_dg"):
+            return [CanValidateDg()]
         return [CanManageJuridique()]
+
+    @action(detail=True, methods=["post"], url_path="valider-dg")
+    def valider_dg(self, request, pk=None):
+        obj = self.get_object()
+        if obj.valide_dg_par_id:
+            raise DRFValidationError("Déjà validée par la Direction Générale.")
+        obj.valide_dg_par = request.user
+        obj.valide_dg_le = timezone.now()
+        obj.save(update_fields=["valide_dg_par", "valide_dg_le", "updated_at"])
+        return Response(self.get_serializer(obj).data)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -234,9 +246,23 @@ class AssuranceViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     serializer_class = AssuranceSerializer
 
     def get_permissions(self):
-        if self.action in ("renouveler", "resilier", "declarer-sinistre"):
+        # NB : self.action = nom de la MÉTHODE (declarer_sinistre), pas l'url_path (bug corrigé : la permission
+        # de déclaration de sinistre ne s'appliquait jamais).
+        if self.action in ("renouveler", "resilier", "valider_dg"):
+            return [CanValidateDg()]
+        if self.action == "declarer_sinistre":
             return [CanValidateJuridique()]
         return [CanManageJuridique()]
+
+    @action(detail=True, methods=["post"], url_path="valider-dg")
+    def valider_dg(self, request, pk=None):
+        obj = self.get_object()
+        if obj.valide_dg_par_id:
+            raise DRFValidationError("Déjà validée par la Direction Générale.")
+        obj.valide_dg_par = request.user
+        obj.valide_dg_le = timezone.now()
+        obj.save(update_fields=["valide_dg_par", "valide_dg_le", "updated_at"])
+        return Response(self.get_serializer(obj).data)
 
     def get_queryset(self):
         qs = super().get_queryset()

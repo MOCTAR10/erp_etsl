@@ -17,7 +17,7 @@ from rest_framework import serializers
 ATTESTATION_FIELDS = {
     "created_by", "cree_par", "demande_par", "demandeur", "requester", "declared_by", "uploaded_by",
     "validateur", "validated_by", "valide_par", "approuve_par", "decided_by", "reviewed_by", "leve_par",
-    "test_gaz_par", "signed_by",
+    "test_gaz_par", "signed_by", "visa_dg_par", "visa_daf_par", "visa_cg_par", "valide_dg_par",
 }
 
 

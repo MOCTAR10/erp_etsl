@@ -83,6 +83,20 @@ class CanManageJuridique(BasePermission):
         return can_manage_juridique(getattr(request, "user", None))
 
 
+def can_validate_dg(user):
+    """Actes qui engagent la société sur une caution / assurance : Direction Générale (CDC M12 §14.8)."""
+    if is_admin_or_staff(user):
+        return True
+    return bool(user and user.is_authenticated and user.role == User.Role.PDG)
+
+
+class CanValidateDg(BasePermission):
+    message = "Validation réservée à la Direction Générale (CDC M12 §14.8)."
+
+    def has_permission(self, request, view):
+        return can_validate_dg(getattr(request, "user", None))
+
+
 class CanValidateJuridique(BasePermission):
     """Actions d'engagement juridique : cercle restreint (RF-ERP-W1)."""
 

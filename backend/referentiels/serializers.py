@@ -90,6 +90,8 @@ class PartnerSerializer(serializers.ModelSerializer):
             "currency",
             "currency_code",
             "is_global_rental",
+            "agree_qualite_jusqu",
+            "agree_hse_jusqu",
             "is_active",
             "created_at",
             "updated_at",

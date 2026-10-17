@@ -64,13 +64,20 @@ class BudgetRevisionSerializer(serializers.ModelSerializer):
             "commentaire",
             "statut",
             "statut_label",
+            "visa_daf_par",
+            "visa_daf_le",
+            "visa_cg_par",
+            "visa_cg_le",
             "created_by",
             "created_by_name",
             "has_amount_access",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["code", "numero", "ancien_montant", "statut", "created_by"]
+        read_only_fields = [
+            "code", "numero", "ancien_montant", "statut", "created_by",
+            "visa_daf_par", "visa_daf_le", "visa_cg_par", "visa_cg_le",
+        ]
 
     def get_has_amount_access(self, obj):
         from .services import can_see_amount
@@ -123,12 +130,18 @@ class BudgetSerializer(serializers.ModelSerializer):
             "statut_label",
             "lignes",
             "nb_revisions",
+            "visa_daf_par",
+            "visa_daf_le",
+            "visa_cg_par",
+            "visa_cg_le",
             "created_by",
             "has_amount_access",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["code", "statut", "created_by"]
+        read_only_fields = [
+            "code", "statut", "created_by", "visa_daf_par", "visa_daf_le", "visa_cg_par", "visa_cg_le",
+        ]
 
     def get_has_amount_access(self, obj):
         from .services import can_see_amount

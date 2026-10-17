@@ -59,6 +59,13 @@ def can_manage_achats(user):
     return user.is_authenticated and user.role in ACHAT_WRITE_ROLES
 
 
+def can_viser_dg(user):
+    """Visa exceptionnel de dépassement budgétaire : Direction Générale uniquement (CDC Couche D §2.8)."""
+    if is_admin_or_staff(user):
+        return True
+    return user.is_authenticated and user.role == User.Role.PDG
+
+
 def can_approve_da(user):
     if is_admin_or_staff(user):
         return True

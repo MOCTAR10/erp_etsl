@@ -198,10 +198,12 @@ class CautionSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "days_left",
             "expiry_status",
             "has_amount_access",
+            "valide_dg_par",
+            "valide_dg_le",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["code", "statut", "days_left", "expiry_status"]
+        read_only_fields = ["valide_dg_par", "valide_dg_le", "code", "statut", "days_left", "expiry_status"]
 
 
 class AssuranceSerializer(AmountMaskMixin, serializers.ModelSerializer):
@@ -239,10 +241,12 @@ class AssuranceSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "days_left",
             "expiry_status",
             "has_amount_access",
+            "valide_dg_par",
+            "valide_dg_le",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["code", "statut", "days_left", "expiry_status", "sinistres"]
+        read_only_fields = ["valide_dg_par", "valide_dg_le", "code", "statut", "days_left", "expiry_status", "sinistres"]
 
 
 class ReunionSerializer(serializers.ModelSerializer):

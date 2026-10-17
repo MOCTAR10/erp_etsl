@@ -420,6 +420,12 @@ class Caution(models.Model):
         related_name="cautions_juridique",
         verbose_name="Garantie (GED)",
     )
+    # Validation DG obligatoire (CDC M12 §14.8).
+    valide_dg_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Validé par la Direction Générale",
+    )
+    valide_dg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date de validation DG")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -520,6 +526,12 @@ class Assurance(models.Model):
         related_name="assurances_juridique",
         verbose_name="Police (GED)",
     )
+    # Validation DG obligatoire (CDC M12 §14.8).
+    valide_dg_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Validé par la Direction Générale",
+    )
+    valide_dg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date de validation DG")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

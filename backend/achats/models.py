@@ -69,6 +69,25 @@ class PurchaseRequest(models.Model):
     )
     is_urgent = models.BooleanField(default=False, verbose_name="Urgente")
     notes = models.TextField(blank=True, verbose_name="Notes")
+    analytic = models.ForeignKey(
+        "referentiels.AnalyticAccount",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="Imputation analytique (affaire / chantier / centre)",
+        help_text="Rattachement au budget M11 : contrôle RG-M2.08 (90 / 100 / 110 %).",
+    )
+    visa_dg_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="Visa exceptionnel DG (dépassement budgétaire)",
+    )
+    visa_dg_motif = models.TextField(blank=True, verbose_name="Motif du visa exceptionnel")
+    visa_dg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa exceptionnel")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -79,6 +98,10 @@ class PurchaseRequest(models.Model):
 
     def __str__(self):
         return f"{self.code} — {self.title}"
+
+    @property
+    def montant_estime(self):
+        return sum((line.quantity * line.estimated_price for line in self.lines.all()), Decimal("0"))
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -253,6 +276,25 @@ class PurchaseOrder(models.Model):
         default=False, verbose_name="Intra-groupe GLOBAL RENTAL"
     )
     notes = models.TextField(blank=True, verbose_name="Notes")
+    analytic = models.ForeignKey(
+        "referentiels.AnalyticAccount",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="Imputation analytique (affaire / chantier / centre)",
+        help_text="Rattachement au budget M11 : contrôle RG-M2.08 (90 / 100 / 110 %).",
+    )
+    visa_dg_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="Visa exceptionnel DG (dépassement budgétaire)",
+    )
+    visa_dg_motif = models.TextField(blank=True, verbose_name="Motif du visa exceptionnel")
+    visa_dg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa exceptionnel")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

@@ -5,6 +5,8 @@ from datetime import date, timedelta
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -36,6 +38,25 @@ class DjangoValidationMixin:
         if isinstance(exc, DjangoValidationError):
             exc = DRFValidationError(getattr(exc, "messages", [str(exc)]))
         return super().handle_exception(exc)
+
+
+def _apposer_visa(obj, request):
+    """Pose le visa DAF ou CG demandé ; retourne True quand les DEUX visas sont réunis (CDC M11 §4.4).
+
+    Deux personnes distinctes : celui qui a posé un visa ne pose pas l'autre (séparation des tâches).
+    """
+    visa = (request.data.get("visa") or "").strip().lower()
+    if visa not in ("daf", "cg"):
+        raise DRFValidationError({"visa": "Préciser le visa apposé : « daf » ou « cg »."})
+    champ, autre = (("visa_daf_par", "visa_cg_par") if visa == "daf" else ("visa_cg_par", "visa_daf_par"))
+    if getattr(obj, f"{champ}_id"):
+        raise DRFValidationError({"visa": f"Visa {visa.upper()} déjà apposé."})
+    if getattr(obj, f"{autre}_id") == request.user.id:
+        raise DRFValidationError({"visa": "Double visa : le second visa doit être apposé par une autre personne."})
+    setattr(obj, champ, request.user)
+    setattr(obj, champ.replace("_par", "_le"), timezone.now())
+    obj.save(update_fields=[champ, champ.replace("_par", "_le"), "updated_at"])
+    return bool(obj.visa_daf_par_id and obj.visa_cg_par_id)
 
 
 class BudgetViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
@@ -80,13 +101,22 @@ class BudgetViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         result = compute_variance(budget)
         return Response(result)
 
+    def perform_update(self, serializer):
+        # Version budgétaire scellée : un budget approuvé ou clôturé ne se modifie que par révision (R1-R4).
+        if serializer.instance.statut != Budget.Statut.BROUILLON:
+            raise DRFValidationError("Budget approuvé (version scellée) : modification par révision R1-R4 uniquement.")
+        serializer.save()
+
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def approuver(self, request, pk=None):
-        budget = self.get_object()
+        """Visa DAF ou CG sur la version V0 ; le budget entre en vigueur au second visa."""
+        budget = Budget.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if budget.statut != Budget.Statut.BROUILLON:
             raise DRFValidationError("Seul un budget brouillon peut être approuvé.")
-        budget.statut = Budget.Statut.APPROUVE
-        budget.save(update_fields=["statut", "updated_at"])
+        if _apposer_visa(budget, request):
+            budget.statut = Budget.Statut.APPROUVE
+            budget.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(budget).data)
 
     @action(detail=True, methods=["post"])
@@ -150,9 +180,10 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def appliquer(self, request, pk=None):
-        """Applique une révision : ajuste le montant du budget (R1-R4)."""
-        revision = self.get_object()
+        """Visa DAF ou CG sur la révision ; elle s'applique au budget au second visa (R1-R4)."""
+        revision = BudgetRevision.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if revision.statut != BudgetRevision.Statut.BROUILLON:
             raise DRFValidationError("Révision déjà appliquée ou annulée.")
         budget = revision.budget
@@ -165,6 +196,8 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
                 f"Le budget a changé depuis la préparation de {revision.code} "
                 f"({revision.ancien_montant} → {budget.montant}) : préparez une nouvelle révision."
             )
+        if not _apposer_visa(revision, request):
+            return Response(self.get_serializer(revision).data)
         budget.montant = revision.nouveau_montant
         budget.save(update_fields=["montant", "updated_at"])
         revision.statut = BudgetRevision.Statut.APPLIQUEE

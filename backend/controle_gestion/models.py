@@ -105,6 +105,16 @@ class Budget(models.Model):
         related_name="budgets_cg",
         verbose_name="Créé par",
     )
+    # Double visa DAF + Contrôle de gestion (CDC M11 §4.4) : deux personnes distinctes.
+    visa_daf_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Visa DAF"
+    )
+    visa_daf_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa DAF")
+    visa_cg_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Visa Contrôle de gestion",
+    )
+    visa_cg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa CG")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -190,6 +200,16 @@ class BudgetRevision(models.Model):
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut"
     )
+    # Double visa DAF + Contrôle de gestion (CDC M11 §4.4) : deux personnes distinctes.
+    visa_daf_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Visa DAF"
+    )
+    visa_daf_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa DAF")
+    visa_cg_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Visa Contrôle de gestion",
+    )
+    visa_cg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa CG")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

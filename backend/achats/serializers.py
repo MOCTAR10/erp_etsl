@@ -49,11 +49,17 @@ class PurchaseRequestSerializer(serializers.ModelSerializer):
             "status_label",
             "is_urgent",
             "notes",
+            "analytic",
+            "visa_dg_par",
+            "visa_dg_motif",
+            "visa_dg_le",
             "lines_count",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["requester", "id", "code", "status", "created_at", "updated_at"]
+        read_only_fields = [
+            "requester", "id", "code", "status", "visa_dg_par", "visa_dg_motif", "visa_dg_le", "created_at", "updated_at",
+        ]
 
     def get_requester_name(self, obj):
         if not obj.requester:
@@ -189,6 +195,10 @@ class PurchaseOrderSerializer(AmountMaskMixin, ModelCleanMixin, serializers.Mode
             "currency",
             "is_global_rental",
             "notes",
+            "analytic",
+            "visa_dg_par",
+            "visa_dg_motif",
+            "visa_dg_le",
             "total",
             "conformity",
             "lines_count",
@@ -200,6 +210,10 @@ class PurchaseOrderSerializer(AmountMaskMixin, ModelCleanMixin, serializers.Mode
         read_only_fields = [
             "id",
             "code",
+            "status",
+            "visa_dg_par",
+            "visa_dg_motif",
+            "visa_dg_le",
             "total",
             "conformity",
             "created_by",
@@ -298,7 +312,7 @@ class PurchaseInvoiceSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "total", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "total", "created_at", "updated_at"]
 
 
 class PurchaseInvoiceLineSerializer(AmountMaskMixin, serializers.ModelSerializer):
