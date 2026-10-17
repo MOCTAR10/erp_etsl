@@ -23,7 +23,8 @@ export default defineConfig({
   // Le backend Django doit tourner sur la base seedée `etls_e2e` (voir
   // archi/AGENTS.md "Régression"). webServer = le lanceur Vite Playwright.
   webServer: {
-    command: "npx vite --host 127.0.0.1",
+    // PW_WEB_CMD permet de servir le build de production (vite preview) au lieu du serveur de dev.
+    command: process.env.PW_WEB_CMD || "npx vite --host 127.0.0.1",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
