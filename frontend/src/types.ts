@@ -1983,3 +1983,27 @@ export interface AnalyseEcart {
   statut_label: string;
   analyse: string;
 }
+
+/** Délégation temporaire des validations (lot 15b, EX-G-02). */
+export interface Delegation {
+  id: string;
+  code: string;
+  delegant_email: string;
+  delegataire_email: string;
+  date_debut: string;
+  date_fin: string;
+  motif: string;
+  active: boolean;
+  annulee_le: string | null;
+}
+
+/** Entrée du journal des accès (lot 15b, EX-G-10). */
+export interface JournalAcces {
+  id: number;
+  cree_le: string;
+  evenement: string;
+  evenement_label: string;
+  email: string;
+  ip: string | null;
+  chemin: string;
+}

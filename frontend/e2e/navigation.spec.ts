@@ -20,6 +20,7 @@ const ROUTES: { path: string; heading: RegExp }[] = [
   { path: "/signatures", heading: /Signatures électroniques/ },
   { path: "/terrain", heading: /Saisie terrain/ },
   { path: "/mon-espace", heading: /Mon espace salarié/ },
+  { path: "/securite", heading: /Sécurité & délégations/ },
 ];
 
 test.describe("Régression : navigation (smoke)", () => {

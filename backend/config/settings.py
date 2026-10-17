@@ -264,8 +264,8 @@ WATCHED_FOLDER = env("WATCHED_FOLDER", default="")
 # EX-G-02 / CL-OM « règles de validation paramétrées »). Valeurs : superviseur, hse, dg.
 HSE_PERMIS_NIVEAUX = env.list("HSE_PERMIS_NIVEAUX", default=["superviseur", "hse", "dg"])
 
-# MFA TOTP obligatoire pour les rôles sensibles (lot 15b, CDC §8.2) ; une valeur vide désactive l'obligation
-# (tests, e2e), un compte peut toujours activer la MFA volontairement.
+# MFA TOTP obligatoire pour les rôles sensibles (lot 15b, CDC §8.2). Imposée par défaut hors DEBUG (production) ;
+# en développement et en e2e, `MFA_ROLES` vide : les comptes de démonstration se connectent sans second facteur.
 MFA_ROLES = [r for r in env.list(
-    "MFA_ROLES", default=["admin", "pdg", "dga", "direction", "finance", "comptable", "rh"]
+    "MFA_ROLES", default=[] if DEBUG else ["admin", "pdg", "dga", "direction", "finance", "comptable", "rh"]
 ) if r]

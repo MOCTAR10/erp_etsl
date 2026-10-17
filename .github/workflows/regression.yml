@@ -267,6 +267,8 @@ jobs:
           # Les scénarios e2e n'ont qu'un compte administrateur (demandeur) : circuit de permis à un niveau.
           # Le circuit complet superviseur → HSE → DG (CDC M7 §9.4) est couvert par hse/test_permis_multiniveaux.py.
           HSE_PERMIS_NIVEAUX: hse
+          # MFA des rôles sensibles (lot 15b) couverte par users/test_securite_acces.py ; l'e2e se connecte en admin.
+          MFA_ROLES: ""
         run: |
           gunicorn config.wsgi:application -b 127.0.0.1:8000 -w 4 --timeout 120 > /tmp/runserver.log 2>&1 &
           for i in $(seq 1 30); do

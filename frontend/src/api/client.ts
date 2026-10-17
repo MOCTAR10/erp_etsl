@@ -71,8 +71,28 @@ export class ApiError extends Error {
   }
 }
 
-export async function login(email: string, password: string): Promise<{ user: Me; tokens: Tokens }> {
-  const tokens = await postForm<Tokens>("/api/users/token/", { email, password });
+/** Étape MFA (lot 15b) : le mot de passe d'un rôle sensible ne délivre pas de jetons mais un jeton MFA (5 min). */
+export interface MfaChallenge {
+  mfa_requis: true;
+  mfa_enrolement: boolean;
+  mfa_jeton: string;
+}
+
+export type LoginResult = { user: Me; tokens: Tokens; mfa?: undefined } | { mfa: MfaChallenge };
+
+export async function login(email: string, password: string): Promise<LoginResult> {
+  const res = await postForm<Tokens | MfaChallenge>("/api/users/token/", { email, password });
+  if ("mfa_requis" in res) return { mfa: res };
+  const user = await authenticatedMe(res.access);
+  return { user, tokens: res };
+}
+
+export async function mfaEnrolement(jeton: string): Promise<{ secret: string; otpauth_uri: string }> {
+  return postForm("/api/users/mfa/enrolement/", { mfa_jeton: jeton });
+}
+
+export async function mfaVerification(jeton: string, code: string): Promise<{ user: Me; tokens: Tokens }> {
+  const tokens = await postForm<Tokens>("/api/users/mfa/verification/", { mfa_jeton: jeton, code });
   const user = await authenticatedMe(tokens.access);
   return { user, tokens };
 }
@@ -101,6 +121,19 @@ export const api = {
   get: <T,>(path: string) => raw<T>(path),
   post: <T,>(path: string, body?: unknown) =>
     raw<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
+  /** Téléchargement authentifié d'un export (CSV, XLSX, PDF) : le serveur journalise l'export (EX-G-10). */
+  download: async (path: string, filename: string) => {
+    const res = await fetch(apiUrl(path), {
+      headers: { Authorization: `Bearer ${useAuth.getState().access ?? ""}` },
+    });
+    if (!res.ok) throw new ApiError(res.status, null);
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   me: () => raw<Me>("/api/users/me/"),
   monProfil: () => raw<import("../types").MonProfil>("/api/rh-paie/mon-espace/profil/"),
   mesBulletins: () => rawList<import("../types").MonBulletin>("/api/rh-paie/mon-espace/bulletins/"),

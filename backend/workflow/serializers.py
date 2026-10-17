@@ -120,17 +120,29 @@ class NotificationSerializer(serializers.ModelSerializer):
 class DelegationSerializer(ModelCleanMixin, serializers.ModelSerializer):
     delegant_email = serializers.EmailField(source="delegant.email", read_only=True)
     delegataire_email = serializers.EmailField(source="delegataire.email", read_only=True)
+    # Saisie par adresse e-mail : un utilisateur non admin n'a pas accès à l'annuaire des comptes.
+    email_delegataire = serializers.EmailField(write_only=True, required=False)
     active = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Delegation
         fields = [
             "id", "code", "delegant", "delegant_email", "delegataire", "delegataire_email", "date_debut",
-            "date_fin", "motif", "active", "annulee_le", "annulee_par", "created_by", "created_at",
+            "date_fin", "motif", "active", "annulee_le", "annulee_par", "created_by", "created_at", "email_delegataire",
         ]
         read_only_fields = ["id", "code", "delegant", "active", "annulee_le", "annulee_par", "created_by", "created_at"]
+        extra_kwargs = {"delegataire": {"required": False}}
 
     def validate(self, attrs):
+        from users.models import User
+
+        email = attrs.pop("email_delegataire", None)
+        if email:
+            attrs["delegataire"] = User.objects.filter(email__iexact=email, is_active=True).first()
+            if attrs["delegataire"] is None:
+                raise serializers.ValidationError({"email_delegataire": "Aucun compte actif avec cette adresse."})
         if self.instance is None:
+            if not attrs.get("delegataire"):
+                raise serializers.ValidationError({"delegataire": "Délégataire obligatoire."})
             attrs["delegant"] = self.context["delegant"]
         return super().validate(attrs)

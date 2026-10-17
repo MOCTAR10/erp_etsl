@@ -34,7 +34,7 @@ import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { login } from "../api/client";
+import { login, mfaEnrolement, mfaVerification, type MfaChallenge } from "../api/client";
 import { landingForRole } from "../lib/landing";
 import { useAuth } from "../store/auth";
 import { motionTokens } from "../theme/tokens";
@@ -90,6 +90,9 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [mfa, setMfa] = useState<MfaChallenge | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
 
@@ -98,13 +101,36 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const { user, tokens } = await login(email, password);
-      setSession(tokens, user);
+      const result = await login(email, password);
+      if (result.mfa) {
+        // Rôle sensible : second facteur exigé avant toute session (lot 15b).
+        setMfa(result.mfa);
+        if (result.mfa.mfa_enrolement) setSecret((await mfaEnrolement(result.mfa.mfa_jeton)).secret);
+        return;
+      }
+      setSession(result.tokens, result.user);
       // Une URL profonde demandée avant connexion reste prioritaire ; sinon on
       // arrive sur la page qui porte le métier du rôle (pas toujours le dashboard).
-      navigate(from || landingForRole(user.role), { replace: true });
+      navigate(from || landingForRole(result.user.role), { replace: true });
     } catch {
       setError(t("login.invalid"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitMfa = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!mfa) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { user, tokens } = await mfaVerification(mfa.mfa_jeton, code);
+      setSession(tokens, user);
+      navigate(from || landingForRole(user.role), { replace: true });
+    } catch {
+      setError(t("login.mfaInvalid"));
+      setCode("");
     } finally {
       setBusy(false);
     }
@@ -205,6 +231,52 @@ export function LoginPage() {
             </p>
           )}
 
+          {mfa ? (
+            <form onSubmit={submitMfa} aria-label={t("login.mfaTitle")}>
+              <h3 className="login-mfa-title">{t("login.mfaTitle")}</h3>
+              {secret ? (
+                <div className="login-mfa-enrol">
+                  <p className="muted">{t("login.mfaEnrolIntro")}</p>
+                  <code className="login-mfa-secret" aria-label={t("login.mfaSecret")}>
+                    {secret.match(/.{1,4}/g)?.join(" ")}
+                  </code>
+                </div>
+              ) : (
+                <p className="muted">{t("login.mfaIntro")}</p>
+              )}
+              <div className="login-field">
+                <label htmlFor="mfa-code">{t("login.mfaCode")}</label>
+                <div className="login-input">
+                  <Lock size={16} aria-hidden />
+                  <input
+                    id="mfa-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    required
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+              </div>
+              <button type="submit" className="login-submit" disabled={busy || code.length !== 6}>
+                {busy ? t("common.loading") : t("login.mfaSubmit")}
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setMfa(null);
+                  setSecret(null);
+                  setCode("");
+                  setError(null);
+                }}
+              >
+                {t("login.mfaBack")}
+              </button>
+            </form>
+          ) : (
           <form onSubmit={submit}>
             <div className="login-field">
               <label htmlFor="email">{t("login.email")}</label>
@@ -262,6 +334,7 @@ export function LoginPage() {
               {busy ? t("common.loading") : t("login.submit")}
             </motion.button>
           </form>
+          )}
 
           <section className="login-demo">
             <div className="login-demo-head">
