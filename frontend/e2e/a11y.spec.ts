@@ -12,6 +12,10 @@ const ROUTES = [
 ];
 
 async function audit(page: Page) {
+  // Motion garde les fondus d'opacité même en reduced-motion : on attend la fin des animations,
+  // sinon axe mesure un contraste sur un élément à demi transparent (faux positif).
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
+  await page.waitForTimeout(700);
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const blocking = results.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")

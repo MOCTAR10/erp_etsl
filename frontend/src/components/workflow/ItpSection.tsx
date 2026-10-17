@@ -80,7 +80,7 @@ export function ItpSection() {
                 </strong>
                 <Badge tone={itp.statut === "valide" ? "ok" : "warn"}>{itp.statut_label}</Badge>
               </header>
-              <ProgressBar value={levés} max={Math.max(points.length, 1)} tone={levés === points.length && points.length > 0 ? "ok" : "brand"} />
+              <ProgressBar label={`${itp.code} · ${t("itp.title")}`} value={levés} max={Math.max(points.length, 1)} tone={levés === points.length && points.length > 0 ? "ok" : "brand"} />
               <span className="muted">
                 {t("itp.progress", { done: levés, total: points.length, restants: itp.points_arret_restants ?? 0 })}
               </span>

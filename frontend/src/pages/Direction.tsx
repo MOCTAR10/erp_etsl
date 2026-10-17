@@ -189,7 +189,7 @@ function DirectionInner() {
         <div className="card hero">
           <span className="hero-label">{t("direction.heroDispo")}</span>
           <span className="hero-value">{taux} %</span>
-          <ProgressBar value={Number(taux)} tone={Number(taux) >= 85 ? "ok" : Number(taux) >= 60 ? "warn" : "err"} />
+          <ProgressBar label={t("direction.heroDispo")} value={Number(taux)} tone={Number(taux) >= 85 ? "ok" : Number(taux) >= 60 ? "warn" : "err"} />
           <span className="hero-hint">
             {p.asmr.operationnels}/{p.asmr.equipements} {t("direction.operationnels").toLowerCase()}
           </span>
@@ -200,7 +200,7 @@ function DirectionInner() {
           <span className="hero-hint">
             {p.hse.jours_sans_accident === null
               ? t("direction.noAccident")
-              : `${t("direction.joursSansAccident")} · ${p.hse.accidents} accident(s)`}
+              : `${t("direction.joursSansAccident")} · ${t("direction.u.accidents", { count: p.hse.accidents })}`}
           </span>
         </div>
         <div className="card hero">
@@ -208,7 +208,7 @@ function DirectionInner() {
           <span className="hero-value">
             {j4.conformes}/{j4.periodes}
           </span>
-          <ProgressBar value={j4Taux} tone={j4Taux >= 80 ? "ok" : j4Taux >= 50 ? "warn" : "err"} />
+          <ProgressBar label={t("direction.heroCloture")} value={j4Taux} tone={j4Taux >= 80 ? "ok" : j4Taux >= 50 ? "warn" : "err"} />
           <span className="hero-hint">{j4Taux} % J+4</span>
         </div>
       </div>
@@ -240,7 +240,7 @@ function DirectionInner() {
       <SectionTitle>{t("direction.directionKPIs")}</SectionTitle>
       <div className="kpi-grid">
         <KpiLink to="/">
-          <Kpi label={t("direction.documentsRetention")} value={d.documents.total} hint={`${d.documents.dossiers} dossiers`} icon={FolderOpen} tone="brand" delay={delay(0)} />
+          <Kpi label={t("direction.documentsRetention")} value={d.documents.total} hint={t("direction.u.dossiers", { count: d.documents.dossiers })} icon={FolderOpen} tone="brand" delay={delay(0)} />
         </KpiLink>
         <KpiLink to="/pipeline">
           <Kpi label={t("nav.pipeline")} value={d.commercial.opportunites_ouvertes} hint={d.commercial.ca_gagne !== null ? `${formatNumber(d.commercial.ca_gagne)} F` : "••••••"} icon={TrendingUp} tone="accent" delay={delay(1)} />
@@ -252,7 +252,7 @@ function DirectionInner() {
           <Kpi label={t("nav.hse")} value={d.hse.incidents_ouverts} hint={`${d.hse.jours_sans_accident ?? "—"} ${t("direction.joursSansAccident")}`} icon={ShieldAlert} tone="err" delay={delay(3)} />
         </KpiLink>
         <KpiLink to="/rh-paie">
-          <Kpi label={t("nav.rhPaie")} value={d.rh_paie.effectif} hint={`${d.rh_paie.bulletins_mois} bulletins`} icon={Users} tone="brand" delay={delay(4)} />
+          <Kpi label={t("nav.rhPaie")} value={d.rh_paie.effectif} hint={t("direction.u.bulletins", { count: d.rh_paie.bulletins_mois })} icon={Users} tone="brand" delay={delay(4)} />
         </KpiLink>
         <KpiLink to="/controle-gestion">
           <Kpi label={t("direction.annuel")} value={`${j4.conformes}/${j4.periodes}`} hint={`${j4Taux}% J+4`} icon={CalendarDays} tone="ok" delay={delay(5)} />
@@ -303,11 +303,11 @@ function DirectionInner() {
       <SectionTitle>{t("direction.reportPetrolier")}</SectionTitle>
       <div className="kpi-grid">
         <Kpi label={t("direction.tauxDisponibilite")} value={`${taux} %`} hint={`${p.asmr.operationnels}/${p.asmr.equipements}`} icon={Gauge} tone="ok" delay={delay(0)} />
-        <Kpi label={t("direction.joursSansAccident")} value={p.hse.jours_sans_accident ?? "—"} hint={`${p.hse.accidents} accidents`} icon={ShieldCheck} tone="ok" delay={delay(1)} />
-        <Kpi label="NC ouvertes" value={p.qualite.nc_ouvertes} hint={`${p.qualite.nc_critiques} critiques`} icon={AlertTriangle} tone="warn" delay={delay(2)} />
-        <Kpi label="Soudeurs qualifiés" value={p.qualite.soudeurs_qualifies} hint={`${p.qualite.soudeurs_expires} expirés`} icon={Award} tone="brand" delay={delay(3)} />
-        <Kpi label="Permis ATEX" value={p.hse.permis_atex} hint={`${p.hse.equipements_atex_quarantaine} quarantaine`} icon={Flame} tone="warn" delay={delay(4)} />
-        <Kpi label="EPI à renouveler" value={p.hse.epi_a_renouveler} hint={`${p.hse.permis_actifs} permis actifs`} icon={UserCheck} tone="accent" delay={delay(5)} />
+        <Kpi label={t("direction.joursSansAccident")} value={p.hse.jours_sans_accident ?? "—"} hint={t("direction.u.accidents", { count: p.hse.accidents })} icon={ShieldCheck} tone="ok" delay={delay(1)} />
+        <Kpi label={t("direction.ncOuvertes")} value={p.qualite.nc_ouvertes} hint={t("direction.u.critiques", { count: p.qualite.nc_critiques })} icon={AlertTriangle} tone="warn" delay={delay(2)} />
+        <Kpi label={t("direction.soudeursQualifies")} value={p.qualite.soudeurs_qualifies} hint={t("direction.u.expires", { count: p.qualite.soudeurs_expires })} icon={Award} tone="brand" delay={delay(3)} />
+        <Kpi label={t("direction.permisAtex")} value={p.hse.permis_atex} hint={t("direction.u.quarantaine", { count: p.hse.equipements_atex_quarantaine })} icon={Flame} tone="warn" delay={delay(4)} />
+        <Kpi label={t("direction.epiRenouveler")} value={p.hse.epi_a_renouveler} hint={t("direction.u.permisActifs", { count: p.hse.permis_actifs })} icon={UserCheck} tone="accent" delay={delay(5)} />
       </div>
 
       <section id="echeances">

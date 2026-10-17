@@ -2,11 +2,14 @@ type Tone = "brand" | "ok" | "warn" | "err" | "accent";
 
 export function ProgressBar({
   value,
+  label,
   max = 100,
   tone = "brand",
   className = "",
 }: {
   value: number;
+  /** Nom accessible (obligatoire : axe aria-progressbar-name). */
+  label: string;
   max?: number;
   tone?: Tone;
   className?: string;
@@ -16,6 +19,7 @@ export function ProgressBar({
     <div
       className={`progress ${className}`.trim()}
       role="progressbar"
+      aria-label={label}
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}
       aria-valuemax={100}
