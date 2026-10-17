@@ -180,6 +180,10 @@ export const api = {
     raw<import("../types").Paginated<import("../types").StockQuant>>(`/api/stocks/quants/${params}`),
   inventaires: (params = "") =>
     raw<import("../types").Paginated<import("../types").Inventaire>>(`/api/stocks/inventaires/${params}`),
+  valorisationsMensuelles: () =>
+    raw<import("../types").Paginated<import("../types").ValorisationMensuelle>>(`/api/stocks/valorisations/?page_size=24`),
+  plansInventaire: () =>
+    raw<import("../types").Paginated<import("../types").PlanInventaireTournant>>(`/api/stocks/plans-inventaire/?page_size=20`),
   valorisation: (depot = "") =>
     raw<import("../types").ValorisationRow[]>(`/api/stocks/quants/valorisation/${depot ? `?depot=${depot}` : ""}`),
   soudeurs: (params = "") =>

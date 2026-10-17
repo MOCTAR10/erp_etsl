@@ -436,6 +436,29 @@ export interface Inventaire {
   created_at: string;
 }
 
+export interface ValorisationMensuelle {
+  id: string;
+  periode: string;
+  depot: string;
+  depot_code: string;
+  quantite: string;
+  valeur_stock: string | null;
+  consommation: string | null;
+  ventilation: Array<{ axe: string; libelle: string; valeur: string | null }>;
+  has_amount_access: boolean;
+}
+
+export interface PlanInventaireTournant {
+  id: string;
+  code: string;
+  depot: string;
+  depot_label: string;
+  periodicite_jours: number;
+  articles_par_passage: number;
+  prochaine_date: string;
+  actif: boolean;
+}
+
 export interface ValorisationRow {
   depot: string;
   article: string;

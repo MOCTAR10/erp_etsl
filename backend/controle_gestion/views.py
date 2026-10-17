@@ -1,6 +1,7 @@
 """API module M11 — Contrôle de gestion (RF-ERP-A0…A4)."""
 
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.types import OpenApiTypes
@@ -28,6 +29,7 @@ from .services import (
     CanManageGestion,
     compute_clotures_stats,
     compute_marges,
+    can_see_amount,
     compute_variance,
     detecter_ecarts,
 )
@@ -285,6 +287,36 @@ class MargesView(viewsets.ViewSet):
             raise DRFValidationError("Paramètre `analytic` doit être un entier (id de compte analytique).")
         result = compute_marges(fiscal_year, axis=axis, analytic=analytic)
         return Response(result, status=status.HTTP_200_OK)
+
+
+class ConsommationsStockView(viewsets.ViewSet):
+    """Consommations matières et valeur du stock publiées par M5 (clôture M5, CDC M5 §7.11) : sans ressaisie."""
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    def list(self, request):
+        from stocks.models import ValorisationMensuelle
+
+        periode = request.query_params.get("periode")
+        qs = ValorisationMensuelle.objects.select_related("depot").order_by("periode", "depot__code")
+        if periode:
+            qs = qs.filter(periode=periode)
+        voir = can_see_amount(request.user)
+        axes, depots = {}, []
+        for v in qs:
+            depots.append({
+                "periode": v.periode, "depot": v.depot.code,
+                "valeur_stock": f"{v.valeur_stock:.2f}" if voir else None,
+                "consommation": f"{v.consommation:.2f}" if voir else None,
+            })
+            for ligne in v.ventilation:
+                axes[ligne["axe"]] = axes.get(ligne["axe"], Decimal("0")) + Decimal(ligne["valeur"])
+        return Response({
+            "depots": depots,
+            "consommations_par_axe": [
+                {"axe": a, "valeur": f"{x:.2f}" if voir else None} for a, x in sorted(axes.items())
+            ],
+        })
 
 
 class AnalyseEcartViewSet(viewsets.ReadOnlyModelViewSet):
