@@ -8,8 +8,10 @@ export default defineConfig({
   testDir: path.join(__dirname, "e2e"),
   timeout: 60_000,
   expect: { timeout: 15_000 },
+  // Fichiers de specs en parallèle (chaque spec crée ses propres données, libellés horodatés) ;
+  // PW_WORKERS règle le nombre de navigateurs simultanés (1 par défaut en local).
   fullyParallel: false,
-  workers: 1,
+  workers: Number(process.env.PW_WORKERS || 1),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : [["html", { open: "never" }], ["list"]],
   use: {

@@ -112,7 +112,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Start S3 (SeaweedFS — remplace MinIO, archivé en 2026-09 ; même port 9000, mêmes identifiants de dev)
         run: |
-          docker run -d --name s3 -p 9000:8333             -v "$GITHUB_WORKSPACE/infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro"             chrislusf/seaweedfs:4.48 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+          docker run -d --name s3 -p 9000:8333 \
+            -v "$GITHUB_WORKSPACE/infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs:4.48 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/ || true)
             [ "$code" != "000" ] && break
@@ -214,7 +216,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Start S3 (SeaweedFS — remplace MinIO, archivé en 2026-09 ; même port 9000, mêmes identifiants de dev)
         run: |
-          docker run -d --name s3 -p 9000:8333             -v "$GITHUB_WORKSPACE/infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro"             chrislusf/seaweedfs:4.48 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+          docker run -d --name s3 -p 9000:8333 \
+            -v "$GITHUB_WORKSPACE/infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs:4.48 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/ || true)
             [ "$code" != "000" ] && break
