@@ -54,7 +54,7 @@ export function PermisActions({ permis }: { permis: PermisTravail }) {
                 testGaz.mutate();
               }}
             >
-              <select value={resultat} onChange={(e) => setResultat(e.target.value as typeof resultat)}>
+              <select aria-label={t("terrain.fields.resultat")} value={resultat} onChange={(e) => setResultat(e.target.value as typeof resultat)}>
                 <option value="conforme">{t("terrain.conforme")}</option>
                 <option value="non_conforme">{t("terrain.nonConforme")}</option>
               </select>

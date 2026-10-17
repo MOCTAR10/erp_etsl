@@ -88,19 +88,19 @@ export function BaremesSection() {
           create.mutate();
         }}
       >
-        <input required placeholder={t("baremes.code")} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-        <input required placeholder={t("baremes.label")} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-        <input placeholder={t("baremes.organisme")} value={form.organisme} onChange={(e) => setForm({ ...form, organisme: e.target.value })} />
-        <select value={form.nature} onChange={(e) => setForm({ ...form, nature: e.target.value })}>
+        <input required aria-label={t("baremes.code")} placeholder={t("baremes.code")} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+        <input required aria-label={t("baremes.label")} placeholder={t("baremes.label")} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+        <input aria-label={t("baremes.organisme")} placeholder={t("baremes.organisme")} value={form.organisme} onChange={(e) => setForm({ ...form, organisme: e.target.value })} />
+        <select aria-label={t("baremes.nature")} value={form.nature} onChange={(e) => setForm({ ...form, nature: e.target.value })}>
           <option value="salariale">{t("baremes.salariale")}</option>
           <option value="patronale">{t("baremes.patronale")}</option>
         </select>
-        <select value={form.base} onChange={(e) => setForm({ ...form, base: e.target.value })}>
+        <select aria-label={t("baremes.base")} value={form.base} onChange={(e) => setForm({ ...form, base: e.target.value })}>
           <option value="brut">{t("baremes.baseBrut")}</option>
           <option value="salaire">{t("baremes.baseSalaire")}</option>
         </select>
-        <input required type="number" step="0.001" min="0" placeholder={t("baremes.taux")} value={form.taux} onChange={(e) => setForm({ ...form, taux: e.target.value })} />
-        <input type="number" step="1" min="0" placeholder={t("baremes.plafond")} value={form.plafond} onChange={(e) => setForm({ ...form, plafond: e.target.value })} />
+        <input required type="number" step="0.001" min="0" aria-label={t("baremes.taux")} placeholder={t("baremes.taux")} value={form.taux} onChange={(e) => setForm({ ...form, taux: e.target.value })} />
+        <input type="number" step="1" min="0" aria-label={t("baremes.plafond")} placeholder={t("baremes.plafond")} value={form.plafond} onChange={(e) => setForm({ ...form, plafond: e.target.value })} />
         <input required type="date" aria-label={t("baremes.effet")} value={form.date_effet} onChange={(e) => setForm({ ...form, date_effet: e.target.value })} />
         <button className="btn" type="submit" disabled={create.isPending}>
           {t("baremes.save")}

@@ -2057,3 +2057,24 @@ kbd {
   white-space: nowrap;
   border: 0;
 }
+
+/* Lien d'évitement (clavier / lecteur d'écran) : invisible jusqu'au focus. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 1000;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+.main:focus {
+  outline: none;
+}

@@ -39,8 +39,8 @@ function AddPoint({ itp, next }: { itp: ControleQualite; next: number }) {
         add.mutate();
       }}
     >
-      <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("itp.pointPlaceholder")} />
-      <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+      <input required aria-label={t("itp.pointPlaceholder")} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("itp.pointPlaceholder")} />
+      <select aria-label={t("itp.type")} value={type} onChange={(e) => setType(e.target.value as typeof type)}>
         <option value="arret">{t("itp.arret")}</option>
         <option value="observation">{t("itp.observation")}</option>
       </select>

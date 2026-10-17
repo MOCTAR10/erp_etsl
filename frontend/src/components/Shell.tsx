@@ -165,12 +165,15 @@ export function Shell() {
 
   return (
     <MotionProvider>
+      <a className="skip-link" href="#main-content">
+        {t("common.skipToContent")}
+      </a>
       <div className="app-shell">
         <aside className={navOpen ? "sidebar open" : "sidebar"} id="app-sidebar">
           <div className="sidebar-brand">
             <BrandLogo />
           </div>
-          <div className="sidebar-scroll">
+          <nav className="sidebar-scroll" aria-label={t("common.mainNav")}>
             <div className="nav-group">
               <span className="nav-group-label">{t("nav.groupPilotage")}</span>
               {renderNav(PILOT_NAV)}
@@ -179,7 +182,7 @@ export function Shell() {
               <span className="nav-group-label">{t("nav.groupModules")}</span>
               {renderNav(visibleModules)}
             </div>
-          </div>
+          </nav>
           <button type="button" className="btn ghost sidebar-logout" onClick={logout}>
             <LogOut size={15} />
             {t("common.logout")}
@@ -248,7 +251,7 @@ export function Shell() {
             </div>
           </header>
 
-          <main className="main">
+          <main className="main" id="main-content" tabIndex={-1}>
             <Outlet />
           </main>
         </div>

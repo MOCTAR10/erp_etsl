@@ -12,6 +12,7 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@playwright/test": "^1.63.0",
     "@tanstack/react-query-devtools": "^5.103.2",
     "@testing-library/jest-dom": "^7.0.1",
