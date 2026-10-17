@@ -1,3 +1,8 @@
+import i18n from "i18next";
+
+/** Langue active de l'interface (FR par défaut) : les dates suivent le sélecteur FR/EN. */
+const currentLocale = () => i18n.language || "fr";
+
 export function formatBytes(bytes: number): string {
   if (!bytes) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -6,7 +11,7 @@ export function formatBytes(bytes: number): string {
   return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }
 
-export function formatDate(iso: string, locale: string): string {
+export function formatDate(iso: string, locale: string = currentLocale()): string {
   return new Date(iso).toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
@@ -14,7 +19,7 @@ export function formatDate(iso: string, locale: string): string {
   });
 }
 
-export function formatDateTime(iso: string, locale: string): string {
+export function formatDateTime(iso: string, locale: string = currentLocale()): string {
   return new Date(iso).toLocaleString(locale, {
     day: "2-digit",
     month: "short",

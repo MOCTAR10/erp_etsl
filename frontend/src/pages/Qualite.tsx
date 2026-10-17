@@ -36,7 +36,7 @@ function QualifCard({ qual, index }: { qual: QualificationSoudeur; index: number
       value={qual.soudeur_name}
       hint={
         <>
-          {qual.procede_label} · {qual.position || "—"} · {formatDate(qual.date_validite, "fr")}
+          {qual.procede_label} · {qual.position || "—"} · {formatDate(qual.date_validite)}
           {expired ? (
             <span className="badge err"> {t("qualite.expiree")}</span>
           ) : (
@@ -124,7 +124,7 @@ function PvCard({ pv, index }: { pv: PvControle; index: number }) {
       value={pv.intitule}
       hint={
         <>
-          {pv.affaire_code ?? "—"} · {formatDate(pv.date_pv, "fr")}
+          {pv.affaire_code ?? "—"} · {formatDate(pv.date_pv)}
           <span className={`badge ${badge}`}> {t(`qualite.pv_statut.${pv.statut}`)}</span>
           <span className="badge brand"> {pv.retention_years}y</span>
         </>

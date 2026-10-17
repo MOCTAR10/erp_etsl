@@ -50,7 +50,7 @@ function OfCard({ of, index }: { of: OrdreFabrication; index: number }) {
       </div>
       {of.planned_end ? (
         <div className="meta muted">
-          {t("operations.due")} {formatDate(of.planned_end, "fr")}
+          {t("operations.due")} {formatDate(of.planned_end)}
         </div>
       ) : null}
     </BoardCard>

@@ -3,7 +3,8 @@ import { Banknote, CalendarClock, FileText, Inbox, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, SectionCard, DataTable } from "../components/ui";
+import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
   BulletinPaie,
@@ -27,32 +28,6 @@ const CONGE_BADGE: Record<StatutConge, "ok" | "warn" | "err" | "brand"> = {
 const CONGE_ORDER: StatutConge[] = ["demande", "approuve", "valide", "refuse", "annule"];
 const CONGE_VALID = new Set<StatutConge>(CONGE_ORDER);
 
-function EmployeCard({ emp }: { emp: Employe }) {
-  const { t } = useTranslation();
-  const badge =
-    emp.statut === "actif" ? "ok" : emp.statut === "sorti" ? "err" : emp.statut === "suspendu" ? "warn" : "brand";
-  const contrat = emp.contrat_actif;
-  return (
-    <div className="card kpi" key={emp.id}>
-      <span className="kpi-label">
-        {emp.code} · {t(`rhPaie.categories.${emp.categorie}`)}{" "}
-        <span className={`badge ${badge}`}>{t(`rhPaie.statut_employe.${emp.statut}`)}</span>
-        {contrat?.a_renouveler ? <span className="badge warn"> {t("rhPaie.contrat")} ≤ 90 j</span> : null}
-      </span>
-      <span className="kpi-value">{emp.nom_complet}</span>
-      <span className="meta muted">
-        {emp.fonction || "—"} · {emp.departement || "—"}
-        {emp.site ? ` · ${emp.site}` : ""}
-      </span>
-      <span className="meta muted">
-        {contrat ? `${t(`rhPaie.contrats_types.${contrat.type}`)} · ${formatDate(contrat.date_debut, "fr")}` : "—"}
-        {" · "}
-        {t("rhPaie.soldeConges")} {formatNumber(emp.solde_conges)} j
-      </span>
-    </div>
-  );
-}
-
 function CongeCard({ c, index }: { c: DemandeConge; index: number }) {
   const { t } = useTranslation();
   return (
@@ -62,7 +37,7 @@ function CongeCard({ c, index }: { c: DemandeConge; index: number }) {
       </div>
       <div className="meta">{c.employe_nom}</div>
       <div className="meta">
-        {formatDate(c.date_debut, "fr")} → {formatDate(c.date_fin, "fr")} · {c.nb_jours} j
+        {formatDate(c.date_debut)} → {formatDate(c.date_fin)} · {c.nb_jours} j
         {c.motif ? ` · ${c.motif}` : ""}
       </div>
     </BoardCard>
@@ -76,7 +51,7 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
   return (
     <div className="card kpi" key={b.id}>
       <span className="kpi-label">
-        {b.code} · {b.matricule} · {formatDate(b.periode, "fr")}{" "}
+        {b.code} · {b.matricule} · {formatDate(b.periode)}{" "}
         <span className={`badge ${badge}`}>{t(`rhPaie.bulletins_statut.${b.statut}`)}</span>
       </span>
       <span className="kpi-value">{b.employe_nom}</span>
@@ -127,8 +102,33 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
   );
 }
 
+function employeTone(e: Employe): "ok" | "warn" | "err" | "brand" {
+  return e.statut === "actif" ? "ok" : e.statut === "sorti" ? "err" : e.statut === "suspendu" ? "warn" : "brand";
+}
+
 export function RhPaiePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const employeColumns: Column<Employe>[] = [
+    { key: "code", header: t("rhPaie.col.matricule"), render: (e) => e.code },
+    { key: "nom", header: t("rhPaie.col.nom"), render: (e) => e.nom_complet },
+    { key: "fonction", header: t("rhPaie.col.fonction"), render: (e) => [e.fonction, e.departement].filter(Boolean).join(" · ") || "—" },
+    { key: "cat", header: t("rhPaie.col.categorie"), render: (e) => t(`rhPaie.categories.${e.categorie}`) },
+    {
+      key: "contrat",
+      header: t("rhPaie.contrat"),
+      render: (e) =>
+        e.contrat_actif ? (
+          <>
+            {t(`rhPaie.contrats_types.${e.contrat_actif.type}`)} · {formatDate(e.contrat_actif.date_debut, i18n.language)}{" "}
+            {e.contrat_actif.a_renouveler && <Badge tone="warn">≤ 90 j</Badge>}
+          </>
+        ) : (
+          "—"
+        ),
+    },
+    { key: "solde", header: t("rhPaie.soldeConges"), num: true, render: (e) => `${formatNumber(e.solde_conges)} j` },
+    { key: "statut", header: t("rhPaie.col.statut"), render: (e) => <Badge tone={employeTone(e)}>{t(`rhPaie.statut_employe.${e.statut}`)}</Badge> },
+  ];
 
   const stats = useQuery({ queryKey: ["rhpaie-stats"], queryFn: api.rhPaieStats });
 
@@ -221,23 +221,18 @@ export function RhPaiePage() {
         {t("rhPaie.pendingNote")}
       </p>
 
-      {employesAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("rhPaie.employes")} · {employesAll.length}
-          </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {employesAll.map((e) => <EmployeCard key={e.id} emp={e} />)}
-          </div>
-        </>
-      ) : null}
+      {employesAll.length > 0 && (
+        <SectionCard title={`${t("rhPaie.employes")} · ${employesAll.length}`}>
+          <DataTable rows={employesAll} columns={employeColumns} caption={t("rhPaie.employes")} />
+        </SectionCard>
+      )}
 
       {bulletinsAll.length > 0 ? (
         <>
           <h3 className="section-heading">
             {t("rhPaie.bulletins")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {bulletinsAll.map((b) => <BulletinCard key={b.id} b={b} />)}
           </div>
         </>

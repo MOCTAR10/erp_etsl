@@ -54,7 +54,7 @@ function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
           {t(`maintenance.ot_priorites.${ot.priorite}`)}
         </span>
         <span className="muted">
-          {formatDate(ot.date_demande, "fr")}
+          {formatDate(ot.date_demande)}
           {ot.technicien_name ? ` · ${ot.technicien_name}` : ""}
           {ot.has_amount_access && ot.cout_total !== null ? ` · ${ot.cout_total} F` : ""}
         </span>

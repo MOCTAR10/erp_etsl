@@ -85,7 +85,7 @@ function DemandeCard({ demande, index }: { demande: DemandeMobilisation; index: 
     <Kpi
       label={`${demande.code} · ${demande.statut_label}`}
       value={demande.label}
-      hint={`${demande.departement}${demande.date_debut ? ` · ${t("logistique.debut")} ${formatDate(demande.date_debut, "fr")}` : ""}${
+      hint={`${demande.departement}${demande.date_debut ? ` · ${t("logistique.debut")} ${formatDate(demande.date_debut)}` : ""}${
         demande.affaire_code ? ` · ${demande.affaire_code}` : ""
       }`}
       icon={ClipboardList}

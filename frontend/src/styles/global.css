@@ -17,7 +17,7 @@
   --surface-2: #eef1f6;
   --border: #dde3ec;
   --text: #101828;
-  --text-muted: #637083;
+  --text-muted: #5a6678;
   --brand: #12308f;
   --brand-deep: #0a1f66;
   --brand-soft: #e9edfa;
@@ -32,6 +32,10 @@
   --warn-soft: #fdeed7;
   --err: #dc2626;
   --err-soft: #fde8e8;
+  /* Texte des badges (12px) : nuances foncées pour tenir WCAG AA 4.5:1 sur les fonds *-soft. */
+  --ok-text: #14743a;
+  --warn-text: #9a4a07;
+  --err-text: #b91c1c;
   --gradient-brand: linear-gradient(135deg, var(--brand), var(--brand-deep));
   --gradient-accent: linear-gradient(135deg, var(--brand), var(--accent));
   --shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 6px 18px rgb(16 24 40 / 0.05);
@@ -68,6 +72,9 @@
   --warn-soft: rgba(251, 191, 36, 0.14);
   --err: #f87171;
   --err-soft: rgba(248, 113, 113, 0.14);
+  --ok-text: #34d399;
+  --warn-text: #fbbf24;
+  --err-text: #f87171;
   --gradient-brand: linear-gradient(135deg, var(--brand), var(--brand-deep));
   --gradient-accent: linear-gradient(135deg, var(--brand), var(--accent));
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 18px rgb(0 0 0 / 0.35);
@@ -631,17 +638,17 @@ input {
 }
 .kpi-icon.ok {
   background: var(--ok-soft);
-  color: var(--ok);
+  color: var(--ok-text);
   box-shadow: none;
 }
 .kpi-icon.warn {
   background: var(--warn-soft);
-  color: var(--warn);
+  color: var(--warn-text);
   box-shadow: none;
 }
 .kpi-icon.err {
   background: var(--err-soft);
-  color: var(--err);
+  color: var(--err-text);
   box-shadow: none;
 }
 .kpi-icon.accent {
@@ -670,9 +677,9 @@ input {
   border: 1px solid transparent;
 }
 
-.badge.ok { background: var(--ok-soft); color: var(--ok); }
-.badge.warn { background: var(--warn-soft); color: var(--warn); }
-.badge.err { background: var(--err-soft); color: var(--err); }
+.badge.ok { background: var(--ok-soft); color: var(--ok-text); }
+.badge.warn { background: var(--warn-soft); color: var(--warn-text); }
+.badge.err { background: var(--err-soft); color: var(--err-text); }
 .badge.brand { background: var(--brand-soft); color: var(--brand); }
 .badge.accent { background: var(--steel-soft); color: var(--steel); }
 .badge.neutral { background: var(--surface-2); color: var(--text-muted); }
@@ -1158,7 +1165,7 @@ input {
   border-color: color-mix(in srgb, var(--err) 32%, transparent);
   border-radius: var(--radius-md);
   background: var(--err-soft);
-  color: var(--err);
+  color: var(--err-text);
   font-size: 12.5px;
   font-weight: 500;
 }
@@ -1894,8 +1901,8 @@ kbd {
   border: 1px solid var(--border);
   margin-bottom: 1rem;
 }
-.terrain-status.on { background: var(--ok-soft); color: var(--ok); }
-.terrain-status.off { background: var(--warn-soft); color: var(--warn); }
+.terrain-status.on { background: var(--ok-soft); color: var(--ok-text); }
+.terrain-status.off { background: var(--warn-soft); color: var(--warn-text); }
 .terrain-status span { flex: 1; min-width: 160px; color: var(--text); }
 .terrain-queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
 .terrain-queue li { display: flex; align-items: center; gap: 0.6rem; }
@@ -1913,7 +1920,7 @@ kbd {
   cursor: pointer;
 }
 .terrain-tabs button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
-.terrain-toast { color: var(--ok); font-weight: 600; margin: 0 0 0.8rem; }
+.terrain-toast { color: var(--ok-text); font-weight: 600; margin: 0 0 0.8rem; }
 .terrain-form { display: grid; gap: 0.9rem; max-width: 560px; }
 .terrain-form .field input,
 .terrain-form .field select { min-height: 46px; font-size: 16px; }
@@ -1933,9 +1940,9 @@ kbd {
   border: 1px solid var(--border); background: var(--surface);
 }
 .urgent-chip strong { font-size: 15px; }
-.urgent-chip.err { background: var(--err-soft); color: var(--err); border-color: color-mix(in srgb, var(--err) 35%, transparent); }
-.urgent-chip.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
-.urgent-none { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--ok); font-weight: 600; }
+.urgent-chip.err { background: var(--err-soft); color: var(--err-text); border-color: color-mix(in srgb, var(--err) 35%, transparent); }
+.urgent-chip.warn { background: var(--warn-soft); color: var(--warn-text); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.urgent-none { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--ok-text); font-weight: 600; }
 
 .hero-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
 .hero { display: flex; flex-direction: column; gap: 0.5rem; padding: 1.25rem 1.4rem; position: relative; overflow: hidden; }
@@ -1967,12 +1974,12 @@ kbd {
 @media (max-width: 600px) { .timeline-item { grid-template-columns: 1fr auto; } .timeline-days { grid-column: 1 / -1; } .hero-value { font-size: 36px; } }
 
 /* -- Barres d'actions de workflow, ITP, baremes -- */
-.btn.danger { background: transparent; color: var(--err); border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); }
+.btn.danger { background: transparent; color: var(--err-text); border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); }
 .btn.danger:hover { background: var(--err-soft); }
 .action-bar { margin-top: 0.55rem; }
 .action-bar-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .action-bar .btn, .permis-actions .btn { min-height: 36px; padding: 0 0.8rem; font-size: 13px; }
-.action-error { color: var(--err); font-size: 13px; margin: 0.4rem 0 0; }
+.action-error { color: var(--err-text); font-size: 13px; margin: 0.4rem 0 0; }
 .permis-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: flex-start; }
 .gaz-form, .itp-add, .bareme-form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; width: 100%; }
 .gaz-form input, .itp-add input { flex: 1; min-width: 180px; }
@@ -2025,4 +2032,28 @@ kbd {
   height: 1.1em;
   border-radius: 2px;
   background: linear-gradient(180deg, var(--brand), var(--accent));
+}
+
+/* Listes d'entités en cartes (avec actions) : cartes plus larges que les KPI, alignées en grille. */
+.card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card-list > .kpi {
+  min-width: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

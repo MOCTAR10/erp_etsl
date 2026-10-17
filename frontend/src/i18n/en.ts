@@ -704,6 +704,7 @@ export const en = {
     pendingNote: "Equipment down: corrective WO / maintenance decision required (MANUAL §5.9).",
   },
   rhPaie: {
+    col: { matricule: "Employee ID", nom: "Name", fonction: "Position · department", categorie: "Category", statut: "Status" },
     title: "HR & Payroll — Staff, leave, training & pay slips (M9)",
     effectif: "Active headcount",
     enConge: "on leave",

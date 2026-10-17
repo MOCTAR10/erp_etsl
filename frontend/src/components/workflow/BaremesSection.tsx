@@ -71,8 +71,8 @@ export function BaremesSection() {
                 <td>{b.taux} %</td>
                 <td>{b.plafond ? `${formatNumber(b.plafond)} F` : "—"}</td>
                 <td>
-                  {formatDate(b.date_effet, "fr")}
-                  {b.date_fin ? ` → ${formatDate(b.date_fin, "fr")}` : ""}
+                  {formatDate(b.date_effet)}
+                  {b.date_fin ? ` → ${formatDate(b.date_fin)}` : ""}
                 </td>
               </tr>
             ))}

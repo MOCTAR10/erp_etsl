@@ -287,7 +287,7 @@ export function JuridiquePage() {
           <h3 className="section-heading">
             {t("juridique.cautions")} · {cautionsList.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {cautionsList.map((c) => (
               <CautionCard key={c.id} c={c} />
             ))}
@@ -300,7 +300,7 @@ export function JuridiquePage() {
           <h3 className="section-heading">
             {t("juridique.assurances")} · {assurancesList.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {assurancesList.map((aPolicy) => (
               <AssuranceCard key={aPolicy.id} a={aPolicy} />
             ))}
@@ -347,7 +347,7 @@ export function JuridiquePage() {
           <h3 className="section-heading">
             GLOBAL RENTAL · {grs.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {grs.map((g) => (
               <div className="card kpi" key={g.id}>
                 <span className="kpi-label">
@@ -399,7 +399,7 @@ export function JuridiquePage() {
           <h3 className="section-heading">
             {t("juridique.reunions")} · {reunionsList.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {reunionsList.map((r) => (
               <div className="card kpi" key={r.id}>
                 <span className="kpi-label">

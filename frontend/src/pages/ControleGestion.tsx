@@ -228,7 +228,7 @@ export function ControleGestionPage() {
           <h3 className="section-heading">
             {t("controleGestion.clotures")} · {closed.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {closed.map((c) => <ClotureCard key={c.id} c={c} />)}
           </div>
         </>
@@ -239,7 +239,7 @@ export function ControleGestionPage() {
           <h3 className="section-heading">
             {t("controleGestion.revisions")} · {revs.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {revs.map((r) => <RevisionCard key={r.id} r={r} />)}
           </div>
         </>

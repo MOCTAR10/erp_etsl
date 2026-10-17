@@ -14,4 +14,5 @@ export { Pressable } from "./Pressable";
 export { ProgressBar } from "./Progress";
 export { Sparkline } from "./Sparkline";
 export { SectionTitle } from "./SectionTitle";
-export { BoardSkeleton, KpiGridSkeleton, KpiSkeleton, Skeleton } from "./Skeleton";
+export { BoardSkeleton, KpiGridSkeleton, KpiSkeleton, Skeleton } from "./Skeleton";export { DataTable } from "./DataTable";
+export type { Column } from "./DataTable";

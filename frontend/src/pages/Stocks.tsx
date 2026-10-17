@@ -46,7 +46,7 @@ function LotCard({ lot, index }: { lot: LotMatiere; index: number }) {
         </span>
       </div>
       <div className="meta muted">
-        {t("stocks.lot")} {lot.numero_lot} · {formatDate(lot.date_reception, "fr")}
+        {t("stocks.lot")} {lot.numero_lot} · {formatDate(lot.date_reception)}
         {lot.certificats.length > 0 ? ` · ${t("stocks.mtc")}` : ""}
       </div>
     </BoardCard>

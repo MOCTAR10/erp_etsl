@@ -40,7 +40,7 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
       </span>
       <span className="kpi-value">{permis.emplacement}</span>
       <span className="meta muted">
-        {formatDate(permis.date_debut, "fr")} → {permis.date_fin ? formatDate(permis.date_fin, "fr") : "…"}
+        {formatDate(permis.date_debut)} → {permis.date_fin ? formatDate(permis.date_fin) : "…"}
         {permis.affaire_code ? ` · ${permis.affaire_code}` : ""}
         <span className={`badge ${badge}`}> {t(`hse.permis_statut.${permis.statut}`)}</span>
         {permis.gaz_obligatoire && (
@@ -109,7 +109,7 @@ function FormCard({ form }: { form: FormationSecurite }) {
       </span>
       <span className="kpi-value">{form.theme}</span>
       <span className="meta muted">
-        {formatDate(form.date_session, "fr")}
+        {formatDate(form.date_session)}
         {form.nb_participants > 0 ? ` · ${form.nb_participants}${t("hse.participants")}` : ""}
         <span className={`badge ${form.statut === "realisee" ? "ok" : form.statut === "annulee" ? "err" : "brand"}`}>
           {" "}{t(`hse.formation_statut.${form.statut}`)}
@@ -164,7 +164,7 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
       <div className="title">
         {inc.code} <span className="muted">· {t(`hse.incident_types.${inc.type_incident}`)}</span>
       </div>
-      <div className="meta">{inc.lieu} · {formatDate(inc.date_evenement, "fr")}</div>
+      <div className="meta">{inc.lieu} · {formatDate(inc.date_evenement)}</div>
       <div className="meta">{inc.description}</div>
       <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span className={`badge ${inc.gravite === "critique" ? "err" : inc.gravite === "majeure" ? "warn" : "brand"}`}>
@@ -311,7 +311,7 @@ export function HsePage() {
           <h3 className="section-heading">
             {t("hse.permis")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {permisAll.map((p) => <PermisCard key={p.id} permis={p} />)}
           </div>
         </>
@@ -322,7 +322,7 @@ export function HsePage() {
           <h3 className="section-heading">
             {t("hse.risques")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {risquesAll.map((r) => <RisqueCard key={r.id} risque={r} />)}
           </div>
         </>
@@ -333,7 +333,7 @@ export function HsePage() {
           <h3 className="section-heading">
             {t("hse.atex")} · {t("hse.formations")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {atexAll.map((eq) => <AtexCard key={eq.id} eq={eq} />)}
             {formAll.map((f) => <FormCard key={f.id} form={f} />)}
           </div>
@@ -345,7 +345,7 @@ export function HsePage() {
           <h3 className="section-heading">
             {t("hse.epi")} · {t("hse.bsd")}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {epiAll.map((e) => <EpiCard key={e.id} epi={e} />)}
             {bsdAll.map((b) => <BsdCard key={b.id} bsd={b} />)}
           </div>

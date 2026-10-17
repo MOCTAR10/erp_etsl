@@ -65,7 +65,7 @@ function TvaCard({ d }: { d: DeclarationTva }) {
   return (
     <div className="card kpi" key={d.id}>
       <span className="kpi-label">
-        {d.code} · {formatDate(d.mois, "fr")} · {d.taux_tva_code}{" "}
+        {d.code} · {formatDate(d.mois)} · {d.taux_tva_code}{" "}
         <span className={`badge ${badge}`}>{t(`comptabilite.tva_statut.${d.statut}`)}</span>
       </span>
       <span className="meta muted">
@@ -100,7 +100,7 @@ function ControleCard({ c }: { c: ControleInterne }) {
       <span className="kpi-value">{c.libelle}</span>
       <span className="meta muted">
         {c.responsable_name ? ` · ${c.responsable_name}` : ""}
-        {c.date_prevue ? ` · ${formatDate(c.date_prevue, "fr")}` : ""}
+        {c.date_prevue ? ` · ${formatDate(c.date_prevue)}` : ""}
       </span>
     </div>
   );
@@ -224,7 +224,7 @@ export function ComptabilitePage() {
           <h3 className="section-heading">
             {t("comptabilite.banques")} · {banquesAll.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {banquesAll.map((b) => <BankCard key={b.id} b={b} />)}
           </div>
         </>
@@ -314,7 +314,7 @@ export function ComptabilitePage() {
           <h3 className="section-heading">
             {t("comptabilite.tva")} · {tvaAll.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {tvaAll.map((d) => <TvaCard key={d.id} d={d} />)}
           </div>
         </>
@@ -325,7 +325,7 @@ export function ComptabilitePage() {
           <h3 className="section-heading">
             {t("comptabilite.controles")} · {controlesAll.length}
           </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
+          <div className="card-list">
             {controlesAll.map((c) => <ControleCard key={c.id} c={c} />)}
           </div>
         </>

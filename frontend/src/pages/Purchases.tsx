@@ -37,7 +37,7 @@ function OrderCard({ order, index }: { order: PurchaseOrder; index: number }) {
       </div>
       {order.expected_date ? (
         <div className="meta muted">
-          {t("purchases.expected")} {formatDate(order.expected_date, "fr")}
+          {t("purchases.expected")} {formatDate(order.expected_date)}
         </div>
       ) : null}
     </BoardCard>

@@ -65,7 +65,7 @@ export const palette = {
     surface2: "#eef1f6",
     border: "#dde3ec",
     text: "#101828",
-    textMuted: "#637083",
+    textMuted: "#5a6678",
     brand: "#12308f",
     brandDeep: "#0a1f66",
     brandSoft: "#e9edfa",
