@@ -13,6 +13,7 @@ from .models import (
     Milestone,
     Opportunity,
     SoumissionEvent,
+    RevueCommande,
     TenderReview,
 )
 
@@ -189,12 +190,31 @@ class TenderReviewSerializer(serializers.ModelSerializer):
             "review_status_label",
             "requirements",
             "decision",
+            "criteres",
+            "score",
+            "decision_rao",
             "reviewed_by",
             "reviewed_at",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["reviewed_by", "id", "created_at", "updated_at"]
+        read_only_fields = ["reviewed_by", "id", "review_status", "score", "decision_rao", "created_at", "updated_at"]
+
+    def validate_criteres(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Liste de critères attendue : [{libelle, poids, note}].")
+        for i, critere in enumerate(value, start=1):
+            if not isinstance(critere, dict) or not str(critere.get("libelle", "")).strip():
+                raise serializers.ValidationError(f"Critère {i} : libellé requis.")
+            try:
+                poids, note = float(critere.get("poids")), float(critere.get("note"))
+            except (TypeError, ValueError):
+                raise serializers.ValidationError(f"Critère {i} : poids et note numériques requis.")
+            if poids <= 0:
+                raise serializers.ValidationError(f"Critère {i} : poids strictement positif requis.")
+            if not 0 <= note <= 100:
+                raise serializers.ValidationError(f"Critère {i} : note entre 0 et 100 requise.")
+        return value
 
 
 class MilestoneSerializer(serializers.ModelSerializer):
@@ -254,7 +274,7 @@ class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeria
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "created_at", "updated_at"]
 
 
 class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
@@ -355,3 +375,25 @@ class SoumissionEventSerializer(serializers.ModelSerializer):
         if not obj.author:
             return None
         return (obj.author.first_name + " " + obj.author.last_name).strip() or obj.author.email
+
+
+class RevueCommandeSerializer(serializers.ModelSerializer):
+    affaire_code = serializers.CharField(source="affaire.code", read_only=True)
+    delta_prix_pct = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
+    delta_delai_jours = serializers.IntegerField(read_only=True)
+    type_label = serializers.CharField(source="get_type_revue_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+
+    class Meta:
+        model = RevueCommande
+        fields = [
+            "id", "affaire", "affaire_code", "montant_offre", "montant_commande", "delai_offre_jours",
+            "delai_commande_jours", "delta_prix_pct", "delta_delai_jours", "type_revue", "type_label", "statut",
+            "statut_label", "commentaire", "valide_par", "valide_le", "created_at", "updated_at",
+        ]
+        read_only_fields = ["type_revue", "statut", "valide_par", "valide_le", "created_at", "updated_at"]
+
+    def validate_montant_offre(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Montant de l'offre strictement positif requis.")
+        return value

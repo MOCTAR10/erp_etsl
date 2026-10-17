@@ -1,8 +1,10 @@
 """API module M1 — Commercial / CRM / CLM (RF-ERP-01…05)."""
 
+from django.db import transaction
 from django.utils import timezone
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .models import (
@@ -16,6 +18,7 @@ from .models import (
     Milestone,
     Opportunity,
     SoumissionEvent,
+    RevueCommande,
     TenderReview,
 )
 from .serializers import (
@@ -29,8 +32,10 @@ from .serializers import (
     MilestoneSerializer,
     OpportunitySerializer,
     SoumissionEventSerializer,
+    RevueCommandeSerializer,
     TenderReviewSerializer,
 )
+from users.models import User
 from users.permissions import can_read_module
 from .services import CanManageCommercial, can_see_amount, pipeline_stats
 
@@ -140,6 +145,26 @@ class TenderReviewViewSet(_CommonViewSet):
     def perform_create(self, serializer):
         serializer.save(reviewed_by=self.request.user, reviewed_at=timezone.now())
 
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def soumettre(self, request, pk=None):
+        """Soumission de l'offre : interdite en No-Go ; un Go sous réserve exige une justification (CDC M1 §3.8)."""
+        rao = TenderReview.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if rao.review_status in (TenderReview.Status.SOUMIS, TenderReview.Status.ARCHIVE):
+            return Response({"detail": "Revue déjà soumise ou archivée."}, status=status.HTTP_400_BAD_REQUEST)
+        if not rao.decision_rao:
+            return Response({"detail": "Notez les critères de la revue avant de soumettre."}, status=status.HTTP_400_BAD_REQUEST)
+        if rao.decision_rao == "no_go":
+            return Response({"detail": f"No-Go (note {rao.score} % < 50 %) : offre non soumise."}, status=status.HTTP_400_BAD_REQUEST)
+        justification = (request.data.get("decision") or rao.decision or "").strip()
+        if rao.decision_rao == "go_reserve" and not justification:
+            return Response({"decision": f"Go sous réserve (note {rao.score} %) : justification obligatoire."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        rao.decision = justification
+        rao.review_status = TenderReview.Status.SOUMIS
+        rao.save()
+        return Response(self.get_serializer(rao).data)
+
 
 class AffaireViewSet(_CommonViewSet):
     serializer_class = AffaireSerializer
@@ -153,6 +178,41 @@ class AffaireViewSet(_CommonViewSet):
             gr = self.request.query_params["global_rental"].lower() in ("1", "true", "yes")
             qs = qs.filter(is_global_rental=gr)
         return qs
+
+    def _transition(self, depuis, vers, controle=None):
+        affaire = Affaire.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if affaire.status != depuis:
+            return None, Response({"detail": f"Affaire {affaire.get_status_display().lower()} : action impossible."},
+                                  status=status.HTTP_400_BAD_REQUEST)
+        if controle:
+            blocage = controle(affaire)
+            if blocage:
+                return None, Response({"detail": blocage}, status=status.HTTP_400_BAD_REQUEST)
+        affaire.status = vers
+        affaire.save(update_fields=["status", "updated_at"])
+        return affaire, None
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def confirmer(self, request, pk=None):
+        """Confirmation : revue de commande validée obligatoire, puis génération automatique de l'OF (CDC M1 §3.10)."""
+        affaire, erreur = self._transition(Affaire.Status.BROUILLON, Affaire.Status.CONFIRMEE, controle_revue_commande)
+        if erreur:
+            return erreur
+        generer_of(affaire, request.user)
+        return Response(self.get_serializer(affaire).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def demarrer(self, request, pk=None):
+        affaire, erreur = self._transition(Affaire.Status.CONFIRMEE, Affaire.Status.EN_COURS)
+        return erreur or Response(self.get_serializer(affaire).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def cloturer(self, request, pk=None):
+        affaire, erreur = self._transition(Affaire.Status.EN_COURS, Affaire.Status.CLOTUREE)
+        return erreur or Response(self.get_serializer(affaire).data)
 
 
 class MilestoneViewSet(_CommonViewSet):
@@ -213,3 +273,66 @@ class SoumissionEventViewSet(_CommonViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+
+REVUE_COMPLETE_ROLES = (User.Role.ADMIN, User.Role.PDG, User.Role.DGA, User.Role.DIRECTION)
+
+
+def controle_revue_commande(affaire):
+    revue = RevueCommande.objects.filter(affaire=affaire).first()
+    if revue is None or revue.statut != RevueCommande.Statut.VALIDEE:
+        return f"Affaire {affaire.code} : revue de commande non validée — confirmation bloquée (CDC M1 §3.8)."
+    return None
+
+
+def generer_of(affaire, user):
+    """Affaire confirmée → OF prévu (atelier / chantier selon le type d'affaire), sans doublon (CDC M1 §3.10, M3 §6.5)."""
+    from operations.models import OrdreFabrication
+
+    if OrdreFabrication.objects.filter(affaire=affaire).exists():
+        return None
+    scope = OrdreFabrication.Scope.CHANTIER if affaire.affaire_type == Affaire.AffaireType.CHANTIER else OrdreFabrication.Scope.ATELIER
+    return OrdreFabrication.objects.create(
+        label=affaire.title, affaire=affaire, scope=scope, status=OrdreFabrication.Status.PREVU,
+        planned_start=affaire.start_date, planned_end=affaire.end_date, created_by=user,
+    )
+
+
+class RevueCommandeViewSet(_CommonViewSet):
+    serializer_class = RevueCommandeSerializer
+
+    def get_queryset(self):
+        qs = RevueCommande.objects.select_related("affaire").all()
+        if affaire := self.request.query_params.get("affaire"):
+            qs = qs.filter(affaire_id=affaire)
+        return qs
+
+    def perform_update(self, serializer):
+        if serializer.instance.statut != RevueCommande.Statut.EN_ATTENTE:
+            raise DRFValidationError("Revue de commande déjà tranchée : non modifiable.")
+        serializer.save()
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def valider(self, request, pk=None):
+        """Revue légère : rôle commercial ; revue complète : Direction + commentaire obligatoire."""
+        revue = RevueCommande.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if revue.statut != RevueCommande.Statut.EN_ATTENTE:
+            return Response({"detail": "Revue déjà tranchée."}, status=status.HTTP_400_BAD_REQUEST)
+        commentaire = (request.data.get("commentaire") or revue.commentaire or "").strip()
+        if revue.type_revue == RevueCommande.Type.COMPLETE:
+            if not (request.user.is_staff or request.user.role in REVUE_COMPLETE_ROLES):
+                return Response(
+                    {"detail": f"Revue complète (Δ prix {revue.delta_prix_pct} %, Δ délai {revue.delta_delai_jours} j) : "
+                               "validation réservée à la Direction."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if not commentaire:
+                return Response({"commentaire": "Revue complète : commentaire de revue obligatoire."},
+                                status=status.HTTP_400_BAD_REQUEST)
+        revue.statut = RevueCommande.Statut.VALIDEE
+        revue.commentaire = commentaire
+        revue.valide_par = request.user
+        revue.valide_le = timezone.now()
+        revue.save()
+        return Response(self.get_serializer(revue).data)

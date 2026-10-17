@@ -7,6 +7,7 @@ MARCHE_TRAVAUX / MAINTENANCE · soumission & suivi client. Procédures MANUEL 6.
 """
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -353,6 +354,13 @@ class TenderReview(models.Model):
     )
     requirements = models.JSONField(default=list, blank=True, verbose_name="Exigences")
     decision = models.TextField(blank=True, verbose_name="Décision / suite")
+    # RAO (CDC M1 §3.4/§3.8) : critères [{libelle, poids, note 0-100}] → note pondérée → Go / Go sous réserve / No-Go.
+    criteres = models.JSONField(default=list, blank=True, verbose_name="Critères notés (RAO)")
+    score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Note pondérée (%)")
+    decision_rao = models.CharField(
+        max_length=12, blank=True, verbose_name="Décision RAO",
+        choices=[("go", "Go"), ("go_reserve", "Go sous réserve"), ("no_go", "No-Go")],
+    )
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -372,6 +380,21 @@ class TenderReview(models.Model):
 
     def __str__(self):
         return f"{self.tender_ref or 'AO'} — {self.get_review_status_display()}"
+
+    def calculer_rao(self):
+        """Note pondérée = Σ(poids × note) / Σ poids ; seuils CDC : ≥ 75 % Go, 50-75 % Go sous réserve, < 50 % No-Go."""
+        criteres = self.criteres or []
+        total = sum(Decimal(str(c.get("poids", 0))) for c in criteres)
+        if not criteres or total <= 0:
+            self.score, self.decision_rao = None, ""
+            return
+        self.score = (sum(Decimal(str(c["poids"])) * Decimal(str(c["note"])) for c in criteres) / total).quantize(Decimal("0.01"))
+        self.decision_rao = "go" if self.score >= 75 else ("go_reserve" if self.score >= 50 else "no_go")
+
+    def save(self, *args, **kwargs):
+        self.calculer_rao()
+        super().save(*args, **kwargs)
+
 
 
 class Affaire(models.Model):
@@ -454,6 +477,65 @@ class Affaire(models.Model):
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValidationError({"end_date": "La date de fin doit être postérieure au début."})
 
+
+
+class RevueCommande(models.Model):
+    """Revue de commande (CDC M1 §3.4 / §3.8 / §3.11) : conformité de la commande à l'offre signée.
+
+    Δ prix ≤ 5 % et Δ délai ≤ 7 jours → revue légère ; sinon revue complète (Direction). L'affaire ne se confirme pas
+    tant que sa revue de commande n'est pas validée.
+    """
+
+    SEUIL_PRIX_PCT = Decimal("5")
+    SEUIL_DELAI_JOURS = 7
+
+    class Type(models.TextChoices):
+        LEGERE = "legere", "Revue légère"
+        COMPLETE = "complete", "Revue complète"
+
+    class Statut(models.TextChoices):
+        EN_ATTENTE = "en_attente", "En attente"
+        VALIDEE = "validee", "Validée"
+        REFUSEE = "refusee", "Refusée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    affaire = models.OneToOneField(Affaire, on_delete=models.CASCADE, related_name="revue_commande", verbose_name="Affaire")
+    montant_offre = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant de l'offre signée")
+    montant_commande = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant de la commande")
+    delai_offre_jours = models.PositiveIntegerField(verbose_name="Délai de l'offre (jours)")
+    delai_commande_jours = models.PositiveIntegerField(verbose_name="Délai de la commande (jours)")
+    type_revue = models.CharField(max_length=10, choices=Type.choices, verbose_name="Type de revue")
+    statut = models.CharField(max_length=12, choices=Statut.choices, default=Statut.EN_ATTENTE, verbose_name="Statut")
+    commentaire = models.TextField(blank=True, verbose_name="Commentaire de revue")
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Validée par"
+    )
+    valide_le = models.DateTimeField(null=True, blank=True, verbose_name="Validée le")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Revue de commande"
+        verbose_name_plural = "Revues de commande"
+
+    def __str__(self):
+        return f"RC {self.affaire.code} ({self.get_type_revue_display()})"
+
+    @property
+    def delta_prix_pct(self):
+        if not self.montant_offre:
+            return Decimal("0")
+        return (abs(self.montant_commande - self.montant_offre) / self.montant_offre * 100).quantize(Decimal("0.01"))
+
+    @property
+    def delta_delai_jours(self):
+        return abs(int(self.delai_commande_jours) - int(self.delai_offre_jours))
+
+    def save(self, *args, **kwargs):
+        legere = self.delta_prix_pct <= self.SEUIL_PRIX_PCT and self.delta_delai_jours <= self.SEUIL_DELAI_JOURS
+        self.type_revue = self.Type.LEGERE if legere else self.Type.COMPLETE
+        super().save(*args, **kwargs)
 
 class Milestone(models.Model):
     """Jalon d'affaire — rattachements, situations travaux (M1.3)."""

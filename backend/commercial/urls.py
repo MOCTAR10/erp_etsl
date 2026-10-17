@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    RevueCommandeViewSet,
     AffaireViewSet,
     ClientProfileViewSet,
     ContractServiceViewSet,
@@ -23,6 +24,7 @@ router.register("estimate-options", EstimateOptionViewSet, basename="estimateopt
 router.register("estimate-lines", EstimateLineViewSet, basename="estimateline")
 router.register("tender-reviews", TenderReviewViewSet, basename="tenderreview")
 router.register("affaires", AffaireViewSet, basename="affaire")
+router.register("revues-commande", RevueCommandeViewSet, basename="revuecommande")
 router.register("milestones", MilestoneViewSet, basename="milestone")
 router.register("contracts", ContractViewSet, basename="contract")
 router.register("contract-services", ContractServiceViewSet, basename="contractservice")
