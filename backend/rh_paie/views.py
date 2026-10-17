@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from accounting_kernel.permissions import CanPostAccounting
 
 from .models import (
+    BaremeImpot,
     BaremeCotisation,
     BulletinPaie,
     ContratTravail,
@@ -31,6 +32,7 @@ from .models import (
     Sanction,
 )
 from .serializers import (
+    BaremeImpotSerializer,
     MonBulletinSerializer,
     MonCongeSerializer,
     BaremeCotisationSerializer,
@@ -665,3 +667,11 @@ class MonCongeAnnulerView(APIView):
         demande.statut = DemandesConge.Statut.ANNULE
         demande.save()
         return Response(MonCongeSerializer(demande).data)
+
+
+class BaremeImpotViewSet(viewsets.ModelViewSet):
+    """Barème progressif de l'impôt sur le revenu (tranches mensuelles par part) — donnée à valider avec ETSL."""
+
+    queryset = BaremeImpot.objects.all()
+    serializer_class = BaremeImpotSerializer
+    permission_classes = [CanManagePaie]

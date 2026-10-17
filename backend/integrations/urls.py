@@ -10,7 +10,7 @@ from .gr_views import (
     WebhookDeliveryViewSet,
     WebhookEndpointViewSet,
 )
-from .views import ImportBatchViewSet, ImportFileView
+from .views import ImportBatchViewSet, ImportFileView, OpeningBalanceView
 
 router = DefaultRouter()
 router.register("batches", ImportBatchViewSet, basename="importbatch")
@@ -20,6 +20,7 @@ router.register("webhook-deliveries", WebhookDeliveryViewSet, basename="webhook-
 
 urlpatterns = [
     path("import/", ImportFileView.as_view(), name="import-file"),
+    path("opening-balances/", OpeningBalanceView.as_view(), name="opening-balances"),
     path("gr/equipements/", GrEquipementsView.as_view(), name="gr-equipements"),
     path("gr/locations/", GrLocationsView.as_view(), name="gr-locations"),
     path("gr/compteurs/", GrCompteursView.as_view(), name="gr-compteurs"),

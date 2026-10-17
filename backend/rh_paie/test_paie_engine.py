@@ -172,3 +172,103 @@ class ListeBulletinsSansNPlus1Tests(MoteurPaieBase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.data["results"]), 8)
         self.assertLess(len(ctx), 15, f"{len(ctx)} requêtes pour 8 bulletins (N+1 ?)")
+
+
+class ImpotProgressifTests(MoteurPaieBase):
+    """Impôt sur le revenu : barème PROGRESSIF par tranches, quotient familial, base nette des cotisations.
+
+    Les tranches ci-dessous sont des valeurs de test arbitraires, PAS le barème légal gabonais (donnée à saisir).
+    """
+
+    TRANCHES = [
+        {"plafond": 500000, "taux": 0},
+        {"plafond": 1000000, "taux": 10},
+        {"plafond": None, "taux": 20},
+    ]
+
+    def bareme_impot(self, **kw):
+        from .models import BaremeImpot
+
+        return BaremeImpot.objects.create(
+            code=kw.pop("code", "IRPP"), label="Impôt (test)", tranches=kw.pop("tranches", self.TRANCHES),
+            date_effet=kw.pop("date_effet", date(2026, 1, 1)), **kw,
+        )
+
+    def test_progressif_par_tranches(self):
+        self.bareme_impot()
+        b = calculer_bulletin(self.bulletin((("SAL", "1000000"),)))
+        # (500k à 0 %) + (500k à 10 %) = 50 000
+        self.assertEqual(b.lignes.get(rubrique__code="IMP-IRPP").montant, Decimal("50000.00"))
+        self.assertEqual(b.net, Decimal("950000.00"))
+
+    def test_tranche_haute(self):
+        self.bareme_impot()
+        b = calculer_bulletin(self.bulletin((("SAL", "1500000"),)))
+        # 0 + 50 000 + (500k à 20 %) = 150 000
+        self.assertEqual(b.lignes.get(rubrique__code="IMP-IRPP").montant, Decimal("150000.00"))
+
+    def test_quotient_familial(self):
+        from .models import Employe
+
+        self.bareme_impot()
+        Employe.objects.filter(pk=self.employe.pk).update(parts_fiscales=Decimal("2"))
+        self.employe.refresh_from_db()
+        b = calculer_bulletin(self.bulletin((("SAL", "1000000"),)))
+        # 1 000 000 / 2 parts = 500 000 par part -> 0 ; impôt total 0
+        self.assertFalse(b.lignes.filter(rubrique__code="IMP-IRPP", montant__gt=0).exists())
+        self.assertEqual(b.net, Decimal("1000000.00"))
+
+    def test_base_nette_des_cotisations_salariales_et_abattement(self):
+        self.bareme("SOC-S", "10")  # 100 000 sur 1 000 000
+        self.bareme_impot(abattement_pct=Decimal("0"))
+        b = calculer_bulletin(self.bulletin((("SAL", "1000000"),)))
+        # base imposable = 1 000 000 - 100 000 = 900 000 -> (400k x 10 %) = 40 000
+        self.assertEqual(b.lignes.get(rubrique__code="IMP-IRPP").montant, Decimal("40000.00"))
+        self.assertEqual(b.net, Decimal("860000.00"))  # 1 000 000 - 100 000 - 40 000
+
+    def test_abattement_reduit_la_base(self):
+        self.bareme_impot(abattement_pct=Decimal("20"), cotisations_deductibles=False)
+        b = calculer_bulletin(self.bulletin((("SAL", "1000000"),)))
+        # base 1 000 000 x 80 % = 800 000 -> 300k x 10 % = 30 000
+        self.assertEqual(b.lignes.get(rubrique__code="IMP-IRPP").montant, Decimal("30000.00"))
+
+    def test_idempotent_et_versionne(self):
+        self.bareme_impot(date_effet=date(2026, 6, 1))
+        b = calculer_bulletin(self.bulletin((("SAL", "1000000"),), periode=date(2026, 3, 1)))
+        self.assertFalse(b.lignes.filter(rubrique__code__startswith="IMP-").exists())  # pas encore en vigueur
+        b2 = self.bulletin((("SAL", "1000000"),), periode=date(2026, 7, 1))
+        calculer_bulletin(b2)
+        calculer_bulletin(b2)
+        self.assertEqual(b2.lignes.filter(rubrique__code="IMP-IRPP").count(), 1)
+
+    def test_tranches_invalides_refusees(self):
+        from django.core.exceptions import ValidationError
+
+        from .models import BaremeImpot
+
+        for bad in ([], [{"plafond": 100, "taux": 5}], [{"plafond": 500, "taux": 5}, {"plafond": 400, "taux": 10}, {"plafond": None, "taux": 20}],
+                    [{"plafond": None, "taux": 150}]):
+            with self.assertRaises(ValidationError, msg=str(bad)):
+                BaremeImpot(code="X", label="x", tranches=bad, date_effet=date(2026, 1, 1)).full_clean()
+
+
+class BaremeImpotApiTests(MoteurPaieBase):
+    def test_creation_via_api_et_validation_des_tranches(self):
+        _auth(self.client, "admin@etls.local")
+        ok = self.client.post(
+            f"{BASE}baremes-impot/",
+            {"code": "IRPP", "label": "IRPP", "date_effet": "2026-01-01",
+             "tranches": [{"plafond": 500000, "taux": 0}, {"plafond": None, "taux": 10}]},
+            format="json",
+        )
+        self.assertEqual(ok.status_code, 201, ok.content)
+        bad = self.client.post(
+            f"{BASE}baremes-impot/",
+            {"code": "X", "label": "X", "date_effet": "2026-01-01", "tranches": [{"plafond": 500000, "taux": 0}]},
+            format="json",
+        )
+        self.assertEqual(bad.status_code, 400)
+
+    def test_reserve_a_la_paie(self):
+        _auth(self.client, "compta@etls.local")
+        self.assertEqual(self.client.get(f"{BASE}baremes-impot/").status_code, 403)

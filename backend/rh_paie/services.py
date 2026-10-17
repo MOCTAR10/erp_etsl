@@ -93,6 +93,7 @@ class CanManagePaie(BasePermission):
 
 CENT = Decimal("0.01")
 COT_PREFIX = "COT-"
+IMP_PREFIX = "IMP-"
 
 
 def _arrondi(valeur):
@@ -106,6 +107,16 @@ def baremes_en_vigueur(periode):
     from .models import BaremeCotisation
 
     return BaremeCotisation.objects.filter(date_effet__lte=periode).filter(
+        Q(date_fin__isnull=True) | Q(date_fin__gte=periode)
+    )
+
+
+def baremes_impot_en_vigueur(periode):
+    from django.db.models import Q
+
+    from .models import BaremeImpot
+
+    return BaremeImpot.objects.filter(date_effet__lte=periode).filter(
         Q(date_fin__isnull=True) | Q(date_fin__gte=periode)
     )
 
@@ -144,6 +155,25 @@ def calculer_bulletin(bulletin):
         BulletinLigne.objects.update_or_create(
             bulletin=bulletin, rubrique=rubrique,
             defaults={"libelle": f"{bareme.label} ({bareme.taux} %)", "montant": montant},
+        )
+
+    # Impôt sur le revenu progressif (barème versionné) : base nette des cotisations salariales déductibles.
+    bulletin.lignes.filter(rubrique__code__startswith=IMP_PREFIX).delete()
+    cotisations = sum(
+        (l.montant for l in bulletin.lignes.filter(rubrique__code__startswith=COT_PREFIX)), Decimal("0")
+    )
+    for bareme in baremes_impot_en_vigueur(bulletin.periode):
+        base = gains - (cotisations if bareme.cotisations_deductibles else Decimal("0"))
+        base = max(base * (Decimal("1") - bareme.abattement_pct / 100), Decimal("0"))
+        parts = max(Decimal(bulletin.employe.parts_fiscales or 1), Decimal("1"))
+        montant = _arrondi(bareme.impot_par_part(base / parts) * parts)
+        rubrique, _ = RubriquePaie.objects.get_or_create(
+            code=f"{IMP_PREFIX}{bareme.code}",
+            defaults={"label": bareme.label, "nature": RubriquePaie.Nature.RETENUE, "ordre": 950},
+        )
+        BulletinLigne.objects.update_or_create(
+            bulletin=bulletin, rubrique=rubrique,
+            defaults={"libelle": f"{bareme.label} ({parts} part(s))", "montant": montant},
         )
 
     retenues = sum(

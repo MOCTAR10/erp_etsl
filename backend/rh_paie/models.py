@@ -9,6 +9,7 @@ Bulletins de paie CNSSG / CNAMGS, barèmes versionnés par date d'effet (RF-ERP-
 
 import uuid
 from datetime import date
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -94,6 +95,10 @@ class Employe(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+    parts_fiscales = models.DecimalField(
+        max_digits=4, decimal_places=2, default=1, verbose_name="Parts fiscales (quotient familial)",
+        help_text="Nombre de parts pour le calcul de l'impôt sur le revenu (1 = célibataire sans charge).",
+    )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="fiche_employe", verbose_name="Compte utilisateur",
@@ -623,6 +628,73 @@ class BaremeCotisation(models.Model):
     def clean(self):
         if self.date_fin and self.date_fin < self.date_effet:
             raise ValidationError({"date_fin": "La date de fin précède la date d'effet."})
+
+
+class BaremeImpot(models.Model):
+    """Barème PROGRESSIF de l'impôt sur le revenu (IRPP), versionné par date d'effet.
+
+    `tranches` = liste ordonnée `[{"plafond": 500000, "taux": 0}, {"plafond": 1000000, "taux": 10},
+    {"plafond": null, "taux": 20}]` : montants MENSUELS par part, dernière tranche sans plafond. Valeurs = DONNÉES
+    à saisir et valider avec ETSL / l'administration fiscale (aucune valeur légale n'est codée en dur).
+    Calcul : base = brut - cotisations salariales (si `cotisations_deductibles`) puis abattement ; impôt =
+    parts x barème(base / parts) (quotient familial).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, verbose_name="Code")
+    label = models.CharField(max_length=150, verbose_name="Libellé")
+    tranches = models.JSONField(default=list, verbose_name="Tranches (mensuelles, par part)")
+    abattement_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0, verbose_name="Abattement (%)"
+    )
+    cotisations_deductibles = models.BooleanField(default=True, verbose_name="Cotisations salariales déductibles")
+    date_effet = models.DateField(verbose_name="Date d'effet")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin")
+
+    class Meta:
+        ordering = ["-date_effet", "code"]
+        verbose_name = "Barème d'impôt"
+        verbose_name_plural = "Barèmes d'impôt"
+        constraints = [models.UniqueConstraint(fields=["code", "date_effet"], name="uniq_bareme_impot_effet")]
+
+    def __str__(self):
+        return f"{self.code} dès {self.date_effet}"
+
+    def clean(self):
+        t = self.tranches
+        if not isinstance(t, list) or not t:
+            raise ValidationError({"tranches": "Au moins une tranche est requise."})
+        previous = None
+        for i, tr in enumerate(t):
+            if not isinstance(tr, dict) or "taux" not in tr or "plafond" not in tr:
+                raise ValidationError({"tranches": f"Tranche {i + 1} : « plafond » et « taux » requis."})
+            if not (0 <= float(tr["taux"]) <= 100):
+                raise ValidationError({"tranches": f"Tranche {i + 1} : taux hors de [0, 100]."})
+            last = i == len(t) - 1
+            if last and tr["plafond"] is not None:
+                raise ValidationError({"tranches": "La dernière tranche doit être sans plafond (null)."})
+            if not last:
+                if tr["plafond"] is None or float(tr["plafond"]) <= 0:
+                    raise ValidationError({"tranches": f"Tranche {i + 1} : plafond positif requis."})
+                if previous is not None and float(tr["plafond"]) <= previous:
+                    raise ValidationError({"tranches": "Plafonds strictement croissants requis."})
+                previous = float(tr["plafond"])
+        if self.date_fin and self.date_fin < self.date_effet:
+            raise ValidationError({"date_fin": "La date de fin précède la date d'effet."})
+
+    def impot_par_part(self, base):
+        """Impôt (progressif) sur `base` pour UNE part."""
+        impot, bas = Decimal("0"), Decimal("0")
+        for tr in self.tranches:
+            haut = None if tr["plafond"] is None else Decimal(str(tr["plafond"]))
+            if base <= bas:
+                break
+            tranche = (base if haut is None else min(base, haut)) - bas
+            impot += tranche * Decimal(str(tr["taux"])) / 100
+            if haut is None:
+                break
+            bas = haut
+        return impot
 
 
 class BulletinPaie(models.Model):

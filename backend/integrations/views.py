@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from .importers import ImportError, run_import
 from .models import ImportBatch
+from accounting_kernel.permissions import CanPostAccounting
 from .serializers import ImportBatchSerializer
 
 
@@ -36,7 +37,8 @@ class ImportFileView(APIView):
     rejoué sans ré-insertion (HTTP 200 + batch existant) sauf `force=true`.
     """
 
-    permission_classes = [IsAuthenticated]
+    # Un import écrit dans la comptabilité (connecteur GL) : cercle comptable uniquement.
+    permission_classes = [CanPostAccounting]
 
     def post(self, request):
         connector = request.data.get("connector")
@@ -63,7 +65,7 @@ class ImportFileView(APIView):
 class ImportBatchViewSet(viewsets.ReadOnlyModelViewSet):
     """Historique des lots + journal d'erreurs ligne à ligne."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [CanPostAccounting]
     serializer_class = ImportBatchSerializer
 
     def get_queryset(self):
@@ -75,3 +77,32 @@ class ImportBatchViewSet(viewsets.ReadOnlyModelViewSet):
         if batch_status:
             qs = qs.filter(status=batch_status)
         return qs
+
+
+class OpeningBalanceView(APIView):
+    """POST multipart : `file` (CSV compte,debit,credit[,libelle]), `date` (1er jour de l'exercice), `total_debit` (contrôle SAGE)."""
+
+    permission_classes = [CanPostAccounting]
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses={201: OpenApiTypes.OBJECT, 200: OpenApiTypes.OBJECT})
+    def post(self, request):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from .opening import OpeningConflict, import_opening_balance
+
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response({"detail": "fichier requis (champ « file »)."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            move, replayed = import_opening_balance(
+                upload.read(), request.data.get("date"), request.user, request.data.get("total_debit")
+            )
+        except OpeningConflict as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except DjangoValidationError as exc:
+            return Response({"detail": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"move": str(move.pk), "number": move.number, "reference": move.reference,
+             "total_debit": str(move.total_debit), "total_credit": str(move.total_credit), "lines": move.lines.count()},
+            status=status.HTTP_200_OK if replayed else status.HTTP_201_CREATED,
+        )

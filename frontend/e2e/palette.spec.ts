@@ -11,7 +11,7 @@ test.describe("Régression : palette de commandes (Ctrl K)", () => {
     await page.keyboard.press("Control+k");
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await page.getByRole("combobox").fill("comptabilite");
+    await page.getByRole("dialog").getByRole("combobox").fill("comptabilite");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/comptabilite$/);
     await expect(dialog).toBeHidden();
@@ -29,7 +29,7 @@ test.describe("Régression : palette de commandes (Ctrl K)", () => {
     await loginAs(page, DEMO_USERS.rh);
     await expect(page.getByRole("button", { name: "Rechercher un module…" })).toBeVisible();
     await page.keyboard.press("Control+k");
-    await page.getByRole("combobox").fill("comptabilite");
+    await page.getByRole("dialog").getByRole("combobox").fill("comptabilite");
     await expect(page.getByRole("option")).toHaveCount(0);
   });
 });

@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import (
+    BaremeImpot,
     BaremeCotisation,
     BulletinLigne,
     BulletinPaie,
@@ -359,3 +360,12 @@ class MonCongeSerializer(serializers.ModelSerializer):
         # (durée cohérente, pas de chevauchement) via full_clean du modèle.
         attrs["employe"] = self.context["employe"]
         return _apply_and_validate(self, attrs)
+
+
+class BaremeImpotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BaremeImpot
+        fields = ["id", "code", "label", "tranches", "abattement_pct", "cotisations_deductibles", "date_effet", "date_fin"]
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs, exclude=())

@@ -126,6 +126,11 @@ class GLConnector(BaseHandler):
 
         reference = (row.get("reference") or "").strip()
         label = (row.get("label") or f"Import {reference}").strip()
+        if not reference:
+            # Sans référence, la clé (journal, date, référence) confondait deux écritures distinctes du même jour :
+            # on dérive une référence STABLE du contenu (même ligne rejouée -> même clé -> pas de doublon).
+            signature = "|".join([journal_code, str(move_date), debit_code, credit_code, str(amount), label])
+            reference = "auto-" + hashlib.sha1(signature.encode()).hexdigest()[:12]
 
         # Clé métier : idempotence de bout en bout (pas de doublon au re-run forcé).
         if AccountMove.objects.filter(
