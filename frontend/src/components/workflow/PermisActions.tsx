@@ -40,6 +40,11 @@ export function PermisActions({ permis }: { permis: PermisTravail }) {
 
   return (
     <div className="permis-actions">
+      {permis.prochain_niveau && (
+        <p className="muted">
+          {t("hse.visaAttendu")} : {t(`hse.niveaux.${permis.prochain_niveau}`)}
+        </p>
+      )}
       <ActionBar actions={actions} />
       {gazPossible && (
         <>

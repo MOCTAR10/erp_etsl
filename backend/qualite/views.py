@@ -205,6 +205,8 @@ class ActionCorrectiveViewSet(viewsets.ModelViewSet):
             qs = qs.filter(statut=statut)
         if params.get("ouvertes") == "1":
             qs = qs.exclude(statut=ActionCorrective.Statut.CLOTUREE)
+        if params.get("en_retard") == "1":
+            qs = qs.exclude(statut=ActionCorrective.Statut.CLOTUREE).filter(echeance__lt=timezone.localdate())
         return qs
 
     @action(detail=True, methods=["post"], url_path="cloturer")

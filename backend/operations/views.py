@@ -1,8 +1,10 @@
 """API module M3 — Opérations (Atelier + Chantier) (RF-ERP-20…23)."""
 
+from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from integrations.idempotency import idempotent
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
@@ -84,6 +86,48 @@ class OrdreFabricationViewSet(_CommonViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    def _transition(self, depuis, vers, controle=None):
+        of = OrdreFabrication.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if of.status not in depuis:
+            return Response({"detail": f"OF {of.get_status_display().lower()} : action impossible."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if controle:
+            blocage = controle(of)
+            if blocage:
+                return Response({"detail": blocage}, status=status.HTTP_400_BAD_REQUEST)
+        of.status = vers
+        of.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(of).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def lancer(self, request, pk=None):
+        return self._transition([OrdreFabrication.Status.PREVU], OrdreFabrication.Status.LANCE)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def demarrer(self, request, pk=None):
+        return self._transition([OrdreFabrication.Status.LANCE], OrdreFabrication.Status.EN_COURS, controle_demarrage)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def terminer(self, request, pk=None):
+        return self._transition([OrdreFabrication.Status.EN_COURS], OrdreFabrication.Status.TERMINE)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def liberer(self, request, pk=None):
+        """Libération (clôture) : conformité qualité obligatoire (CDC M3 §6.8, M6 §8.10)."""
+        return self._transition([OrdreFabrication.Status.TERMINE], OrdreFabrication.Status.CLOTURE, controle_liberation)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def annuler(self, request, pk=None):
+        return self._transition(
+            [OrdreFabrication.Status.PREVU, OrdreFabrication.Status.LANCE, OrdreFabrication.Status.EN_COURS],
+            OrdreFabrication.Status.ANNULE,
+        )
+
     @action(detail=False, methods=["get"], url_path="charge")
     def charge(self, request):
         """Plan de charge & capacité atelier (RF-ERP-23)."""
@@ -159,3 +203,45 @@ class SituationTravauxViewSet(_CommonViewSet):
         situation.validated_at = timezone.now()
         situation.save(update_fields=["status", "validated_by", "validated_at", "updated_at"])
         return Response(self.get_serializer(situation).data)
+
+
+def controle_demarrage(of):
+    """Démarrage d'un OF : permis HSE en vigueur pour un chantier (CDC M3 §6.8, M7 §9.10) et soudeurs affectés
+    qualifiés à la date du jour (CDC M6 §8.11). Retourne le motif de blocage, ou None."""
+    from hse.models import PermisTravail
+    from qualite.models import QualificationSoudeur
+
+    jour = timezone.localdate()
+    if of.scope == OrdreFabrication.Scope.CHANTIER:
+        permis_ok = PermisTravail.objects.filter(
+            ordre=of, statut__in=[PermisTravail.Statut.VALIDE, PermisTravail.Statut.ACTIF], date_debut__lte=jour,
+        ).filter(Q(date_fin__isnull=True) | Q(date_fin__gte=jour)).exists()
+        if not permis_ok:
+            return f"OF chantier {of.code} : aucun permis de travail HSE en vigueur — démarrage interdit (CDC M3 §6.8)."
+    non_qualifies = [
+        str(s) for s in of.soudeurs.all()
+        if not QualificationSoudeur.objects.filter(
+            soudeur=s, statut=QualificationSoudeur.Statut.VALIDE, date_validite__gte=jour
+        ).exists()
+    ]
+    if non_qualifies:
+        return f"Soudeur(s) sans qualification valide : {', '.join(non_qualifies)} — démarrage interdit (CDC M6 §8.11)."
+    return None
+
+
+def controle_liberation(of):
+    """Libération : au moins un contrôle qualité validé conforme, aucun contrôle en attente ou non conforme, aucune NC
+    ouverte sur l'OF (CDC M3 §6.11 « aucun OF libéré sans conformité qualité »)."""
+    from qualite.models import ControleQualite, NonConformite
+
+    controles = ControleQualite.objects.filter(ordre=of).exclude(statut=ControleQualite.Statut.ANNULE)
+    if not controles.filter(statut=ControleQualite.Statut.VALIDE, resultat=ControleQualite.Resultat.CONFORME).exists():
+        return f"OF {of.code} : aucun contrôle qualité validé conforme (CND / ITP) — libération interdite."
+    en_attente = controles.exclude(statut=ControleQualite.Statut.VALIDE).count()
+    if en_attente:
+        return f"OF {of.code} : {en_attente} contrôle(s) qualité non validé(s) (ITP / CND en cours) — libération interdite."
+    if controles.filter(resultat=ControleQualite.Resultat.NON_CONFORME).exists():
+        return f"OF {of.code} : contrôle non conforme — reprise et re-contrôle requis avant libération."
+    if NonConformite.objects.filter(controle__ordre=of).exclude(statut=NonConformite.Statut.CLOTUREE).exists():
+        return f"OF {of.code} : NC ouverte(s) sur l'OF — traitement et clôture requis avant libération."
+    return None

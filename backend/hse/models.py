@@ -114,6 +114,21 @@ class PermisTravail(models.Model):
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.DEMANDE, verbose_name="Statut"
     )
+    visa_superviseur_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Visa superviseur",
+    )
+    visa_superviseur_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa superviseur")
+    visa_hse_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Visa HSE",
+    )
+    visa_hse_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa HSE")
+    visa_dg_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Visa Direction Générale",
+    )
+    visa_dg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa Direction Générale")
     date_validation = models.DateTimeField(null=True, blank=True, verbose_name="Validation le")
     date_cloture = models.DateTimeField(null=True, blank=True, verbose_name="Clôture le")
     # Test d'atmosphère (CL-OM-07) : obligatoire avant démarrage pour les types à risque gaz.
@@ -169,6 +184,17 @@ class PermisTravail(models.Model):
         age = timezone.now() - self.test_gaz_date
         return age <= timezone.timedelta(hours=self.TEST_GAZ_VALIDITE_HEURES)
 
+    @property
+    def prochain_niveau(self):
+        """Prochain niveau de validation attendu (None si le circuit est complet ou le permis n'est plus en demande)."""
+        from django.conf import settings as dj_settings
+
+        if self.statut != self.Statut.DEMANDE:
+            return None
+        for niveau in dj_settings.HSE_PERMIS_NIVEAUX:
+            if not getattr(self, f"visa_{niveau}_par_id"):
+                return niveau
+        return None
 
 
 class EvaluationRisque(models.Model):
@@ -381,6 +407,10 @@ class Incident(models.Model):
         verbose_name="Responsable d'enquête",
     )
     date_ouverture_enquete = models.DateTimeField(null=True, blank=True, verbose_name="Enquête ouverte le")
+    escalade_dg_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Escalade Direction Générale",
+        help_text="CDC M7 §9.8 : escalade DG obligatoire pour les accidents graves.",
+    )
     date_rapport = models.DateField(null=True, blank=True, verbose_name="Date du rapport")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -402,6 +432,15 @@ class Incident(models.Model):
     def clean(self):
         if not self.description.strip():
             raise ValidationError({"description": "La description est requise."})
+
+    @property
+    def est_grave(self):
+        """Accident grave (CDC M7 §9.8) : gravité critique, ou accident / blessure de gravité majeure."""
+        if self.gravite == self.Gravite.CRITIQUE:
+            return True
+        return self.gravite == self.Gravite.MAJEURE and self.type_incident in (
+            self.TypeIncident.ACCIDENT, self.TypeIncident.BLESSURE,
+        )
 
 
 class ActionHse(models.Model):

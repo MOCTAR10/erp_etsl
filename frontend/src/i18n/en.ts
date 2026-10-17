@@ -509,6 +509,7 @@ export const en = {
     interne: "Internal QA/QC",
   },
   hse: {
+    visaAttendu: "Awaiting sign-off", niveaux: { superviseur: "supervisor", hse: "HSE", dg: "Managing Director" },
     act: { enquete: "Open investigation", rapport: "Investigation report (required for an accident or a major/critical event):" },
     form: { title: "Report an incident", date: "Event date and time", description: "Description of the facts" },
     col: { code: "Code", lieux: "Locations", score: "Score P×S", criticite: "Criticality", statut: "Status", designation: "Designation", zone: "ATEX zone", certificat: "Certificate", theme: "Topic", type: "Type", date: "Date", participants: "Participants", beneficiaire: "Holder", numeroBsd: "Waste slip no.", quantite: "Quantity", transporteur: "Carrier" },

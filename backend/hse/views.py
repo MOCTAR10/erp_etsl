@@ -1,5 +1,6 @@
 """Vues API M7 — HSE : Hygiène, Sécurité & Environnement."""
 
+from django.db import transaction
 from django.utils import timezone
 from integrations.idempotency import idempotent
 from rest_framework import serializers, status, viewsets
@@ -27,9 +28,11 @@ from .serializers import (
     PermisTravailSerializer,
 )
 from .services import (
+    PERMIS_NIVEAU_LIBELLES,
     CanManageHse,
     CanValidateHse,
     can_validate_hse,
+    peut_signer_niveau,
 )
 
 
@@ -46,6 +49,13 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = PermisTravailSerializer
     permission_classes = [CanValidateHse]
+
+    def get_permissions(self):
+        # Le visa d'un niveau se contrôle dans l'action (signataires par niveau) : un chef d'atelier (superviseur)
+        # doit pouvoir y accéder, alors que les autres écritures restent au cercle de validation HSE.
+        if self.action == "valider":
+            return [CanManageHse()]
+        return super().get_permissions()
 
     def perform_create(self, serializer):
         # Le demandeur est toujours l'auteur de la demande : sinon la séparation des tâches (le demandeur ne valide
@@ -64,32 +74,48 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         return qs
 
     @action(detail=True, methods=["post"], url_path="valider")
+    @transaction.atomic
     def valider(self, request, pk=None):
-        permis = self.get_object()
+        """Visa du niveau attendu (superviseur → HSE → DG, paramétrable) ; refus possible à chaque niveau."""
+        permis = PermisTravail.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if permis.statut != PermisTravail.Statut.DEMANDE:
             return Response(
                 {"detail": "Le permis n'est plus en attente de validation."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if not can_validate_hse(request.user):
+        niveau = permis.prochain_niveau
+        if niveau is None:
+            return Response({"detail": "Circuit de validation déjà complet."}, status=status.HTTP_400_BAD_REQUEST)
+        libelle = PERMIS_NIVEAU_LIBELLES.get(niveau, niveau)
+        if not peut_signer_niveau(request.user, niveau):
             return Response(
-                {"detail": "Réservé au HSE et à la hiérarchie."},
+                {"detail": f"Visa attendu : niveau {libelle} — vous n'êtes pas signataire de ce niveau."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        # Séparation des tâches : on ne valide pas son propre permis (hors admin).
-        if permis.demandeur_id == request.user.id and not (
-            request.user.is_staff or request.user.role == "admin"
-        ):
+        # Séparation des tâches : le demandeur ne signe aucun niveau (hors admin), personne ne signe deux niveaux.
+        if permis.demandeur_id == request.user.id and not (request.user.is_staff or request.user.role == "admin"):
+            return Response({"detail": "Le demandeur ne peut pas valider son propre permis."},
+                            status=status.HTTP_403_FORBIDDEN)
+        deja = [n for n in ("superviseur", "hse", "dg") if getattr(permis, f"visa_{n}_par_id") == request.user.id]
+        if deja:
             return Response(
-                {"detail": "Le demandeur ne peut pas valider son propre permis."},
+                {"detail": f"Vous avez déjà signé le niveau {PERMIS_NIVEAU_LIBELLES[deja[0]]} : un autre signataire est requis."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         accept = _as_bool(request.data.get("accept", True))
-        permis.statut = PermisTravail.Statut.VALIDE if accept else PermisTravail.Statut.REFUSE
-        permis.validateur = request.user
-        permis.date_validation = timezone.now()
-        if not accept and request.data.get("motif"):
-            permis.notes = request.data.get("motif")
+        maintenant = timezone.now()
+        setattr(permis, f"visa_{niveau}_par", request.user)
+        setattr(permis, f"visa_{niveau}_le", maintenant)
+        if not accept:
+            permis.statut = PermisTravail.Statut.REFUSE
+            permis.validateur = request.user
+            permis.date_validation = maintenant
+            if request.data.get("motif"):
+                permis.notes = f"Refus niveau {libelle} : {request.data.get('motif')}"
+        elif permis.prochain_niveau is None:  # dernière signature
+            permis.statut = PermisTravail.Statut.VALIDE
+            permis.validateur = request.user
+            permis.date_validation = maintenant
         permis.save()
         return Response(self.get_serializer(permis).data)
 
@@ -204,6 +230,27 @@ class EquipementAtexViewSet(viewsets.ModelViewSet):
         return qs
 
 
+def escalader_si_grave(incident):
+    """CDC M7 §9.8 : escalade DG obligatoire (une seule fois) dès qu'un incident est un accident grave."""
+    if not incident.est_grave or incident.escalade_dg_le:
+        return
+    from users.models import User
+    from workflow.models import Notification
+
+    incident.escalade_dg_le = timezone.now()
+    incident.save(update_fields=["escalade_dg_le", "updated_at"])
+    sujet = f"ESCALADE DG — accident grave {incident.code}"
+    message = (
+        f"{incident.get_type_incident_display()} de gravité {incident.get_gravite_display().lower()} déclaré le "
+        f"{timezone.localtime(incident.date_evenement):%d/%m/%Y %H:%M} à {incident.lieu} : {incident.description[:300]}. "
+        "Investigation immédiate requise (CDC M7 §9.8)."
+    )
+    Notification.objects.bulk_create([
+        Notification(user=u, subject=sujet, message=message, kind="escalation")
+        for u in User.objects.filter(is_active=True, role__in=[User.Role.PDG, User.Role.DGA])
+    ])
+
+
 class IncidentViewSet(viewsets.ModelViewSet):
     queryset = Incident.objects.select_related(
         "declared_by", "enqueteur"
@@ -212,7 +259,11 @@ class IncidentViewSet(viewsets.ModelViewSet):
     permission_classes = [CanManageHse]
 
     def perform_create(self, serializer):
-        serializer.save(declared_by=self.request.user)
+        incident = serializer.save(declared_by=self.request.user)
+        escalader_si_grave(incident)
+
+    def perform_update(self, serializer):
+        escalader_si_grave(serializer.save())
 
     def get_queryset(self):
         qs = super().get_queryset()

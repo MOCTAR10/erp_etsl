@@ -1,5 +1,6 @@
 """Tests M7 — HSE : Hygiène, Sécurité & Environnement (RF-ERP-60…63)."""
 
+from django.test import override_settings
 from datetime import date, timedelta
 
 from django.utils import timezone
@@ -94,6 +95,9 @@ class SequencesTests(M7BaseTest):
         ).code.startswith("BSD"))
 
 
+# Circuit à un niveau (HSE) : ces tests portent sur d'autres règles ; le circuit complet superviseur → HSE → DG
+# est couvert par hse/test_permis_multiniveaux.py.
+@override_settings(HSE_PERMIS_NIVEAUX=["hse"])
 class PermisTravailTests(M7BaseTest):
     def _permis(self):
         return PermisTravail.objects.create(

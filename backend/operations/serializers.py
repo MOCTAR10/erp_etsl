@@ -101,6 +101,7 @@ class OrdreFabricationSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
             "calculated_hours",
             "responsible",
             "responsible_name",
+            "soudeurs",
             "created_by",
             "pointage_hours",
             "pointages_count",
@@ -108,6 +109,7 @@ class OrdreFabricationSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
             "updated_at",
         ]
         read_only_fields = [
+            "status",
             "id",
             "code",
             "created_by",
@@ -165,6 +167,10 @@ class PointageChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"worker": "Le pointage doit être rattaché à un opérateur ou un nom libre."}
             )
+        ordre = attrs.get("ordre", getattr(inst, "ordre", None))
+        jour = attrs.get("date", getattr(inst, "date", None))
+        if worker and ordre and ordre.scope == OrdreFabrication.Scope.CHANTIER:
+            controler_habilitation_chantier(worker, jour)
         return attrs
 
     def get_worker_name_filled(self, obj):
@@ -233,3 +239,26 @@ class SituationTravauxSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
         if not obj.validated_by:
             return None
         return (obj.validated_by.first_name + " " + obj.validated_by.last_name).strip() or obj.validated_by.email
+
+
+def controler_habilitation_chantier(worker, jour):
+    """CDC M9 §10.8 / M7 §9.11 : aucun salarié non habilité affecté à un chantier (habilitation valide à la date)."""
+    from django.db.models import Q
+
+    from rh_paie.models import Employe, Qualification
+
+    fiche = Employe.objects.filter(user=worker).first()
+    nom = worker.get_full_name() or worker.email
+    if fiche is None:
+        raise serializers.ValidationError(
+            {"worker": f"{nom} n'est rattaché à aucune fiche salarié : habilitation chantier invérifiable."}
+        )
+    habilite = Qualification.objects.filter(
+        employe=fiche, type=Qualification.Type.HABILITATION,
+    ).filter(Q(date_obtention__isnull=True) | Q(date_obtention__lte=jour)).filter(
+        Q(date_validite__isnull=True) | Q(date_validite__gte=jour)
+    ).exists()
+    if not habilite:
+        raise serializers.ValidationError(
+            {"worker": f"{nom} n'a aucune habilitation valide au {jour:%d/%m/%Y} : affectation chantier interdite (CDC M9 §10.8)."}
+        )

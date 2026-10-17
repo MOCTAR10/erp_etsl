@@ -1,6 +1,9 @@
 """Sérialiseurs M6 — Qualité & Contrôle Qualité / Inspection."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import serializers
 
 from config.serializers import ModelCleanMixin
@@ -177,6 +180,9 @@ class NonConformiteSerializer(serializers.ModelSerializer):
         return attrs
 
 
+CAPA_DELAI_JOURS = 5
+
+
 class ActionCorrectiveSerializer(serializers.ModelSerializer):
     non_conformite_code = serializers.CharField(
         source="non_conformite.code", read_only=True
@@ -187,14 +193,31 @@ class ActionCorrectiveSerializer(serializers.ModelSerializer):
         source="responsable.get_full_name", read_only=True, default=None
     )
 
+    en_retard = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = ActionCorrective
         fields = [
             "id", "code", "non_conformite", "non_conformite_code", "type", "type_label",
-            "description", "responsable", "responsable_name", "echeance", "statut",
+            "description", "responsable", "responsable_name", "echeance", "en_retard", "statut",
             "statut_label", "efficace", "closed_at", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "closed_at", "statut"]
+
+    def validate_echeance(self, value):
+        # CDC M6 §8.8 : clôture des CAPA sous 5 jours.
+        limite = timezone.localdate() + timedelta(days=CAPA_DELAI_JOURS)
+        if value and value > limite:
+            raise serializers.ValidationError(
+                f"Échéance au plus tard le {limite:%d/%m/%Y} : les CAPA se clôturent sous {CAPA_DELAI_JOURS} jours (CDC M6)."
+            )
+        return value
+
+    def create(self, validated_data):
+        validated_data.setdefault("echeance", None)
+        if not validated_data["echeance"]:
+            validated_data["echeance"] = timezone.localdate() + timedelta(days=CAPA_DELAI_JOURS)
+        return super().create(validated_data)
 
 
 class PvControleSerializer(serializers.ModelSerializer):

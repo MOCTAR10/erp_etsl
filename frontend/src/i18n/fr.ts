@@ -509,6 +509,7 @@ export const fr = {
     interne: "Interne QA/QC",
   },
   hse: {
+    visaAttendu: "Visa attendu", niveaux: { superviseur: "superviseur", hse: "HSE", dg: "Direction Générale" },
     act: { enquete: "Ouvrir l'enquête", rapport: "Rapport d'enquête (obligatoire pour un accident ou un événement majeur/critique) :" },
     form: { title: "Déclarer un incident", date: "Date et heure de l'événement", description: "Description des faits" },
     col: { code: "Code", lieux: "Lieux", score: "Score P×G", criticite: "Criticité", statut: "Statut", designation: "Désignation", zone: "Zone ATEX", certificat: "Certificat", theme: "Thème", type: "Type", date: "Date", participants: "Participants", beneficiaire: "Bénéficiaire", numeroBsd: "N° BSD", quantite: "Quantité", transporteur: "Transporteur" },

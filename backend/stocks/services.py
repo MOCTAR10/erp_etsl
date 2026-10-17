@@ -13,12 +13,13 @@ tenue en **CUMP** (coût moyen pondéré) — comptes 31 SYSCOHADA → M10.
 """
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
 from users.models import User
 from users.rbac import can_read_app
 
-from .models import Inventaire, InventaireLigne, LotMatiere, MouvementStock, StockQuant
+from .models import ArticleStock, Inventaire, InventaireLigne, LotMatiere, MouvementStock, StockQuant
 
 STOCK_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -90,6 +91,33 @@ def _quant(depot, article, lot):
     return quant
 
 
+SORTIES_CONTROLEES = (MouvementStock.Type.CONSOMMATION, MouvementStock.Type.TRANSFERT)
+
+
+def controler_sortie_lot(mouvement):
+    """CDC M5 §7.8 / §7.11 : aucune sortie (consommation, transfert) d'un lot en quarantaine, périmé ou dont le
+    certificat MTC / CoC n'est pas validé et conforme. Le retour fournisseur reste possible (traitement d'un lot non
+    conforme) ; l'entrée et l'inventaire ne sont pas des sorties."""
+    if not (mouvement.lot_id and mouvement.source_id and mouvement.type_mouvement in SORTIES_CONTROLEES):
+        return
+    lot = mouvement.lot
+    if lot.statut == LotMatiere.Statut.BLOQUE:
+        raise ValueError(f"Lot {lot.code} ({lot.numero_lot}) en quarantaine : sortie interdite (CDC M5 §7.8).")
+    jour = mouvement.date or timezone.localdate()
+    if lot.date_peremption and lot.date_peremption < jour:
+        raise ValueError(f"Lot {lot.code} ({lot.numero_lot}) périmé depuis le {lot.date_peremption} : sortie interdite.")
+    certificats = list(lot.certificats.all())
+    if certificats:
+        if not any(c.conforme and c.date_validation for c in certificats):
+            raise ValueError(
+                f"Lot {lot.code} ({lot.numero_lot}) : certificat MTC / CoC non validé ou non conforme — sortie interdite."
+            )
+    elif ArticleStock.objects.filter(article_id=mouvement.article_id, certificat_requis=True).exists():
+        raise ValueError(
+            f"Lot {lot.code} ({lot.numero_lot}) sans certificat MTC / CoC : exigé pour cet article (traçabilité pétrolière)."
+        )
+
+
 @transaction.atomic
 def apply_move(mouvement):
     """Applique un mouvement aux quants (double-entrée) et aux lots.
@@ -99,6 +127,7 @@ def apply_move(mouvement):
     """
     if mouvement.executed:
         return mouvement
+    controler_sortie_lot(mouvement)
     prix = mouvement.prix_unitaire
     if mouvement.source:
         src = _quant(mouvement.source, mouvement.article, mouvement.lot)

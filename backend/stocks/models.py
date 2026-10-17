@@ -104,6 +104,10 @@ class ArticleStock(models.Model):
         max_digits=14, decimal_places=2, default=0, verbose_name="Seuil minimum de stock"
     )
     gestion_lots = models.BooleanField(default=False, verbose_name="Gestion par lots")
+    certificat_requis = models.BooleanField(
+        default=False, verbose_name="Certificat MTC / CoC exigé",
+        help_text="Traçabilité client pétrolier (CDC M5 §7.8) : aucune sortie d'un lot sans certificat validé et conforme.",
+    )
     is_active = models.BooleanField(default=True, verbose_name="Actif")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

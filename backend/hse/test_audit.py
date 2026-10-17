@@ -6,6 +6,7 @@ H2 : le demandeur ne valide pas son propre permis (hors admin) ; un permis annul
 H3 : un test gaz non conforme sur un permis actif l'arrête ; permis expiré non démarrable.
 """
 
+from django.test import override_settings
 from datetime import timedelta
 
 from django.utils import timezone
@@ -86,6 +87,9 @@ class TestGazTests(PermisBase):
         self.assertEqual(self.post(p, "test-gaz", self.hse2, {"resultat": "peut-etre"}).status_code, 400)
 
 
+# Circuit à un niveau (HSE) : ces tests portent sur d'autres règles ; le circuit complet superviseur → HSE → DG
+# est couvert par hse/test_permis_multiniveaux.py.
+@override_settings(HSE_PERMIS_NIVEAUX=["hse"])
 class SeparationDesTachesTests(PermisBase):
     def test_demandeur_ne_valide_pas_son_propre_permis(self):
         p = self.permis("hauteur")

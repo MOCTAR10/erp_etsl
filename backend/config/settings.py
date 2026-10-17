@@ -257,3 +257,7 @@ IMAP_USERNAME = env("IMAP_USERNAME", default="")
 IMAP_PASSWORD = env("IMAP_PASSWORD", default="")
 IMAP_MAILBOXES = env("IMAP_MAILBOXES", default="INBOX")
 WATCHED_FOLDER = env("WATCHED_FOLDER", default="")
+
+# Permis de travail : niveaux de validation successifs (CDC M7 §9.4 émetteur → superviseur → HSE → DG ; paramétrable,
+# EX-G-02 / CL-OM « règles de validation paramétrées »). Valeurs : superviseur, hse, dg.
+HSE_PERMIS_NIVEAUX = env.list("HSE_PERMIS_NIVEAUX", default=["superviseur", "hse", "dg"])

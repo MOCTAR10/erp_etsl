@@ -683,6 +683,7 @@ export interface PermisTravail {
   demandeur_name: string | null;
   validateur: string | null;
   validateur_name: string | null;
+  prochain_niveau?: "superviseur" | "hse" | "dg" | null;
   date_debut: string;
   date_fin: string | null;
   statut: StatutPermis;

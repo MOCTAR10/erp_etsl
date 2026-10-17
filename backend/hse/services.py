@@ -72,3 +72,18 @@ class CanValidateHse(BasePermission):
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return can_read_app(getattr(request, "user", None), "hse")
         return can_validate_hse(getattr(request, "user", None))
+
+
+# Signataires de chaque niveau du permis de travail (CDC M7 §9.4). L'administrateur peut signer UN niveau.
+PERMIS_SIGNATAIRES = {
+    "superviseur": (User.Role.CHEF_ATELIER, User.Role.DIRECTEUR_OPERATIONS, User.Role.DIRECTEUR_PROJETS),
+    "hse": (User.Role.HSE,),
+    "dg": (User.Role.PDG,),
+}
+PERMIS_NIVEAU_LIBELLES = {"superviseur": "superviseur", "hse": "HSE", "dg": "Direction Générale"}
+
+
+def peut_signer_niveau(user, niveau):
+    if not (user and user.is_authenticated):
+        return False
+    return user.is_staff or user.role == User.Role.ADMIN or user.role in PERMIS_SIGNATAIRES.get(niveau, ())

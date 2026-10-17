@@ -177,6 +177,11 @@ class OrdreFabrication(models.Model):
         related_name="operations_ordres",
         verbose_name="Responsable",
     )
+    soudeurs = models.ManyToManyField(
+        "qualite.Soudeur", blank=True, related_name="ordres_fabrication",
+        verbose_name="Soudeurs affectés",
+        help_text="Qualifications contrôlées au démarrage de l'OF (CDC M6 §8.11).",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

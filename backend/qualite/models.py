@@ -475,6 +475,10 @@ class ActionCorrective(models.Model):
             self.code = QualiteSequence.next_for("CAP", "CAP")
         return super().save(*args, **kwargs)
 
+    @property
+    def en_retard(self):
+        return bool(self.echeance and self.statut != self.Statut.CLOTUREE and self.echeance < timezone.localdate())
+
 
 class PvControle(models.Model):
     """Procès-verbal de contrôle & levée de réserve / réception interne (RF-ERP-51/53)."""
