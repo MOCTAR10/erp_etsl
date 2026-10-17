@@ -149,15 +149,17 @@ jobs:
                   print(f"tentative {attempt + 1}: {exc}")
                   time.sleep(2)
           EOF
-      - name: Backend tests ${{ matrix.shard }} (coverage report-only, pas de gate)
+      - name: Backend tests ${{ matrix.shard }} (pytest parallèle, coverage report-only, pas de gate)
         working-directory: backend
         env:
           POSTGRES_DB: etls_ci
+          # Le vrai MinIO n'est testé qu'une fois (aller-retour S3) ; les autres tests utilisent le stockage mémoire.
+          MINIO_INTEGRATION: ${{ matrix.shard == 'socle-ged' && '1' || '0' }}
         run: |
-          coverage run --source='.' manage.py test ${{ matrix.apps }} --noinput
-          coverage xml -o coverage.xml
-          echo "### Couverture backend — ${{ matrix.shard }}" >> "$GITHUB_STEP_SUMMARY"
-          coverage report >> "$GITHUB_STEP_SUMMARY"
+          set -o pipefail  # sinon `| tee` masquerait un échec de pytest
+          python -m pytest -n auto --cov=. --cov-report=xml:coverage.xml --cov-report=term ${{ matrix.apps }} | tee pytest.log
+          echo "### Backend — ${{ matrix.shard }}" >> "$GITHUB_STEP_SUMMARY"
+          tail -n 40 pytest.log >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
