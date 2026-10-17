@@ -167,7 +167,7 @@ class AffaireTests(BaseM1):
         return Affaire.objects.get(pk=r.data["id"])
 
     def confirmer(self, affaire):
-        RevueCommande.objects.create(affaire=affaire, montant_offre=100, montant_commande=101, delai_offre_jours=90,
+        RevueCommande.objects.create(affaire=affaire, montant_offre=Decimal("100"), montant_commande=Decimal("101"), delai_offre_jours=90,
                                      delai_commande_jours=90, statut=RevueCommande.Statut.VALIDEE)
         return self.client.post(f"/api/commercial/affaires/{affaire.pk}/confirmer/")
 
