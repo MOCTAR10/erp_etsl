@@ -3,7 +3,7 @@ import { BadgePercent, ClipboardList, CreditCard, Inbox, Landmark } from "lucide
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
   CompteBancaire,
@@ -59,29 +59,6 @@ function EngagementCard({ e, index }: { e: Engagement; index: number }) {
   );
 }
 
-function PaymentCard({ p }: { p: Paiement }) {
-  const { t } = useTranslation();
-  const badge =
-    p.statut === "valide" ? "ok" : p.statut === "annule" ? "err" : "warn";
-  return (
-    <div className="card kpi" key={p.id}>
-      <span className="kpi-label">
-        {p.code} · {t(`comptabilite.sens_${p.sens}`)} · {t(`comptabilite.mode_${p.mode}`)}{" "}
-        <span className={`badge ${badge}`}>{t(`comptabilite.paiement_statut.${p.statut}`)}</span>
-      </span>
-      <span className="kpi-value">
-        {p.has_amount_access && p.montant !== null ? `${formatNumber(p.montant)} F` : "••••••"}
-      </span>
-      <span className="meta muted">
-        {formatDate(p.date, "fr")}
-        {p.tiers_name ? ` · ${p.tiers_name}` : ""}
-        {p.imputation_618 ? ` · ${t("comptabilite.tva")} 618` : ""}
-        {p.move_number ? ` · ${t("comptabilite.ecriture")} ${p.move_number}` : ""}
-      </span>
-    </div>
-  );
-}
-
 function TvaCard({ d }: { d: DeclarationTva }) {
   const { t } = useTranslation();
   const badge = d.statut === "deposee" ? "ok" : "warn";
@@ -130,7 +107,7 @@ function ControleCard({ c }: { c: ControleInterne }) {
 }
 
 export function ComptabilitePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const banques = useQuery({
     queryKey: ["compta-banques"],
@@ -253,42 +230,84 @@ export function ComptabilitePage() {
         </>
       ) : null}
 
-      {relevesAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("comptabilite.releves")} · {relevesAll.length}
-          </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {relevesAll.map((r) => (
-              <div className="card kpi" key={r.id}>
-                <span className="kpi-label">
-                  {r.code} · {r.compte_bancaire_label}{" "}
-                  <span className={`badge ${r.statut === "valide" ? "ok" : "warn"}`}>
-                    {t(`comptabilite.releve_statut.${r.statut}`)}
-                  </span>
-                </span>
-                <span className="meta muted">
-                  {formatDate(r.date_debut, "fr")} → {formatDate(r.date_fin, "fr")}
-                </span>
-                <span className="meta muted">
-                  D {formatNumber(r.total_debit)} · C {formatNumber(r.total_credit)} F
-                </span>
-              </div>
-            ))}
+      {relevesAll.length > 0 && (
+        <SectionCard title={`${t("comptabilite.releves")} · ${relevesAll.length}`}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("comptabilite.col.code")}</th>
+                  <th>{t("comptabilite.col.bank")}</th>
+                  <th>{t("comptabilite.col.period")}</th>
+                  <th className="num">{t("comptabilite.col.debit")}</th>
+                  <th className="num">{t("comptabilite.col.credit")}</th>
+                  <th>{t("comptabilite.col.status")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relevesAll.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.code}</td>
+                    <td>{r.compte_bancaire_label}</td>
+                    <td>
+                      {formatDate(r.date_debut, i18n.language)} → {formatDate(r.date_fin, i18n.language)}
+                    </td>
+                    <td className="num">{formatNumber(r.total_debit)}</td>
+                    <td className="num">{formatNumber(r.total_credit)}</td>
+                    <td>
+                      <Badge tone={r.statut === "valide" ? "ok" : "warn"}>{t(`comptabilite.releve_statut.${r.statut}`)}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
 
-      {pay.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("comptabilite.paiements")} · {pay.length}
-          </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {pay.map((p) => <PaymentCard key={p.id} p={p} />)}
+      {pay.length > 0 && (
+        <SectionCard title={`${t("comptabilite.paiements")} · ${pay.length}`}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("comptabilite.col.code")}</th>
+                  <th>{t("comptabilite.col.date")}</th>
+                  <th>{t("comptabilite.col.direction")}</th>
+                  <th>{t("comptabilite.col.mode")}</th>
+                  <th>{t("comptabilite.col.party")}</th>
+                  <th className="num">{t("comptabilite.col.amount")}</th>
+                  <th>{t("comptabilite.col.entry")}</th>
+                  <th>{t("comptabilite.col.status")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pay.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.code}</td>
+                    <td>{formatDate(p.date, i18n.language)}</td>
+                    <td>{t(`comptabilite.sens_${p.sens}`)}</td>
+                    <td>{t(`comptabilite.mode_${p.mode}`)}</td>
+                    <td>
+                      {p.tiers_name ?? "—"}
+                      {p.imputation_618 ? " · 618" : ""}
+                    </td>
+                    <td className="num">
+                      {p.has_amount_access && p.montant !== null ? `${formatNumber(p.montant)} F` : "••••••"}
+                    </td>
+                    <td>{p.move_number ?? "—"}</td>
+                    <td>
+                      <Badge tone={p.statut === "valide" ? "ok" : p.statut === "annule" ? "err" : "warn"}>
+                        {t(`comptabilite.paiement_statut.${p.statut}`)}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
 
       {tvaAll.length > 0 ? (
         <>

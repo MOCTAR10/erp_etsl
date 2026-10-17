@@ -619,6 +619,7 @@ export const fr = {
     },
   },
   maintenance: {
+    col: { code: "Code", designation: "Désignation", category: "Catégorie", site: "Site", status: "Statut", type: "Type", date: "Date", ot: "OT généré" },
     title: "Maintenance & GMAO — Parc machines & équipements (M8)",
     otOuverts: "OT ouverts",
     enCours: "OT en cours",
@@ -819,6 +820,7 @@ export const fr = {
     pendingNote: "Paie restreinte au cercle RH (RF-33) : salaires et bulletins masqués hors RH/Finance/Direction (RF-59).",
   },
   comptabilite: {
+    col: { code: "Code", date: "Date", bank: "Compte bancaire", period: "Période", debit: "Débit", credit: "Crédit", status: "Statut", direction: "Sens", mode: "Mode", party: "Tiers", amount: "Montant", entry: "Écriture" },
     title: "Comptabilité — Trésorerie, engagements, TVA & contrôles (M10)",
     banques: "Comptes bancaires",
     releves: "Relevés bancaires",

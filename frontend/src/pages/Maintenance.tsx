@@ -3,7 +3,7 @@ import { ClipboardCheck, Coins, Hammer, Inbox, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import { formatDate } from "../lib/format";
 import type {
   Actif,
@@ -26,58 +26,17 @@ const OT_BADGE: Record<StatutOT, "ok" | "warn" | "err" | "brand"> = {
 const OT_ORDER: StatutOT[] = ["demande", "planifie", "en_cours", "termine", "cloture", "annule"];
 const OT_VALID = new Set<StatutOT>(OT_ORDER);
 
-function ActifCard({ actif }: { actif: Actif }) {
-  const { t } = useTranslation();
-  const badge =
-    actif.statut === "operationnel"
-      ? "ok"
-      : actif.statut === "reforme" || actif.statut === "hors_service"
-        ? "err"
-        : actif.statut === "en_panne"
-          ? "warn"
-          : "brand";
-  return (
-    <div className="card kpi" key={actif.id}>
-      <span className="kpi-label">
-        {actif.code} · {t(`maintenance.categories.${actif.categorie}`)}
-        {actif.is_global_rental ? <span className="badge brand"> {t("maintenance.GR")}</span> : null}
-        {actif.signe_618 ? <span className="badge warn"> {t("maintenance.cpt618")}</span> : null}
-      </span>
-      <span className="kpi-value">{actif.designation}</span>
-      <span className="meta muted">
-        {actif.site || "—"} · {t("maintenance.compteur")} {String(actif.compteur_lecture ?? actif.compteur_value)}
-        {actif.en_arret ? (
-          <span className="badge warn"> {t(`maintenance.statut_actif.${actif.statut}`)}</span>
-        ) : (
-          <span className={`badge ${badge}`}> {t(`maintenance.statut_actif.${actif.statut}`)}</span>
-        )}
-      </span>
-    </div>
-  );
+function actifTone(a: Actif): "ok" | "warn" | "err" | "brand" {
+  if (a.en_arret) return "warn";
+  if (a.statut === "operationnel") return "ok";
+  if (a.statut === "reforme" || a.statut === "hors_service") return "err";
+  return a.statut === "en_panne" ? "warn" : "brand";
 }
 
-function InspectionCard({ insp }: { insp: Inspection }) {
-  const { t } = useTranslation();
-  const badge =
-    insp.statut === "realisee" ? (insp.resultat === "non_conforme" ? "err" : insp.resultat === "sous_reserve" ? "warn" : "ok") : insp.statut === "annulee" ? "err" : "brand";
-  return (
-    <div className="card kpi" key={insp.id}>
-      <span className="kpi-label">
-        {insp.code} · {t(`maintenance.inspection_types.${insp.type_inspection}`)}
-      </span>
-      <span className="kpi-value">{insp.actif_designation}</span>
-      <span className="meta muted">
-        {formatDate(insp.date_inspection, "fr")}
-        {insp.prochaine_inspection ? ` · ${t("maintenance.prochaine")} ${formatDate(insp.prochaine_inspection, "fr")}` : ""}
-        {insp.ot_genere_code ? ` · ${insp.ot_genere_code}` : ""}
-        {insp.statut === "realisee" && insp.resultat ? (
-          <span className={`badge ${badge}`}> {t(`maintenance.inspection_resultats.${insp.resultat}`)}</span>
-        ) : (
-          <span className={`badge ${badge}`}> {t(`maintenance.inspection_statut.${insp.statut}`)}</span>
-        )}
-      </span>
-    </div>
-  );
+function inspectionTone(i: Inspection): "ok" | "warn" | "err" | "brand" {
+  if (i.statut === "annulee") return "err";
+  if (i.statut !== "realisee") return "brand";
+  return i.resultat === "non_conforme" ? "err" : i.resultat === "sous_reserve" ? "warn" : "ok";
 }
 
 function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
@@ -105,7 +64,8 @@ function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
 }
 
 export function MaintenancePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
 
   const stats = useQuery({ queryKey: ["maintenance-stats"], queryFn: api.maintenanceStats });
 
@@ -196,27 +156,81 @@ export function MaintenancePage() {
         </p>
       ) : null}
 
-      {actifsAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("maintenance.actifs")}
-          </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {actifsAll.map((a) => <ActifCard key={a.id} actif={a} />)}
+      {actifsAll.length > 0 && (
+        <SectionCard title={`${t("maintenance.actifs")} · ${actifsAll.length}`}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("maintenance.col.code")}</th>
+                  <th>{t("maintenance.col.designation")}</th>
+                  <th>{t("maintenance.col.category")}</th>
+                  <th>{t("maintenance.col.site")}</th>
+                  <th className="num">{t("maintenance.compteur")}</th>
+                  <th>{t("maintenance.col.status")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actifsAll.map((a) => (
+                  <tr key={a.id}>
+                    <td>{a.code}</td>
+                    <td>
+                      {a.designation}{" "}
+                      {a.is_global_rental && <Badge tone="brand">{t("maintenance.GR")}</Badge>}{" "}
+                      {a.signe_618 && <Badge tone="warn">{t("maintenance.cpt618")}</Badge>}
+                    </td>
+                    <td>{t(`maintenance.categories.${a.categorie}`)}</td>
+                    <td>{a.site || "—"}</td>
+                    <td className="num">{String(a.compteur_lecture ?? a.compteur_value)}</td>
+                    <td>
+                      <Badge tone={actifTone(a)}>{t(`maintenance.statut_actif.${a.statut}`)}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
 
-      {inspectionsAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("maintenance.inspections")}
-          </h3>
-          <div className="kpis" style={{ flexWrap: "wrap" }}>
-            {inspectionsAll.map((i) => <InspectionCard key={i.id} insp={i} />)}
+      {inspectionsAll.length > 0 && (
+        <SectionCard title={`${t("maintenance.inspections")} · ${inspectionsAll.length}`}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("maintenance.col.code")}</th>
+                  <th>{t("maintenance.col.designation")}</th>
+                  <th>{t("maintenance.col.type")}</th>
+                  <th>{t("maintenance.col.date")}</th>
+                  <th>{t("maintenance.prochaine")}</th>
+                  <th>{t("maintenance.col.ot")}</th>
+                  <th>{t("maintenance.col.status")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inspectionsAll.map((i) => (
+                  <tr key={i.id}>
+                    <td>{i.code}</td>
+                    <td>{i.actif_designation}</td>
+                    <td>{t(`maintenance.inspection_types.${i.type_inspection}`)}</td>
+                    <td>{formatDate(i.date_inspection, lang)}</td>
+                    <td>{i.prochaine_inspection ? formatDate(i.prochaine_inspection, lang) : "—"}</td>
+                    <td>{i.ot_genere_code ?? "—"}</td>
+                    <td>
+                      <Badge tone={inspectionTone(i)}>
+                        {i.statut === "realisee" && i.resultat
+                          ? t(`maintenance.inspection_resultats.${i.resultat}`)
+                          : t(`maintenance.inspection_statut.${i.statut}`)}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
     </>
   );
 }

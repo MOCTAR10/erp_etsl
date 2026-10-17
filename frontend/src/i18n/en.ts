@@ -619,6 +619,7 @@ export const en = {
     },
   },
   maintenance: {
+    col: { code: "Code", designation: "Designation", category: "Category", site: "Site", status: "Status", type: "Type", date: "Date", ot: "Generated WO" },
     title: "Maintenance & CMMS — Machinery & equipment fleet (M8)",
     otOuverts: "Open work orders",
     enCours: "WOs in progress",
@@ -819,6 +820,7 @@ export const en = {
     pendingNote: "Payroll restricted to the HR circle (RF-33): salaries and pay slips hidden outside HR/Finance/Management (RF-59).",
   },
   comptabilite: {
+    col: { code: "Code", date: "Date", bank: "Bank account", period: "Period", debit: "Debit", credit: "Credit", status: "Status", direction: "Direction", mode: "Mode", party: "Counterparty", amount: "Amount", entry: "Entry" },
     title: "Accounting — Treasury, commitments, VAT & internal controls (M10)",
     banques: "Bank accounts",
     releves: "Bank statements",
