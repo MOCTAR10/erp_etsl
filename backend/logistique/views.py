@@ -1,6 +1,7 @@
 """API module M4 — Logistique ETSL & GLOBAL RENTAL (RF-ERP-30…33)."""
 
 from decimal import Decimal, InvalidOperation
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -66,6 +67,12 @@ class EquipementParcViewSet(_CommonViewSet):
         equipement = EquipementParc.objects.filter(pk=request.data.get("id")).first()
         if not equipement:
             raise ValidationError({"id": "Équipement introuvable."})
+        # Un équipement affecté ou en location GR se libère par la fin de l'affectation / la clôture de la location
+        # (compteurs, refacturation 618) : pas par un simple bouton, sinon il serait réaffecté en double.
+        if equipement.affectations.filter(statut=AffectationParc.Statut.ACTIVE).exists():
+            raise ValidationError({"detail": "Affectation en cours : terminez-la pour libérer l'équipement."})
+        if equipement.locations.filter(statut=LocationGR.Statut.ACTIVE).exists():
+            raise ValidationError({"detail": "Location GLOBAL RENTAL active : clôturez-la pour libérer l'équipement."})
         equipement.statut = EquipementParc.Statut.DISPONIBLE
         equipement.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(equipement).data)
@@ -88,6 +95,8 @@ class DemandeMobilisationViewSet(_CommonViewSet):
     def soumettre(self, request, pk=None):
         """Soumission d'un besoin opérationnel (RF-ERP-31)."""
         demande = self.get_object()
+        if demande.statut != DemandeMobilisation.Statut.BROUILLON:
+            raise ValidationError({"detail": f"Demande {demande.get_statut_display().lower()} : soumission impossible."})
         demande.statut = DemandeMobilisation.Statut.SOUMISE
         demande.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(demande).data)
@@ -96,6 +105,8 @@ class DemandeMobilisationViewSet(_CommonViewSet):
     def traiter(self, request, pk=None):
         """Marque le besoin traité (affectation réalisée)."""
         demande = self.get_object()
+        if demande.statut != DemandeMobilisation.Statut.SOUMISE:
+            raise ValidationError({"detail": f"Demande {demande.get_statut_display().lower()} : seule une demande soumise se traite."})
         demande.statut = DemandeMobilisation.Statut.TRAITEE
         demande.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(demande).data)
@@ -166,9 +177,11 @@ class LocationGRViewSet(_CommonViewSet):
         return Response(stats_parc())
 
     @action(detail=True, methods=["post"], url_path="demarrer")
+    @transaction.atomic
     def demarrer(self, request, pk=None):
         """Démarrage location GR : compteur initial + statut actif (RF-ERP-32)."""
-        location = self.get_object()
+        # Verrou : deux démarrages simultanés publieraient deux événements GR (webhook partenaire).
+        location = LocationGR.objects.select_for_update().get(pk=self.get_object().pk)
         if location.statut != LocationGR.Statut.BROUILLON:
             raise ValidationError(
                 "Seule une prestation en brouillon peut démarrer (déjà active, terminée ou annulée)."
@@ -201,9 +214,10 @@ class LocationGRViewSet(_CommonViewSet):
         return Response(self.get_serializer(location).data)
 
     @action(detail=True, methods=["post"], url_path="cloturer")
+    @transaction.atomic
     def cloturer(self, request, pk=None):
         """Clôture location GR : compteur final + consommation + statut (RF-ERP-32/33)."""
-        location = self.get_object()
+        location = LocationGR.objects.select_for_update().get(pk=self.get_object().pk)
         if location.statut != LocationGR.Statut.ACTIVE:
             raise ValidationError("Seule une location active peut être clôturée.")
         lecture = request.data.get("lecture_finale")

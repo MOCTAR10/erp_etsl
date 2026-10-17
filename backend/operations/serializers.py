@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from config.serializers import ModelCleanMixin
+
 from .models import (
     GammeOperatoire,
     GammeOperation,
@@ -66,7 +68,7 @@ class GammeOperationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class OrdreFabricationSerializer(AmountMaskMixin, serializers.ModelSerializer):
+class OrdreFabricationSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
     amount_fields = []
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     scope_label = serializers.CharField(source="get_scope_display", read_only=True)
@@ -121,7 +123,7 @@ class OrdreFabricationSerializer(AmountMaskMixin, serializers.ModelSerializer):
         return (obj.responsible.first_name + " " + obj.responsible.last_name).strip() or obj.responsible.email
 
 
-class PointageChantierSerializer(serializers.ModelSerializer):
+class PointageChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     hours_type_label = serializers.CharField(source="get_hours_type_display", read_only=True)
     ordre_code = serializers.CharField(source="ordre.code", read_only=True, default=None)
@@ -173,7 +175,7 @@ class PointageChantierSerializer(serializers.ModelSerializer):
         return None
 
 
-class SituationTravauxSerializer(AmountMaskMixin, serializers.ModelSerializer):
+class SituationTravauxSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
     amount_fields = ["amount"]
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     affaire_code = serializers.CharField(source="affaire.code", read_only=True, default=None)

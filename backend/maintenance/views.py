@@ -9,6 +9,9 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from config.inputs import choice_input, date_input, fk_input
+from users.models import User
+
 from .models import Actif, Inspection, OrdreTravail
 from .serializers import ActifSerializer, InspectionSerializer, OrdreTravailSerializer
 from .services import CanManageMaintenance
@@ -85,11 +88,13 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
                 {"detail": "Seul un OT demandé peut être planifié."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        date_planifiee = date_input(request.data.get("date_planifiee"), "date_planifiee")
+        technicien = fk_input(request.data.get("technicien"), User.objects.filter(is_active=True), "technicien")
         ot.statut = OrdreTravail.Statut.PLANIFIE
-        if request.data.get("date_planifiee"):
-            ot.date_planifiee = request.data.get("date_planifiee")
-        if request.data.get("technicien"):
-            ot.technicien_id = request.data.get("technicien")
+        if date_planifiee:
+            ot.date_planifiee = date_planifiee
+        if technicien:
+            ot.technicien = technicien
         if request.data.get("priorite"):
             ot.priorite = _choix(request.data.get("priorite"), OrdreTravail.Priorite, "priorite")
         ot.save()
@@ -237,22 +242,28 @@ class InspectionViewSet(viewsets.ModelViewSet):
                 {"detail": "Seule une inspection planifiée peut être réalisée."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Saisies validées avant tout changement d'état (400 explicite, jamais de valeur hors choix stockée).
+        resultat = choice_input(request.data.get("resultat"), Inspection.Resultat, "resultat")
+        prochaine = date_input(request.data.get("prochaine_inspection"), "prochaine_inspection")
+        intervenant = fk_input(request.data.get("intervenant"), User.objects.filter(is_active=True), "intervenant")
         inspection.statut = Inspection.Statut.REALISEE
-        if request.data.get("resultat"):
-            inspection.resultat = request.data.get("resultat")
+        if resultat:
+            inspection.resultat = resultat
         if request.data.get("constat"):
             inspection.constat = request.data.get("constat")
-        if request.data.get("prochaine_inspection"):
-            inspection.prochaine_inspection = request.data.get("prochaine_inspection")
-        if request.data.get("intervenant"):
-            inspection.intervenant_id = request.data.get("intervenant")
+        if prochaine:
+            inspection.prochaine_inspection = prochaine
+        if intervenant:
+            inspection.intervenant = intervenant
         inspection.save()
         return Response(self.get_serializer(inspection).data)
 
     @action(detail=True, methods=["post"], url_path="creer-ot")
+    @transaction.atomic
     def creer_ot(self, request, pk=None):
         """Génère un OT correctif depuis une inspection non conforme (5.9.5 → 5.9.4)."""
-        inspection = self.get_object()
+        # Verrou : un double clic ne crée pas deux OT pour la même inspection.
+        inspection = Inspection.objects.select_for_update().get(pk=self.get_object().pk)
         if inspection.statut != Inspection.Statut.REALISEE:
             return Response(
                 {"detail": "L'inspection doit être réalisée pour générer un OT."},

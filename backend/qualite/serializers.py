@@ -3,6 +3,8 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from config.serializers import ModelCleanMixin
+
 from .models import (
     PointInspection,
     ActionCorrective,
@@ -156,7 +158,7 @@ class NonConformiteSerializer(serializers.ModelSerializer):
             "statut", "statut_label", "decided_by", "decided_by_name",
             "date_decision", "archive", "actions_count", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "actions_count", "statut"]
+        read_only_fields = ["decided_by", "code", "actions_count", "statut"]
 
     def get_actions_count(self, obj):
         return obj.actions_correctives.count()
@@ -216,7 +218,7 @@ class PvControleSerializer(serializers.ModelSerializer):
         read_only_fields = ["validated_by", "levee_reserve", "code", "statut"]
 
 
-class PointInspectionSerializer(serializers.ModelSerializer):
+class PointInspectionSerializer(ModelCleanMixin, serializers.ModelSerializer):
     type_label = serializers.CharField(source="get_type_point_display", read_only=True)
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     leve_par_name = serializers.CharField(source="leve_par.get_full_name", read_only=True, default=None)

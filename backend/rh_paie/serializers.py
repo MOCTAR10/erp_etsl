@@ -2,6 +2,7 @@
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from .models import (
     BaremeImpot,
@@ -18,7 +19,7 @@ from .models import (
     SaisieTemps,
     Sanction,
 )
-from .services import can_see_amount
+from .services import can_manage_paie, can_see_amount
 
 
 def _apply_and_validate(serializer, attrs, exclude=("code",)):
@@ -66,6 +67,14 @@ class EmployeSerializer(serializers.ModelSerializer):
         read_only_fields = ["code", "nom_complet", "statut"]
 
     def validate(self, attrs):
+        # Rattacher un compte à une fiche ouvre « Mon espace » (bulletins de paie) : cercle paie uniquement (RF-33),
+        # sinon un rôle RH hors paie se rattache à la fiche d'autrui et lit ses bulletins.
+        request = self.context.get("request")
+        if "user" in attrs and not can_manage_paie(getattr(request, "user", None)):
+            current = getattr(self.instance, "user_id", None)
+            new = attrs["user"].pk if attrs["user"] else None
+            if new != current:
+                raise PermissionDenied("Rattachement d'un compte à une fiche salarié : cercle paie uniquement (RF-33).")
         return _apply_and_validate(self, attrs)
 
     def to_representation(self, instance):

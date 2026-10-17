@@ -19,6 +19,8 @@ from .models import (
     ReleveBancaire,
     TauxTva,
 )
+from config.inputs import date_input
+
 from .permissions import IsComptaAdmin
 from .serializers import (
     CompteBancaireSerializer,
@@ -93,10 +95,12 @@ class ReleveBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         lignes = request.data.get("lignes")
         if not isinstance(lignes, list) or not lignes:
             raise DRFValidationError("Fournissez une liste `lignes` non vide.")
+        if not all(isinstance(item, dict) for item in lignes):
+            raise DRFValidationError("Chaque ligne doit être un objet {date, libelle, debit|credit}.")
         created = []
         for item in lignes:
-            item.setdefault("releve", releve.pk)
-            serializer = LigneReleveSerializer(data=item)
+            # Le relevé est celui de l'URL : jamais celui fourni par le client (sinon on écrirait dans un relevé validé).
+            serializer = LigneReleveSerializer(data={**item, "releve": releve.pk})
             serializer.is_valid(raise_exception=True)
             instance = serializer.save()
             created.append(instance)
@@ -107,6 +111,8 @@ class ReleveBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def valider(self, request, pk=None):
         releve = self.get_object()
+        if releve.statut == ReleveBancaire.Statut.VALIDE:
+            raise DRFValidationError("Relevé déjà validé.")
         if not releve.lignes.exists():
             raise DRFValidationError("Ajoutez au moins une ligne avant de valider.")
         releve.statut = ReleveBancaire.Statut.VALIDE
@@ -149,6 +155,8 @@ class RapprochementBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet)
     @action(detail=True, methods=["post"])
     def valider(self, request, pk=None):
         rapprochement = self.get_object()
+        if rapprochement.statut == RapprochementBancaire.Statut.VALIDE:
+            raise DRFValidationError("Rapprochement déjà validé.")
         if not rapprochement.lignes.exists():
             raise DRFValidationError("Rapprochez au moins une ligne avant de valider.")
         rapprochement.statut = RapprochementBancaire.Statut.VALIDE
@@ -324,8 +332,9 @@ class ControleInterneViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         controle = self.get_object()
         if controle.statut == ControleInterne.Statut.REALISE:
             raise DRFValidationError("Contrôle déjà réalisé.")
+        date_realise = date_input(request.data.get("date_realise"), "date_realise", default=timezone.localdate())
         controle.statut = ControleInterne.Statut.REALISE
-        controle.date_realise = request.data.get("date_realise")
+        controle.date_realise = date_realise
         controle.constat = request.data.get("constat", controle.constat)
         controle.save(update_fields=["statut", "date_realise", "constat", "updated_at"])
         return Response(self.get_serializer(controle).data)

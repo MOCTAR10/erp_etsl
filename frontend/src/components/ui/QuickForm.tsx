@@ -9,7 +9,7 @@ import { describeError } from "../../lib/offlineQueue";
 export interface QuickField {
   name: string;
   label: string;
-  type?: "text" | "textarea" | "number" | "date" | "select";
+  type?: "text" | "textarea" | "number" | "date" | "datetime-local" | "select";
   options?: { value: string; label: string }[];
   required?: boolean;
   defaultValue?: string;

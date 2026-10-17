@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from config.serializers import ModelCleanMixin
+
 from .models import (
     AffectationParc,
     DemandeMobilisation,
@@ -61,7 +63,7 @@ class EquipementParcSerializer(serializers.ModelSerializer):
         return obj.proprietaire.is_global_rental
 
 
-class DemandeMobilisationSerializer(serializers.ModelSerializer):
+class DemandeMobilisationSerializer(ModelCleanMixin, serializers.ModelSerializer):
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     affaire_code = serializers.CharField(source="affaire.code", read_only=True, default=None)
     ordre_code = serializers.CharField(source="ordre.code", read_only=True, default=None)
@@ -96,7 +98,7 @@ class DemandeMobilisationSerializer(serializers.ModelSerializer):
         return (obj.created_by.first_name + " " + obj.created_by.last_name).strip() or obj.created_by.email
 
 
-class AffectationParcSerializer(serializers.ModelSerializer):
+class AffectationParcSerializer(ModelCleanMixin, serializers.ModelSerializer):
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     equipement_code = serializers.CharField(source="equipement.code", read_only=True, default=None)
     equipement_label = serializers.CharField(source="equipement.label", read_only=True, default=None)
@@ -137,7 +139,7 @@ class AffectationParcSerializer(serializers.ModelSerializer):
         return (obj.responsable.first_name + " " + obj.responsable.last_name).strip() or obj.responsable.email
 
 
-class LocationGRSerializer(AmountMaskMixin, serializers.ModelSerializer):
+class LocationGRSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
     amount_fields = ["montant_estime"]
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     periodicite_label = serializers.CharField(source="get_periodicite_display", read_only=True)
@@ -204,7 +206,7 @@ class LocationGRSerializer(AmountMaskMixin, serializers.ModelSerializer):
         return (obj.created_by.first_name + " " + obj.created_by.last_name).strip() or obj.created_by.email
 
 
-class LectureCompteurSerializer(serializers.ModelSerializer):
+class LectureCompteurSerializer(ModelCleanMixin, serializers.ModelSerializer):
     type_lecture_label = serializers.CharField(source="get_type_lecture_display", read_only=True)
     source_label = serializers.CharField(source="get_source_display", read_only=True)
     location_code = serializers.CharField(source="location.code", read_only=True, default=None)

@@ -3,7 +3,7 @@ import { Activity, Flame, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate } from "../lib/format";
 import type {
@@ -183,6 +183,16 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
           {inc.actions_count > 0 ? ` · ${t("hse.actions")} ×${inc.actions_count}` : ""}
         </span>
       </div>
+      <ActionBar
+        actions={[
+          ...(inc.statut === "declare"
+            ? [{ label: t("hse.act.enquete"), path: `/api/hse/incidents/${inc.id}/ouvrir-enquete/`, tone: "ghost" as const }]
+            : []),
+          ...(inc.statut !== "cloture"
+            ? [{ label: t("actions.cloturer"), path: `/api/hse/incidents/${inc.id}/cloturer/`, prompt: { name: "rapport", label: t("hse.act.rapport") } }]
+            : []),
+        ]}
+      />
     </BoardCard>
   );
 }
@@ -279,6 +289,33 @@ export function HsePage() {
   return (
     <>
       <PageHeader title={t("hse.title")} />
+      <QuickForm
+        title={t("hse.form.title")}
+        endpoint="/api/hse/incidents/"
+        fields={[
+          {
+            name: "type_incident",
+            label: t("hse.col.type"),
+            type: "select",
+            required: true,
+            defaultValue: "quasi_accident",
+            options: ["quasi_accident", "incident", "accident", "blessure", "depart_feu", "pollution", "deversement", "dommage_materiel", "situation_dangereuse"].map(
+              (v) => ({ value: v, label: t(`hse.incident_types.${v}`) }),
+            ),
+          },
+          {
+            name: "gravite",
+            label: t("hse.gravite"),
+            type: "select",
+            required: true,
+            defaultValue: "mineure",
+            options: ["mineure", "majeure", "critique"].map((v) => ({ value: v, label: t(`hse.incident_gravite.${v}`) })),
+          },
+          { name: "date_evenement", label: t("hse.form.date"), type: "datetime-local", required: true },
+          { name: "lieu", label: t("hse.col.lieux"), required: true },
+          { name: "description", label: t("hse.form.description"), type: "textarea", required: true },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? "∞"} hint={`${t("hse.incidentsOuverts")} · ${s.incidents_ouverts}`} icon={ShieldAlert} tone="ok" delay={0} />

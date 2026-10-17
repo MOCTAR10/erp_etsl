@@ -157,6 +157,9 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
     def traiter(self, request, pk=None):
         """Applique le traitement décidé par QA/QC (reprise, rejet, arbitrage…)."""
         nc = self.get_object()
+        if nc.statut == NonConformite.Statut.CLOTUREE:
+            return Response({"detail": "NC clôturée : traitement impossible (ouvrir une nouvelle NC)."},
+                            status=status.HTTP_400_BAD_REQUEST)
         traitement = request.data.get("traitement") or nc.traitement
         if traitement not in NonConformite.Traitement.values:
             return Response(
@@ -176,6 +179,10 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="cloturer")
     def cloturer(self, request, pk=None):
         nc = self.get_object()
+        # MANUEL 5.8 : une NC se clôture après décision de traitement (pas directement depuis « signalée »).
+        if nc.statut != NonConformite.Statut.EN_TRAITEMENT:
+            return Response({"detail": f"NC {nc.get_statut_display().lower()} : décidez d'abord du traitement."},
+                            status=status.HTTP_400_BAD_REQUEST)
         nc.statut = NonConformite.Statut.CLOTUREE
         nc.archive = True
         nc.save()
@@ -203,6 +210,9 @@ class ActionCorrectiveViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="cloturer")
     def cloturer(self, request, pk=None):
         capa = self.get_object()
+        # Une CAPA clôturée est une preuve : date et évaluation d'efficacité ne se réécrivent pas.
+        if capa.statut == ActionCorrective.Statut.CLOTUREE:
+            return Response({"detail": "Action déjà clôturée."}, status=status.HTTP_400_BAD_REQUEST)
         capa.statut = ActionCorrective.Statut.CLOTUREE
         capa.closed_at = timezone.now()
         if "efficace" in request.data:

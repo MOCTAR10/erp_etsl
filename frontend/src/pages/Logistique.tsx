@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import type {
   DemandeMobilisation,
@@ -89,6 +89,16 @@ function locationColumns(t: T): Column<LocationGR>[] {
       render: (l) => (
         <>
           <Badge tone="brand">{l.statut_label}</Badge> {l.imputation_618 && <Badge tone="warn">618</Badge>}
+          <ActionBar
+            actions={[
+              ...(l.statut === "brouillon"
+                ? [{ label: t("actions.demarrer"), path: `/api/logistique/locations/${l.id}/demarrer/`, prompt: { name: "lecture_initiale", label: t("logistique.act.compteurDepart") } }]
+                : []),
+              ...(l.statut === "active"
+                ? [{ label: t("actions.cloturer"), path: `/api/logistique/locations/${l.id}/cloturer/`, prompt: { name: "lecture_finale", label: t("logistique.act.compteurFin") } }]
+                : []),
+            ]}
+          />
         </>
       ),
     },
@@ -102,7 +112,23 @@ function demandeColumns(t: T): Column<DemandeMobilisation>[] {
     { key: "dept", header: t("logistique.col.departement"), render: (d) => d.departement || "—" },
     { key: "debut", header: t("logistique.debut"), render: (d) => (d.date_debut ? formatDate(d.date_debut) : "—") },
     { key: "affaire", header: t("logistique.col.affaire"), render: (d) => d.affaire_code ?? "—" },
-    { key: "statut", header: t("logistique.col.statut"), render: (d) => <Badge tone="brand">{d.statut_label}</Badge> },
+    {
+      key: "statut",
+      header: t("logistique.col.statut"),
+      render: (d) => (
+        <>
+          <Badge tone="brand">{d.statut_label}</Badge>
+          <ActionBar
+            actions={[
+              ...(d.statut === "brouillon"
+                ? [{ label: t("logistique.act.soumettre"), path: `/api/logistique/demandes/${d.id}/soumettre/`, tone: "ghost" as const }]
+                : []),
+              ...(d.statut === "soumise" ? [{ label: t("logistique.act.traiter"), path: `/api/logistique/demandes/${d.id}/traiter/` }] : []),
+            ]}
+          />
+        </>
+      ),
+    },
   ];
 }
 

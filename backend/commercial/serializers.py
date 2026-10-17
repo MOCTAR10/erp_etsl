@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from config.serializers import ModelCleanMixin
+
 from .models import (
     Affaire,
     ClientProfile,
@@ -192,7 +194,7 @@ class TenderReviewSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["reviewed_by", "id", "created_at", "updated_at"]
 
 
 class MilestoneSerializer(serializers.ModelSerializer):
@@ -216,7 +218,7 @@ class MilestoneSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "code", "status", "created_at", "updated_at"]
 
 
-class AffaireSerializer(AmountMaskMixin, serializers.ModelSerializer):
+class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
     amount_fields = ["contract_amount", "margin"]
 
     opportunity_code = serializers.CharField(
@@ -255,7 +257,7 @@ class AffaireSerializer(AmountMaskMixin, serializers.ModelSerializer):
         read_only_fields = ["id", "code", "created_at", "updated_at"]
 
 
-class ContractSerializer(AmountMaskMixin, serializers.ModelSerializer):
+class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
     amount_fields = ["amount_initial", "penalty"]
 
     client_name = serializers.CharField(source="client.partner.name", read_only=True, default=None)

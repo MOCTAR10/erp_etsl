@@ -2,7 +2,7 @@
 
 from django.utils import timezone
 from integrations.idempotency import idempotent
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -211,6 +211,9 @@ class IncidentViewSet(viewsets.ModelViewSet):
     serializer_class = IncidentSerializer
     permission_classes = [CanManageHse]
 
+    def perform_create(self, serializer):
+        serializer.save(declared_by=self.request.user)
+
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
@@ -253,12 +256,32 @@ class IncidentViewSet(viewsets.ModelViewSet):
                 {"detail": "Incident déjà clôturé."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # La clôture archive l'incident (traçabilité §9.9) : elle engage le HSE, comme l'ouverture d'enquête.
+        if not can_validate_hse(request.user):
+            return Response(
+                {"detail": "Clôture réservée au HSE et à la hiérarchie."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        rapport = (request.data.get("rapport") or incident.rapport or "").strip()
+        # MANUEL §9.6 : déclaration → enquête → rapport → clôture. Un accident ou un événement majeur/critique
+        # ne se clôture pas sans rapport d'enquête.
+        if not rapport and (
+            incident.type_incident == Incident.TypeIncident.ACCIDENT
+            or incident.gravite in (Incident.Gravite.MAJEURE, Incident.Gravite.CRITIQUE)
+        ):
+            return Response(
+                {"rapport": "Rapport d'enquête obligatoire pour clôturer un accident ou un événement majeur/critique."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        raw_date = request.data.get("date_rapport")
+        if raw_date:
+            try:
+                incident.date_rapport = serializers.DateField().run_validation(raw_date)
+            except serializers.ValidationError as exc:
+                return Response({"date_rapport": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+        incident.rapport = rapport
         incident.statut = Incident.Statut.CLOTURE
         incident.archive = True
-        if request.data.get("rapport"):
-            incident.rapport = request.data.get("rapport")
-        if request.data.get("date_rapport"):
-            incident.date_rapport = request.data.get("date_rapport")
         incident.save()
         return Response(self.get_serializer(incident).data)
 
@@ -344,6 +367,8 @@ class ActionHseViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="cloturer")
     def cloturer(self, request, pk=None):
         action = self.get_object()
+        if action.statut == ActionHse.Statut.CLOTUREE:
+            return Response({"detail": "Action déjà clôturée."}, status=status.HTTP_400_BAD_REQUEST)
         action.statut = ActionHse.Statut.CLOTUREE
         action.closed_at = timezone.now()
         if "efficace" in request.data:

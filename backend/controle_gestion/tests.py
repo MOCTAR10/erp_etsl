@@ -243,6 +243,23 @@ class RevisionTests(BaseGestionTest):
         rev = BudgetRevision.objects.get(pk=r.data["id"])
         self.assertEqual(rev.statut, BudgetRevision.Statut.APPLIQUEE)
 
+    def test_revision_preparee_sur_un_montant_perime_refusee(self):
+        """R1 et R2 préparées sur 15 M : après application de R1, R2 (calculée sur 15 M) ne s'applique plus."""
+        _auth(self.client, "finance@etls.local")
+        budget = self._budget(montant=Decimal("15000000"))
+        ids = []
+        for montant in ("16500000.00", "14000000.00"):
+            r = self.client.post(f"{BASE}revisions/", {"budget": budget.pk, "nouveau_montant": montant,
+                                                       "date_revision": "2026-04-15", "commentaire": "R"}, format="json")
+            self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.data)
+            ids.append(r.data["id"])
+        _auth(self.client, "admin@etls.local")
+        self.assertEqual(self.client.post(f"{BASE}revisions/{ids[0]}/appliquer/").status_code, status.HTTP_200_OK)
+        r2 = self.client.post(f"{BASE}revisions/{ids[1]}/appliquer/")
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST, r2.data)
+        budget.refresh_from_db()
+        self.assertEqual(budget.montant, Decimal("16500000"))
+
     def test_max_quatre_revisions(self):
         _auth(self.client, "finance@etls.local")
         budget = self._budget()

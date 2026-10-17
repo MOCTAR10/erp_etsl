@@ -3,6 +3,8 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from config.serializers import ModelCleanMixin
+
 from .models import (
     ArticleStock,
     CertificatMatiere,
@@ -30,7 +32,7 @@ class DepotSerializer(serializers.ModelSerializer):
         read_only_fields = ["code"]
 
 
-class LotMatiereSerializer(serializers.ModelSerializer):
+class LotMatiereSerializer(ModelCleanMixin, serializers.ModelSerializer):
     article_code = serializers.CharField(source="article.code", read_only=True, default=None)
     article_label = serializers.CharField(source="article.label", read_only=True, default=None)
     certificats = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
@@ -45,7 +47,7 @@ class LotMatiereSerializer(serializers.ModelSerializer):
         read_only_fields = ["code", "statut", "quantite_restante"]
 
 
-class CertificatMatiereSerializer(serializers.ModelSerializer):
+class CertificatMatiereSerializer(ModelCleanMixin, serializers.ModelSerializer):
     lot_code = serializers.CharField(source="lot.code", read_only=True, default=None)
     article_code = serializers.CharField(
         source="lot.article.code", read_only=True, default=None
@@ -150,7 +152,7 @@ class MouvementStockSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class InventaireLigneSerializer(serializers.ModelSerializer):
+class InventaireLigneSerializer(ModelCleanMixin, serializers.ModelSerializer):
     article_code = serializers.CharField(source="article.code", read_only=True, default=None)
     article_label = serializers.CharField(source="article.label", read_only=True, default=None)
     lot_code = serializers.CharField(source="lot.code", read_only=True, default=None)

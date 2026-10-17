@@ -34,6 +34,19 @@ ACHAT_AMOUNT_ROLES = (
 )
 
 
+# Approbation d'une DA (validation hiérarchique avant consultation / commande) : hiérarchie + Finance.
+# Logistique et chef d'atelier SAISISSENT des DA mais ne les approuvent pas. Liste à confirmer avec ETSL.
+ACHAT_APPROVAL_ROLES = (
+    User.Role.ADMIN,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.DIRECTEUR_PROJETS,
+    User.Role.DIRECTEUR_OPERATIONS,
+    User.Role.FINANCE,
+    User.Role.DIRECTION,
+)
+
+
 def is_admin_or_staff(user):
     return user.is_authenticated and (
         user.is_staff or user.is_superuser or user.role == User.Role.ADMIN
@@ -44,6 +57,17 @@ def can_manage_achats(user):
     if is_admin_or_staff(user):
         return True
     return user.is_authenticated and user.role in ACHAT_WRITE_ROLES
+
+
+def can_approve_da(user):
+    if is_admin_or_staff(user):
+        return True
+    return user.is_authenticated and user.role in ACHAT_APPROVAL_ROLES
+
+
+class CanApproveDa(BasePermission):
+    def has_permission(self, request, view):
+        return can_approve_da(getattr(request, "user", None))
 
 
 def can_see_amount(user):

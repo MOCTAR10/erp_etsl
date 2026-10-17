@@ -3,7 +3,7 @@ import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
@@ -166,7 +166,24 @@ function courrierColumns(t: T): Column<Courrier>[] {
     {
       key: "statut",
       header: t("juridique.col.statut"),
-      render: (c) => <Badge tone={COURRIER_TONE[c.statut]}>{t(`juridique.statut_courrier.${c.statut}`)}</Badge>,
+      render: (c) => (
+        <>
+          <Badge tone={COURRIER_TONE[c.statut]}>{t(`juridique.statut_courrier.${c.statut}`)}</Badge>
+          <ActionBar
+            actions={[
+              ...(c.statut === "recu"
+                ? [{ label: t("juridique.act.enregistrer"), path: `/api/juridique/courriers/${c.id}/enregistrer/`, tone: "ghost" as const }]
+                : []),
+              ...(c.statut === "recu" || c.statut === "enregistre"
+                ? [{ label: t("juridique.act.classer"), path: `/api/juridique/courriers/${c.id}/classer/`, tone: "ghost" as const }]
+                : []),
+              ...(c.statut === "enregistre" || c.statut === "classe"
+                ? [{ label: t("juridique.act.archiver"), path: `/api/juridique/courriers/${c.id}/archiver/` }]
+                : []),
+            ]}
+          />
+        </>
+      ),
     },
   ];
 }
@@ -278,6 +295,36 @@ export function JuridiquePage() {
   return (
     <>
       <PageHeader title={t("juridique.title")} />
+      <QuickForm
+        title={t("juridique.form.title")}
+        endpoint="/api/juridique/courriers/"
+        fields={[
+          {
+            name: "sens",
+            label: t("juridique.col.sens"),
+            type: "select",
+            required: true,
+            defaultValue: "entrant",
+            options: [
+              { value: "entrant", label: t("juridique.form.entrant") },
+              { value: "sortant", label: t("juridique.form.sortant") },
+            ],
+          },
+          {
+            name: "type",
+            label: t("juridique.col.type"),
+            type: "select",
+            required: true,
+            defaultValue: "lettre",
+            options: ["lettre", "email", "note", "convocation", "proces", "autre"].map((v) => ({ value: v, label: t(`juridique.form.types.${v}`) })),
+          },
+          { name: "objet", label: t("juridique.col.objet"), required: true },
+          { name: "reference", label: t("juridique.form.reference") },
+          { name: "expediteur", label: t("juridique.form.expediteur") },
+          { name: "destinataire", label: t("juridique.form.destinataire") },
+          { name: "date_courrier", label: t("juridique.form.dateCourrier"), type: "date" },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi

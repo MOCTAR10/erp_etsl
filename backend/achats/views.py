@@ -1,7 +1,8 @@
 """API module M2 — Achats & Approvisionnements (RF-ERP-10…13)."""
 
 from integrations.idempotency import idempotent
-from rest_framework import viewsets
+from django.db import transaction
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -30,7 +31,7 @@ from .serializers import (
     PurchaseRequestSerializer,
 )
 from users.permissions import can_read_module
-from .services import CanManageAchats, can_see_amount
+from .services import CanApproveDa, CanManageAchats, can_see_amount
 
 
 class _CommonViewSet(viewsets.ModelViewSet):
@@ -52,6 +53,12 @@ class _CommonViewSet(viewsets.ModelViewSet):
 class PurchaseRequestViewSet(_CommonViewSet):
     serializer_class = PurchaseRequestSerializer
 
+    def get_permissions(self):
+        # _CommonViewSet.get_permissions ignore les permission_classes d'action : l'approbation est déclarée ici.
+        if self.action in ("approuver", "rejeter"):
+            return [CanManageAchats(), CanApproveDa()]
+        return super().get_permissions()
+
     def get_queryset(self):
         qs = PurchaseRequest.objects.select_related("requester").all()
         status_ = self.request.query_params.get("status")
@@ -63,6 +70,42 @@ class PurchaseRequestViewSet(_CommonViewSet):
 
     def perform_create(self, serializer):
         serializer.save(requester=self.request.user)
+
+    def _transition(self, frm, to, extra_note=None):
+        da = PurchaseRequest.objects.select_for_update().get(pk=self.get_object().pk)
+        if da.status != frm:
+            return Response(
+                {"detail": f"DA {da.get_status_display().lower()} : action impossible."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        da.status = to
+        fields = ["status", "updated_at"]
+        if extra_note:
+            da.notes = f"{da.notes}\n{extra_note}".strip()
+            fields.append("notes")
+        da.save(update_fields=fields)
+        return Response(self.get_serializer(da).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def soumettre(self, request, pk=None):
+        return self._transition(PurchaseRequest.Status.BROUILLON, PurchaseRequest.Status.SOUMISE)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def approuver(self, request, pk=None):
+        return self._transition(PurchaseRequest.Status.SOUMISE, PurchaseRequest.Status.APPROUVEE)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def rejeter(self, request, pk=None):
+        motif = (request.data.get("motif") or "").strip()
+        if not motif:
+            return Response({"motif": "Motif du rejet obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
+        who = request.user.get_full_name() or request.user.email
+        return self._transition(
+            PurchaseRequest.Status.SOUMISE, PurchaseRequest.Status.REJETEE, f"Rejet ({who}) : {motif}"
+        )
 
 
 class PurchaseRequestLineViewSet(_CommonViewSet):
@@ -115,8 +158,13 @@ class PurchaseOrderViewSet(_CommonViewSet):
             qs = qs.filter(is_global_rental=gr)
         return qs
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        order = serializer.save(created_by=self.request.user)
+        # La DA approuvée à l'origine du BC est désormais « convertie en commande ».
+        if order.request_id and order.request.status == PurchaseRequest.Status.APPROUVEE:
+            order.request.status = PurchaseRequest.Status.CONVERTIE
+            order.request.save(update_fields=["status", "updated_at"])
 
     @action(detail=True, methods=["get"], url_path="reconciliation")
     def reconciliation(self, request, pk=None):

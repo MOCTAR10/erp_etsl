@@ -3,7 +3,7 @@ import { Banknote, CalendarClock, FileText, Inbox, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, SectionCard, DataTable } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
@@ -13,7 +13,6 @@ import type {
   Paginated,
   StatutConge,
 } from "../types";
-import { ActionBar } from "../components/ui";
 import { BaremesSection } from "../components/workflow/BaremesSection";
 
 type CongeGroups = Record<StatutConge, DemandeConge[]>;
@@ -40,6 +39,15 @@ function CongeCard({ c, index }: { c: DemandeConge; index: number }) {
         {formatDate(c.date_debut)} → {formatDate(c.date_fin)} · {c.nb_jours} j
         {c.motif ? ` · ${c.motif}` : ""}
       </div>
+      <ActionBar
+        actions={[
+          ...(c.statut === "demande" ? [{ label: t("rhPaie.act.approuver"), path: `/api/rh-paie/conges/${c.id}/approuver/`, tone: "ghost" as const }] : []),
+          ...(c.statut === "approuve" ? [{ label: t("actions.valider"), path: `/api/rh-paie/conges/${c.id}/valider/` }] : []),
+          ...(c.statut === "demande" || c.statut === "approuve"
+            ? [{ label: t("actions.refuser"), path: `/api/rh-paie/conges/${c.id}/refuser/`, tone: "danger" as const }]
+            : []),
+        ]}
+      />
     </BoardCard>
   );
 }

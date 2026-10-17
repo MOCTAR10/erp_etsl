@@ -133,6 +133,7 @@ export const fr = {
     placeholder: "Aller à une page ou lancer une action…",
   },
   quickForm: { created: "Enregistré.", save: "Enregistrer", close: "Fermer le formulaire" },
+  actionBar: { confirmer: "Confirmer", annuler: "Annuler" },
   common: {
     skipToContent: "Aller au contenu",
     mainNav: "Navigation principale",
@@ -246,6 +247,12 @@ export const fr = {
     masked: "Montant restreint",
   },
   purchases: {
+    da: {
+      title: "Demandes d'achat", new: "Nouvelle demande d'achat", code: "Code", objet: "Objet", demandeur: "Demandeur",
+      echeance: "Échéance souhaitée", statut: "Statut", service: "Service", urgente: "Urgente", oui: "Oui", non: "Non",
+      notes: "Justification / notes", soumettre: "Soumettre", motif: "Motif du rejet :",
+      status: { brouillon: "Brouillon", soumise: "Soumise", approuvee: "Approuvée", rejetee: "Rejetée", convertie: "Convertie en commande" },
+    },
     title: "Commandes & Achats (M2)",
     orders: "Bon de commande",
     confirmed: "Commandes actives",
@@ -261,6 +268,7 @@ export const fr = {
     previ: "Prévisionnel",
   },
   operations: {
+    sit: { code: "Code", periode: "Période", heures: "Heures pointées", avancement: "Avancement", montant: "Montant", statut: "Statut" },
     title: "Opérations — Atelier & Chantier (M3)",
     of: "OF en cours",
     reported: "Heures pointées",
@@ -299,6 +307,7 @@ export const fr = {
     },
   },
   logistique: {
+    act: { soumettre: "Soumettre", traiter: "Marquer traitée", compteurDepart: "Relevé du compteur au départ :", compteurFin: "Relevé du compteur au retour :" },
     col: { code: "Code", equipement: "Équipement", partenaire: "Partenaire", periodicite: "Périodicité", consommation: "Consommation", montant: "Montant estimé", statut: "Statut", besoin: "Besoin", departement: "Département", affaire: "Affaire" },
     title: "Logistique — Parc & GLOBAL RENTAL (M4)",
     parc: "Parc ETSL",
@@ -326,7 +335,7 @@ export const fr = {
     prelevement: "Relevés",
   },
   stocks: {
-    form: { title: "Nouveau mouvement de stock", source: "Dépôt source", destination: "Dépôt destination", reference: "Référence document (BL, OF…)" },
+    form: { confirmCloture: "Clôturer l'inventaire ? Les écarts seront passés en mouvements de stock (non modifiables).", title: "Nouveau mouvement de stock", source: "Dépôt source", destination: "Dépôt destination", reference: "Référence document (BL, OF…)" },
     col: { article: "Article", depot: "Dépôt", method: "Valorisation", qty: "Quantité", unitCost: "Coût unitaire", value: "Valeur", code: "Code", type: "Type", flow: "Flux", date: "Date", certNo: "N° certificat", lot: "Lot", organisme: "Organisme", status: "Statut" },
     title: "Stocks & Traçabilité matière (M5)",
     depots: "Dépôts & magasins",
@@ -385,6 +394,8 @@ export const fr = {
     totalMvt: "Mouvements",
   },
   qualite: {
+    act: { traiter: "Décider du traitement", choisirTraitement: "Traitement…" },
+    form: { title: "Signaler une non-conformité", gravite: "Gravité", description: "Description de l'écart" },
     col: { code: "Code", soudeur: "Soudeur", norme: "Norme", procede: "Procédé · position", validite: "Validité", statut: "Statut", type: "Type", reference: "Référence", materiau: "Matériau", point: "Point de contrôle", objet: "Affaire / OF / lot", organisme: "Organisme agréé", resultat: "Résultat", date: "Date", retention: "Conservation", ans: "ans" },
     title: "Qualité industrielle & Soudage (M6)",
     soudeurs: "Soudeurs",
@@ -498,6 +509,8 @@ export const fr = {
     interne: "Interne QA/QC",
   },
   hse: {
+    act: { enquete: "Ouvrir l'enquête", rapport: "Rapport d'enquête (obligatoire pour un accident ou un événement majeur/critique) :" },
+    form: { title: "Déclarer un incident", date: "Date et heure de l'événement", description: "Description des faits" },
     col: { code: "Code", lieux: "Lieux", score: "Score P×G", criticite: "Criticité", statut: "Statut", designation: "Désignation", zone: "Zone ATEX", certificat: "Certificat", theme: "Thème", type: "Type", date: "Date", participants: "Participants", beneficiaire: "Bénéficiaire", numeroBsd: "N° BSD", quantite: "Quantité", transporteur: "Transporteur" },
     gaz: { conforme: "Test gaz conforme", nonConforme: "Test gaz non conforme", aFaire: "Test gaz à faire" },
     title: "HSE — Hygiène, Sécurité & Environnement (M7)",
@@ -715,6 +728,7 @@ export const fr = {
     pendingNote: "Équipements en arrêt : OT correctif / décision de maintenance requise (MANUEL §5.9).",
   },
   rhPaie: {
+    act: { approuver: "Approuver" },
     col: { matricule: "Matricule", nom: "Nom", fonction: "Fonction · département", categorie: "Catégorie", statut: "Statut" },
     title: "RH & Paie — Personnel, congés, formations & bulletins (M9)",
     effectif: "Effectif actif",
@@ -900,6 +914,7 @@ export const fr = {
     pendingNote: "Comptabilité SYSCOHADA révisée : écritures validées par le noyau (immuables, extournes). Règles de conservation proc. 4.3–4.8, refacturations GR au compte 618 (RF-ERP-90…94).",
   },
   controleGestion: {
+    act: { approuver: "Approuver", realiser: "Marquer réalisée", appliquer: "Appliquer" },
     col: { axe: "Axe analytique", taux: "Taux de marge", code: "Code", periode: "Période", dateCloture: "Date de clôture", delai: "Délai", statut: "Statut", budget: "Budget · révision", nouveauMontant: "Nouveau montant", auteur: "Auteur", commentaire: "Commentaire" },
     title: "Contrôle de gestion — Budgets, marges, écarts & clôtures (M11)",
     budgets: "Budgets",
@@ -941,6 +956,12 @@ export const fr = {
     pendingNote: "Marges et écarts agrégés depuis les écritures comptabilisées (noyau comptable) ; coût GLOBAL RENTAL isolé au compte 618 (RF-ERP-A4). Clôtures de gestion < J+4 (RF-ERP-A3), budgets & révisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    act: { enregistrer: "Enregistrer", classer: "Classer", archiver: "Archiver" },
+    form: {
+      title: "Enregistrer un courrier", entrant: "Entrant", sortant: "Sortant", reference: "Référence",
+      expediteur: "Expéditeur", destinataire: "Destinataire", dateCourrier: "Date du courrier",
+      types: { lettre: "Lettre", email: "E-mail", note: "Note interne", convocation: "Convocation", proces: "Procès-verbal", autre: "Autre" },
+    },
     col: { code: "Code", type: "Type", beneficiaire: "Bénéficiaire", montant: "Montant", echeance: "Échéance", reste: "Reste", statut: "Statut", police: "N° police", assureur: "Assureur", prime: "Prime annuelle", objet: "Objet", partieAdverse: "Partie adverse", phase: "Phase", enjeu: "Montant en jeu", partenaire: "Partenaire", sens: "Sens", tiers: "Tiers", date: "Date", decisions: "Décisions" },
     title: "Juridique & GED — Courrier, contrats, cautions, assurances, contentieux & réunions (M12)",
     courriers: "Courriers",

@@ -1,5 +1,6 @@
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, F
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -416,7 +417,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if document.is_checked_out and document.checked_out_by_id != request.user.id:
             raise PermissionDenied("Document verrouillé (check-out) par un autre utilisateur (RF-44).")
         version_id = request.data.get("version_id")
-        version = document.versions.filter(id=version_id).first()
+        try:
+            version = document.versions.filter(id=version_id).first()
+        except (DjangoValidationError, ValueError):
+            version = None  # identifiant mal formé : même réponse qu'une version absente
         if version is None:
             return Response(
                 {"detail": "Version introuvable pour ce document."},

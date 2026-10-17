@@ -16,6 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounting_kernel.permissions import CanPostAccounting
+from config.inputs import date_input
 
 from .models import (
     BaremeImpot,
@@ -74,6 +75,10 @@ class EmployeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="activer")
     def activer(self, request, pk=None):
         e = self.get_object()
+        # Un salarié sorti ne se « réactive » pas (date de sortie, solde de tout compte) : réembauche = nouvelle fiche.
+        if e.statut == Employe.Statut.SORTI:
+            return Response({"detail": "Salarié sorti : réembauche par une nouvelle fiche et un nouveau contrat."},
+                            status=status.HTTP_400_BAD_REQUEST)
         e.statut = Employe.Statut.ACTIF
         e.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(e).data)
@@ -81,6 +86,8 @@ class EmployeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="sortir")
     def sortir(self, request, pk=None):
         e = self.get_object()
+        if e.statut == Employe.Statut.SORTI:
+            return Response({"detail": f"Salarié déjà sorti (le {e.date_sortie})."}, status=status.HTTP_400_BAD_REQUEST)
         e.statut = Employe.Statut.SORTI
         date_sortie = request.data.get("date_sortie")
         if date_sortie:
@@ -374,8 +381,9 @@ class SanctionViewSet(viewsets.ModelViewSet):
                 {"detail": "Seule une sanction en instruction peut faire l'objet d'une décision."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        date_decision = date_input(request.data.get("date_decision"), "date_decision", default=timezone.localdate())
         s.statut = Sanction.Statut.DECIDEE
-        s.date_decision = request.data.get("date_decision") or timezone.localdate()
+        s.date_decision = date_decision
         s.save()
         return Response(self.get_serializer(s).data)
 

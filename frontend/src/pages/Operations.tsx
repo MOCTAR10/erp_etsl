@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Clock3, Construction, Factory, HardHat } from "lucide-react";
+import { Clock3, Construction, Factory, HardHat } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type {
   ChargeStats,
   OfStatus,
@@ -162,24 +162,33 @@ export function OperationsPage() {
         </Board>
       </div>
 
-      {situations.data && situations.data.length > 0 ? (
-        <h3 className="section-heading">
-          {t("operations.situations")}
-        </h3>
-      ) : null}
-      <div className="kpi-grid">
-        {(situations.data ?? []).map((s, i) => (
-          <Kpi
-            key={s.id}
-            label={`${s.code} · ${s.status_label}`}
-            value={s.amount === null ? t("operations.masked") : formatNumber(Number(s.amount))}
-            hint={`${formatNumber(Number(s.ordered_hours))} h · ${s.ordres_count} OF · ${s.progress}%`}
-            icon={ClipboardList}
-            tone="brand"
-            delay={i * 0.05}
+      {(situations.data ?? []).length > 0 && (
+        <SectionCard title={`${t("operations.situations")} · ${(situations.data ?? []).length}`}>
+          <DataTable
+            rows={situations.data ?? []}
+            caption={t("operations.situations")}
+            columns={[
+              { key: "code", header: t("operations.sit.code"), render: (s) => s.code },
+              { key: "periode", header: t("operations.sit.periode"), render: (s) => `${formatDate(s.period_start)} → ${formatDate(s.period_end)}` },
+              { key: "heures", header: t("operations.sit.heures"), num: true, render: (s) => `${formatNumber(Number(s.ordered_hours))} h` },
+              { key: "avancement", header: t("operations.sit.avancement"), num: true, render: (s) => `${s.progress} %` },
+              { key: "montant", header: t("operations.sit.montant"), num: true, render: (s) => (s.amount === null ? t("operations.masked") : `${formatNumber(Number(s.amount))} F`) },
+              {
+                key: "statut",
+                header: t("operations.sit.statut"),
+                render: (s) => (
+                  <>
+                    <Badge tone={s.status === "brouillon" ? "warn" : "ok"}>{s.status_label}</Badge>
+                    {s.status === "brouillon" && (
+                      <ActionBar actions={[{ label: t("actions.valider"), path: `/api/operations/situations/${s.id}/validate/` }]} />
+                    )}
+                  </>
+                ),
+              },
+            ]}
           />
-        ))}
-      </div>
+        </SectionCard>
+      )}
     </>
   );
 }

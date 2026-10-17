@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from config.serializers import ModelCleanMixin
+
 from .models import (
     ConsultationOffer,
     ConsultationRequest,
@@ -51,7 +53,7 @@ class PurchaseRequestSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_at", "updated_at"]
+        read_only_fields = ["requester", "id", "code", "status", "created_at", "updated_at"]
 
     def get_requester_name(self, obj):
         if not obj.requester:
@@ -103,6 +105,16 @@ class ConsultationRequestSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "code", "created_at", "updated_at"]
 
+    def validate_request(self, value):
+        # Une consultation / un BC ne s'appuie que sur une DA approuvée (validation hiérarchique préalable).
+        if value is not None and value.status not in (
+            PurchaseRequest.Status.APPROUVEE, PurchaseRequest.Status.CONVERTIE
+        ):
+            raise serializers.ValidationError(
+                f"DA {value.code} non approuvée ({value.get_status_display().lower()}) : consultation / commande impossible."
+            )
+        return value
+
 
 class ConsultationOfferSerializer(AmountMaskMixin, serializers.ModelSerializer):
     amount_fields = ["amount"]
@@ -149,7 +161,7 @@ class PurchaseOrderLineSerializer(AmountMaskMixin, serializers.ModelSerializer):
         read_only_fields = ["id", "price_total", "received_qty", "invoiced_qty"]
 
 
-class PurchaseOrderSerializer(AmountMaskMixin, serializers.ModelSerializer):
+class PurchaseOrderSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
     amount_fields = ["total"]
 
     supplier_name = serializers.CharField(source="supplier.name", read_only=True, default=None)
@@ -199,6 +211,16 @@ class PurchaseOrderSerializer(AmountMaskMixin, serializers.ModelSerializer):
         if not obj.created_by:
             return None
         return (obj.created_by.first_name + " " + obj.created_by.last_name).strip() or obj.created_by.email
+
+    def validate_request(self, value):
+        # Une consultation / un BC ne s'appuie que sur une DA approuvée (validation hiérarchique préalable).
+        if value is not None and value.status not in (
+            PurchaseRequest.Status.APPROUVEE, PurchaseRequest.Status.CONVERTIE
+        ):
+            raise serializers.ValidationError(
+                f"DA {value.code} non approuvée ({value.get_status_display().lower()}) : consultation / commande impossible."
+            )
+        return value
 
 
 class GoodsReceiptSerializer(serializers.ModelSerializer):

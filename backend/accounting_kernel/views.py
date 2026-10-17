@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from config.inputs import date_input
 from users.permissions import IsAdminOrStaff, can_read_module
 
 from .models import AccountMove, AccountMoveLine, FiscalYear, Journal, Period, Sequence
@@ -141,7 +142,7 @@ class AccountMoveViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         move = reverse_move(
             self.get_object(),
             user=request.user,
-            date=request.data.get("date"),
+            date=date_input(request.data.get("date"), "date"),
             reference=request.data.get("reference", ""),
             label=request.data.get("label", ""),
         )

@@ -3,7 +3,7 @@ import { CalendarCheck, Coins, Inbox, PieChart, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
@@ -42,6 +42,14 @@ function BudgetCard({ b, index }: { b: Budget; index: number }) {
         {b.analytic_code ? ` · ${b.axis_code ?? "axe"}:${b.analytic_code}` : ""}
         {b.nb_revisions > 0 ? ` · R${b.nb_revisions}` : ""}
       </div>
+      <ActionBar
+        actions={[
+          ...(b.statut === "brouillon" ? [{ label: t("controleGestion.act.approuver"), path: `/api/controle-gestion/budgets/${b.id}/approuver/` }] : []),
+          ...(b.statut === "approuve"
+            ? [{ label: t("actions.cloturer"), path: `/api/controle-gestion/budgets/${b.id}/cloturer/`, tone: "ghost" as const, confirm: t("actions.confirmCloturer") }]
+            : []),
+        ]}
+      />
     </BoardCard>
   );
 }
@@ -92,7 +100,10 @@ function clotureColumns(t: T): Column<ClotureGestion>[] {
         c.statut === "realisee" ? (
           <Badge tone={c.conforme_j4 ? "ok" : "err"}>{c.conforme_j4 ? t("controleGestion.conformeJ4") : t("controleGestion.horsJ4")}</Badge>
         ) : (
-          <Badge tone="warn">{t(`controleGestion.cloture_statut.${c.statut}`)}</Badge>
+          <>
+            <Badge tone="warn">{t(`controleGestion.cloture_statut.${c.statut}`)}</Badge>
+            <ActionBar actions={[{ label: t("controleGestion.act.realiser"), path: `/api/controle-gestion/clotures/${c.id}/realiser/` }]} />
+          </>
         ),
     },
   ];
@@ -109,9 +120,14 @@ function revisionColumns(t: T): Column<BudgetRevision>[] {
       key: "statut",
       header: t("controleGestion.col.statut"),
       render: (r) => (
-        <Badge tone={r.statut === "appliquee" ? "ok" : r.statut === "annulee" ? "err" : "warn"}>
-          {t(`controleGestion.revision_statut.${r.statut}`)}
-        </Badge>
+        <>
+          <Badge tone={r.statut === "appliquee" ? "ok" : r.statut === "annulee" ? "err" : "warn"}>
+            {t(`controleGestion.revision_statut.${r.statut}`)}
+          </Badge>
+          {r.statut === "brouillon" && (
+            <ActionBar actions={[{ label: t("controleGestion.act.appliquer"), path: `/api/controle-gestion/revisions/${r.id}/appliquer/` }]} />
+          )}
+        </>
       ),
     },
   ];

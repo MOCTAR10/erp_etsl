@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import type {
   ControleQualite,
@@ -128,6 +128,25 @@ function NcCard({ nc, index }: { nc: NonConformite; index: number }) {
         {nc.controle_code ? `· ${nc.controle_code}` : ""}
         {nc.actions_count > 0 ? ` · ${t("qualite.capa")} ×${nc.actions_count}` : ""}
       </div>
+      <ActionBar
+        actions={[
+          ...(nc.statut !== "cloturee"
+            ? [{
+                label: t("qualite.act.traiter"),
+                path: `/api/qualite/non-conformites/${nc.id}/traiter/`,
+                tone: "ghost" as const,
+                prompt: {
+                  name: "traitement",
+                  label: t("qualite.act.choisirTraitement"),
+                  options: ["reprise", "reparation", "rejet", "acceptation", "arbitrage"].map((v) => ({ value: v, label: t(`qualite.nc_traitement.${v}`) })),
+                },
+              }]
+            : []),
+          ...(nc.statut === "en_traitement"
+            ? [{ label: t("actions.cloturer"), path: `/api/qualite/non-conformites/${nc.id}/cloturer/`, confirm: t("actions.confirmCloturer") }]
+            : []),
+        ]}
+      />
     </BoardCard>
   );
 }
@@ -210,6 +229,21 @@ export function QualitePage() {
   return (
     <>
       <PageHeader title={t("qualite.title")} />
+      <QuickForm
+        title={t("qualite.form.title")}
+        endpoint="/api/qualite/non-conformites/"
+        fields={[
+          {
+            name: "gravite",
+            label: t("qualite.form.gravite"),
+            type: "select",
+            required: true,
+            defaultValue: "mineure",
+            options: ["mineure", "majeure", "critique"].map((v) => ({ value: v, label: t(`qualite.nc_gravite.${v}`) })),
+          },
+          { name: "description", label: t("qualite.form.description"), type: "textarea", required: true },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi

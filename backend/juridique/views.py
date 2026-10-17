@@ -1,7 +1,5 @@
 """API module M12 — Juridique & GED (RF-ERP-B0...B4)."""
 
-from datetime import date as _date
-
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
@@ -28,6 +26,7 @@ from .serializers import (
     DossierGlobalRentalSerializer,
     ReunionSerializer,
 )
+from config.inputs import date_input
 from users.permissions import can_read_module
 from .services import (
     CanManageJuridique,
@@ -69,13 +68,19 @@ class CourrierViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def enregistrer(self, request, pk=None):
         courrier = self.get_object()
-        courrier.enregistrer()
+        try:
+            courrier.enregistrer()
+        except ValueError as exc:
+            raise DRFValidationError(str(exc))
         return Response(self.get_serializer(courrier).data)
 
     @action(detail=True, methods=["post"])
     def classer(self, request, pk=None):
         courrier = self.get_object()
-        courrier.classer()
+        try:
+            courrier.classer()
+        except ValueError as exc:
+            raise DRFValidationError(str(exc))
         return Response(self.get_serializer(courrier).data)
 
     @action(detail=True, methods=["post"])
@@ -243,10 +248,11 @@ class AssuranceViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def renouveler(self, request, pk=None):
         assurance = self.get_object()
-        nouvelle_echeance = request.data.get("date_echeance")
-        if nouvelle_echeance:
-            nouvelle_echeance = _date.fromisoformat(nouvelle_echeance)
-        assurance.renouveler(nouvelle_echeance)
+        nouvelle_echeance = date_input(request.data.get("date_echeance"), "date_echeance")
+        try:
+            assurance.renouveler(nouvelle_echeance)
+        except ValueError as exc:
+            raise DRFValidationError(str(exc))
         return Response(self.get_serializer(assurance).data)
 
     @action(detail=True, methods=["post"])

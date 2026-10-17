@@ -158,6 +158,13 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         budget = revision.budget
         if budget.statut == Budget.Statut.CLOTURE:
             raise DRFValidationError("Budget clôturé : révision non applicable.")
+        # Révision préparée sur un montant périmé (une autre révision a été appliquée entre-temps) : l'appliquer
+        # écraserait silencieusement la précédente. Il faut la refaire sur le montant en vigueur.
+        if revision.ancien_montant is not None and revision.ancien_montant != budget.montant:
+            raise DRFValidationError(
+                f"Le budget a changé depuis la préparation de {revision.code} "
+                f"({revision.ancien_montant} → {budget.montant}) : préparez une nouvelle révision."
+            )
         budget.montant = revision.nouveau_montant
         budget.save(update_fields=["montant", "updated_at"])
         revision.statut = BudgetRevision.Statut.APPLIQUEE

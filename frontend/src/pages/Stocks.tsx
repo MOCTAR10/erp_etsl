@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import type {
   CertificatMatiere,
   Depot,
@@ -386,7 +386,14 @@ export function StocksPage() {
                     <td>{inv.code}</td>
                     <td>{inv.depot_label}</td>
                     <td>{formatDate(inv.date, i18n.language)}</td>
-                    <td>{t(`stocks.inv_status.${inv.statut}`)}</td>
+                    <td>
+                      {t(`stocks.inv_status.${inv.statut}`)}
+                      {(inv.statut === "brouillon" || inv.statut === "en_cours") && (
+                        <ActionBar
+                          actions={[{ label: t("actions.cloturer"), path: `/api/stocks/inventaires/${inv.id}/cloturer/`, confirm: t("stocks.form.confirmCloture") }]}
+                        />
+                      )}
+                    </td>
                     <td className="num">{formatNumber(Number(inv.ecart_total))}</td>
                   </tr>
                 ))}

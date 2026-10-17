@@ -60,7 +60,7 @@ class PermisTravailSerializer(serializers.ModelSerializer):
             "gaz_obligatoire", "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date",
             "test_gaz_par", "test_gaz_valide",
         ]
-        read_only_fields = ["demandeur", 
+        read_only_fields = ["validateur", "demandeur", 
             "code", "date_validation", "date_cloture", "statut", "gaz_obligatoire",
             "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date", "test_gaz_par", "test_gaz_valide",
         ]
@@ -129,7 +129,7 @@ class IncidentSerializer(serializers.ModelSerializer):
             "enqueteur", "enqueteur_name", "date_ouverture_enquete", "date_rapport",
             "actions_count", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "actions_count", "date_ouverture_enquete", "statut"]
+        read_only_fields = ["declared_by", "code", "actions_count", "date_ouverture_enquete", "statut"]
 
     def get_actions_count(self, obj):
         return obj.actions.count()

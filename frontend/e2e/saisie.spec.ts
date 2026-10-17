@@ -26,6 +26,40 @@ test.describe("Régression : saisie depuis l'interface", () => {
     await expect(page.locator(".task-card", { hasText: label }).getByRole("button", { name: "Planifier" })).toHaveCount(0);
   });
 
+  test("Achats : une demande d'achat se crée, se soumet puis s'approuve", async ({ page }) => {
+    const label = `DA e2e ${Date.now()}`;
+    await page.goto("/purchases");
+    await page.getByRole("button", { name: "Nouvelle demande d'achat" }).click();
+    const form = page.getByRole("form", { name: "Nouvelle demande d'achat" });
+    await form.getByLabel(/Objet/).fill(label);
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+
+    const row = () => page.getByRole("row", { name: new RegExp(label) });
+    await row().getByRole("button", { name: "Soumettre" }).click();
+    await expect(row()).toContainText("Soumise");
+    await row().getByRole("button", { name: "Valider" }).click();
+    await expect(row()).toContainText("Approuvée");
+  });
+
+  test("Qualité : une NC se signale, reçoit un traitement choisi puis se clôture", async ({ page }) => {
+    const label = `NC e2e ${Date.now()}`;
+    await page.goto("/qualite");
+    await page.getByRole("button", { name: "Signaler une non-conformité" }).click();
+    const form = page.getByRole("form", { name: "Signaler une non-conformité" });
+    await form.getByLabel(/Description de l'écart/).fill(label);
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+
+    const card = () => page.locator(".task-card", { hasText: label });
+    await card().getByRole("button", { name: "Décider du traitement" }).click();
+    await card().getByLabel("Traitement…").selectOption("reprise");
+    await card().getByRole("button", { name: "Confirmer" }).click();
+    page.once("dialog", (d) => void d.accept());
+    await card().getByRole("button", { name: "Clôturer" }).click();
+    await expect(card().getByRole("button", { name: "Clôturer" })).toHaveCount(0);
+  });
+
   test("Comptabilité : un montant négatif est refusé avec le message du serveur", async ({ page }) => {
     await page.goto("/comptabilite");
     await page.getByRole("button", { name: "Nouveau paiement" }).click();

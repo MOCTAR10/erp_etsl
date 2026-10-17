@@ -126,10 +126,15 @@ class Courrier(models.Model):
         return super().save(*args, **kwargs)
 
     def enregistrer(self):
+        if self.statut != self.Statut.RECU:
+            raise ValueError(f"Courrier {self.get_statut_display().lower()} : déjà enregistré.")
         self.statut = self.Statut.ENREGISTRE
         return self.save(update_fields=["statut", "updated_at"])
 
     def classer(self):
+        # Un courrier archivé ne revient pas en arrière (traçabilité du bureau d'ordre, §3.3).
+        if self.statut not in (self.Statut.RECU, self.Statut.ENREGISTRE):
+            raise ValueError(f"Courrier {self.get_statut_display().lower()} : classement impossible.")
         if self.statut == self.Statut.RECU:
             self.enregistrer()
         self.statut = self.Statut.CLASSE
@@ -549,6 +554,10 @@ class Assurance(models.Model):
         return "en_cours"
 
     def renouveler(self, date_echeance=None):
+        if self.statut == self.Statut.RESILIEE:
+            raise ValueError("Police résiliée : souscrivez une nouvelle police plutôt que de la renouveler.")
+        if date_echeance and self.date_echeance and date_echeance <= self.date_echeance:
+            raise ValueError("La nouvelle échéance doit être postérieure à l'échéance en cours.")
         self.statut = self.Statut.ACTIVE
         if date_echeance:
             self.date_echeance = date_echeance

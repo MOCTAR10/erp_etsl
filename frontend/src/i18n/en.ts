@@ -133,6 +133,7 @@ export const en = {
     placeholder: "Go to a page or run an action…",
   },
   quickForm: { created: "Saved.", save: "Save", close: "Close form" },
+  actionBar: { confirmer: "Confirm", annuler: "Cancel" },
   common: {
     skipToContent: "Skip to content",
     mainNav: "Main navigation",
@@ -246,6 +247,12 @@ export const en = {
     masked: "Amount restricted",
   },
   purchases: {
+    da: {
+      title: "Purchase requests", new: "New purchase request", code: "Code", objet: "Subject", demandeur: "Requester",
+      echeance: "Needed by", statut: "Status", service: "Department", urgente: "Urgent", oui: "Yes", non: "No",
+      notes: "Justification / notes", soumettre: "Submit", motif: "Rejection reason:",
+      status: { brouillon: "Draft", soumise: "Submitted", approuvee: "Approved", rejetee: "Rejected", convertie: "Converted to order" },
+    },
     title: "Purchase Orders (M2)",
     orders: "Purchase order",
     confirmed: "Active orders",
@@ -261,6 +268,7 @@ export const en = {
     previ: "Forecast",
   },
   operations: {
+    sit: { code: "Code", periode: "Period", heures: "Logged hours", avancement: "Progress", montant: "Amount", statut: "Status" },
     title: "Operations — Workshop & Site (M3)",
     of: "Active WOs",
     reported: "Pointed hours",
@@ -299,6 +307,7 @@ export const en = {
     },
   },
   logistique: {
+    act: { soumettre: "Submit", traiter: "Mark as handled", compteurDepart: "Meter reading at start:", compteurFin: "Meter reading at return:" },
     col: { code: "Code", equipement: "Equipment", partenaire: "Partner", periodicite: "Billing period", consommation: "Usage", montant: "Estimated amount", statut: "Status", besoin: "Need", departement: "Department", affaire: "Project" },
     title: "Logistics — Fleet & GLOBAL RENTAL (M4)",
     parc: "ETSL fleet",
@@ -326,7 +335,7 @@ export const en = {
     prelevement: "Readings",
   },
   stocks: {
-    form: { title: "New stock movement", source: "Source warehouse", destination: "Destination warehouse", reference: "Document reference (delivery note, WO…)" },
+    form: { confirmCloture: "Close the inventory? Differences will be posted as stock movements (not editable).", title: "New stock movement", source: "Source warehouse", destination: "Destination warehouse", reference: "Document reference (delivery note, WO…)" },
     col: { article: "Article", depot: "Warehouse", method: "Valuation", qty: "Quantity", unitCost: "Unit cost", value: "Value", code: "Code", type: "Type", flow: "Flow", date: "Date", certNo: "Certificate no.", lot: "Lot", organisme: "Body", status: "Status" },
     title: "Stocks & Materials traceability (M5)",
     depots: "Warehouses & stores",
@@ -385,6 +394,8 @@ export const en = {
     totalMvt: "Moves",
   },
   qualite: {
+    act: { traiter: "Decide treatment", choisirTraitement: "Treatment…" },
+    form: { title: "Report a non-conformity", gravite: "Severity", description: "Description of the deviation" },
     col: { code: "Code", soudeur: "Welder", norme: "Standard", procede: "Process · position", validite: "Valid until", statut: "Status", type: "Type", reference: "Reference", materiau: "Material", point: "Check point", objet: "Project / WO / lot", organisme: "Accredited body", resultat: "Result", date: "Date", retention: "Retention", ans: "yrs" },
     title: "Industrial Quality & Welding (M6)",
     soudeurs: "Welders",
@@ -498,6 +509,8 @@ export const en = {
     interne: "Internal QA/QC",
   },
   hse: {
+    act: { enquete: "Open investigation", rapport: "Investigation report (required for an accident or a major/critical event):" },
+    form: { title: "Report an incident", date: "Event date and time", description: "Description of the facts" },
     col: { code: "Code", lieux: "Locations", score: "Score P×S", criticite: "Criticality", statut: "Status", designation: "Designation", zone: "ATEX zone", certificat: "Certificate", theme: "Topic", type: "Type", date: "Date", participants: "Participants", beneficiaire: "Holder", numeroBsd: "Waste slip no.", quantite: "Quantity", transporteur: "Carrier" },
     gaz: { conforme: "Gas test OK", nonConforme: "Gas test failed", aFaire: "Gas test required" },
     title: "HSE — Health, Safety & Environment (M7)",
@@ -715,6 +728,7 @@ export const en = {
     pendingNote: "Equipment down: corrective WO / maintenance decision required (MANUAL §5.9).",
   },
   rhPaie: {
+    act: { approuver: "Approve" },
     col: { matricule: "Employee ID", nom: "Name", fonction: "Position · department", categorie: "Category", statut: "Status" },
     title: "HR & Payroll — Staff, leave, training & pay slips (M9)",
     effectif: "Active headcount",
@@ -900,6 +914,7 @@ export const en = {
     pendingNote: "SYSCOHADA-revised accounting: entries validated by the kernel (immutable, reversals). Retention rules proc. 4.3–4.8, inter-company refactoring to account 618 (RF-ERP-90…94).",
   },
   controleGestion: {
+    act: { approuver: "Approve", realiser: "Mark as done", appliquer: "Apply" },
     col: { axe: "Analytic axis", taux: "Margin rate", code: "Code", periode: "Period", dateCloture: "Closing date", delai: "Lead time", statut: "Status", budget: "Budget · revision", nouveauMontant: "New amount", auteur: "Author", commentaire: "Comment" },
     title: "Management control — Budgets, margins, variances & closings (M11)",
     budgets: "Budgets",
@@ -941,6 +956,12 @@ export const en = {
     pendingNote: "Margins and variances aggregated from posted entries (accounting kernel); GLOBAL RENTAL cost isolated to account 618 (RF-ERP-A4). Period closings < J+4 (RF-ERP-A3), budgets & revisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    act: { enregistrer: "Register", classer: "File", archiver: "Archive" },
+    form: {
+      title: "Register a letter", entrant: "Incoming", sortant: "Outgoing", reference: "Reference",
+      expediteur: "Sender", destinataire: "Recipient", dateCourrier: "Letter date",
+      types: { lettre: "Letter", email: "E-mail", note: "Internal memo", convocation: "Summons", proces: "Minutes", autre: "Other" },
+    },
     col: { code: "Code", type: "Type", beneficiaire: "Beneficiary", montant: "Amount", echeance: "Due date", reste: "Remaining", statut: "Status", police: "Policy no.", assureur: "Insurer", prime: "Annual premium", objet: "Subject", partieAdverse: "Opposing party", phase: "Stage", enjeu: "Amount at stake", partenaire: "Partner", sens: "Direction", tiers: "Party", date: "Date", decisions: "Decisions" },
     title: "Legal & DMS — Mail registry, contracts, guarantees, insurance, disputes & meetings (M12)",
     courriers: "Mail items",
