@@ -3,6 +3,8 @@ from rest_framework import serializers
 from config.serializers import ModelCleanMixin
 
 from .models import (
+    CapaciteAtelier,
+    DossierOperationnel,
     GammeOperatoire,
     GammeOperation,
     OrdreFabrication,
@@ -147,11 +149,14 @@ class PointageChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
             "hours_type_label",
             "status",
             "status_label",
+            "validated_by",
+            "validated_at",
+            "saisie_temps",
             "created_by",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "validated_by", "validated_at", "saisie_temps", "created_by", "created_at", "updated_at"]
 
     def validate(self, attrs):
         # `clean()` du modèle n'est pas appelé par DRF : sans cela un pointage à 0 h ou sans opérateur passait.
@@ -202,6 +207,8 @@ class SituationTravauxSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
             "period_end",
             "amount",
             "progress",
+            "facture_ref",
+            "facture_le",
             "status",
             "status_label",
             "ordres",
@@ -227,7 +234,9 @@ class SituationTravauxSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
             "ordres_count",
             "created_at",
             "updated_at",
-            "status",  # évolue par l'action `validate` uniquement
+            "facture_ref",
+            "facture_le",
+            "status",  # évolue par les actions `validate` / `marquer-facturee`
         ]
 
     def get_created_by_name(self, obj):
@@ -262,3 +271,23 @@ def controler_habilitation_chantier(worker, jour):
         raise serializers.ValidationError(
             {"worker": f"{nom} n'a aucune habilitation valide au {jour:%d/%m/%Y} : affectation chantier interdite (CDC M9 §10.8)."}
         )
+
+
+class CapaciteAtelierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CapaciteAtelier
+        fields = ["id", "scope", "resource", "hours_per_week"]
+
+    def validate_hours_per_week(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("La capacité doit être strictement positive.")
+        return value
+
+
+class DossierOperationnelSerializer(serializers.ModelSerializer):
+    ordre_code = serializers.CharField(source="ordre.code", read_only=True)
+
+    class Meta:
+        model = DossierOperationnel
+        fields = ["id", "ordre", "ordre_code", "contenu", "sha256", "retention_years", "created_at"]
+        read_only_fields = fields

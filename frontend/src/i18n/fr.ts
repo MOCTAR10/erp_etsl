@@ -346,6 +346,8 @@ export const fr = {
     previ: "Prévisionnel",
   },
   operations: {
+    surcharge: "Surcharge de capacité (alertes)",
+    semaine: "semaine du",
     sit: { code: "Code", periode: "Période", heures: "Heures pointées", avancement: "Avancement", montant: "Montant", statut: "Statut" },
     title: "Opérations — Atelier & Chantier (M3)",
     of: "OF en cours",

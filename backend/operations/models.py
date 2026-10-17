@@ -265,6 +265,16 @@ class PointageChantier(models.Model):
         related_name="operations_created_pointages",
         verbose_name="Saisi par",
     )
+    validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="operations_validated_pointages", verbose_name="Validé par",
+    )
+    validated_at = models.DateTimeField(null=True, blank=True, verbose_name="Validé le")
+    saisie_temps = models.OneToOneField(
+        "rh_paie.SaisieTemps", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="pointage_chantier", verbose_name="Saisie temps M9",
+        help_text="Saisie temps générée dans M9 au transfert (flux pointage → paie).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -345,6 +355,8 @@ class SituationTravaux(models.Model):
         verbose_name="Validé par",
     )
     validated_at = models.DateTimeField(null=True, blank=True, verbose_name="Validé le")
+    facture_ref = models.CharField(max_length=60, blank=True, verbose_name="Référence facture (M10)")
+    facture_le = models.DateField(null=True, blank=True, verbose_name="Facturée le")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -371,3 +383,48 @@ class SituationTravaux(models.Model):
     @property
     def ordered_hours(self):
         return sum((float(o.pointage_hours) for o in self.ordres.all()), 0) if self.pk else 0
+
+
+class CapaciteAtelier(models.Model):
+    """Capacité finie hebdomadaire par périmètre (heures/semaine) — alertes de surcharge (CDC M3 §6.5)."""
+
+    class Resource(models.TextChoices):
+        RH = "rh", "Main-d'œuvre"
+        MACHINE = "machine", "Machines"
+
+    scope = models.CharField(max_length=10, choices=OrdreFabrication.Scope.choices, verbose_name="Périmètre")
+    resource = models.CharField(max_length=8, choices=Resource.choices, default=Resource.RH, verbose_name="Ressource")
+    hours_per_week = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Heures / semaine")
+
+    class Meta:
+        unique_together = [("scope", "resource")]
+        verbose_name = "Capacité hebdomadaire"
+        verbose_name_plural = "Capacités hebdomadaires"
+
+    def __str__(self):
+        return f"{self.get_scope_display()} / {self.get_resource_display()} : {self.hours_per_week} h"
+
+
+class DossierOperationnel(models.Model):
+    """Dossier opérationnel figé à la libération de l'OF : OF, pointages, contrôles, NC, consommations (CDC M3 §6.11).
+
+    Immuable ; l'empreinte SHA-256 garantit l'intégrité (archivage 10 ans)."""
+
+    ordre = models.OneToOneField(OrdreFabrication, on_delete=models.PROTECT, related_name="dossier")
+    contenu = models.JSONField(default=dict)
+    sha256 = models.CharField(max_length=64)
+    retention_years = models.PositiveSmallIntegerField(default=10)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Dossier opérationnel"
+        verbose_name_plural = "Dossiers opérationnels"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Dossier opérationnel scellé : non modifiable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Dossier opérationnel scellé : suppression interdite.")

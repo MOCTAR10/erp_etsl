@@ -346,6 +346,8 @@ export const en = {
     previ: "Forecast",
   },
   operations: {
+    surcharge: "Capacity overload (alerts)",
+    semaine: "week of",
     sit: { code: "Code", periode: "Period", heures: "Logged hours", avancement: "Progress", montant: "Amount", statut: "Status" },
     title: "Operations — Workshop & Site (M3)",
     of: "Active WOs",

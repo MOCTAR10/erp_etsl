@@ -1,5 +1,6 @@
 """API module M3 — Opérations (Atelier + Chantier) (RF-ERP-20…23)."""
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -10,6 +11,8 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .models import (
+    CapaciteAtelier,
+    DossierOperationnel,
     GammeOperatoire,
     GammeOperation,
     OrdreFabrication,
@@ -17,6 +20,8 @@ from .models import (
     SituationTravaux,
 )
 from .serializers import (
+    CapaciteAtelierSerializer,
+    DossierOperationnelSerializer,
     GammeOperatoireSerializer,
     GammeOperationSerializer,
     OrdreFabricationSerializer,
@@ -24,6 +29,7 @@ from .serializers import (
     SituationTravauxSerializer,
 )
 from users.permissions import can_read_module
+from .cloture import figer_dossier, transferer_paie, valider_pointage
 from .services import CanManageOperations, can_see_amount, charge_stats
 
 
@@ -118,7 +124,10 @@ class OrdreFabricationViewSet(_CommonViewSet):
     @transaction.atomic
     def liberer(self, request, pk=None):
         """Libération (clôture) : conformité qualité obligatoire (CDC M3 §6.8, M6 §8.10)."""
-        return self._transition([OrdreFabrication.Status.TERMINE], OrdreFabrication.Status.CLOTURE, controle_liberation)
+        reponse = self._transition([OrdreFabrication.Status.TERMINE], OrdreFabrication.Status.CLOTURE, controle_liberation)
+        if reponse.status_code == status.HTTP_200_OK:
+            figer_dossier(OrdreFabrication.objects.get(pk=pk))  # dossier opérationnel scellé, archivage 10 ans
+        return reponse
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -132,6 +141,21 @@ class OrdreFabricationViewSet(_CommonViewSet):
     def charge(self, request):
         """Plan de charge & capacité atelier (RF-ERP-23)."""
         return Response(charge_stats())
+
+
+class CapaciteAtelierViewSet(_CommonViewSet):
+    serializer_class = CapaciteAtelierSerializer
+    queryset = CapaciteAtelier.objects.all()
+
+
+class DossierOperationnelViewSet(viewsets.ReadOnlyModelViewSet):
+    """Dossiers opérationnels scellés à la libération des OF (lecture seule)."""
+
+    serializer_class = DossierOperationnelSerializer
+    queryset = DossierOperationnel.objects.select_related("ordre")
+
+    def get_permissions(self):
+        return [can_read_module("operations")()]
 
 
 class PointageChantierViewSet(_CommonViewSet):
@@ -157,6 +181,39 @@ class PointageChantierViewSet(_CommonViewSet):
     @idempotent
     def create(self, request, *args, **kwargs):  # saisie terrain rejouable (hors-ligne)
         return super().create(request, *args, **kwargs)
+
+
+    def _assert_saisi(self):
+        if self.get_object().status != PointageChantier.Status.SAISI:
+            raise DRFValidationError("Pointage validé ou transféré en paie : non modifiable ni supprimable.")
+
+    def update(self, request, *args, **kwargs):
+        self._assert_saisi()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._assert_saisi()
+        return super().destroy(request, *args, **kwargs)
+
+    def _pointage_action(self, fonction, *args):
+        pointage = self.get_object()
+        try:
+            fonction(pointage, *args)
+        except DjangoValidationError as exc:
+            raise DRFValidationError(exc.messages)
+        return Response(self.get_serializer(pointage).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def valider(self, request, pk=None):
+        """Validation par un tiers du saisisseur (séparation des tâches)."""
+        return self._pointage_action(valider_pointage, request.user)
+
+    @action(detail=True, methods=["post"], url_path="transferer-paie")
+    @transaction.atomic
+    def transferer_paie(self, request, pk=None):
+        """Sortie vers M9 : crée la saisie temps de paie (idempotent)."""
+        return self._pointage_action(transferer_paie)
 
 
 class SituationTravauxViewSet(_CommonViewSet):
@@ -202,6 +259,29 @@ class SituationTravauxViewSet(_CommonViewSet):
         situation.validated_by = request.user
         situation.validated_at = timezone.now()
         situation.save(update_fields=["status", "validated_by", "validated_at", "updated_at"])
+        return Response(self.get_serializer(situation).data)
+
+
+    @action(detail=False, methods=["get"], url_path="a-facturer")
+    def a_facturer(self, request):
+        """Sortie vers M10 : situations validées, valorisées et non encore facturées."""
+        qs = self.get_queryset().filter(status=SituationTravaux.Status.VALIDEE, amount__gt=0)
+        return Response(self.get_serializer(qs, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="marquer-facturee")
+    @transaction.atomic
+    def marquer_facturee(self, request, pk=None):
+        """Retour de M10 : référence de la facture émise ; la situation est ensuite scellée."""
+        situation = SituationTravaux.objects.select_for_update().get(pk=self.get_object().pk)
+        ref = str(request.data.get("facture_ref", "")).strip()
+        if situation.status != SituationTravaux.Status.VALIDEE:
+            raise DRFValidationError("Seule une situation validée peut être facturée.")
+        if not ref:
+            raise DRFValidationError({"facture_ref": "La référence de la facture est obligatoire."})
+        situation.status = SituationTravaux.Status.FACTUREE
+        situation.facture_ref = ref
+        situation.facture_le = timezone.localdate()
+        situation.save(update_fields=["status", "facture_ref", "facture_le", "updated_at"])
         return Response(self.get_serializer(situation).data)
 
 

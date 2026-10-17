@@ -104,4 +104,6 @@ def charge_stats():
             "count": sum(1 for r in rows if r["scope"] == "chantier"),
         },
     }
-    return {"ordres": rows, "totals": totals}
+    from .cloture import alertes_surcharge
+
+    return {"ordres": rows, "totals": totals, "alertes": alertes_surcharge()}

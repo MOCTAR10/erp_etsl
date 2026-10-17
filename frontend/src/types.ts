@@ -227,8 +227,16 @@ export interface ChargeRow {
   calculated_hours: number;
   pointed_hours: number;
 }
+export interface ChargeAlerte {
+  scope: OfScope;
+  week: string;
+  planned_hours: number;
+  capacity: number;
+  overload_pct: number;
+}
 export interface ChargeStats {
   ordres: ChargeRow[];
+  alertes?: ChargeAlerte[];
   totals: {
     atelier: { calculated: number; pointed: number; count: number };
     chantier: { calculated: number; pointed: number; count: number };
