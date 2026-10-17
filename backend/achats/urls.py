@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    LitigeFournisseurViewSet,
     ConsultationOfferViewSet,
     ConsultationRequestViewSet,
     GoodsReceiptLineViewSet,
@@ -25,6 +26,7 @@ router.register("receipts", GoodsReceiptViewSet, basename="goodsreceipt")
 router.register("receipt-lines", GoodsReceiptLineViewSet, basename="goodsreceiptline")
 router.register("invoices", PurchaseInvoiceViewSet, basename="purchaseinvoice")
 router.register("invoice-lines", PurchaseInvoiceLineViewSet, basename="purchaseinvoiceline")
+router.register("litiges", LitigeFournisseurViewSet, basename="litigefournisseur")
 
 urlpatterns = [
     path("", include(router.urls)),

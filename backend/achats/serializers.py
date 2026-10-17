@@ -3,6 +3,7 @@ from rest_framework import serializers
 from config.serializers import ModelCleanMixin
 
 from .models import (
+    LitigeFournisseur,
     ConsultationOffer,
     ConsultationRequest,
     GoodsReceipt,
@@ -109,7 +110,7 @@ class ConsultationRequestSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "created_at", "updated_at"]
 
     def validate_request(self, value):
         # Une consultation / un BC ne s'appuie que sur une DA approuvée (validation hiérarchique préalable).
@@ -242,6 +243,8 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     received_by_name = serializers.SerializerMethodField()
 
+    controle_qualite = serializers.SerializerMethodField()
+
     class Meta:
         model = GoodsReceipt
         fields = [
@@ -255,10 +258,17 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
             "received_by",
             "received_by_name",
             "notes",
+            "controle_qualite",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "received_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "received_by", "created_at", "updated_at"]
+
+    def get_controle_qualite(self, obj):
+        ctrl = obj.controles_qualite.order_by("-created_at").first()
+        if ctrl is None:
+            return None
+        return {"id": str(ctrl.pk), "code": ctrl.code, "statut": ctrl.statut, "resultat": ctrl.resultat}
 
     def get_received_by_name(self, obj):
         if not obj.received_by:
@@ -338,3 +348,27 @@ class PurchaseInvoiceLineSerializer(AmountMaskMixin, serializers.ModelSerializer
             "price_total",
         ]
         read_only_fields = ["id", "price_total"]
+
+
+class LitigeFournisseurSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
+    amount_fields = ["montant_en_jeu"]
+    order_code = serializers.CharField(source="purchase_order.code", read_only=True)
+    fournisseur_name = serializers.CharField(source="purchase_order.supplier.name", read_only=True, default=None)
+    type_label = serializers.CharField(source="get_type_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    contentieux_code = serializers.CharField(source="contentieux.code", read_only=True, default=None)
+
+    class Meta:
+        model = LitigeFournisseur
+        fields = [
+            "id", "code", "purchase_order", "order_code", "fournisseur_name", "receipt", "invoice", "type", "type_label",
+            "description", "montant_en_jeu", "statut", "statut_label", "nb_relances", "derniere_relance_le",
+            "contentieux", "contentieux_code", "resolution", "resolu_le", "created_by", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "code", "statut", "nb_relances", "derniere_relance_le", "contentieux", "resolution",
+                            "resolu_le", "created_by", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        if self.instance and self.instance.statut == LitigeFournisseur.Statut.RESOLU:
+            raise serializers.ValidationError({"detail": "Litige résolu : pièce scellée."})
+        return super().validate(attrs)
