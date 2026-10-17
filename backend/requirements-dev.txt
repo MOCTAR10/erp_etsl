@@ -2,3 +2,7 @@
 # CI (GitHub Actions) : pip install -r requirements.txt -r requirements-dev.txt
 coverage>=7.6
 ruff>=0.8
+pytest>=8.3
+pytest-django>=4.9
+pytest-xdist>=3.6
+pytest-testmon>=2.1
