@@ -642,7 +642,7 @@ export const fr = {
     },
   },
   maintenance: {
-    act: { planifier: "Planifier", terminer: "Terminer", annuler: "Annuler", confirmAnnuler: "Annuler cet ordre de travail ?" },
+    act: { planifier: "Planifier", terminer: "Terminer", annuler: "Annuler", confirmAnnuler: "Annuler cet ordre de travail ?", archiver: "Archiver", confirmArchiver: "Archiver cet OT ? Il deviendra non modifiable." },
     form: { title: "Nouvel ordre de travail", actif: "Équipement", priorite: "Priorité", datePlanifiee: "Date planifiée", description: "Description de l'intervention" },
     col: { code: "Code", designation: "Désignation", category: "Catégorie", site: "Site", status: "Statut", type: "Type", date: "Date", ot: "OT généré" },
     title: "Maintenance & GMAO — Parc machines & équipements (M8)",
@@ -699,6 +699,7 @@ export const fr = {
       en_cours: "En cours",
       termine: "Terminé",
       cloture: "Clôturé",
+      archive: "Archivé",
       annule: "Annulé",
     },
     ot_decisions: {

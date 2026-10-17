@@ -18,7 +18,7 @@ select
     (select count(*) from {{ source("etls_replica", "hse_incident") }} where statut <> 'cloture') as hse_incidents_ouverts,
     (select count(*) from {{ source("etls_replica", "hse_permistravail") }} where statut = 'actif') as hse_permis_actifs,
     (select count(*) from {{ source("etls_replica", "maintenance_actif") }} where statut in ('en_panne','en_maintenance')) as maintenance_arrets,
-    (select count(*) from {{ source("etls_replica", "maintenance_ordretravail") }} where statut not in ('cloture','annule')) as maintenance_ot_ouverts,
+    (select count(*) from {{ source("etls_replica", "maintenance_ordretravail") }} where statut not in ('cloture','archive','annule')) as maintenance_ot_ouverts,
     (select count(*) from {{ source("etls_replica", "rh_paie_employe") }} where statut = 'actif') as rh_effectif,
     (select count(*) from {{ source("etls_replica", "juridique_courrier") }} where statut in ('recu','enregistre')) as juridique_courriers_a_classer,
     (select count(*) from {{ source("etls_replica", "juridique_contentieux") }} where statut in ('ouvert','en_instruction')) as juridique_contentieux_ouverts,

@@ -12,8 +12,9 @@ from rest_framework.response import Response
 from config.inputs import choice_input, date_input, fk_input
 from users.models import User
 
-from .models import Actif, Inspection, OrdreTravail
-from .serializers import ActifSerializer, InspectionSerializer, OrdreTravailSerializer
+from .models import Actif, Inspection, OrdreTravail, PlanPreventif
+from .preventif import declencher_plans, rearmer_plan
+from .serializers import ActifSerializer, InspectionSerializer, OrdreTravailSerializer, PlanPreventifSerializer
 from .services import CanManageMaintenance
 
 
@@ -52,6 +53,52 @@ class ActifViewSet(viewsets.ModelViewSet):
             qs = qs.filter(is_global_rental=True)
         return qs
 
+    @action(detail=True, methods=["post"], url_path="releve-compteur")
+    @transaction.atomic
+    def releve_compteur(self, request, pk=None):
+        """Relevé du compteur machine ; un seuil préventif dépassé génère l'OT (lot 14, CDC M8 §13.11)."""
+        actif = Actif.objects.select_for_update().get(pk=self.get_object().pk)
+        if actif.is_global_rental:
+            raise ValidationError(
+                {"valeur": "Compteur GLOBAL RENTAL en lecture seule : le relevé se saisit en logistique (M4)."}
+            )
+        if actif.compteur_type == Actif.Compteur.AUCUN:
+            raise ValidationError({"valeur": "Cet équipement n'a pas de compteur."})
+        valeur = _montant_positif(request.data.get("valeur"), "valeur")
+        if valeur < actif.compteur_value:
+            raise ValidationError(
+                {"valeur": f"Le compteur ne peut pas reculer (valeur actuelle {actif.compteur_value})."}
+            )
+        actif.compteur_value = valeur
+        actif.save(update_fields=["compteur_value", "updated_at"])
+        ots = declencher_plans([actif], user=request.user)
+        data = self.get_serializer(actif).data
+        data["ot_generes"] = [ot.code for ot in ots]
+        return Response(data)
+
+
+class PlanPreventifViewSet(viewsets.ModelViewSet):
+    queryset = PlanPreventif.objects.select_related("actif", "actif__equipement_gr").all()
+    serializer_class = PlanPreventifSerializer
+    permission_classes = [CanManageMaintenance]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        if actif := params.get("actif"):
+            qs = qs.filter(actif_id=actif)
+        if params.get("en_vigueur") == "1":
+            qs = qs.filter(en_vigueur=True)
+        return qs
+
+    @action(detail=False, methods=["post"], url_path="declencher")
+    def declencher(self, request):
+        """Déclenchement manuel des plans échus (même règle que la tâche quotidienne)."""
+        return Response({"ot_generes": [ot.code for ot in declencher_plans(user=request.user)]})
+
 
 class OrdreTravailViewSet(viewsets.ModelViewSet):
     queryset = OrdreTravail.objects.select_related("actif", "demandeur", "technicien").all()
@@ -60,6 +107,11 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user, demandeur=self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.statut in OrdreTravail.STATUTS_SCELLES:
+            raise ValidationError({"detail": "OT clôturé ou archivé : pièce scellée, non supprimable."})
+        instance.delete()
 
     def _locked(self):
         return OrdreTravail.objects.select_for_update().select_related("actif").get(pk=self.get_object().pk)
@@ -76,7 +128,7 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         if statut := params.get("statut"):
             qs = qs.filter(statut=statut)
         if params.get("ouverts") == "1":
-            qs = qs.exclude(statut__in=[OrdreTravail.Statut.CLOTURE, OrdreTravail.Statut.ANNULE])
+            qs = qs.exclude(statut__in=OrdreTravail.STATUTS_CLOS)
         return qs
 
     @action(detail=True, methods=["post"], url_path="planifier")
@@ -163,13 +215,35 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
             ot.actif.statut = Actif.Statut.OPERATIONNEL
         ot.actif.save(update_fields=["statut", "updated_at"])
         ot.save()
+        rearmer_plan(ot)
+        return Response(self.get_serializer(ot).data)
+
+    @action(detail=True, methods=["post"], url_path="archiver")
+    @transaction.atomic
+    def archiver(self, request, pk=None):
+        """5e état du cycle OT (CDC M8 §13.4) : archivage d'un OT clôturé, rapport d'intervention exigé."""
+        ot = self._locked()
+        if ot.statut != OrdreTravail.Statut.CLOTURE:
+            return Response(
+                {"detail": "Seul un OT clôturé peut être archivé."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not ot.rapport.strip():
+            return Response(
+                {"rapport": "Rapport d'intervention requis avant archivage."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        ot.statut = OrdreTravail.Statut.ARCHIVE
+        ot.archive_le = timezone.now()
+        ot.archive_par = request.user
+        ot.save(update_fields=["statut", "archive_le", "archive_par", "updated_at"])
         return Response(self.get_serializer(ot).data)
 
     @action(detail=True, methods=["post"], url_path="annuler")
     @transaction.atomic
     def annuler(self, request, pk=None):
         ot = self._locked()
-        if ot.statut in (OrdreTravail.Statut.CLOTURE, OrdreTravail.Statut.ANNULE):
+        if ot.statut in OrdreTravail.STATUTS_CLOS:
             return Response(
                 {"detail": "L'OT est déjà clos ou annulé."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -189,9 +263,7 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
-        ouverts = OrdreTravail.objects.exclude(
-            statut__in=[OrdreTravail.Statut.CLOTURE, OrdreTravail.Statut.ANNULE]
-        )
+        ouverts = OrdreTravail.objects.exclude(statut__in=OrdreTravail.STATUTS_CLOS)
         return Response(
             {
                 "ot_ouverts": ouverts.count(),

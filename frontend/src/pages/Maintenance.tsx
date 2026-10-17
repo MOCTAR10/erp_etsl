@@ -21,9 +21,10 @@ const OT_BADGE: Record<StatutOT, "ok" | "warn" | "err" | "brand"> = {
   en_cours: "brand",
   termine: "warn",
   cloture: "ok",
+  archive: "ok",
   annule: "err",
 };
-const OT_ORDER: StatutOT[] = ["demande", "planifie", "en_cours", "termine", "cloture", "annule"];
+const OT_ORDER: StatutOT[] = ["demande", "planifie", "en_cours", "termine", "cloture", "archive", "annule"];
 const OT_VALID = new Set<StatutOT>(OT_ORDER);
 
 function actifTone(a: Actif): "ok" | "warn" | "err" | "brand" {
@@ -47,7 +48,9 @@ function otActions(ot: OrdreTravail, t: (k: string) => string) {
   if (ot.statut === "en_cours") out.push({ label: t("maintenance.act.terminer"), path: `${base}/terminer/` });
   if (ot.statut === "termine")
     out.push({ label: t("actions.cloturer"), path: `${base}/cloturer/`, confirm: t("actions.confirmCloturer") });
-  if (!["cloture", "annule"].includes(ot.statut))
+  if (ot.statut === "cloture")
+    out.push({ label: t("maintenance.act.archiver"), path: `${base}/archiver/`, tone: "ghost", confirm: t("maintenance.act.confirmArchiver") });
+  if (!["cloture", "archive", "annule"].includes(ot.statut))
     out.push({ label: t("maintenance.act.annuler"), path: `${base}/annuler/`, tone: "danger", confirm: t("maintenance.act.confirmAnnuler") });
   return out;
 }
@@ -93,7 +96,7 @@ export function MaintenancePage() {
     queryKey: ["maintenance-ordres"],
     queryFn: () => api.ordresTravail(`?page_size=100`),
     select: (page: Paginated<OrdreTravail>) => {
-      const groups: OtGroups = { demande: [], planifie: [], en_cours: [], termine: [], cloture: [], annule: [] };
+      const groups: OtGroups = { demande: [], planifie: [], en_cours: [], termine: [], cloture: [], archive: [], annule: [] };
       for (const ot of page.results) {
         if (OT_VALID.has(ot.statut)) groups[ot.statut].push(ot);
       }
@@ -129,7 +132,7 @@ export function MaintenancePage() {
   const inspectionsAll = inspections.data ?? [];
   const arrete = actifsAll.filter((a) => a.en_arret).length;
   const ouvertNonClos = Object.entries(groups)
-    .filter(([k]) => k !== "cloture")
+    .filter(([k]) => !["cloture", "archive", "annule"].includes(k))
     .reduce((sum, [, arr]) => sum + arr.length, 0);
 
   return (

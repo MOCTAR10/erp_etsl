@@ -348,6 +348,19 @@ class LocationGR(models.Model):
     imputation_618 = models.BooleanField(
         default=True, verbose_name="Refacturation compte 618"
     )
+    tarif_gr = models.ForeignKey(
+        "TarifGR",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="locations",
+        verbose_name="Version de grille tarifaire GR",
+    )
+    date_retour = models.DateField(null=True, blank=True, verbose_name="Retour effectif")
+    jours_retard = models.PositiveIntegerField(default=0, verbose_name="Jours de retard")
+    penalite = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, verbose_name="Pénalité de retard"
+    )
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut"
     )
@@ -403,6 +416,113 @@ class LocationGR(models.Model):
     @property
     def libelle_montant(self):
         return f"{self.montant_estime} {self.devise.code if self.devise else ''}".strip()
+
+
+class TarifGR(models.Model):
+    """Grille tarifaire GLOBAL RENTAL versionnée (lot 14, CDC M4 §12.4 / §12.11).
+
+    Un changement de tarif crée une nouvelle version datée (date d'effet) — jamais de réécriture. La
+    prestation retient la version en vigueur à sa date de début, la plus spécifique d'abord : équipement,
+    puis catégorie, puis grille générale du partenaire. `penalite_jour` : pénalité par jour de retour tardif.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    partenaire = models.ForeignKey(
+        "referentiels.Partner",
+        on_delete=models.PROTECT,
+        related_name="tarifs_gr",
+        verbose_name="Partenaire GR",
+    )
+    equipement = models.ForeignKey(
+        EquipementParc,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="tarifs_gr",
+        verbose_name="Équipement (tarif spécifique)",
+    )
+    categorie = models.CharField(
+        max_length=10, choices=EquipementParc.Categorie.choices, blank=True,
+        verbose_name="Catégorie (vide = grille générale)",
+    )
+    periodicite = models.CharField(
+        max_length=7, choices=LocationGR.Periodicite.choices, default=LocationGR.Periodicite.JOUR,
+        verbose_name="Périodicité",
+    )
+    tarif = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Tarif unitaire")
+    penalite_jour = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, verbose_name="Pénalité par jour de retard"
+    )
+    date_effet = models.DateField(verbose_name="Date d'effet")
+    version = models.PositiveIntegerField(default=1, editable=False, verbose_name="Version")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="logistique_tarifs_gr",
+        verbose_name="Créé par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["partenaire", "categorie", "-date_effet", "-version"]
+        verbose_name = "Tarif GLOBAL RENTAL (version)"
+        verbose_name_plural = "Grille tarifaire GLOBAL RENTAL"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["partenaire", "equipement", "categorie", "periodicite", "date_effet"],
+                nulls_distinct=False,
+                name="uniq_tarif_gr_date_effet",
+            )
+        ]
+
+    def __str__(self):
+        cible = self.equipement.code if self.equipement_id else (self.get_categorie_display() or "général")
+        return f"{self.code} — {self.partenaire.code} {cible} v{self.version}"
+
+    def clean(self):
+        if self.partenaire_id and not self.partenaire.is_global_rental:
+            raise ValidationError(
+                {"partenaire": "Le partenaire doit être marqué GLOBAL RENTAL (intra-groupe)."}
+            )
+        if self.tarif is not None and self.tarif < 0:
+            raise ValidationError({"tarif": "Le tarif ne peut être négatif."})
+        if self.penalite_jour is not None and self.penalite_jour < 0:
+            raise ValidationError({"penalite_jour": "La pénalité ne peut être négative."})
+        if self.equipement_id:
+            self.categorie = self.equipement.categorie
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = LogistiqueSequence.next_for("TGR", "TGR")
+        if self._state.adding:
+            dernier = (
+                TarifGR.objects.filter(
+                    partenaire_id=self.partenaire_id, equipement_id=self.equipement_id,
+                    categorie=self.categorie, periodicite=self.periodicite,
+                )
+                .aggregate(m=models.Max("version"))["m"]
+            )
+            self.version = (dernier or 0) + 1
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def applicable(cls, partenaire, equipement, periodicite, jour):
+        """Version en vigueur au `jour` : la plus spécifique, puis la plus récente."""
+        candidats = cls.objects.filter(
+            models.Q(equipement=equipement)
+            | models.Q(equipement__isnull=True, categorie=equipement.categorie)
+            | models.Q(equipement__isnull=True, categorie=""),
+            partenaire=partenaire, periodicite=periodicite, date_effet__lte=jour,
+        )
+
+        def rang(t):
+            specificite = 2 if t.equipement_id else (1 if t.categorie else 0)
+            return (specificite, t.date_effet, t.version)
+
+        return max(candidats, key=rang, default=None)
 
 
 class LectureCompteur(models.Model):

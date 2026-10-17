@@ -942,6 +942,7 @@ export type StatutOT =
   | "en_cours"
   | "termine"
   | "cloture"
+  | "archive"
   | "annule";
 export type DecisionOT = "reparation" | "mise_hors_service" | "reforme";
 

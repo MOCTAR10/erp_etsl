@@ -7,11 +7,12 @@ autorisés (RF-59, pattern RF-ERP-33).
 """
 
 from django.db.models import Q, Sum
+from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
 from users.models import User
 
-from .models import EquipementParc, LocationGR
+from .models import EquipementParc, LocationGR, TarifGR
 
 LOGISTIQUE_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -109,3 +110,46 @@ def stats_parc():
             "rows": active_rows,
         },
     }
+
+def appliquer_tarif(location):
+    """Prestation en brouillon : retient la version de grille GR en vigueur à la date de début (lot 14).
+
+    Sans grille applicable, le tarif saisi est conservé. Au démarrage, la version retenue est figée.
+    """
+    if location.statut != LocationGR.Statut.BROUILLON:
+        return
+    tarif = TarifGR.applicable(
+        location.partenaire, location.equipement, location.periodicite,
+        location.date_debut or timezone.localdate(),
+    )
+    if tarif is None:
+        if location.tarif_gr_id:
+            location.tarif_gr = None
+            location.save(update_fields=["tarif_gr", "updated_at"])
+        return
+    location.tarif_gr = tarif
+    location.tarif = tarif.tarif
+    location.save(update_fields=["tarif_gr", "tarif", "updated_at"])
+
+
+def calculer_penalite(location, date_retour):
+    """Retour après la date de fin prévue : jours de retard × pénalité journalière de la version (CDC M4 §12.11)."""
+    location.date_retour = date_retour
+    retard = (date_retour - location.date_fin).days if location.date_fin else 0
+    location.jours_retard = max(retard, 0)
+    penalite_jour = location.tarif_gr.penalite_jour if location.tarif_gr_id else 0
+    location.penalite = location.jours_retard * penalite_jour
+
+
+def reporter_compteur(equipement, valeur):
+    """Relevé GR → compteur du parc (jamais à la baisse) puis seuils préventifs M8 (CDC M4 §12.11)."""
+    from maintenance.preventif import declencher_plans
+
+    if valeur is None:
+        return []
+    equipement = EquipementParc.objects.select_for_update().get(pk=equipement.pk)
+    if valeur > equipement.compteur_value:
+        equipement.compteur_value = valeur
+        equipement.save(update_fields=["compteur_value", "updated_at"])
+    actifs = list(equipement.maintenance_actifs.all())
+    return declencher_plans(actifs) if actifs else []

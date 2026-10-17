@@ -63,12 +63,12 @@ class OutboxDispatchTests(TestCase):
 class OutboxBeatScheduleTests(TestCase):
     def test_setup_beat_schedule_is_idempotent(self):
         call_command("setup_beat_schedule")
-        self.assertEqual(PeriodicTask.objects.count(), 3)
+        self.assertEqual(PeriodicTask.objects.count(), 4)
         self.assertTrue(
             PeriodicTask.objects.filter(task="outbox.tasks.dispatch_outbox").exists()
         )
         call_command("setup_beat_schedule")
-        self.assertEqual(PeriodicTask.objects.count(), 3)
+        self.assertEqual(PeriodicTask.objects.count(), 4)
 
 
 class OutboxAPITests(APITestCase):

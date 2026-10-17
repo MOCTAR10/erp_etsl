@@ -153,7 +153,7 @@ def dashboard_direction(user):
             "en_panne": Actif.objects.filter(statut=Actif.Statut.EN_PANNE).count(),
             "en_maintenance": Actif.objects.filter(statut=Actif.Statut.EN_MAINTENANCE).count(),
             "ot_ouverts": OrdreTravail.objects.exclude(
-                statut__in=[OrdreTravail.Statut.CLOTURE, OrdreTravail.Statut.ANNULE]
+                statut__in=OrdreTravail.STATUTS_CLOS
             ).count(),
             "inspections_prevues": Inspection.objects.exclude(
                 statut__in=[Inspection.Statut.REALISEE]

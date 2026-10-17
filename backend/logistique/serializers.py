@@ -8,6 +8,7 @@ from .models import (
     EquipementParc,
     LectureCompteur,
     LocationGR,
+    TarifGR,
 )
 
 
@@ -140,7 +141,9 @@ class AffectationParcSerializer(ModelCleanMixin, serializers.ModelSerializer):
 
 
 class LocationGRSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
-    amount_fields = ["montant_estime"]
+    amount_fields = ["montant_estime", "tarif", "penalite"]
+    tarif_gr_code = serializers.CharField(source="tarif_gr.code", read_only=True, default=None)
+    tarif_gr_version = serializers.IntegerField(source="tarif_gr.version", read_only=True, default=None)
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     periodicite_label = serializers.CharField(source="get_periodicite_display", read_only=True)
     partenaire_code = serializers.CharField(source="partenaire.code", read_only=True, default=None)
@@ -182,6 +185,12 @@ class LocationGRSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSe
             "lecture_finale",
             "consommation",
             "imputation_618",
+            "tarif_gr",
+            "tarif_gr_code",
+            "tarif_gr_version",
+            "date_retour",
+            "jours_retard",
+            "penalite",
             "statut",
             "statut_label",
             "lectures_count",
@@ -198,12 +207,41 @@ class LocationGRSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSe
             "lectures_count",
             "consommation",
             "created_at",
-            "updated_at", "statut"]
+            "updated_at", "statut", "tarif_gr", "date_retour", "jours_retard", "penalite"]
+
+    # Champs figés dès le démarrage : la version de grille retenue fait foi (lot 14, CDC M4 §12.4).
+    TARIF_FIGE = ("tarif", "periodicite", "partenaire", "equipement", "date_debut")
+
+    def validate(self, attrs):
+        if self.instance and self.instance.statut != LocationGR.Statut.BROUILLON:
+            figes = [f for f in self.TARIF_FIGE if f in attrs and attrs[f] != getattr(self.instance, f)]
+            if figes:
+                raise serializers.ValidationError(
+                    {f: "Tarif figé au démarrage de la prestation : non modifiable." for f in figes}
+                )
+        return super().validate(attrs)
 
     def get_created_by_name(self, obj):
         if not obj.created_by:
             return None
         return (obj.created_by.first_name + " " + obj.created_by.last_name).strip() or obj.created_by.email
+
+
+class TarifGRSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSerializer):
+    amount_fields = ["tarif", "penalite_jour"]
+    partenaire_code = serializers.CharField(source="partenaire.code", read_only=True, default=None)
+    equipement_code = serializers.CharField(source="equipement.code", read_only=True, default=None)
+    categorie_label = serializers.CharField(source="get_categorie_display", read_only=True)
+    periodicite_label = serializers.CharField(source="get_periodicite_display", read_only=True)
+
+    class Meta:
+        model = TarifGR
+        fields = [
+            "id", "code", "partenaire", "partenaire_code", "equipement", "equipement_code",
+            "categorie", "categorie_label", "periodicite", "periodicite_label", "tarif",
+            "penalite_jour", "date_effet", "version", "created_by", "created_at",
+        ]
+        read_only_fields = ["id", "code", "version", "created_by", "created_at"]
 
 
 class LectureCompteurSerializer(ModelCleanMixin, serializers.ModelSerializer):

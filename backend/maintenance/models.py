@@ -8,6 +8,7 @@ préventif · RF-ERP-72 : inspections périodiques + compteurs GLOBAL RENTAL en
 """
 
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -173,7 +174,12 @@ class OrdreTravail(models.Model):
         EN_COURS = "en_cours", "En cours"
         TERMINE = "termine", "Terminé"
         CLOTURE = "cloture", "Clôturé"
+        ARCHIVE = "archive", "Archivé"
         ANNULE = "annule", "Annulé"
+
+    # Statuts terminaux : l'OT n'est plus « ouvert » ; clôturé / archivé = pièce scellée (lot 14, CDC M8 §13.4).
+    STATUTS_CLOS = ("cloture", "archive", "annule")
+    STATUTS_SCELLES = ("cloture", "archive")
 
     class Decision(models.TextChoices):
         REPARATION = "reparation", "Réparation lourde"
@@ -235,6 +241,23 @@ class OrdreTravail(models.Model):
         max_length=10, choices=Statut.choices, default=Statut.DEMANDE,
         verbose_name="Statut",
     )
+    plan = models.ForeignKey(
+        "PlanPreventif",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ordres",
+        verbose_name="Plan préventif d'origine",
+    )
+    archive_le = models.DateTimeField(null=True, blank=True, verbose_name="Archivé le")
+    archive_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="maintenance_ot_archives",
+        verbose_name="Archivé par",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -267,6 +290,102 @@ class OrdreTravail(models.Model):
     @property
     def cout_total(self):
         return self.cout_main_oeuvre + self.cout_pieces
+
+
+class PlanPreventif(models.Model):
+    """Plan de maintenance préventive par machine / composant (lot 14, CDC M8 §13.4 / §13.11).
+
+    Déclencheur calendaire (périodicité en jours) et / ou compteur (intervalle d'heures ou de km) : à
+    l'échéance, un OT préventif est généré automatiquement (`maintenance.preventif.declencher_plans`).
+    La clôture de l'OT réarme le plan (dernière date / dernier compteur).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    actif = models.ForeignKey(
+        Actif,
+        on_delete=models.PROTECT,
+        related_name="plans_preventifs",
+        verbose_name="Équipement",
+    )
+    libelle = models.CharField(max_length=200, verbose_name="Intervention préventive")
+    composant = models.CharField(max_length=120, blank=True, verbose_name="Composant")
+    periodicite_jours = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name="Périodicité (jours)"
+    )
+    intervalle_compteur = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name="Intervalle compteur (h / km)",
+    )
+    derniere_date = models.DateField(default=timezone.localdate, verbose_name="Dernière exécution")
+    dernier_compteur = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, verbose_name="Compteur à la dernière exécution"
+    )
+    priorite = models.CharField(
+        max_length=10, choices=OrdreTravail.Priorite.choices, default=OrdreTravail.Priorite.MOYENNE,
+        verbose_name="Priorité de l'OT généré",
+    )
+    en_vigueur = models.BooleanField(default=True, verbose_name="En vigueur")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="maintenance_plans_crees",
+        verbose_name="Créé par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["actif__code", "libelle"]
+        verbose_name = "Plan préventif"
+        verbose_name_plural = "Plans préventifs"
+
+    def __str__(self):
+        return f"{self.code} — {self.actif.code} — {self.libelle}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = MaintenanceSequence.next_for("PP", "PP")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if not self.periodicite_jours and self.intervalle_compteur is None:
+            raise ValidationError(
+                "Un plan préventif exige une périodicité calendaire et / ou un intervalle compteur."
+            )
+        if self.periodicite_jours == 0:
+            raise ValidationError({"periodicite_jours": "La périodicité doit être d'au moins 1 jour."})
+        if self.intervalle_compteur is not None:
+            if self.intervalle_compteur <= 0:
+                raise ValidationError({"intervalle_compteur": "L'intervalle doit être strictement positif."})
+            if self.actif_id and self.actif.compteur_type == Actif.Compteur.AUCUN:
+                raise ValidationError({"intervalle_compteur": "Cet équipement n'a pas de compteur."})
+
+    @property
+    def prochaine_date(self):
+        if not self.periodicite_jours:
+            return None
+        return self.derniere_date + timedelta(days=self.periodicite_jours)
+
+    @property
+    def prochain_compteur(self):
+        if self.intervalle_compteur is None:
+            return None
+        return self.dernier_compteur + self.intervalle_compteur
+
+    def motif_echeance(self, today=None):
+        """Raison de l'échéance (texte) ou None si le plan n'est pas échu."""
+        today = today or timezone.localdate()
+        if self.prochain_compteur is not None and self.actif.compteur_lecture >= self.prochain_compteur:
+            return (
+                f"seuil compteur atteint ({self.actif.compteur_lecture} ≥ {self.prochain_compteur} "
+                f"{self.actif.get_compteur_type_display().lower()})"
+            )
+        if self.prochaine_date is not None and today >= self.prochaine_date:
+            return f"échéance calendaire du {self.prochaine_date:%d/%m/%Y}"
+        return None
 
 
 class Inspection(models.Model):

@@ -14,6 +14,7 @@ from .models import (
     EquipementParc,
     LectureCompteur,
     LocationGR,
+    TarifGR,
 )
 from .serializers import (
     AffectationParcSerializer,
@@ -21,10 +22,19 @@ from .serializers import (
     EquipementParcSerializer,
     LectureCompteurSerializer,
     LocationGRSerializer,
+    TarifGRSerializer,
 )
+from config.inputs import date_input
 from users.permissions import can_read_module
 from outbox.models import publish
-from .services import CanManageLogistique, can_see_amount, stats_parc
+from .services import (
+    CanManageLogistique,
+    appliquer_tarif,
+    calculer_penalite,
+    can_see_amount,
+    reporter_compteur,
+    stats_parc,
+)
 
 
 class _CommonViewSet(viewsets.ModelViewSet):
@@ -169,7 +179,10 @@ class LocationGRViewSet(_CommonViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        appliquer_tarif(serializer.save(created_by=self.request.user))
+
+    def perform_update(self, serializer):
+        appliquer_tarif(serializer.save())
 
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
@@ -195,6 +208,7 @@ class LocationGRViewSet(_CommonViewSet):
             raise ValidationError({"lecture_initiale": "Compteur numérique attendu."})
         if lecture < 0:
             raise ValidationError({"lecture_initiale": "Le compteur ne peut pas être négatif."})
+        appliquer_tarif(location)  # version en vigueur à la date de début, figée dès maintenant
         location.lecture_initiale = lecture
         location.statut = LocationGR.Statut.ACTIVE
         location.save(update_fields=["lecture_initiale", "statut", "updated_at"])
@@ -221,13 +235,22 @@ class LocationGRViewSet(_CommonViewSet):
         if location.statut != LocationGR.Statut.ACTIVE:
             raise ValidationError("Seule une location active peut être clôturée.")
         lecture = request.data.get("lecture_finale")
-        if lecture is None:
+        if lecture in (None, ""):
             raise ValidationError({"lecture_finale": "Compteur de retour requis."})
+        try:
+            lecture = Decimal(str(lecture))
+        except InvalidOperation:
+            raise ValidationError({"lecture_finale": "Compteur numérique attendu."})
         location.lecture_finale = lecture
         if location.consommation is not None and location.consommation < 0:
             raise ValidationError("Compteur de retour inférieur au compteur de départ.")
+        date_retour = date_input(request.data.get("date_retour"), "date_retour", default=timezone.localdate())
+        if location.date_debut and date_retour < location.date_debut:
+            raise ValidationError({"date_retour": "Le retour ne peut précéder le début de la location."})
+        calculer_penalite(location, date_retour)
         location.statut = LocationGR.Statut.TERMINEE
-        location.save(update_fields=["lecture_finale", "statut", "updated_at"])
+        location.save(update_fields=["lecture_finale", "date_retour", "jours_retard", "penalite", "statut", "updated_at"])
+        reporter_compteur(location.equipement, lecture)
         publish(
             "gr.location.cloturee",
             {
@@ -235,6 +258,8 @@ class LocationGRViewSet(_CommonViewSet):
                 "reference_retour": location.reference_retour,
                 "lecture_finale": str(location.lecture_finale),
                 "consommation": str(location.consommation) if location.consommation is not None else None,
+                "date_retour": str(location.date_retour), "jours_retard": location.jours_retard,
+                "penalite": str(location.penalite),
             },
         )
         equipement = location.equipement
@@ -263,5 +288,28 @@ class LectureCompteurViewSet(_CommonViewSet):
             qs = qs.filter(date__lte=self.request.query_params["to"])
         return qs
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(releve_par=self.request.user)
+        lecture = serializer.save(releve_par=self.request.user)
+        reporter_compteur(lecture.location.equipement, lecture.valeur)
+
+
+class TarifGRViewSet(_CommonViewSet):
+    """Grille GR versionnée : création et suppression (si inutilisée) — jamais de modification (lot 14)."""
+
+    serializer_class = TarifGRSerializer
+    http_method_names = ["get", "post", "delete"]
+
+    def get_queryset(self):
+        qs = TarifGR.objects.select_related("partenaire", "equipement", "created_by")
+        params = self.request.query_params
+        if partenaire := params.get("partenaire"):
+            qs = qs.filter(partenaire_id=partenaire)
+        if categorie := params.get("categorie"):
+            qs = qs.filter(categorie=categorie)
+        if equipement := params.get("equipement"):
+            qs = qs.filter(equipement_id=equipement)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)

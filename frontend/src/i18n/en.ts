@@ -642,7 +642,7 @@ export const en = {
     },
   },
   maintenance: {
-    act: { planifier: "Schedule", terminer: "Complete", annuler: "Cancel", confirmAnnuler: "Cancel this work order?" },
+    act: { planifier: "Schedule", terminer: "Complete", annuler: "Cancel", confirmAnnuler: "Cancel this work order?", archiver: "Archive", confirmArchiver: "Archive this work order? It will become read-only." },
     form: { title: "New work order", actif: "Equipment", priorite: "Priority", datePlanifiee: "Planned date", description: "Work description" },
     col: { code: "Code", designation: "Designation", category: "Category", site: "Site", status: "Status", type: "Type", date: "Date", ot: "Generated WO" },
     title: "Maintenance & CMMS — Machinery & equipment fleet (M8)",
@@ -699,6 +699,7 @@ export const en = {
       en_cours: "In progress",
       termine: "Completed",
       cloture: "Closed",
+      archive: "Archived",
       annule: "Cancelled",
     },
     ot_decisions: {

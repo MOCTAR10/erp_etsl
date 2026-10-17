@@ -17,6 +17,11 @@ SCHEDULES = [
         "workflow.tasks.check_overdue_tasks",
         {"minute": "0", "hour": "8", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
     ),
+    (
+        "ETSL — maintenance préventive (lot 14, CDC M8 §13.4)",
+        "maintenance.tasks.declencher_plans_preventifs",
+        {"minute": "0", "hour": "6", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
+    ),
 ]
 
 # Tâches périodiques supprimées : l'app `ingestion` (IMAP, RF-04) n'existe pas dans le code ; planifier une tâche
