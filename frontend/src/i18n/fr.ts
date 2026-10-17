@@ -320,6 +320,7 @@ export const fr = {
     prelevement: "Relevés",
   },
   stocks: {
+    col: { article: "Article", depot: "Dépôt", method: "Valorisation", qty: "Quantité", unitCost: "Coût unitaire", value: "Valeur", code: "Code", type: "Type", flow: "Flux", date: "Date", certNo: "N° certificat", lot: "Lot", organisme: "Organisme", status: "Statut" },
     title: "Stocks & Traçabilité matière (M5)",
     depots: "Dépôts & magasins",
     lots: "Lots suivis",

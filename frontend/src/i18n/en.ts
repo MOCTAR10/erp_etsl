@@ -320,6 +320,7 @@ export const en = {
     prelevement: "Readings",
   },
   stocks: {
+    col: { article: "Article", depot: "Warehouse", method: "Valuation", qty: "Quantity", unitCost: "Unit cost", value: "Value", code: "Code", type: "Type", flow: "Flow", date: "Date", certNo: "Certificate no.", lot: "Lot", organisme: "Body", status: "Status" },
     title: "Stocks & Materials traceability (M5)",
     depots: "Warehouses & stores",
     lots: "Tracked lots",

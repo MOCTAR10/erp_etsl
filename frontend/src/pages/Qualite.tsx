@@ -275,7 +275,7 @@ export function QualitePage() {
 
       {qualifsAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("qualite.qualifs")}
           </h3>
           <div className="kpi-grid">
@@ -286,7 +286,7 @@ export function QualitePage() {
 
       {wpsAll.length > 0 || ctrlAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("qualite.wps")} · {t("qualite.controles")}
           </h3>
           <div className="kpi-grid">
@@ -298,7 +298,7 @@ export function QualitePage() {
 
       {pvAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("qualite.pvs")}
           </h3>
           <div className="kpi-grid">

@@ -2001,3 +2001,28 @@ kbd {
 .cert { display: grid; gap: 0.4rem; padding: 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .cert-head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .cert-hash { word-break: break-all; font-size: 12px; color: var(--text-muted); }
+
+.table th.num,
+.table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 2rem 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.section-heading::before {
+  content: "";
+  width: 4px;
+  height: 1.1em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--brand), var(--accent));
+}

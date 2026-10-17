@@ -244,7 +244,7 @@ export function ComptabilitePage() {
 
       {banquesAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("comptabilite.banques")} · {banquesAll.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -255,7 +255,7 @@ export function ComptabilitePage() {
 
       {relevesAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("comptabilite.releves")} · {relevesAll.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -281,7 +281,7 @@ export function ComptabilitePage() {
 
       {pay.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("comptabilite.paiements")} · {pay.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -292,7 +292,7 @@ export function ComptabilitePage() {
 
       {tvaAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("comptabilite.tva")} · {tvaAll.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -303,7 +303,7 @@ export function ComptabilitePage() {
 
       {controlesAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("comptabilite.controles")} · {controlesAll.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>

@@ -308,7 +308,7 @@ export function HsePage() {
 
       {permisAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("hse.permis")}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -319,7 +319,7 @@ export function HsePage() {
 
       {risquesAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("hse.risques")}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -330,7 +330,7 @@ export function HsePage() {
 
       {(atexAll.length > 0 || formAll.length > 0) ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("hse.atex")} · {t("hse.formations")}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -342,7 +342,7 @@ export function HsePage() {
 
       {(epiAll.length > 0 || bsdAll.length > 0) ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("hse.epi")} · {t("hse.bsd")}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>

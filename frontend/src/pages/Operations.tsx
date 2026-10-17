@@ -163,7 +163,7 @@ export function OperationsPage() {
       </div>
 
       {situations.data && situations.data.length > 0 ? (
-        <h3 className="muted" style={{ marginTop: "2rem" }}>
+        <h3 className="section-heading">
           {t("operations.situations")}
         </h3>
       ) : null}

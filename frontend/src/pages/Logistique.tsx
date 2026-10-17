@@ -205,7 +205,7 @@ export function LogistiquePage() {
       </div>
 
       {(locations.data ?? []).length > 0 ? (
-        <h3 className="muted" style={{ marginTop: "2rem" }}>
+        <h3 className="section-heading">
           {t("logistique.locationsActives")} — GLOBAL RENTAL
         </h3>
       ) : null}
@@ -217,7 +217,7 @@ export function LogistiquePage() {
 
       {(demandes.data ?? []).length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("logistique.demandes")}
           </h3>
           <div className="kpi-grid">

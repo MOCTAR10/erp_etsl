@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type {
   CertificatMatiere,
   Depot,
@@ -72,47 +72,8 @@ function QuantCard({ quant, index }: { quant: StockQuant; index: number }) {
   );
 }
 
-function MvtCard({ mvt, index }: { mvt: MouvementStock; index: number }) {
-  const { t } = useTranslation();
-  return (
-    <Kpi
-      label={`${mvt.code} · ${t(`stocks.type_labels.${mvt.type_mouvement}`)}`}
-      value={`${mvt.quantite} ${mvt.article_code}`}
-      hint={`${mvt.source_code ?? t("stocks.reserved")} → ${mvt.destination_code ?? "—"}${
-        mvt.ordre_code ? ` · ${mvt.ordre_code}` : ""
-      }${mvt.document_reference ? ` · ${mvt.document_reference}` : ""} · ${formatDate(mvt.date, "fr")}`}
-      icon={ArrowLeftRight}
-      tone="warn"
-      delay={index * 0.05}
-    />
-  );
-}
-
-function CertCard({ cert, index }: { cert: CertificatMatiere; index: number }) {
-  const { t } = useTranslation();
-  return (
-    <Kpi
-      label={`${cert.code} · ${cert.type === "mtc" ? t("stocks.mtc") : t("stocks.coc")}`}
-      value={cert.numero_certificat}
-      hint={
-        <>
-          {cert.lot_code} · {cert.organisme || "—"}
-          {cert.conforme ? (
-            <span className="badge ok"> {t("stocks.certConforme")}</span>
-          ) : (
-            <span className="badge err"> {t("stocks.certNonConforme")}</span>
-          )}
-        </>
-      }
-      icon={Package}
-      tone="brand"
-      delay={index * 0.05}
-    />
-  );
-}
-
 export function StocksPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const lots = useQuery({
     queryKey: ["lots"],
@@ -247,80 +208,143 @@ export function StocksPage() {
         </Board>
       </div>
 
-      {quantsAll.length > 0 || (valAll.length > 0 && valorisation.isSuccess) ? (
-        <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
-            {t("stocks.quants")}
-          </h3>
-          <div className="kpi-grid">
-            {valAll.map((row, i) => (
-              <Kpi
-                key={`${row.depot}-${row.article}-${i}`}
-                label={`${row.article} · ${row.depot} · ${t(`stocks.methods.${row.method}`)}`}
-                value={formatNumber(row.quantity)}
-                hint={
-                  row.value === undefined
-                    ? t("stocks.demi")
-                    : `${formatNumber(row.value)} FCFA · ${formatNumber(row.unit_cost)} u.`
-                }
-                icon={Boxes}
-                tone="brand"
-                delay={i * 0.05}
-              />
-            ))}
-            {valAll.length === 0
-              ? quantsAll.map((q, i) => <QuantCard key={q.id} quant={q} index={i} />)
-              : null}
+      {valAll.length > 0 && (
+        <SectionCard title={t("stocks.quants")}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("stocks.col.article")}</th>
+                  <th>{t("stocks.col.depot")}</th>
+                  <th>{t("stocks.col.method")}</th>
+                  <th className="num">{t("stocks.col.qty")}</th>
+                  <th className="num">{t("stocks.col.unitCost")}</th>
+                  <th className="num">{t("stocks.col.value")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {valAll.map((row, i) => (
+                  <tr key={`${row.depot}-${row.article}-${i}`}>
+                    <td>{row.article}</td>
+                    <td>{row.depot}</td>
+                    <td>{t(`stocks.methods.${row.method}`)}</td>
+                    <td className="num">{formatNumber(row.quantity)}</td>
+                    <td className="num">{row.value === undefined ? "—" : formatNumber(row.unit_cost)}</td>
+                    <td className="num">{row.value === undefined ? t("stocks.demi") : `${formatNumber(row.value)} FCFA`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
+      {valAll.length === 0 && quantsAll.length > 0 && (
+        <SectionCard title={t("stocks.quants")}>
+          <div className="kpi-grid">
+            {quantsAll.map((q, i) => (
+              <QuantCard key={q.id} quant={q} index={i} />
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
-      {(mouvements.data ?? []).length > 0 ? (
-        <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
-            {t("stocks.mouvements")}
-          </h3>
-          <div className="kpi-grid">
-            {(mouvements.data ?? []).map((mvt, i) => (
-              <MvtCard key={mvt.id} mvt={mvt} index={i} />
-            ))}
+      {(mouvements.data ?? []).length > 0 && (
+        <SectionCard title={t("stocks.mouvements")}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("stocks.col.code")}</th>
+                  <th>{t("stocks.col.type")}</th>
+                  <th>{t("stocks.col.article")}</th>
+                  <th className="num">{t("stocks.col.qty")}</th>
+                  <th>{t("stocks.col.flow")}</th>
+                  <th>{t("stocks.col.date")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(mouvements.data ?? []).map((mvt) => (
+                  <tr key={mvt.id}>
+                    <td>{mvt.code}</td>
+                    <td>{t(`stocks.type_labels.${mvt.type_mouvement}`)}</td>
+                    <td>{mvt.article_code}</td>
+                    <td className="num">{mvt.quantite}</td>
+                    <td>
+                      {mvt.source_code ?? t("stocks.reserved")} → {mvt.destination_code ?? "—"}
+                      {mvt.ordre_code ? ` · ${mvt.ordre_code}` : ""}
+                    </td>
+                    <td>{formatDate(mvt.date, i18n.language)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
 
-      {(certificats.data ?? []).length > 0 ? (
-        <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
-            {t("stocks.certificats")}
-          </h3>
-          <div className="kpi-grid">
-            {(certificats.data ?? []).map((cert, i) => (
-              <CertCard key={cert.id} cert={cert} index={i} />
-            ))}
+      {(certificats.data ?? []).length > 0 && (
+        <SectionCard title={t("stocks.certificats")}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("stocks.col.code")}</th>
+                  <th>{t("stocks.col.type")}</th>
+                  <th>{t("stocks.col.certNo")}</th>
+                  <th>{t("stocks.col.lot")}</th>
+                  <th>{t("stocks.col.organisme")}</th>
+                  <th>{t("stocks.col.status")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(certificats.data ?? []).map((cert) => (
+                  <tr key={cert.id}>
+                    <td>{cert.code}</td>
+                    <td>{cert.type === "mtc" ? t("stocks.mtc") : t("stocks.coc")}</td>
+                    <td>{cert.numero_certificat}</td>
+                    <td>{cert.lot_code}</td>
+                    <td>{cert.organisme || "—"}</td>
+                    <td>
+                      <Badge tone={cert.conforme ? "ok" : "err"}>
+                        {cert.conforme ? t("stocks.certConforme") : t("stocks.certNonConforme")}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
 
-      {(inventaires.data ?? []).length > 0 ? (
-        <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
-            {t("stocks.inventaires")}
-          </h3>
-          <div className="kpi-grid">
-            {(inventaires.data ?? []).map((inv, i) => (
-              <Kpi
-                key={inv.id}
-                label={`${inv.code} · ${inv.depot_label} · ${t(`stocks.inv_status.${inv.statut}`)}`}
-                value={formatDate(inv.date, "fr")}
-                hint={`${t("stocks.ecarts")}: ${formatNumber(Number(inv.ecart_total))}`}
-                icon={Warehouse}
-                tone="accent"
-                delay={i * 0.05}
-              />
-            ))}
+      {(inventaires.data ?? []).length > 0 && (
+        <SectionCard title={t("stocks.inventaires")}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("stocks.col.code")}</th>
+                  <th>{t("stocks.col.depot")}</th>
+                  <th>{t("stocks.col.date")}</th>
+                  <th>{t("stocks.col.status")}</th>
+                  <th className="num">{t("stocks.ecarts")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(inventaires.data ?? []).map((inv) => (
+                  <tr key={inv.id}>
+                    <td>{inv.code}</td>
+                    <td>{inv.depot_label}</td>
+                    <td>{formatDate(inv.date, i18n.language)}</td>
+                    <td>{t(`stocks.inv_status.${inv.statut}`)}</td>
+                    <td className="num">{formatNumber(Number(inv.ecart_total))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : null}
+        </SectionCard>
+      )}
     </>
   );
 }

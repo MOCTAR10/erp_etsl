@@ -228,7 +228,7 @@ export function JuridiquePage() {
 
       {a.total > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("juridique.alertes")} · {a.total}
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.5rem" }}>
@@ -254,7 +254,7 @@ export function JuridiquePage() {
 
       {convs.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("juridique.conventions")} · {convs.length}
           </h3>
           <div style={{ overflowX: "auto" }}>
@@ -284,7 +284,7 @@ export function JuridiquePage() {
 
       {cautionsList.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("juridique.cautions")} · {cautionsList.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -297,7 +297,7 @@ export function JuridiquePage() {
 
       {assurancesList.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("juridique.assurances")} · {assurancesList.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -310,7 +310,7 @@ export function JuridiquePage() {
 
       {litiges.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("juridique.contentieux")} · {litiges.length}
           </h3>
           <table className="table">
@@ -344,7 +344,7 @@ export function JuridiquePage() {
 
       {grs.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             GLOBAL RENTAL · {grs.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -366,7 +366,7 @@ export function JuridiquePage() {
 
       {courts.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("juridique.courriers")} · {courts.length}
           </h3>
           <table className="table">
@@ -396,7 +396,7 @@ export function JuridiquePage() {
 
       {reunionsList.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("juridique.reunions")} · {reunionsList.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>

@@ -196,7 +196,7 @@ export function ControleGestionPage() {
 
       {m && m.rows.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("controleGestion.marges")} · {m.rows.length}
           </h3>
           <table className="table">
@@ -225,7 +225,7 @@ export function ControleGestionPage() {
 
       {closed.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("controleGestion.clotures")} · {closed.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -236,7 +236,7 @@ export function ControleGestionPage() {
 
       {revs.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("controleGestion.revisions")} · {revs.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>

@@ -198,7 +198,7 @@ export function MaintenancePage() {
 
       {actifsAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("maintenance.actifs")}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -209,7 +209,7 @@ export function MaintenancePage() {
 
       {inspectionsAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("maintenance.inspections")}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>

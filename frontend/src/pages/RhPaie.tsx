@@ -223,7 +223,7 @@ export function RhPaiePage() {
 
       {employesAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("rhPaie.employes")} · {employesAll.length}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
@@ -234,7 +234,7 @@ export function RhPaiePage() {
 
       {bulletinsAll.length > 0 ? (
         <>
-          <h3 className="muted" style={{ marginTop: "2rem" }}>
+          <h3 className="section-heading">
             {t("rhPaie.bulletins")}
           </h3>
           <div className="kpis" style={{ flexWrap: "wrap" }}>
