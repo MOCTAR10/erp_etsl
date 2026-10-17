@@ -21,6 +21,9 @@ ANON_ALLOWLIST = (
     "/api/health/",
     "/api/users/token/",
     "/api/users/token/refresh/",
+    # Étapes MFA (lot 15b) : appelées avant d'avoir un JWT, protégées par le jeton MFA signé (400 sans lui).
+    "/api/users/mfa/enrolement/",
+    "/api/users/mfa/verification/",
     "/api/schema/",
 )
 MODULE_PREFIXES = tuple(

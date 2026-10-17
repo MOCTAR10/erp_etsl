@@ -1,4 +1,5 @@
 import {
+  KeyRound,
   Bell,
   Boxes,
   Calculator,
@@ -58,6 +59,7 @@ const PILOT_NAV: NavItem[] = [
   { to: "/signatures", key: "nav.signatures", Icon: FileSignature },
   { to: "/terrain", key: "nav.terrain", Icon: Smartphone },
   { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
+  { to: "/securite", key: "nav.securite", Icon: KeyRound },
 ];
 
 const MODULE_NAV: ModuleNavItem[] = [

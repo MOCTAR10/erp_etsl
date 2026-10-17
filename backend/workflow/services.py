@@ -9,7 +9,7 @@ from django.utils import timezone
 from documents.models import Document
 from users.models import User
 
-from .models import Circuit, Task, TaskComment
+from .models import Circuit, Delegation, Task, TaskComment
 
 
 def _find_assignee(role):
@@ -31,6 +31,9 @@ def _assert_can_act(task, user, verb):
         return
     if task.assigned_to_id:
         if task.assigned_to_id != user.id:
+            # Délégation temporaire en cours du titulaire vers cet utilisateur (EX-G-02).
+            if Delegation.actives().filter(delegant_id=task.assigned_to_id, delegataire=user).exists():
+                return
             raise PermissionDenied(f"Seul l'assigné peut {verb} cette tâche.")
     elif user.role != task.step.actor_role:
         raise PermissionDenied(
@@ -39,15 +42,27 @@ def _assert_can_act(task, user, verb):
 
 
 def _create_task(document, circuit, step, assigned_by):
-    return Task.objects.create(
+    titulaire = _find_assignee(step.actor_role)
+    delegation = Delegation.active_pour(titulaire)
+    task = Task.objects.create(
         document=document,
         circuit=circuit,
         step=step,
-        assigned_to=_find_assignee(step.actor_role),
+        assigned_to=delegation.delegataire if delegation else titulaire,
         assigned_by=assigned_by,
         status=Task.Status.PENDING,
         due_date=timezone.now() + timedelta(days=step.max_days),
     )
+    if delegation:
+        TaskComment.objects.create(
+            task=task,
+            author=None,
+            text=(
+                f"Assignée à {delegation.delegataire.email} par délégation temporaire {delegation.code} "
+                f"de {titulaire.email} ({delegation.motif}, jusqu'au {delegation.date_fin:%d/%m/%Y}) — EX-G-02."
+            ),
+        )
+    return task
 
 
 @transaction.atomic

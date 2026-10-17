@@ -7,12 +7,15 @@ import "../i18n";
 
 vi.mock("../api/client", () => ({
   login: vi.fn(),
+  mfaEnrolement: vi.fn(),
+  mfaVerification: vi.fn(),
 }));
 
-import { login } from "../api/client";
+import { login, mfaVerification } from "../api/client";
 import { LoginPage } from "./Login";
 
 const mockedLogin = vi.mocked(login);
+const mockedMfa = vi.mocked(mfaVerification);
 
 function renderLogin() {
   return render(
@@ -149,5 +152,24 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /Direction \/ Admin/ }));
     expect(screen.getByLabelText("Adresse e-mail")).toHaveValue("admin@etls.local");
     expect(screen.getByLabelText("Mot de passe")).toHaveValue("Etls#Demo2026");
+  });
+
+  it("exige le code à 6 chiffres pour un rôle sensible (étape MFA)", async () => {
+    mockedLogin.mockResolvedValue({ mfa: { mfa_requis: true, mfa_enrolement: false, mfa_jeton: "j" } });
+    mockedMfa.mockResolvedValue({
+      tokens: { access: "a", refresh: "r" },
+      user: { email: "admin@etls.local", first_name: "Admin", role: "admin" } as never,
+    });
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText("Adresse e-mail"), "admin@etls.local");
+    await user.type(screen.getByLabelText("Mot de passe"), "Etls#Demo2026");
+    await user.click(screen.getByRole("button", { name: "Se connecter" }));
+    const champ = await screen.findByLabelText("Code à 6 chiffres");
+    expect(screen.queryByText("dashboard-root")).not.toBeInTheDocument();
+    await user.type(champ, "123456");
+    await user.click(screen.getByRole("button", { name: "Valider le code" }));
+    await waitFor(() => expect(screen.getByText("dashboard-root")).toBeInTheDocument());
+    expect(mockedMfa).toHaveBeenCalledWith("j", "123456");
   });
 });

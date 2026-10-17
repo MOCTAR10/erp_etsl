@@ -95,6 +95,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Journal des accès (EX-G-10) : trace chaque export / téléchargement de données.
+    "users.journal.JournalExportsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -261,3 +263,9 @@ WATCHED_FOLDER = env("WATCHED_FOLDER", default="")
 # Permis de travail : niveaux de validation successifs (CDC M7 §9.4 émetteur → superviseur → HSE → DG ; paramétrable,
 # EX-G-02 / CL-OM « règles de validation paramétrées »). Valeurs : superviseur, hse, dg.
 HSE_PERMIS_NIVEAUX = env.list("HSE_PERMIS_NIVEAUX", default=["superviseur", "hse", "dg"])
+
+# MFA TOTP obligatoire pour les rôles sensibles (lot 15b, CDC §8.2). Imposée par défaut hors DEBUG (production) ;
+# en développement et en e2e, `MFA_ROLES` vide : les comptes de démonstration se connectent sans second facteur.
+MFA_ROLES = [r for r in env.list(
+    "MFA_ROLES", default=[] if DEBUG else ["admin", "pdg", "dga", "direction", "finance", "comptable", "rh"]
+) if r]

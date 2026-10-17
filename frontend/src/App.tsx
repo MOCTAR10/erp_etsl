@@ -29,6 +29,7 @@ const JuridiquePage = lazy(() => import("./pages/Juridique").then((m) => ({ defa
 const DirectionPage = lazy(() => import("./pages/Direction").then((m) => ({ default: m.DirectionPage })));
 const CircuitsPage = lazy(() => import("./pages/Circuits").then((m) => ({ default: m.CircuitsPage })));
 const NotificationsPage = lazy(() => import("./pages/Notifications").then((m) => ({ default: m.NotificationsPage })));
+const SecuritePage = lazy(() => import("./pages/Securite").then((m) => ({ default: m.SecuritePage })));
 
 function pilotPage(children: ReactNode) {
   return withPilot(<Suspense fallback={<KpiGridSkeleton count={6} />}>{children}</Suspense>);
@@ -89,6 +90,7 @@ export default function App() {
         <Route path="direction" element={pilotPage(<DirectionPage />)} />
         <Route path="circuits" element={pilotPage(<CircuitsPage />)} />
         <Route path="notifications" element={pilotPage(<NotificationsPage />)} />
+        <Route path="securite" element={pilotPage(<SecuritePage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
