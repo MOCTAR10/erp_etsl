@@ -1,0 +1,36 @@
+# Override pour le serveur PARTAGÉ (79.143.177.127 — héberge aussi l'application « trees » et Jenkins).
+# Usage : docker compose -p etsl-dev -f docker-compose.yml -f docker-compose.server.yml up -d
+#
+# - Docker contourne le pare-feu UFW : tout port publié sans adresse est exposé sur Internet.
+#   `!override` REMPLACE les listes de ports du fichier de base (sinon Compose les ajoute) : écoute 127.0.0.1 uniquement,
+#   accès depuis le PC par tunnel SSH (ssh -L 5173:localhost:5173 -L 8100:localhost:8100 etsl-dev@79.143.177.127).
+# - Limites de ressources : protègent l'application de production et Jenkins.
+# - MinIO : minio/minio est archivé (pull authentifié) → bitnamilegacy/minio, comme la CI.
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    mem_limit: 2g
+    cpus: 2
+
+  minio:
+    image: bitnamilegacy/minio:latest
+    command: !reset []
+    ports: !override
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes: !override
+      - minio_data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    cpus: 1
+
+  redis:
+    ports: !override
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    mem_limit: 256m
+    cpus: 0.5
