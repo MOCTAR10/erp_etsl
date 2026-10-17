@@ -60,6 +60,7 @@ describe("contraste WCAG AA de la charte", () => {
         ["err-text", "err-soft"],
         ["brand", "brand-soft"],
         ["steel", "steel-soft"],
+        ["on-brand", "brand"],
       ];
       const failures = pairs
         .map(([fg, bg]) => [fg, bg, ratio(parse(v[fg], surface), parse(v[bg], surface))] as const)
