@@ -58,8 +58,8 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+          cache-dependency-path: backend/requirements*.lock
+      - run: pip install -r backend/requirements-dev.lock
       - name: Lint (ruff - erreurs reelles uniquement)
         working-directory: backend
         run: ruff check . --select E9,F63,F7,F82,F811 --exclude migrations
@@ -125,9 +125,9 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements*.lock
       - name: Install backend
-        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+        run: pip install -r backend/requirements-dev.lock
       - name: Create MinIO bucket (etls-documents)
         run: |
           python - <<'EOF'
@@ -230,8 +230,8 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r backend/requirements.txt
+          cache-dependency-path: backend/requirements*.lock
+      - run: pip install -r backend/requirements.lock
       - name: Create MinIO bucket (etls-documents)
         run: |
           python - <<'EOF'
