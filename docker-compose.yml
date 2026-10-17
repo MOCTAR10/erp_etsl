@@ -19,24 +19,26 @@ services:
       timeout: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    container_name: etls_minio
+  # Stockage objet S3 de la GED : SeaweedFS (Apache-2.0, maintenu) remplace MinIO, archivé en 2026-09.
+  # Publié sur le port 9000 (celui de MinIO) : MINIO_ENDPOINT=http://localhost:9000 reste valable partout.
+  # Identifiants de DEV dans infra/seaweedfs/s3.json (production : fichier monté depuis les secrets).
+  s3:
+    image: chrislusf/seaweedfs:4.48
+    container_name: etls_s3
     restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-etls_minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-etls_minio_dev_password}
+    command: >-
+      server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+      -master.volumeSizeLimitMB=1024 -volume.max=16
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${MINIO_API_PORT:-9000}:8333"
     volumes:
-      - minio_data:/data
+      - s3_data:/data
+      - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9333/cluster/status"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -55,5 +57,5 @@ services:
 
 volumes:
   postgres_data:
-  minio_data:
+  s3_data:
   redis_data:

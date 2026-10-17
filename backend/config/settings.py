@@ -209,6 +209,9 @@ AWS_SECRET_ACCESS_KEY = env("MINIO_ROOT_PASSWORD", default="etls_minio_dev_passw
 AWS_STORAGE_BUCKET_NAME = "etls-documents"
 AWS_S3_ENDPOINT_URL = env("MINIO_ENDPOINT", default="http://localhost:9000")
 AWS_S3_ADDRESSING_STYLE = "path"
+# URL présignées en SigV4 (SigV2 est déprécié) ; région nominale exigée par la signature (SeaweedFS / S3 compatibles).
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_S3_REGION_NAME = env("S3_REGION", default="us-east-1")
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = True
 AWS_S3_FILE_OVERWRITE = False

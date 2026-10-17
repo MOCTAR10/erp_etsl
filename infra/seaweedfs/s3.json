@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "etls-dev",
+      "credentials": [
+        {
+          "accessKey": "etls_minio",
+          "secretKey": "etls_minio_dev_password"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

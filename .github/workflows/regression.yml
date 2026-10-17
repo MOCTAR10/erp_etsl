@@ -110,17 +110,15 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Start MinIO (bitnamilegacy — pull anonyme Docker Hub OK ; minio/minio archivé → exige auth ; Quay 401)
+      - name: Start S3 (SeaweedFS — remplace MinIO, archivé en 2026-09 ; même port 9000, mêmes identifiants de dev)
         run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=etls_minio \
-            -e MINIO_ROOT_PASSWORD=etls_minio_dev_password \
-            bitnamilegacy/minio:latest
+          docker run -d --name s3 -p 9000:8333             -v "$GITHUB_WORKSPACE/infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro"             chrislusf/seaweedfs:4.48 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
           for i in $(seq 1 60); do
-            curl -sf http://localhost:9000/minio/health/live >/dev/null && break
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/ || true)
+            [ "$code" != "000" ] && break
             sleep 2
           done
-          curl -sf http://localhost:9000/minio/health/live >/dev/null && echo "minio ok"
+          echo "s3 ok (HTTP $code)"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -214,17 +212,15 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Start MinIO (bitnamilegacy — pull anonyme Docker Hub OK ; minio/minio archivé → exige auth ; Quay 401)
+      - name: Start S3 (SeaweedFS — remplace MinIO, archivé en 2026-09 ; même port 9000, mêmes identifiants de dev)
         run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=etls_minio \
-            -e MINIO_ROOT_PASSWORD=etls_minio_dev_password \
-            bitnamilegacy/minio:latest
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:9000/minio/health/live >/dev/null && break
+          docker run -d --name s3 -p 9000:8333             -v "$GITHUB_WORKSPACE/infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro"             chrislusf/seaweedfs:4.48 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/ || true)
+            [ "$code" != "000" ] && break
             sleep 2
           done
-          curl -sf http://localhost:9000/minio/health/live >/dev/null && echo "minio ok"
+          echo "s3 ok (HTTP $code)"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
