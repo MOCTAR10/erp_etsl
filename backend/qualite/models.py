@@ -236,6 +236,7 @@ class ControleQualite(models.Model):
         PDA = "pda", "PDA (plan de détection)"
         ITP = "itp", "ITP (plan d'inspection et d'essais)"
         PEINTURE = "peinture", "Peinture / anticorrosion"
+        RECEPTION = "reception", "Contrôle à réception (achats M2)"
 
     class OrganismeCnd(models.TextChoices):
         INTERNE = "interne", "Interne QA/QC"
@@ -288,6 +289,15 @@ class ControleQualite(models.Model):
         on_delete=models.SET_NULL,
         related_name="controles",
         verbose_name="WPS",
+    )
+    # Réception fournisseur contrôlée (clôture M2, CDC §5.11 : chaque réception déclenche le contrôle M6).
+    reception = models.ForeignKey(
+        "achats.GoodsReceipt",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="controles_qualite",
+        verbose_name="Réception fournisseur",
     )
     lot = models.ForeignKey(
         "stocks.LotMatiere",

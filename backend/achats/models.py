@@ -679,3 +679,89 @@ def _on_invoice_line_deleted(sender, instance, **kwargs):
         if line.invoiced_qty < 0:
             line.invoiced_qty = 0
         line.save(update_fields=["invoiced_qty"])
+
+
+class LitigeFournisseur(models.Model):
+    """Litige fournisseur (clôture M2, CDC §5.4 « relance fournisseur, escalade, conservation M12 »).
+
+    Cycle : ouvert → relancé (n relances tracées) → escaladé (pré-contentieux M12 ouvert) → résolu (motivé).
+    """
+
+    class Type(models.TextChoices):
+        QUANTITE = "quantite", "Écart de quantité"
+        QUALITE = "qualite", "Non-conformité qualité"
+        PRIX = "prix", "Écart de prix / facturation"
+        DELAI = "delai", "Retard de livraison"
+        AUTRE = "autre", "Autre"
+
+    class Statut(models.TextChoices):
+        OUVERT = "ouvert", "Ouvert"
+        RELANCE = "relance", "Relancé"
+        ESCALADE = "escalade", "Escaladé (contentieux)"
+        RESOLU = "resolu", "Résolu"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    purchase_order = models.ForeignKey(
+        PurchaseOrder, on_delete=models.PROTECT, related_name="litiges", verbose_name="Bon de commande"
+    )
+    receipt = models.ForeignKey(
+        "GoodsReceipt", null=True, blank=True, on_delete=models.SET_NULL, related_name="litiges", verbose_name="Réception"
+    )
+    invoice = models.ForeignKey(
+        "PurchaseInvoice", null=True, blank=True, on_delete=models.SET_NULL, related_name="litiges", verbose_name="Facture"
+    )
+    type = models.CharField(max_length=10, choices=Type.choices, verbose_name="Type")
+    description = models.TextField(verbose_name="Description")
+    montant_en_jeu = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Montant en jeu")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.OUVERT, verbose_name="Statut")
+    nb_relances = models.PositiveSmallIntegerField(default=0, verbose_name="Relances")
+    derniere_relance_le = models.DateTimeField(null=True, blank=True, verbose_name="Dernière relance")
+    contentieux = models.ForeignKey(
+        "juridique.Contentieux", null=True, blank=True, on_delete=models.SET_NULL, related_name="litiges_fournisseurs",
+        verbose_name="Contentieux (M12)",
+    )
+    resolution = models.TextField(blank=True, verbose_name="Résolution")
+    resolu_le = models.DateTimeField(null=True, blank=True, verbose_name="Résolu le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créé par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Litige fournisseur"
+        verbose_name_plural = "Litiges fournisseurs"
+
+    def __str__(self):
+        return f"{self.code} — {self.purchase_order.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = AchatsSequence.next_for("LTF", "LTF")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        for champ in ("receipt", "invoice"):
+            objet = getattr(self, champ)
+            if objet is not None and objet.purchase_order_id != self.purchase_order_id:
+                raise ValidationError({champ: "Pièce d'un autre bon de commande."})
+
+
+from django.db.models.signals import post_save  # noqa: E402
+
+
+@receiver(post_save, sender=GoodsReceipt)
+def _controle_a_reception(sender, instance, created, **kwargs):
+    """Chaque réception (même partielle) déclenche son contrôle qualité M6 (CDC M2 §5.11)."""
+    if not created:
+        return
+    from qualite.models import ControleQualite
+
+    ControleQualite.objects.create(
+        type_controle=ControleQualite.TypeControle.RECEPTION,
+        reception=instance,
+        point_controle=f"Réception {instance.code} — BC {instance.purchase_order.code}"[:200],
+        statut=ControleQualite.Statut.EN_ATTENTE,
+    )

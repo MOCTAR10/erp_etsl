@@ -7,9 +7,11 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import (
+    LitigeFournisseur,
     ConsultationOffer,
     ConsultationRequest,
     GoodsReceipt,
@@ -22,6 +24,7 @@ from .models import (
     PurchaseRequestLine,
 )
 from .serializers import (
+    LitigeFournisseurSerializer,
     ConsultationOfferSerializer,
     ConsultationRequestSerializer,
     GoodsReceiptLineSerializer,
@@ -158,6 +161,35 @@ class ConsultationRequestViewSet(_CommonViewSet):
             qs = qs.filter(status=status_)
         return qs
 
+    def _consultation(self):
+        return ConsultationRequest.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def ouvrir(self, request, pk=None):
+        """Mise en concurrence : la consultation est envoyée aux fournisseurs (CDC M2 §5.3)."""
+        consultation = self._consultation()
+        if consultation.status != ConsultationRequest.Status.BROUILLON:
+            return Response({"detail": "Seule une consultation en brouillon s'ouvre."}, status=status.HTTP_400_BAD_REQUEST)
+        consultation.status = ConsultationRequest.Status.OUVERTE
+        consultation.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(consultation).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def cloturer(self, request, pk=None):
+        """Clôture de la mise en concurrence : une et une seule offre retenue."""
+        consultation = self._consultation()
+        if consultation.status != ConsultationRequest.Status.OUVERTE:
+            return Response({"detail": "Seule une consultation ouverte se clôture."}, status=status.HTTP_400_BAD_REQUEST)
+        retenues = consultation.offers.filter(is_selected=True).count()
+        if retenues != 1:
+            return Response({"detail": "Retenez une et une seule offre fournisseur avant de clôturer."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        consultation.status = ConsultationRequest.Status.CLOTUREE
+        consultation.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(consultation).data)
+
 
 class ConsultationOfferViewSet(_CommonViewSet):
     serializer_class = ConsultationOfferSerializer
@@ -255,6 +287,20 @@ class PurchaseOrderViewSet(_CommonViewSet):
             order.request.status = PurchaseRequest.Status.CONVERTIE
             order.request.save(update_fields=["status", "updated_at"])
 
+    @action(detail=False, methods=["get"], url_path="performance-fournisseurs")
+    def performance_fournisseurs(self, request):
+        """Notation fournisseur : taux de service, retard moyen, conformité qualité, litiges (CDC M2 §5.4 / §5.7)."""
+        from .pilotage import performance_fournisseurs
+
+        return Response(performance_fournisseurs())
+
+    @action(detail=False, methods=["get"], url_path="reporting")
+    def reporting(self, request):
+        """Reporting achats : prix moyens par article, engagements par axe analytique (→ M11), fournisseurs."""
+        from .pilotage import reporting_achats
+
+        return Response(reporting_achats(can_see_amount(request.user)))
+
     @action(detail=True, methods=["get"], url_path="reconciliation")
     def reconciliation(self, request, pk=None):
         """Rapprochement 3-way (RF-ERP-12) : commandé / reçu / facturé par ligne."""
@@ -285,6 +331,98 @@ class GoodsReceiptViewSet(_CommonViewSet):
 
     def perform_create(self, serializer):
         serializer.save(received_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def valider(self, request, pk=None):
+        """Réception validée seulement après le contrôle qualité M6 validé conforme ou accepté sous réserve (§5.11)."""
+        from qualite.models import ControleQualite
+
+        receipt = GoodsReceipt.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if receipt.status != GoodsReceipt.Status.EN_ATTENTE:
+            return Response({"detail": "Réception déjà validée ou annulée."}, status=status.HTTP_400_BAD_REQUEST)
+        ctrl = receipt.controles_qualite.order_by("-created_at").first()
+        if ctrl is None or ctrl.statut != ControleQualite.Statut.VALIDE:
+            return Response({"detail": "Contrôle qualité à réception (M6) non validé : réception en attente."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if ctrl.resultat == ControleQualite.Resultat.NON_CONFORME:
+            return Response({"detail": f"Contrôle qualité {ctrl.code} non conforme : ouvrez un litige fournisseur."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        receipt.status = GoodsReceipt.Status.VALIDE
+        receipt.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(receipt).data)
+
+
+class LitigeFournisseurViewSet(_CommonViewSet):
+    """Litiges fournisseurs (clôture M2) : relance, escalade en pré-contentieux M12, résolution motivée."""
+
+    serializer_class = LitigeFournisseurSerializer
+
+    def get_queryset(self):
+        qs = LitigeFournisseur.objects.select_related("purchase_order__supplier", "contentieux")
+        params = self.request.query_params
+        if statut := params.get("statut"):
+            qs = qs.filter(statut=statut)
+        if fournisseur := params.get("fournisseur"):
+            qs = qs.filter(purchase_order__supplier_id=fournisseur)
+        if params.get("ouverts") == "1":
+            qs = qs.exclude(statut=LitigeFournisseur.Statut.RESOLU)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def _litige(self):
+        litige = LitigeFournisseur.objects.select_for_update(of=("self",)).select_related("purchase_order__supplier").get(
+            pk=self.get_object().pk
+        )
+        if litige.statut == LitigeFournisseur.Statut.RESOLU:
+            raise ValidationError({"detail": "Litige déjà résolu."})
+        return litige
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def relancer(self, request, pk=None):
+        litige = self._litige()
+        litige.nb_relances += 1
+        litige.derniere_relance_le = timezone.now()
+        if litige.statut == LitigeFournisseur.Statut.OUVERT:
+            litige.statut = LitigeFournisseur.Statut.RELANCE
+        litige.save()
+        return Response(self.get_serializer(litige).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def escalader(self, request, pk=None):
+        """Escalade : ouverture d'un pré-contentieux fournisseur au module juridique (M12), lié au litige."""
+        from juridique.models import Contentieux
+
+        litige = self._litige()
+        if litige.contentieux_id:
+            raise ValidationError({"detail": "Litige déjà escaladé."})
+        bc = litige.purchase_order
+        litige.contentieux = Contentieux.objects.create(
+            nature=Contentieux.Nature.FOURNISSEUR,
+            phase=Contentieux.Phase.PRE_CONTENTIEUX,
+            objet=f"Litige {litige.code} — BC {bc.code} : {litige.get_type_display()}"[:250],
+            partie_adverse=bc.supplier.name if bc.supplier_id else "Fournisseur",
+            montant_en_jeu=litige.montant_en_jeu or 0,
+            reference=litige.code,
+        )
+        litige.statut = LitigeFournisseur.Statut.ESCALADE
+        litige.save()
+        return Response(self.get_serializer(litige).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def resoudre(self, request, pk=None):
+        litige = self._litige()
+        resolution = str(request.data.get("resolution") or "").strip()
+        if not resolution:
+            raise ValidationError({"resolution": "Résolution obligatoire (avoir, remplacement, abandon…)."})
+        litige.resolution, litige.resolu_le, litige.statut = resolution, timezone.now(), LitigeFournisseur.Statut.RESOLU
+        litige.save()
+        return Response(self.get_serializer(litige).data)
 
 
 class GoodsReceiptLineViewSet(_CommonViewSet):
