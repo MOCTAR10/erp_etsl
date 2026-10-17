@@ -8,9 +8,10 @@ export default defineConfig({
   testDir: path.join(__dirname, "e2e"),
   timeout: 60_000,
   expect: { timeout: 15_000 },
-  // Fichiers de specs en parallèle (chaque spec crée ses propres données, libellés horodatés) ;
+  // Tests indépendants (page propre, connexion en beforeEach, données horodatées) : répartis entre workers
+  // y compris au sein d'un même fichier (sinon a11y.spec, 41 tests, fixait seul la durée totale).
   // PW_WORKERS règle le nombre de navigateurs simultanés (1 par défaut en local).
-  fullyParallel: false,
+  fullyParallel: true,
   workers: Number(process.env.PW_WORKERS || 1),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : [["html", { open: "never" }], ["list"]],
