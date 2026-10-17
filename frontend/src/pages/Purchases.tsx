@@ -7,6 +7,7 @@ import { formatDate, formatNumber } from "../lib/format";
 import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type { Paginated, PoStatus, PurchaseOrder } from "../types";
 import { DemandesAchat } from "../components/workflow/DemandesAchat";
+import { AchatsPilotage } from "../components/achats/AchatsPilotage";
 
 type Groups = Record<PoStatus, PurchaseOrder[]>;
 
@@ -109,6 +110,8 @@ export function PurchasesPage() {
       </div>
 
       <DemandesAchat />
+
+      <AchatsPilotage />
     </>
   );
 }
