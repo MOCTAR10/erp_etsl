@@ -101,6 +101,19 @@ class CreationTests(SignatureBase):
         self.assertEqual(r.status_code, 400)
 
 
+class DirectoryTests(SignatureBase):
+    def test_annuaire_signataires_sans_donnees_sensibles(self):
+        r = self.as_(self.s1).get("/api/documents/signatures/signataires/")
+        self.assertEqual(r.status_code, 200, r.content)
+        ids = {row["id"] for row in r.data}
+        self.assertIn(self.s2.pk, ids)
+        self.assertEqual(set(r.data[0]), {"id", "name", "role"})
+
+    def test_annuaire_exige_authentification(self):
+        self.client.force_authenticate(None)
+        self.assertIn(self.client.get("/api/documents/signatures/signataires/").status_code, (401, 403))
+
+
 class SignatureFlowTests(SignatureBase):
     def setUp(self):
         super().setUp()

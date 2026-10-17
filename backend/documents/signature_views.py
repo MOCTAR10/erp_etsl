@@ -79,6 +79,13 @@ class SignatureRequestViewSet(
             )
         return qs
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["get"], url_path="signataires")
+    def signataires(self, request):
+        """Annuaire minimal (id, nom, rôle) des comptes actifs pour composer une demande de signature."""
+        users = User.objects.filter(is_active=True).order_by("first_name", "last_name", "email")
+        return Response([{"id": u.pk, "name": u.get_full_name() or u.email, "role": u.role} for u in users])
+
     def create(self, request, *args, **kwargs):
         s = self.get_serializer(data=request.data)
         s.is_valid(raise_exception=True)

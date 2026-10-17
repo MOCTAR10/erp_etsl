@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, FileSignature } from "lucide-react";
+import { BadgeCheck, FileSignature, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -156,6 +156,116 @@ function RequestCard({ req }: { req: SignatureRequestItem }) {
   );
 }
 
+interface DocOption {
+  id: string;
+  title: string;
+  current_version: { id: string } | null;
+}
+interface SignerOption {
+  id: number;
+  name: string;
+  role: string;
+}
+
+function NewRequest() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [docId, setDocId] = useState("");
+  const [title, setTitle] = useState("");
+  const [days, setDays] = useState(7);
+  const [signers, setSigners] = useState<number[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+  const docs = useQuery({
+    queryKey: ["sig-docs"],
+    enabled: open,
+    queryFn: () => api.get<Paginated<DocOption>>("/api/documents/documents/").then((p) => p.results),
+  });
+  const people = useQuery({
+    queryKey: ["sig-people"],
+    enabled: open,
+    queryFn: () => api.get<SignerOption[]>("/api/documents/signatures/signataires/"),
+  });
+  const doc = docs.data?.find((d) => d.id === docId);
+  const send = useMutation({
+    mutationFn: () =>
+      api.post("/api/documents/signatures/", {
+        version: doc?.current_version?.id,
+        title,
+        signers,
+        expires_in_days: days,
+      }),
+    onSuccess: () => {
+      setMsg(t("signatures.created"));
+      setDocId("");
+      setTitle("");
+      setSigners([]);
+      void qc.invalidateQueries({ queryKey: ["signatures"] });
+    },
+    onError: (e) => setMsg(describeError(e)),
+  });
+  if (!open)
+    return (
+      <button className="btn" onClick={() => setOpen(true)}>
+        <Plus size={16} aria-hidden="true" /> {t("signatures.new")}
+      </button>
+    );
+  const free = (people.data ?? []).filter((p) => !signers.includes(p.id));
+  const nameOf = (id: number) => people.data?.find((p) => p.id === id)?.name ?? String(id);
+  const noVersion = !!doc && !doc.current_version;
+  return (
+    <SectionCard title={t("signatures.new")}>
+      <div className="sign-new">
+        <select aria-label={t("signatures.document")} value={docId} onChange={(e) => setDocId(e.target.value)}>
+          <option value="">{t("signatures.chooseDocument")}</option>
+          {(docs.data ?? []).map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.title}
+            </option>
+          ))}
+        </select>
+        {noVersion && <p className="muted">{t("signatures.noVersion")}</p>}
+        <input placeholder={t("signatures.titleLabel")} aria-label={t("signatures.titleLabel")} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <label className="muted">
+          {t("signatures.days")}{" "}
+          <input type="number" min={1} max={90} value={days} onChange={(e) => setDays(Number(e.target.value))} />
+        </label>
+        <strong>{t("signatures.signers")}</strong>
+        <ol className="sign-signers">
+          {signers.map((id) => (
+            <li key={id}>
+              <span>{nameOf(id)}</span>
+              <button className="btn ghost" onClick={() => setSigners(signers.filter((s) => s !== id))}>
+                {t("signatures.remove")}
+              </button>
+            </li>
+          ))}
+        </ol>
+        <select
+          aria-label={t("signatures.addSigner")}
+          value=""
+          onChange={(e) => e.target.value && setSigners([...signers, Number(e.target.value)])}
+        >
+          <option value="">{t("signatures.addSigner")}</option>
+          {free.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <button className="btn" disabled={!doc?.current_version || !signers.length || send.isPending} onClick={() => send.mutate()}>
+          {t("signatures.send")}
+        </button>
+        {msg && (
+          <p className="muted" role="status">
+            {msg}
+          </p>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 export function SignaturesPage() {
   const { t } = useTranslation();
   const list = useQuery({
@@ -173,6 +283,7 @@ export function SignaturesPage() {
   return (
     <>
       <PageHeader title={t("signatures.title")} subtitle={t("signatures.subtitle")} />
+      <NewRequest />
       {rows.length === 0 && <EmptyState label={t("signatures.none")} icon={FileSignature} />}
       {toSign.length > 0 && (
         <SectionCard title={`${t("signatures.toSign")} · ${toSign.length}`}>

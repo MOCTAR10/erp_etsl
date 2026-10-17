@@ -123,6 +123,9 @@ export const fr = {
     docOk: "Document intact", docKo: "Document modifié", sealOk: "Sceau valide", sealKo: "Sceau invalide",
     status: { pending: "En cours", completed: "Signée", refused: "Refusée" },
     signer: { pending: "En attente", signed: "Signé", refused: "Refusé" },
+    new: "Nouvelle demande", document: "Document", chooseDocument: "Choisir un document", titleLabel: "Objet de la signature",
+    signers: "Signataires (dans l'ordre)", addSigner: "Ajouter un signataire", remove: "Retirer", days: "Validité (jours)",
+    send: "Envoyer la demande", noVersion: "Ce document n'a pas encore de version.", created: "Demande envoyée.",
   },
   palette: {
     pages: "Pages",
