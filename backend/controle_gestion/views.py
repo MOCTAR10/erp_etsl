@@ -79,6 +79,7 @@ class BudgetViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         "revisions",
     )
     serializer_class = BudgetSerializer
+    search_fields = ("code", "label",)
 
     def get_permissions(self):
         if getattr(self, "action", None) in ("approuver", "cloturer"):
@@ -183,6 +184,7 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = BudgetRevision.objects.select_related("budget", "created_by").all()
     serializer_class = BudgetRevisionSerializer
+    search_fields = ("code",)
 
     def get_permissions(self):
         if getattr(self, "action", None) == "appliquer":
@@ -246,6 +248,7 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 class ClotureGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     queryset = ClotureGestion.objects.select_related("period", "created_by").all()
     serializer_class = ClotureGestionSerializer
+    search_fields = ("code",)
 
     def get_permissions(self):
         if getattr(self, "action", None) in ("realiser", "publier"):
@@ -382,6 +385,7 @@ class AnalyseEcartViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AnalyseEcart.objects.select_related("budget", "period", "analyse_par").all()
     serializer_class = AnalyseEcartSerializer
+    search_fields = ("code",)
     permission_classes = [CanManageGestion]
 
     def get_queryset(self):

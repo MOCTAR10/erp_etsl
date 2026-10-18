@@ -68,3 +68,26 @@ class RechercheTests(APITestCase):
     def test_recherche_vide_ne_filtre_pas(self):
         data = self.client.get("/api/referentiels/partners/", {"search": ""}).json()
         self.assertGreaterEqual(data["count"], 26)
+
+
+class RechercheToutesRoutesTests(APITestCase):
+    """Chaque liste qui déclare `search_fields` répond 200 à `?search=` (un champ invalide donnerait un 500)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(email="adm3@etls.local", password="x", role="admin")
+
+    def test_search_ne_casse_aucune_liste(self):
+        from drf_spectacular.generators import EndpointEnumerator
+
+        self.client.force_authenticate(self.user)
+        testes = 0
+        for path, _path_regex, method, callback in EndpointEnumerator().get_api_endpoints():
+            cls = getattr(callback, "cls", None)
+            if method != "GET" or "{" in path or not getattr(cls, "search_fields", None) or callback.actions.get("get") != "list":
+                continue
+            with self.subTest(path=path):
+                res = self.client.get(path, {"search": "zz"})
+                self.assertEqual(res.status_code, 200, f"{path} -> {res.status_code}")
+            testes += 1
+        self.assertGreaterEqual(testes, 60)

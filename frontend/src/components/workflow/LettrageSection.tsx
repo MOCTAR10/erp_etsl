@@ -30,7 +30,7 @@ export function LettrageSection() {
   const comptes = useQuery({
     queryKey: ["lettrage-comptes"],
     queryFn: () =>
-      api.get<Paginated<CompteRef>>("/api/referentiels/accounts/?page_size=500").then((p) => p.results.filter((c) => c.reconcile)),
+      api.listAll<CompteRef>("/api/referentiels/accounts/").then((rows) => rows.filter((c) => c.reconcile)),
     retry: 0,
   });
   const params = useQuery({

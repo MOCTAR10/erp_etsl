@@ -85,6 +85,7 @@ class ClientProfileViewSet(_CommonViewSet):
 
 class OpportunityViewSet(_CommonViewSet):
     serializer_class = OpportunitySerializer
+    search_fields = ("code", "subject", "client__partner__name",)
 
     def get_queryset(self):
         qs = Opportunity.objects.select_related("client__partner", "owner").all()
@@ -107,6 +108,7 @@ class OpportunityViewSet(_CommonViewSet):
 
 class EstimateViewSet(_CommonViewSet):
     serializer_class = EstimateSerializer
+    search_fields = ("code", "title", "client__partner__name",)
 
     def get_queryset(self):
         qs = Estimate.objects.select_related("opportunity", "client__partner", "currency")
@@ -247,6 +249,7 @@ class TenderReviewViewSet(_CommonViewSet):
 
 class AffaireViewSet(_CommonViewSet):
     serializer_class = AffaireSerializer
+    search_fields = ("code", "title", "client__partner__name",)
 
     def get_queryset(self):
         qs = Affaire.objects.select_related("opportunity", "client__partner", "currency")
@@ -323,6 +326,7 @@ class MilestoneViewSet(_CommonViewSet):
 
 class ContractViewSet(_CommonViewSet):
     serializer_class = ContractSerializer
+    search_fields = ("code", "client__partner__name",)
 
     def get_queryset(self):
         qs = Contract.objects.select_related("client__partner", "currency", "affaire").all()

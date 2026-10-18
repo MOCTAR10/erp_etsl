@@ -163,18 +163,18 @@ export function PiecesRechangeSection() {
 
   const ordres = useQuery({
     queryKey: ["m8-ot-ouverts"],
-    queryFn: () => api.get<Paginated<OrdreTravail>>("/api/maintenance/ordres/?ouverts=1&page_size=100").then((p) => p.results),
+    queryFn: () => api.listAll<OrdreTravail>("/api/maintenance/ordres/?ouverts=1"),
     retry: 0,
   });
   const articles = useQuery({
     queryKey: ["m8-articles-stock"],
     queryFn: () =>
-      api.get<Paginated<{ id: string; code: string; label: string }>>("/api/referentiels/articles/?stockable=1&page_size=200").then((p) => p.results),
+      api.listAll<{ id: string; code: string; label: string }>("/api/referentiels/articles/?stockable=1"),
     retry: 0,
   });
   const depots = useQuery({
     queryKey: ["m8-depots"],
-    queryFn: () => api.depots("?page_size=100").then((p: Paginated<Depot>) => p.results),
+    queryFn: () => api.listAll<Depot>("/api/stocks/depots/"),
     retry: 0,
   });
   const pieces = useQuery({

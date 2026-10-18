@@ -63,6 +63,7 @@ def _uuid_or_none(value):
 class SoudeurViewSet(viewsets.ModelViewSet):
     queryset = Soudeur.objects.all()
     serializer_class = SoudeurSerializer
+    search_fields = ("code", "nom", "prenoms", "matricule",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):
@@ -100,6 +101,7 @@ class QualificationSoudeurViewSet(viewsets.ModelViewSet):
 class WpsWpqrViewSet(viewsets.ModelViewSet):
     queryset = WpsWpqr.objects.select_related("validated_by").all()
     serializer_class = WpsWpqrSerializer
+    search_fields = ("code", "reference",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):
@@ -131,6 +133,7 @@ class ControleQualiteViewSet(viewsets.ModelViewSet):
         "affaire", "ordre", "wps", "lot", "created_by"
     ).all()
     serializer_class = ControleQualiteSerializer
+    search_fields = ("code", "point_controle",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):
@@ -180,6 +183,7 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
         "controle", "decided_by"
     ).prefetch_related("actions_correctives").all()
     serializer_class = NonConformiteSerializer
+    search_fields = ("code",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):
@@ -250,6 +254,7 @@ class ActionCorrectiveViewSet(viewsets.ModelViewSet):
         "non_conformite", "responsable"
     ).all()
     serializer_class = ActionCorrectiveSerializer
+    search_fields = ("code",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):
@@ -284,6 +289,7 @@ class PvControleViewSet(viewsets.ModelViewSet):
         "affaire", "ordre", "validated_by"
     ).prefetch_related("controles__wps").all()
     serializer_class = PvControleSerializer
+    search_fields = ("code", "intitule",)
     permission_classes = [CanValidatePv]
 
     def get_queryset(self):
@@ -390,6 +396,7 @@ class PointInspectionViewSet(viewsets.ModelViewSet):
 class InstrumentMesureViewSet(viewsets.ModelViewSet):
     queryset = InstrumentMesure.objects.prefetch_related("etalonnages").all()
     serializer_class = InstrumentMesureSerializer
+    search_fields = ("code", "designation", "numero_serie",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):
@@ -436,6 +443,7 @@ class JointSoudeViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.R
 
     queryset = JointSoude.objects.select_related("ordre", "soudeur", "wps").all()
     serializer_class = JointSoudeSerializer
+    search_fields = ("code", "repere",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):

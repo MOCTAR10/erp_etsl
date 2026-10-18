@@ -22,7 +22,7 @@ export function ClotureSection() {
 
   const periodes = useQuery({
     queryKey: ["cloture-periodes"],
-    queryFn: () => api.get<Paginated<PeriodeRef>>("/api/accounting/periods/?page_size=60").then((p) => p.results),
+    queryFn: () => api.listAll<PeriodeRef>("/api/accounting/periods/"),
     retry: 0,
   });
   const clotures = useQuery({
