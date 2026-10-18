@@ -1125,6 +1125,35 @@ export const en = {
     },
     pendingNote: "SYSCOHADA-revised accounting: entries validated by the kernel (immutable, reversals). Retention rules proc. 4.3–4.8, inter-company refactoring to account 618 (RF-ERP-90…94).",
   },
+  m8: {
+    fiabilite: {
+      title: "Fleet reliability: MTBF, MTTR, availability (M8)",
+      hint: "Computed over a {{jours}}-day observation window from completed work orders; published to the BI layer.",
+      warnProvisoire: "Observation window and service hours are provisional: to be confirmed by ETSL.",
+      machine: "Machine", pannes: "Failures", dispo: "Availability",
+    },
+    params: {
+      title: "Reliability parameters (M8)",
+      hint: "Observation window and service hours per day: ETSL data, editable here without a developer.",
+      warnProvisoire: "{{count}} provisional maintenance parameter(s) to be confirmed by ETSL.",
+      confirmConfirmer: "Confirm this value (validated by ETSL)?",
+    },
+    pieces: {
+      title: "Spare parts: stock issue and replenishment (M8 ↔ M5)",
+      hint: "The part leaves M5 stock at weighted average cost and its cost is added to the work order.",
+      ot: "Work order", piece: "Part", depot: "Warehouse", quantite: "Quantity", sortir: "Issue the part",
+      sortie: "Part issued from stock and charged to the work order.", total: "Cost",
+      reappro: "Replenishment below minimum level", aucunBesoin: "No part below its minimum level.",
+      stock: "Stock", seuil: "Minimum", aCommander: "To order", genererDa: "Generate the purchase request",
+      daCreee: "Purchase request {{da}} created as draft ({{n}} line(s)).", rienAGenerer: "No new line to request.",
+    },
+    couts: {
+      title: "Maintenance cost per machine (M8 → M11)",
+      hint: "Completed work orders of the month, labour + parts. GLOBAL RENTAL machines stay on account 618; no accounting entry is generated.",
+      periode: "Month", aucun: "No completed work order in the period.", mo: "Labour", pieces: "Parts", total: "Total",
+      totalGr: "GR total", totalHorsGr: "Non-GR total",
+    },
+  },
   grAffaires: {
     title: "GLOBAL RENTAL cost by project (meters to M11)", periode: "Month",
     hint: "GR meter readings valued per the rate grid and split by project. The cost stays in account 618, isolated from margins: the margin after GR cost is indicative.",

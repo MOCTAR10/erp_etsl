@@ -215,3 +215,132 @@ class CoucheDTests(APITestCase):
             self.assertIn(mot, sql)
         self.assertIn("dm_maintenance_fiabilite", (dbt / "marts" / "schema.yml").read_text(encoding="utf-8"))
         self.assertIn("maintenance_parametremaintenance", (dbt / "sources.yml").read_text(encoding="utf-8"))
+
+
+# --------------------------------------------------------------------------------------------------
+# PR 2 : pièces de rechange sorties du stock M5, liées à l'OT, valorisées au CUMP ; réappro sous seuil
+# --------------------------------------------------------------------------------------------------
+from achats.models import PurchaseRequest  # noqa: E402
+from referentiels.models import Article, UnitOfMeasure  # noqa: E402
+from stocks.models import ArticleStock, Depot, MouvementStock, StockQuant  # noqa: E402
+from stocks.services import apply_move  # noqa: E402
+
+from .models import PieceOT  # noqa: E402
+
+
+class _PiecesBase(_Base):
+    def setUp(self):
+        super().setUp()
+        unit, _ = UnitOfMeasure.objects.get_or_create(code="U", defaults={"label": "Unité"})
+        self.filtre = Article.objects.create(
+            code="PR-FILTRE", label="Filtre à huile", article_type="consommable", unit=unit, is_stockable=True)
+        self.depot = Depot.objects.create(code="DEP-M8", label="Magasin pièces")
+        self.entree(10, "1000")
+        self.entree(10, "2000")  # CUMP = 1500
+        self.ot_en_cours = self.ot_(statut="en_cours")
+
+    def entree(self, qte, prix):
+        mv = MouvementStock.objects.create(
+            type_mouvement="reception", article=self.filtre, quantite=qte, prix_unitaire=Decimal(prix),
+            destination=self.depot, date=AUJOURDHUI)
+        apply_move(mv)
+
+    def ot_(self, statut="en_cours"):
+        return OrdreTravail.objects.create(actif=self.actif, description="Révision", statut=statut)
+
+    def sortir(self, ot, qte="4", **kw):
+        body = {"article": str(self.filtre.pk), "depot": str(self.depot.pk), "quantite": qte}
+        body.update(kw)
+        return self.client.post(f"/api/maintenance/ordres/{ot.pk}/sortir-piece/", body, format="json")
+
+class PiecesStockTests(_PiecesBase):
+    def test_sortie_decremente_le_stock_au_cump_et_alimente_le_cout_de_l_ot(self):
+        r = self.sortir(self.ot_en_cours, "4")
+        self.assertEqual(r.status_code, 200, r.content)
+        quant = StockQuant.objects.get(depot=self.depot, article=self.filtre)
+        self.assertEqual(quant.quantity, Decimal("16.00"))
+        piece = PieceOT.objects.get(ot=self.ot_en_cours)
+        self.assertEqual(piece.cout_unitaire, Decimal("1500.0000"))
+        self.assertEqual(piece.mouvement.type_mouvement, "consommation")
+        self.assertEqual(piece.mouvement.document_reference, self.ot_en_cours.code)
+        self.assertEqual(piece.sorti_par, self.maint)
+        self.ot_en_cours.refresh_from_db()
+        self.assertEqual(self.ot_en_cours.cout_pieces, Decimal("6000.00"))
+
+    def test_stock_insuffisant_refuse_sans_effet(self):
+        r = self.sortir(self.ot_en_cours, "999")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(PieceOT.objects.count(), 0)
+        self.assertEqual(StockQuant.objects.get(depot=self.depot).quantity, Decimal("20.00"))
+
+    def test_ot_non_ouvert_ou_scelle_refuse(self):
+        for statut in ("demande", "termine", "cloture", "archive", "annule"):
+            self.assertEqual(self.sortir(self.ot_(statut)).status_code, 400, statut)
+
+    def test_quantite_invalide_refusee(self):
+        for q in ("0", "-1", "abc"):
+            self.assertEqual(self.sortir(self.ot_en_cours, q).status_code, 400, q)
+
+    def test_cout_pieces_libre_interdit_des_qu_une_sortie_existe(self):
+        self.sortir(self.ot_en_cours, "1")
+        r = self.client.post(f"/api/maintenance/ordres/{self.ot_en_cours.pk}/terminer/", {"cout_pieces": "5"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        r = self.client.patch(f"/api/maintenance/ordres/{self.ot_en_cours.pk}/", {"cout_pieces": "5"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+
+    def test_cout_piece_remonte_a_m11(self):
+        self.sortir(self.ot_en_cours, "2")
+        self.client.post(f"/api/maintenance/ordres/{self.ot_en_cours.pk}/terminer/", {}, format="json")
+        self.client.force_authenticate(self.admin)
+        mois = OrdreTravail.objects.get(pk=self.ot_en_cours.pk).date_fin.strftime("%Y-%m")
+        r = self.client.get(f"/api/controle-gestion/maintenance-couts/?periode={mois}")
+        ligne = next(x for x in r.data["rows"] if x["actif"] == self.actif.code)
+        self.assertEqual(Decimal(ligne["pieces"]), Decimal("3000.00"))
+
+    def test_montants_masques_pour_les_roles_sans_acces(self):
+        self.sortir(self.ot_en_cours, "1")
+        self.client.force_authenticate(self.rh)
+        # rh lit rh_paie mais pas maintenance : 403 ; un lecteur sans montants (chef atelier) voit des None
+        chef = _user("chef@etls.ga", User.Role.CHEF_ATELIER)
+        self.client.force_authenticate(chef)
+        r = self.client.get(f"/api/maintenance/ordres/{self.ot_en_cours.pk}/pieces/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIsNone(r.data[0]["cout_unitaire"])
+
+    def test_liste_des_pieces_de_l_ot(self):
+        self.sortir(self.ot_en_cours, "1")
+        self.sortir(self.ot_en_cours, "2")
+        r = self.client.get(f"/api/maintenance/ordres/{self.ot_en_cours.pk}/pieces/")
+        self.assertEqual(len(r.data), 2)
+        self.assertEqual(r.data[0]["article_code"], "PR-FILTRE")
+
+
+class ReapproTests(_PiecesBase):
+    def setUp(self):
+        super().setUp()
+        ArticleStock.objects.create(article=self.filtre, seuil_minimal=Decimal("25"))
+        self.sortir(self.ot_en_cours, "1")  # 19 en stock < seuil 25
+
+    def test_besoins_sous_seuil(self):
+        r = self.client.get("/api/maintenance/pieces/reappro/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(len(r.data["rows"]), 1)
+        b = r.data["rows"][0]
+        self.assertEqual((b["article"], Decimal(b["stock"]), Decimal(b["seuil"]), Decimal(b["a_commander"])),
+                         ("PR-FILTRE", Decimal("19"), Decimal("25"), Decimal("6")))
+
+    def test_generation_da_brouillon_idempotente(self):
+        r = self.client.post("/api/maintenance/pieces/reappro/", {}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        da = PurchaseRequest.objects.get(code=r.data["da"])
+        self.assertEqual(da.status, "brouillon")
+        self.assertEqual(da.lines.get().quantity, Decimal("6"))
+        r2 = self.client.post("/api/maintenance/pieces/reappro/", {}, format="json")
+        self.assertEqual(r2.data["lignes_ajoutees"], 0)
+        self.assertEqual(PurchaseRequest.objects.count(), 1)
+
+    def test_rien_sous_seuil_aucune_da(self):
+        self.entree(50, "1000")
+        r = self.client.post("/api/maintenance/pieces/reappro/", {}, format="json")
+        self.assertIsNone(r.data["da"])
+        self.assertEqual(PurchaseRequest.objects.count(), 0)

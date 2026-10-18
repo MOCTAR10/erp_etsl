@@ -12,17 +12,21 @@ from rest_framework.response import Response
 from config.inputs import choice_input, date_input, fk_input
 from users.models import User
 
-from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PlanPreventif
+from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
 from .preventif import declencher_plans, rearmer_plan
 from .serializers import (
     ActifSerializer,
     InspectionSerializer,
     OrdreTravailSerializer,
     ParametreMaintenanceSerializer,
+    PieceOTSerializer,
     PlanPreventifSerializer,
 )
 from .services import (
     PARAMETRES_DEFAUT,
+    besoins_reappro,
+    generer_da_reappro,
+    sortir_piece,
     CanManageMaintenance,
     IsConfirmateurMaintenance,
     fiabilite_actifs,
@@ -202,6 +206,8 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
             ot.heures_mo = _montant_positif(heures_mo, "heures_mo")
         cout_pieces = request.data.get("cout_pieces")
         if cout_pieces not in (None, ""):
+            if ot.pieces.exists():
+                raise ValidationError({"cout_pieces": "Coût pièces calculé depuis les sorties de stock : saisie libre interdite."})
             ot.cout_pieces = _montant_positif(cout_pieces, "cout_pieces")
         if request.data.get("decision"):
             ot.decision = _choix(request.data.get("decision"), OrdreTravail.Decision, "decision")
@@ -255,6 +261,31 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         ot.archive_par = request.user
         ot.save(update_fields=["statut", "archive_le", "archive_par", "updated_at"])
         return Response(self.get_serializer(ot).data)
+
+    @action(detail=True, methods=["post"], url_path="sortir-piece")
+    @transaction.atomic
+    def sortir_piece(self, request, pk=None):
+        """Pièce de rechange sortie du stock M5 (CUMP) et imputée à l'OT ; refus (stock, lot, statut) = 400."""
+        from referentiels.models import Article
+        from stocks.models import Depot
+
+        ot = self._locked()
+        article = fk_input(request.data.get("article"), Article.objects.filter(is_stockable=True), "article")
+        depot = fk_input(request.data.get("depot"), Depot.objects.all(), "depot")
+        if article is None or depot is None:
+            raise ValidationError({"detail": "Article et dépôt requis."})
+        quantite = _montant_positif(request.data.get("quantite"), "quantite")
+        try:
+            sortir_piece(ot, article, depot, quantite, request.user)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)})
+        ot.refresh_from_db()
+        return Response(self.get_serializer(ot).data)
+
+    @action(detail=True, methods=["get"], url_path="pieces")
+    def pieces(self, request, pk=None):
+        qs = self.get_object().pieces.select_related("article", "depot", "mouvement")
+        return Response(PieceOTSerializer(qs, many=True, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["post"], url_path="annuler")
     @transaction.atomic
@@ -406,3 +437,20 @@ class ParametreMaintenanceViewSet(viewsets.ModelViewSet):
         p.confirme_le = timezone.now()
         p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
         return Response(self.get_serializer(p).data)
+
+
+class PiecesViewSet(viewsets.ViewSet):
+    """Réapprovisionnement des pièces de rechange sous le seuil minimum M5 (DA brouillon M2, idempotente)."""
+
+    permission_classes = [CanManageMaintenance]
+
+    @action(detail=False, methods=["get", "post"], url_path="reappro")
+    @transaction.atomic
+    def reappro(self, request):
+        if request.method == "GET":
+            rows = besoins_reappro()
+            return Response({"rows": [
+                {**r, "article_id": str(r["article_id"]), "stock": str(r["stock"]), "seuil": str(r["seuil"]),
+                 "a_commander": str(r["a_commander"])} for r in rows
+            ]})
+        return Response(generer_da_reappro(request.user))
