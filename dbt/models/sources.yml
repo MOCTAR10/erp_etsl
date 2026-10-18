@@ -48,3 +48,12 @@ sources:
       - name: comptabilite_paiement
       - name: controle_gestion_budget
       - name: controle_gestion_cloturegestion
+      - name: rh_paie_saisietemps
+      - name: rh_paie_parametrepaie
+      - name: accounting_kernel_accountmove
+      - name: accounting_kernel_accountmoveline
+      - name: referentiels_account
+      - name: referentiels_analyticaccount
+      - name: referentiels_analyticaxis
+      - name: maintenance_planpreventif
+      - name: logistique_lecturecompteur
