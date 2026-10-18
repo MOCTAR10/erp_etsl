@@ -8,7 +8,10 @@ from .views import (
     BudgetViewSet,
     ClotureGestionViewSet,
     ConsommationsStockView,
+    DoctrineView,
     MargesView,
+    ParametreGestionViewSet,
+    SousActiviteView,
 )
 
 router = DefaultRouter()
@@ -18,6 +21,9 @@ router.register("revisions", BudgetRevisionViewSet, basename="cg-revisions")
 router.register("clotures", ClotureGestionViewSet, basename="cg-clotures")
 router.register("marges", MargesView, basename="cg-marges")
 router.register("consommations-stock", ConsommationsStockView, basename="cg-consommations-stock")
+router.register("sous-activite", SousActiviteView, basename="cg-sous-activite")
+router.register("doctrine", DoctrineView, basename="cg-doctrine")
+router.register("parametres", ParametreGestionViewSet, basename="cg-parametres")
 router.register("analyses-ecart", AnalyseEcartViewSet, basename="cg-analyses-ecart")
 
 urlpatterns = [

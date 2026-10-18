@@ -99,6 +99,10 @@ class Budget(models.Model):
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut"
     )
+    classe_mix = models.CharField(
+        max_length=1, blank=True, choices=[("A", "Mix A"), ("B", "Mix B"), ("C", "Mix C")],
+        verbose_name="Classe de la doctrine d'imputation (Mix A/B/C)",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -361,3 +365,57 @@ class AnalyseEcart(models.Model):
     @property
     def en_retard(self):
         return self.statut == self.Statut.A_ANALYSER and timezone.localdate() > self.echeance
+
+
+class ParametreGestion(models.Model):
+    """Paramètre de contrôle de gestion modifiable par ETSL sans développeur (seuils de sous-activité,
+    doctrine d'imputation Mix A/B/C, jours de reporting J+4/J+6).
+
+    Tant que `statut_valeur` = « provisoire », les écrans et états qui l'utilisent avertissent. Le défaut est
+    créé à la volée par `services.get_param_gestion` (la valeur est une DONNÉE, jamais figée dans le code).
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
+        verbose_name="Statut de la valeur",
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+", verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre de gestion"
+        verbose_name_plural = "Paramètres de gestion"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class AlerteSousActivite(models.Model):
+    """Alerte d'entrée d'un budget en centre 99 (sous-activité > seuil haut) : une seule fois par budget."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="alertes_sous_activite")
+    centre = models.CharField(max_length=2)
+    taux = models.DecimalField(max_digits=6, decimal_places=2)
+    detecte_le = models.DateField()
+
+    class Meta:
+        ordering = ["-detecte_le"]
+        constraints = [models.UniqueConstraint(fields=["budget", "centre"], name="uniq_alerte_sous_activite")]

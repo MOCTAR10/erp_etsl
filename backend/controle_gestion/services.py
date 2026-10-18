@@ -324,3 +324,150 @@ def detecter_ecarts(budgets=None, today=None):
                     kind="reminder",
                 )
     return crees
+
+
+# --------------------------------------------------------------------------------------------------
+# Paramètres modifiables (valeur = donnée ETSL, défaut provisoire créé à la volée)
+# --------------------------------------------------------------------------------------------------
+PARAMETRES_DEFAUT = {
+    "SOUS_ACTIVITE_SEUIL_90": ("Sous-activité maximale du centre 90 (au-delà : centre 91)", Decimal("5"), "%"),
+    "SOUS_ACTIVITE_SEUIL_91": ("Sous-activité maximale du centre 91 (au-delà : centre 99)", Decimal("15"), "%"),
+    "RGM_MIX_A": ("Doctrine d'imputation : part cible du Mix A", Decimal("55"), "%"),
+    "RGM_MIX_B": ("Doctrine d'imputation : part cible du Mix B", Decimal("40"), "%"),
+    "RGM_MIX_C": ("Doctrine d'imputation : part maximale du Mix C", Decimal("5"), "%"),
+    "RGM_TOLERANCE_MIX": ("Doctrine d'imputation : écart toléré à la cible", Decimal("5"), "points"),
+    "REPORTING_JOUR_J4": ("Reporting Direction : jour cible (J+n après la fin du mois)", Decimal("4"), "jours"),
+    "REPORTING_JOUR_J6": ("Reporting Direction : jour limite (J+n après la fin du mois)", Decimal("6"), "jours"),
+}
+
+
+def get_param_gestion(code):
+    """Valeur du paramètre `code` ; crée le défaut provisoire si absent."""
+    from .models import ParametreGestion
+
+    label, valeur, unite = PARAMETRES_DEFAUT[code]
+    obj, _ = ParametreGestion.objects.get_or_create(
+        code=code, defaults={"label": label, "valeur": valeur, "unite": unite}
+    )
+    return obj.valeur
+
+
+def parametres_gestion_provisoires(codes):
+    """Vrai si l'un des paramètres `codes` n'est pas encore confirmé par ETSL."""
+    from .models import ParametreGestion
+
+    for c in codes:
+        get_param_gestion(c)
+    return ParametreGestion.objects.filter(code__in=codes).exclude(statut_valeur="confirme").exists()
+
+
+# --------------------------------------------------------------------------------------------------
+# Sous-activité : centres 90 / 91 / 99 (CDC M11 §4.4)
+# --------------------------------------------------------------------------------------------------
+CODES_SOUS_ACTIVITE = ("SOUS_ACTIVITE_SEUIL_90", "SOUS_ACTIVITE_SEUIL_91")
+CODES_DOCTRINE = ("RGM_MIX_A", "RGM_MIX_B", "RGM_MIX_C", "RGM_TOLERANCE_MIX")
+
+
+def classer_centre(taux_pct):
+    """Centre 90 (≤ seuil bas), 91 (jusqu'au seuil haut) ou 99 (au-delà) selon le taux de sous-activité en %."""
+    if taux_pct <= get_param_gestion("SOUS_ACTIVITE_SEUIL_90"):
+        return "90"
+    if taux_pct <= get_param_gestion("SOUS_ACTIVITE_SEUIL_91"):
+        return "91"
+    return "99"
+
+
+def compute_sous_activite(fiscal_year, today=None):
+    """Taux de sous-activité par budget approuvé/clôturé : part du budget non consommée sur les périodes écoulées."""
+    from accounting_kernel.models import Period
+
+    from .models import Budget
+
+    today = today or timezone.localdate()
+    ecoulees = set(
+        Period.objects.filter(fiscal_year_id=fiscal_year, end_date__lt=today).values_list("id", flat=True)
+    )
+    budgets = Budget.objects.filter(
+        fiscal_year_id=fiscal_year, statut__in=(Budget.Statut.APPROUVE, Budget.Statut.CLOTURE)
+    ).select_related("analytic")
+    rows = []
+    for budget in budgets:
+        lignes = [x for x in compute_variance(budget)["lignes"] if x["period"] in ecoulees]
+        prevu = sum((x["montant"] for x in lignes), ZERO)
+        realise = sum((x["realise"] for x in lignes), ZERO)
+        if not prevu:
+            continue
+        taux = max(ZERO, (prevu - realise) * 100 / prevu).quantize(Decimal("0.01"))
+        rows.append({
+            "budget": budget.pk, "code": budget.code, "label": budget.label,
+            "analytic_label": budget.analytic.label if budget.analytic_id else "",
+            "budget_ecoule": prevu, "realise": realise, "taux_sous_activite": taux,
+            "centre": classer_centre(taux),
+        })
+    rows.sort(key=lambda r: (-r["taux_sous_activite"], r["code"]))
+    return {"rows": rows, "provisoire": parametres_gestion_provisoires(CODES_SOUS_ACTIVITE)}
+
+
+def alerter_sous_activite(today=None):
+    """Alerte (une seule fois par budget) lorsqu'un budget entre au centre 99 ; prévient Finance / DGA."""
+    from accounting_kernel.models import FiscalYear
+    from workflow.notifications import notify
+
+    from .models import AlerteSousActivite
+
+    today = today or timezone.localdate()
+    destinataires = list(User.objects.filter(role__in=(User.Role.FINANCE, User.Role.DGA), is_active=True))
+    crees = []
+    for fy in FiscalYear.objects.all():
+        for r in compute_sous_activite(fy.pk, today)["rows"]:
+            if r["centre"] != "99":
+                continue
+            alerte, cree = AlerteSousActivite.objects.get_or_create(
+                budget_id=r["budget"], centre="99",
+                defaults={"taux": r["taux_sous_activite"], "detecte_le": today},
+            )
+            if not cree:
+                continue
+            crees.append(alerte)
+            for user in destinataires:
+                notify(
+                    user, f"Sous-activité {r['taux_sous_activite']} % : {r['code']} (centre 99)",
+                    f"Le budget « {r['label']} » ({r['code']}) est sous-consommé de {r['taux_sous_activite']} % "
+                    f"sur les périodes écoulées : classement au centre 99.",
+                    kind="reminder",
+                )
+    return crees
+
+
+# --------------------------------------------------------------------------------------------------
+# Doctrine d'imputation Mix A / B / C (valeurs RGM_* = paramètres provisoires)
+# --------------------------------------------------------------------------------------------------
+def compute_doctrine(fiscal_year):
+    """Répartition réelle des budgets par classe de Mix (A/B/C) face à la cible paramétrée.
+
+    Interprétation provisoire : la part d'une classe = son budget / total des budgets classés. A et B sont
+    conformes à ±tolérance de la cible ; C l'est tant qu'il ne dépasse pas son plafond.
+    """
+    from .models import Budget
+
+    cible = {k: get_param_gestion(f"RGM_MIX_{k}") for k in "ABC"}
+    tol = get_param_gestion("RGM_TOLERANCE_MIX")
+    totaux = {k: ZERO for k in "ABC"}
+    non_classes = 0
+    for b in Budget.objects.filter(fiscal_year_id=fiscal_year).exclude(statut=Budget.Statut.BROUILLON):
+        if b.classe_mix in totaux:
+            totaux[b.classe_mix] += b.montant
+        else:
+            non_classes += 1
+    total = sum(totaux.values(), ZERO)
+    lignes = []
+    for k in "ABC":
+        part = (totaux[k] * 100 / total).quantize(Decimal("0.01")) if total else ZERO
+        conforme = (part <= cible[k]) if k == "C" else (abs(part - cible[k]) <= tol)
+        lignes.append({"classe": k, "montant": totaux[k], "part": part, "cible": cible[k],
+                       "conforme": conforme if total else None})
+    return {
+        "lignes": lignes, "non_classes": non_classes,
+        "cible_coherente": cible["A"] + cible["B"] + cible["C"] == 100,
+        "provisoire": parametres_gestion_provisoires(CODES_DOCTRINE),
+    }

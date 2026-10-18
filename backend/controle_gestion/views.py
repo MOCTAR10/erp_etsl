@@ -15,19 +15,24 @@ from rest_framework.response import Response
 
 from django.db.models import Prefetch
 
-from .models import AnalyseEcart, Budget, BudgetLigne, BudgetRevision, ClotureGestion
+from .models import AnalyseEcart, Budget, BudgetLigne, BudgetRevision, ClotureGestion, ParametreGestion
 from .serializers import (
     AnalyseEcartSerializer,
     BudgetLigneSerializer,
     BudgetRevisionSerializer,
     BudgetSerializer,
     ClotureGestionSerializer,
+    ParametreGestionSerializer,
 )
 from users.permissions import can_read_module
 from .services import (
     CanApproveBudget,
     CanManageGestion,
+    PARAMETRES_DEFAUT,
     compute_clotures_stats,
+    compute_doctrine,
+    compute_sous_activite,
+    get_param_gestion,
     compute_marges,
     can_see_amount,
     compute_variance,
@@ -357,3 +362,76 @@ class AnalyseEcartViewSet(viewsets.ReadOnlyModelViewSet):
         analyse.analyse_le = timezone.now()
         analyse.save()
         return Response(self.get_serializer(analyse).data)
+
+
+def _fiscal_year_requis(request):
+    fiscal_year = request.query_params.get("fiscal_year")
+    if not fiscal_year:
+        raise DRFValidationError("Paramètre `fiscal_year` requis.")
+    if not fiscal_year.isdigit():
+        raise DRFValidationError("Paramètre `fiscal_year` doit être un entier.")
+    return fiscal_year
+
+
+class SousActiviteView(viewsets.ViewSet):
+    """Classement des budgets en centres 90 / 91 / 99 selon le taux de sous-activité (CDC M11 §4.4)."""
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    @extend_schema(
+        parameters=[OpenApiParameter("fiscal_year", type=int, required=True)], responses={200: OpenApiTypes.OBJECT}
+    )
+    def list(self, request):
+        result = compute_sous_activite(_fiscal_year_requis(request))
+        if not can_see_amount(request.user):
+            for r in result["rows"]:
+                r["budget_ecoule"] = r["realise"] = None
+        return Response(result)
+
+
+class DoctrineView(viewsets.ViewSet):
+    """Doctrine d'imputation Mix A / B / C : répartition réelle face à la cible paramétrée (valeurs RGM_*)."""
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    @extend_schema(
+        parameters=[OpenApiParameter("fiscal_year", type=int, required=True)], responses={200: OpenApiTypes.OBJECT}
+    )
+    def list(self, request):
+        result = compute_doctrine(_fiscal_year_requis(request))
+        if not can_see_amount(request.user):
+            for r in result["lignes"]:
+                r["montant"] = None
+        return Response(result)
+
+
+class ParametreGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+    """Paramètres modifiables par ETSL ; création/suppression interdites (définis par le code)."""
+
+    queryset = ParametreGestion.objects.all()
+    serializer_class = ParametreGestionSerializer
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        for code in PARAMETRES_DEFAUT:
+            get_param_gestion(code)
+        return super().get_queryset()
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("controle_gestion")()]
+        if getattr(self, "action", None) == "confirmer":
+            return [CanApproveBudget()]
+        return [CanManageGestion()]
+
+    def create(self, request, *args, **kwargs):
+        raise DRFValidationError("Les paramètres sont prédéfinis : modifiez leur valeur.")
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        p = self.get_object()
+        p.statut_valeur = ParametreGestion.StatutValeur.CONFIRME
+        p.confirme_par = request.user
+        p.confirme_le = timezone.now()
+        p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(p).data)

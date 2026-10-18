@@ -2226,3 +2226,44 @@ export interface ClotureMensuelle {
   retard: "cloture_en_retard" | "envoi_en_retard" | null;
   has_amount_access: boolean;
 }
+
+export interface ParametreGestion {
+  id: string;
+  code: string;
+  label: string;
+  valeur: string;
+  unite: string;
+  statut_valeur: "provisoire" | "confirme";
+  est_provisoire: boolean;
+}
+
+export interface SousActiviteRow {
+  budget: string;
+  code: string;
+  label: string;
+  analytic_label: string;
+  budget_ecoule: string | null;
+  realise: string | null;
+  taux_sous_activite: string;
+  centre: "90" | "91" | "99";
+}
+
+export interface SousActiviteResult {
+  rows: SousActiviteRow[];
+  provisoire: boolean;
+}
+
+export interface DoctrineLigne {
+  classe: "A" | "B" | "C";
+  montant: string | null;
+  part: string;
+  cible: string;
+  conforme: boolean | null;
+}
+
+export interface DoctrineResult {
+  lignes: DoctrineLigne[];
+  non_classes: number;
+  cible_coherente: boolean;
+  provisoire: boolean;
+}
