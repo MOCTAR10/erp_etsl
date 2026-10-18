@@ -626,6 +626,20 @@ export interface BaremeCotisation {
   est_provisoire: boolean;
 }
 
+export interface BaremeImpot {
+  id: string;
+  code: string;
+  label: string;
+  tranches: { plafond: number | null; taux: number }[];
+  abattement_pct: string;
+  cotisations_deductibles: boolean;
+  date_effet: string;
+  date_fin: string | null;
+  statut_valeur: "provisoire" | "confirme";
+  source: string;
+  reference_texte: string;
+}
+
 export interface ParametrePaie {
   id: string;
   code: string;

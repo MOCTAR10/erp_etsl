@@ -33,3 +33,16 @@ test.describe("M9 RH & Paie : paramétrage des barèmes", () => {
     await expect(page.getByText("SMIG", { exact: true })).toBeVisible();
   });
 });
+
+test.describe("M9 : ETSL modifie les taux lui-même", () => {
+  test("un taux de cotisation se modifie depuis l'écran et repasse en provisoire", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.rh);
+    await page.goto("/rh-paie");
+    const ligne = page.getByRole("row", { name: /CNSS-VIEIL-S/ });
+    await ligne.getByRole("button", { name: "Modifier" }).click();
+    await ligne.getByLabel("Taux (%)").fill("5.5");
+    await ligne.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(page.getByRole("row", { name: /CNSS-VIEIL-S/ })).toContainText("5.5");
+    await expect(page.getByRole("row", { name: /CNSS-VIEIL-S/ })).toContainText("Provisoire");
+  });
+});

@@ -96,6 +96,8 @@ export const fr = {
     confirmComptabiliser: "Générer l'écriture comptable de paie ? Action non modifiable (extourne uniquement).",
   },
   baremes: {
+    modifier: "Modifier", annuler: "Annuler", impotTitle: "Impôt sur le revenu (barème progressif, montants mensuels par part)", tranche: "Plafond de tranche (F)", derniere: "au-delà", abattement: "Abattement (%)",
+    addTranche: "Ajouter une tranche", editHint: "Modifier une valeur la repasse en « provisoire ». Une valeur déjà utilisée par un bulletin validé exige « Nouvelle version ».",
     statut: "Statut", provisoire: "Provisoire", confirme: "Confirmé", confirmer: "Confirmer", confirmConfirmer: "Confirmer cette valeur (validée par ETSL / le cabinet de paie) ?",
     source: "Source", reference: "Référence du texte", historique: "Historique", reviser: "Nouvelle version", revisionDate: "Date d'effet de la nouvelle version (AAAA-MM-JJ)", revisionTaux: "Nouveau taux (%)",
     warnProvisoire: "{{count}} valeur(s) de paie provisoire(s) à faire confirmer par ETSL / le cabinet de paie : les bulletins et déclarations qui les utilisent portent un avertissement.",

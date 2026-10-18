@@ -219,3 +219,33 @@ class VersionsEtRecalculTests(M9Base):
             {"date_effet": "2027-01-01", "tranches": [{"plafond": None, "taux": 5}]}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(BaremeImpot.objects.filter(code="IR").count(), 2)
+
+
+class ModificationParEtslTests(M9Base):
+    """ETSL modifie lui-même taux, plafonds, tranches et paramètres (sans développeur)."""
+
+    def test_modifier_taux_plafond_tranches_et_parametre(self):
+        call_command("seed_baremes_legaux_provisoires")
+        _auth(self.client, "rh@etls.local")
+        bar = BaremeCotisation.objects.get(code="CNSS-VIEIL-P")
+        r = self.client.patch(f"{BASE}baremes/{bar.pk}/", {"taux": "10.5", "plafond": "1600000"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        bar.refresh_from_db()
+        self.assertEqual((bar.taux, bar.plafond), (Decimal("10.5"), Decimal("1600000")))
+
+        imp = BaremeImpot.objects.get(code="IRPP")
+        tranches = [{"plafond": 150000, "taux": 0}, {"plafond": None, "taux": 12}]
+        r = self.client.patch(f"{BASE}baremes-impot/{imp.pk}/", {"tranches": tranches, "abattement_pct": "15"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        imp.refresh_from_db()
+        self.assertEqual((imp.tranches, imp.abattement_pct), (tranches, Decimal("15")))
+        # tranches incohérentes refusées
+        r = self.client.patch(f"{BASE}baremes-impot/{imp.pk}/", {"tranches": [{"plafond": 1, "taux": 1}]}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+        param = ParametrePaie.objects.get(code="HS_MAJ_1")
+        r = self.client.patch(f"{BASE}parametres-paie/{param.pk}/", {"valeur": "15"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        param.refresh_from_db()
+        self.assertEqual(param.valeur, Decimal("15"))
+        self.assertEqual(HistoriqueBareme.objects.filter(action="modification").count(), 3)
