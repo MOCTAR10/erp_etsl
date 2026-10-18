@@ -10,29 +10,42 @@ from rest_framework.response import Response
 
 from .models import (
     ActionHse,
+    AuditHse,
     BordereauDechet,
+    ConstatAudit,
+    Duer,
     Epi,
     EquipementAtex,
     EvaluationRisque,
+    ExerciceUrgence,
+    ExigenceHabilitation,
     FormationSecurite,
     Incident,
     PermisTravail,
+    PlanUrgence,
 )
 from .serializers import (
     ActionHseSerializer,
+    AuditHseSerializer,
     BordereauDechetSerializer,
+    ConstatAuditSerializer,
+    DuerSerializer,
     EpiSerializer,
     EquipementAtexSerializer,
     EvaluationRisqueSerializer,
+    ExerciceUrgenceSerializer,
+    ExigenceHabilitationSerializer,
     FormationSecuriteSerializer,
     IncidentSerializer,
     PermisTravailSerializer,
+    PlanUrgenceSerializer,
 )
 from .services import (
     PERMIS_NIVEAU_LIBELLES,
     CanManageHse,
     CanValidateHse,
     can_validate_hse,
+    habilitations_manquantes,
     peut_signer_niveau,
 )
 
@@ -137,6 +150,11 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         if permis.date_fin and permis.date_fin < aujourdhui:
             return Response(
                 {"detail": "Permis expiré : sa date de fin est dépassée."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if manquantes := habilitations_manquantes(permis, aujourdhui):
+            return Response(
+                {"detail": "Habilitation manquante ou expirée - " + " ; ".join(manquantes)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if permis.gaz_obligatoire and not permis.test_gaz_valide:
@@ -501,4 +519,123 @@ class BordereauDechetViewSet(viewsets.ModelViewSet):
                 BordereauDechet.TypeDechet.BATTERIES,
                 BordereauDechet.TypeDechet.PEINTURES,
             ])
+        return qs
+
+
+class ExigenceHabilitationViewSet(viewsets.ModelViewSet):
+    queryset = ExigenceHabilitation.objects.all()
+    serializer_class = ExigenceHabilitationSerializer
+    permission_classes = [CanValidateHse]
+
+
+class AuditHseViewSet(viewsets.ModelViewSet):
+    queryset = AuditHse.objects.all()
+    serializer_class = AuditHseSerializer
+    permission_classes = [CanManageHse]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if statut := self.request.query_params.get("statut"):
+            qs = qs.filter(statut=statut)
+        return qs
+
+    @action(detail=True, methods=["post"], url_path="realiser")
+    @transaction.atomic
+    def realiser(self, request, pk=None):
+        audit = AuditHse.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if audit.statut != AuditHse.Statut.PLANIFIE:
+            return Response({"detail": "Seul un audit planifié peut être réalisé."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            score = serializers.IntegerField(min_value=0, max_value=100).run_validation(request.data.get("score"))
+            jour = serializers.DateField().run_validation(request.data.get("date_realisation") or timezone.localdate())
+        except serializers.ValidationError as exc:
+            return Response({"detail": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+        audit.score, audit.date_realisation = score, jour
+        audit.statut = AuditHse.Statut.REALISE
+        audit.realise_par = request.user
+        audit.save()
+        return Response(self.get_serializer(audit).data)
+
+    @action(detail=True, methods=["post"], url_path="cloturer")
+    @transaction.atomic
+    def cloturer(self, request, pk=None):
+        audit = AuditHse.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if audit.statut != AuditHse.Statut.REALISE:
+            return Response({"detail": "Seul un audit réalisé peut être clôturé."}, status=status.HTTP_400_BAD_REQUEST)
+        if ecarts := audit.ecarts_ouverts:
+            return Response(
+                {"detail": f"{len(ecarts)} écart(s) sans action corrective clôturée : clôture impossible."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        audit.statut = AuditHse.Statut.CLOTURE
+        audit.cloture_par, audit.cloture_le = request.user, timezone.now()
+        audit.save()
+        return Response(self.get_serializer(audit).data)
+
+
+class ConstatAuditViewSet(viewsets.ModelViewSet):
+    queryset = ConstatAudit.objects.select_related("audit", "action").all()
+    serializer_class = ConstatAuditSerializer
+    permission_classes = [CanManageHse]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if audit := self.request.query_params.get("audit"):
+            qs = qs.filter(audit_id=audit)
+        return qs
+
+
+class DuerViewSet(viewsets.ModelViewSet):
+    queryset = Duer.objects.all()
+    serializer_class = DuerSerializer
+    permission_classes = [CanValidateHse]
+
+    @action(detail=True, methods=["post"], url_path="approuver")
+    @transaction.atomic
+    def approuver(self, request, pk=None):
+        duer = Duer.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if duer.statut == Duer.Statut.APPROUVE:
+            return Response({"detail": "DUER déjà approuvé."}, status=status.HTTP_400_BAD_REQUEST)
+        risques = list(duer.risques.all())
+        if not risques:
+            return Response({"detail": "Aucun risque évalué : approbation impossible."}, status=status.HTTP_400_BAD_REQUEST)
+        sans_mesure = [
+            r.code for r in risques
+            if r.criticite in (EvaluationRisque.Criticite.ELEVEE, EvaluationRisque.Criticite.CRITIQUE)
+            and not r.mesure.strip()
+        ]
+        if sans_mesure:
+            return Response(
+                {"detail": f"Risque(s) élevé(s)/critique(s) sans mesure de prévention : {', '.join(sans_mesure)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        duer.statut = Duer.Statut.APPROUVE
+        duer.approuve_par, duer.approuve_le = request.user, timezone.now()
+        duer.save()
+        return Response(self.get_serializer(duer).data)
+
+
+class PlanUrgenceViewSet(viewsets.ModelViewSet):
+    queryset = PlanUrgence.objects.all()
+    serializer_class = PlanUrgenceSerializer
+    permission_classes = [CanManageHse]
+
+    def list(self, request, *args, **kwargs):
+        # `en_retard` dépend des exercices : filtre calculé en Python (volume faible : quelques plans par site).
+        if request.query_params.get("en_retard") == "1":
+            plans = [p for p in self.filter_queryset(self.get_queryset()) if p.en_retard]
+            page = self.paginate_queryset(plans)
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return super().list(request, *args, **kwargs)
+
+
+class ExerciceUrgenceViewSet(viewsets.ModelViewSet):
+    queryset = ExerciceUrgence.objects.select_related("plan").all()
+    serializer_class = ExerciceUrgenceSerializer
+    permission_classes = [CanManageHse]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if plan := self.request.query_params.get("plan"):
+            qs = qs.filter(plan_id=plan)
         return qs

@@ -18,6 +18,7 @@ import type {
   PermisTravail,
   StatutIncident,
 } from "../types";
+import { ConformiteHse } from "../components/hse/ConformiteHse";
 import { PermisActions } from "../components/workflow/PermisActions";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
@@ -396,6 +397,7 @@ export function HsePage() {
           <DataTable rows={epiAll} columns={epiColumns(t)} caption={t("hse.epi")} />
         </SectionCard>
       )}
+      <ConformiteHse />
       {bsdAll.length > 0 && (
         <SectionCard title={`${t("hse.bsd")} · ${bsdAll.length}`}>
           <DataTable rows={bsdAll} columns={bsdColumns(t)} caption={t("hse.bsd")} />

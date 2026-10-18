@@ -11,9 +11,11 @@ gravité × probabilité (inspiration OCA management-system — concepts uniquem
 """
 
 import uuid
+from calendar import monthrange
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -144,6 +146,9 @@ class PermisTravail(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="hse_tests_gaz", verbose_name="Test gaz - par",
     )
+    intervenants = models.ManyToManyField(
+        "rh_paie.Employe", blank=True, related_name="permis_hse", verbose_name="Intervenants",
+    )
     notes = models.TextField(blank=True, verbose_name="Notes")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -238,6 +243,10 @@ class EvaluationRisque(models.Model):
         on_delete=models.PROTECT,
         related_name="evaluations_risques",
         verbose_name="Affaire",
+    )
+    duer = models.ForeignKey(
+        "hse.Duer", null=True, blank=True, on_delete=models.PROTECT, related_name="risques",
+        verbose_name="DUER",
     )
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.OUVERTE, verbose_name="Statut"
@@ -715,3 +724,240 @@ class BordereauDechet(models.Model):
         if not self.code:
             self.code = HseSequence.next_for("BSD", "BSD")
         return super().save(*args, **kwargs)
+
+
+class ExigenceHabilitation(models.Model):
+    """Habilitation exigée pour un type de permis : une qualification RH valide dont l'intitulé contient `mot_cle`."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    type_permis = models.CharField(max_length=14, choices=PermisTravail.TypePermis.choices, verbose_name="Type de permis")
+    mot_cle = models.CharField(max_length=80, verbose_name="Mot-clé de l'intitulé de qualification")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+
+    class Meta:
+        ordering = ["type_permis", "mot_cle"]
+        verbose_name = "Exigence d'habilitation"
+        verbose_name_plural = "Exigences d'habilitation"
+        constraints = [models.UniqueConstraint(fields=["type_permis", "mot_cle"], name="uniq_exigence_hab")]
+
+    def __str__(self):
+        return f"{self.get_type_permis_display()} → {self.mot_cle}"
+
+
+class AuditHse(models.Model):
+    """Audit ou inspection HSE planifié, réalisé puis clôturé quand tous les écarts ont une action clôturée."""
+
+    class TypeAudit(models.TextChoices):
+        AUDIT = "audit", "Audit"
+        INSPECTION = "inspection", "Inspection"
+
+    class Statut(models.TextChoices):
+        PLANIFIE = "planifie", "Planifié"
+        REALISE = "realise", "Réalisé"
+        CLOTURE = "cloture", "Clôturé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    type_audit = models.CharField(max_length=12, choices=TypeAudit.choices, default=TypeAudit.AUDIT, verbose_name="Type")
+    zone = models.CharField(max_length=200, verbose_name="Zone / périmètre")
+    referentiel = models.CharField(max_length=120, blank=True, verbose_name="Référentiel (ISO 45001, ISO 14001…)")
+    date_prevue = models.DateField(default=timezone.localdate, verbose_name="Date prévue")
+    date_realisation = models.DateField(null=True, blank=True, verbose_name="Réalisé le")
+    score = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Score de conformité (%)")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.PLANIFIE, verbose_name="Statut")
+    realise_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Réalisé par",
+    )
+    cloture_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Clôturé par",
+    )
+    cloture_le = models.DateTimeField(null=True, blank=True, verbose_name="Clôturé le")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_prevue"]
+        verbose_name = "Audit / inspection HSE"
+        verbose_name_plural = "Audits & inspections HSE"
+
+    def __str__(self):
+        return f"{self.code} — {self.get_type_audit_display()} {self.zone}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("AUD", "AUD")
+        return super().save(*args, **kwargs)
+
+    @property
+    def ecarts_ouverts(self):
+        """Écarts (constats non conformes) sans action, ou dont l'action n'est pas clôturée."""
+        return [
+            c for c in self.constats.select_related("action")
+            if c.gravite != ConstatAudit.Gravite.CONFORME
+            and (c.action_id is None or c.action.statut != ActionHse.Statut.CLOTUREE)
+        ]
+
+
+class ConstatAudit(models.Model):
+    """Constat d'un audit ; un écart (non conforme) doit être rattaché à une action HSE."""
+
+    class Gravite(models.TextChoices):
+        CONFORME = "conforme", "Conforme"
+        MINEUR = "mineur", "Écart mineur"
+        MAJEUR = "majeur", "Écart majeur"
+        CRITIQUE = "critique", "Écart critique"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    audit = models.ForeignKey(AuditHse, on_delete=models.CASCADE, related_name="constats", verbose_name="Audit")
+    description = models.TextField(verbose_name="Constat")
+    gravite = models.CharField(max_length=10, choices=Gravite.choices, default=Gravite.MINEUR, verbose_name="Gravité")
+    action = models.ForeignKey(
+        ActionHse, null=True, blank=True, on_delete=models.SET_NULL, related_name="constats_audit",
+        verbose_name="Action corrective",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Constat d'audit"
+        verbose_name_plural = "Constats d'audit"
+
+    def __str__(self):
+        return f"{self.audit.code} — {self.get_gravite_display()}"
+
+
+class Duer(models.Model):
+    """Document unique d'évaluation des risques : versionné par (année, périmètre), scellé à l'approbation."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        APPROUVE = "approuve", "Approuvé"
+
+    #: Revue au moins annuelle (obligation légale du DUER).
+    REVUE_JOURS = 365
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    annee = models.PositiveSmallIntegerField(verbose_name="Année")
+    perimetre = models.CharField(max_length=200, verbose_name="Périmètre (site / unité)")
+    version = models.PositiveSmallIntegerField(default=1, verbose_name="Version")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    approuve_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Approuvé par",
+    )
+    approuve_le = models.DateTimeField(null=True, blank=True, verbose_name="Approuvé le")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-annee", "-version"]
+        verbose_name = "DUER"
+        verbose_name_plural = "DUER"
+        constraints = [models.UniqueConstraint(fields=["annee", "perimetre", "version"], name="uniq_duer_version")]
+
+    def __str__(self):
+        return f"{self.code} — {self.perimetre} {self.annee} v{self.version}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("DUER", "DUER")
+            self.version = (
+                Duer.objects.filter(annee=self.annee, perimetre=self.perimetre).aggregate(m=models.Max("version"))["m"] or 0
+            ) + 1
+        return super().save(*args, **kwargs)
+
+    @property
+    def a_revoir(self):
+        if self.statut != self.Statut.APPROUVE or not self.approuve_le:
+            return False
+        return (timezone.now() - self.approuve_le).days > self.REVUE_JOURS
+
+
+class PlanUrgence(models.Model):
+    """Plan d'urgence / d'intervention (ISO 14001, ISO 45001) avec périodicité d'exercice."""
+
+    class TypePlan(models.TextChoices):
+        INCENDIE = "incendie", "Incendie / évacuation"
+        DEVERSEMENT = "deversement", "Déversement / pollution"
+        MEDICAL = "medical", "Urgence médicale"
+        ATEX = "atex", "Explosion / ATEX"
+        AUTRE = "autre", "Autre"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    type_plan = models.CharField(max_length=12, choices=TypePlan.choices, default=TypePlan.INCENDIE, verbose_name="Type")
+    intitule = models.CharField(max_length=200, verbose_name="Intitulé")
+    perimetre = models.CharField(max_length=200, blank=True, verbose_name="Site / périmètre")
+    periodicite_mois = models.PositiveSmallIntegerField(
+        default=12, validators=[MinValueValidator(1)], verbose_name="Périodicité des exercices (mois)",
+    )
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["intitule"]
+        verbose_name = "Plan d'urgence"
+        verbose_name_plural = "Plans d'urgence"
+
+    def __str__(self):
+        return f"{self.code} — {self.intitule}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("PUR", "PUR")
+        return super().save(*args, **kwargs)
+
+    @property
+    def dernier_exercice(self):
+        ex = self.exercices.order_by("-date_exercice").first()
+        return ex.date_exercice if ex else None
+
+    @property
+    def prochain_exercice(self):
+        dernier = self.dernier_exercice
+        if not dernier:
+            return None
+        total = dernier.month - 1 + self.periodicite_mois
+        annee, mois = dernier.year + total // 12, total % 12 + 1
+        return dernier.replace(year=annee, month=mois, day=min(dernier.day, monthrange(annee, mois)[1]))
+
+    @property
+    def en_retard(self):
+        if not self.actif:
+            return False
+        prochain = self.prochain_exercice
+        return prochain is None or prochain < timezone.localdate()
+
+
+class ExerciceUrgence(models.Model):
+    """Exercice (simulation) d'un plan d'urgence, avec résultat et observations."""
+
+    class Resultat(models.TextChoices):
+        SATISFAISANT = "satisfaisant", "Satisfaisant"
+        INSUFFISANT = "insuffisant", "Insuffisant"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    plan = models.ForeignKey(PlanUrgence, on_delete=models.CASCADE, related_name="exercices", verbose_name="Plan")
+    date_exercice = models.DateField(verbose_name="Date de l'exercice")
+    participants = models.PositiveIntegerField(default=0, verbose_name="Participants")
+    resultat = models.CharField(max_length=12, choices=Resultat.choices, default=Resultat.SATISFAISANT, verbose_name="Résultat")
+    observations = models.TextField(blank=True, verbose_name="Observations / axes d'amélioration")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_exercice"]
+        verbose_name = "Exercice d'urgence"
+        verbose_name_plural = "Exercices d'urgence"
+
+    def __str__(self):
+        return f"{self.plan.code} — {self.date_exercice}"
+
+    def clean(self):
+        if self.date_exercice and self.date_exercice > timezone.localdate():
+            raise ValidationError({"date_exercice": "Un exercice ne peut pas être daté dans le futur."})
+        if self.resultat == self.Resultat.INSUFFISANT and not (self.observations or "").strip():
+            raise ValidationError({"observations": "Observations obligatoires pour un exercice insuffisant."})

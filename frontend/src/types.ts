@@ -2043,3 +2043,39 @@ export interface JournalAcces {
   ip: string | null;
   chemin: string;
 }
+
+
+export interface AuditHse {
+  id: string;
+  code: string;
+  type_audit: "audit" | "inspection";
+  zone: string;
+  date_prevue: string;
+  score: number | null;
+  statut: "planifie" | "realise" | "cloture";
+  nb_constats: number;
+  nb_ecarts_ouverts: number;
+}
+
+export interface Duer {
+  id: string;
+  code: string;
+  annee: number;
+  perimetre: string;
+  version: number;
+  statut: "brouillon" | "approuve";
+  nb_risques: number;
+  a_revoir: boolean;
+}
+
+export interface PlanUrgence {
+  id: string;
+  code: string;
+  type_plan: string;
+  type_label: string;
+  intitule: string;
+  periodicite_mois: number;
+  dernier_exercice: string | null;
+  prochain_exercice: string | null;
+  en_retard: boolean;
+}
