@@ -63,8 +63,8 @@ class CompteBancaireSerializer(serializers.ModelSerializer):
 class LigneReleveSerializer(serializers.ModelSerializer):
     class Meta:
         model = LigneReleve
-        fields = ["id", "releve", "date", "libelle", "reference", "debit", "credit", "rapprochee"]
-        read_only_fields = ["rapprochee"]
+        fields = ["id", "releve", "date", "libelle", "reference", "debit", "credit", "rapprochee", "paiement"]
+        read_only_fields = ["rapprochee", "paiement"]
 
 
 class ReleveBancaireSerializer(serializers.ModelSerializer):
@@ -95,9 +95,10 @@ class ReleveBancaireSerializer(serializers.ModelSerializer):
             "total_debit",
             "total_credit",
             "lignes",
+            "anomalies",
             "created_at",
         ]
-        read_only_fields = ["code", "statut"]
+        read_only_fields = ["code", "statut", "anomalies"]
 
 
 class LigneRapprochementSerializer(serializers.ModelSerializer):

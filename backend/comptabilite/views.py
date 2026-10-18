@@ -48,10 +48,22 @@ from .services import (
     compute_declaration_tva,
     delettrer,
     get_param,
+    importer_releve,
+    rapprocher_auto,
     lettrer_auto,
     lettrer_lignes,
     parametres_provisoires,
 )
+
+
+def _est_uuid(valeur):
+    import uuid
+
+    try:
+        uuid.UUID(str(valeur))
+        return True
+    except (ValueError, AttributeError):
+        return False
 
 
 class DjangoValidationMixin:
@@ -98,9 +110,32 @@ class ReleveBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    @action(detail=False, methods=["post"], url_path="importer")
+    def importer(self, request):
+        """Importe un relevé MT940 ou CFONB 120 (champ `contenu` ou fichier `fichier`) — gabarits standard."""
+        compte = CompteBancaire.objects.filter(pk=request.data.get("compte_bancaire")).first() \
+            if _est_uuid(request.data.get("compte_bancaire")) else None
+        if compte is None:
+            raise DRFValidationError("Compte bancaire inconnu : fournissez `compte_bancaire`.")
+        fichier = request.FILES.get("fichier")
+        if fichier is not None:
+            brut = fichier.read(5_000_001)
+            if len(brut) > 5_000_000:
+                raise DRFValidationError("Fichier trop volumineux (5 Mo maximum).")
+            try:
+                texte = brut.decode("utf-8")
+            except UnicodeDecodeError:
+                texte = brut.decode("latin-1")
+        else:
+            texte = request.data.get("contenu")
+        if not isinstance(texte, str) or not texte.strip():
+            raise DRFValidationError("Fournissez le fichier (`fichier`) ou son texte (`contenu`).")
+        releve = importer_releve(compte, texte, request.data.get("format") or "auto", request.user)
+        return Response(self.get_serializer(releve).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["post"], url_path="lignes")
     def add_lignes(self, request, pk=None):
-        """Ajoute des lignes de relevé (import CFONB / MT940 fortement simplifié)."""
+        """Ajoute des lignes de relevé saisies à la main."""
         releve = self.get_object()
         if releve.statut == ReleveBancaire.Statut.VALIDE:
             raise DRFValidationError("Relevé déjà validé — lignes verrouillées.")
@@ -139,6 +174,24 @@ class RapprochementBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet)
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="rapprocher-auto")
+    def rapprocher_auto_action(self, request):
+        """Rapproche automatiquement relevés et paiements validés d'un compte bancaire (RF-ERP-91)."""
+        compte = CompteBancaire.objects.filter(pk=request.data.get("compte_bancaire")).first() \
+            if _est_uuid(request.data.get("compte_bancaire")) else None
+        if compte is None:
+            raise DRFValidationError("Compte bancaire inconnu : fournissez `compte_bancaire`.")
+        res = rapprocher_auto(compte, request.user)
+        rap = res.pop("rapprochement")
+        res["rapprochement"] = str(rap.id) if rap else None
+        res["parametres_provisoires"] = parametres_provisoires(["RAPPRO_TOLERANCE_JOURS", "RAPPRO_TOLERANCE_MONTANT"])
+        if not can_see_amount(request.user):
+            for item in res["ambigues"] + res["lignes_sans_paiement"]:
+                item["debit"] = item["credit"] = None
+            for item in res["paiements_sans_ligne"]:
+                item["montant"] = None
+        return Response(res)
 
     @action(detail=True, methods=["post"], url_path="lignes")
     def add_lignes(self, request, pk=None):

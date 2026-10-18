@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { BanqueSection } from "../components/workflow/BanqueSection";
 import { LettrageSection } from "../components/workflow/LettrageSection";
 import { formatDate, formatNumber } from "../lib/format";
 import type {
@@ -367,6 +368,8 @@ export function ComptabilitePage() {
           </div>
         </SectionCard>
       )}
+
+      <BanqueSection />
 
       <LettrageSection />
 

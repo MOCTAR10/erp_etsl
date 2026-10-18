@@ -167,6 +167,11 @@ class ReleveBancaire(models.Model):
         on_delete=models.SET_NULL,
         related_name="releves_bancaires",
     )
+    empreinte = models.CharField(
+        max_length=64, blank=True, db_index=True, verbose_name="Empreinte SHA-256 du fichier importé",
+        help_text="Empêche d'importer deux fois le même fichier pour un compte.",
+    )
+    anomalies = models.JSONField(default=list, blank=True, verbose_name="Anomalies détectées à l'import")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -208,6 +213,10 @@ class LigneReleve(models.Model):
     debit = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Débit")
     credit = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Crédit")
     rapprochee = models.BooleanField(default=False, verbose_name="Rapprochée")
+    paiement = models.ForeignKey(
+        "Paiement", null=True, blank=True, on_delete=models.SET_NULL, related_name="lignes_releve",
+        verbose_name="Paiement rapproché",
+    )
 
     class Meta:
         ordering = ["date", "id"]

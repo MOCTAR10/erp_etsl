@@ -8,6 +8,7 @@ refacturation intra-groupe s'appuie sur le partenaire flaggé `is_global_rental`
 et le compte 618 (M4/M5, RF-ERP-93).
 """
 
+import hashlib
 from datetime import timedelta
 from decimal import Decimal
 
@@ -20,7 +21,17 @@ from accounting_kernel.models import AccountMove, AccountMoveLine
 from users.models import User
 from users.rbac import can_read_app
 
-from .models import Lettrage, LigneLettree, ParametreCompta, Paiement
+from . import bancaire
+from .models import (
+    Lettrage,
+    LigneLettree,
+    LigneRapprochement,
+    LigneReleve,
+    Paiement,
+    ParametreCompta,
+    RapprochementBancaire,
+    ReleveBancaire,
+)
 
 COMPTA_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -242,6 +253,8 @@ PARAMETRES_DEFAUT = {
     "LETTRAGE_TOLERANCE": ("Tolérance d'écart de lettrage", Decimal("0"), "FCFA"),
     "LETTRAGE_DELAI_ANOMALIE_JOURS": (
         "Ancienneté d'une ligne non lettrée signalée en anomalie", Decimal("90"), "jours"),
+    "RAPPRO_TOLERANCE_JOURS": ("Écart de date toléré entre relevé et paiement", Decimal("3"), "jours"),
+    "RAPPRO_TOLERANCE_MONTANT": ("Écart de montant toléré entre relevé et paiement", Decimal("0"), "FCFA"),
 }
 
 
@@ -384,3 +397,104 @@ def anomalies_lettrage(compte):
             "debit": l.debit, "credit": l.credit, "tiers": str(l.partner_id) if l.partner_id else None,
         })
     return delai, out
+
+
+# --------------------------------------------------------------------------------------------------
+# Import des relevés MT940 / CFONB 120 et rapprochement bancaire automatique (RF-ERP-91)
+# --------------------------------------------------------------------------------------------------
+@transaction.atomic
+def importer_releve(compte_bancaire, texte, format_, user):
+    """Lit le fichier (gabarit standard), crée le relevé et ses lignes, enregistre les anomalies."""
+    try:
+        data = bancaire.parse(texte, format_)
+    except bancaire.FichierBancaireInvalide as e:
+        raise ValidationError(str(e))
+    empreinte = hashlib.sha256(texte.encode("utf-8")).hexdigest()
+    if ReleveBancaire.objects.filter(compte_bancaire=compte_bancaire, empreinte=empreinte).exists():
+        raise ValidationError("Ce fichier a déjà été importé pour ce compte bancaire.")
+    anomalies = list(data["anomalies"])
+    numero = "".join(ch for ch in (compte_bancaire.numero or "") if ch.isalnum())
+    fichier = "".join(ch for ch in data["compte"] if ch.isalnum())
+    if numero and fichier and not (numero.endswith(fichier) or fichier.endswith(numero)):
+        anomalies.append({
+            "type": "compte_different",
+            "message": f"Le compte du fichier ({data['compte']}) diffère de celui du compte bancaire ({compte_bancaire.numero}).",
+        })
+    lignes = data["lignes"]
+    dates = [l["date"] for l in lignes]
+    aujourdhui = timezone.localdate()
+    releve = ReleveBancaire.objects.create(
+        compte_bancaire=compte_bancaire,
+        date_debut=data["date_debut"] or (min(dates) if dates else aujourdhui),
+        date_fin=data["date_fin"] or (max(dates) if dates else aujourdhui),
+        solde_initial=data["solde_initial"] or 0,
+        solde_final=data["solde_final"] or 0,
+        source=ReleveBancaire.Source.MT940 if data["format"] == "mt940" else ReleveBancaire.Source.CFONB,
+        created_by=user, empreinte=empreinte, anomalies=anomalies,
+    )
+    LigneReleve.objects.bulk_create([
+        LigneReleve(releve=releve, date=l["date"], libelle=l["libelle"], reference=l["reference"],
+                    debit=l["debit"], credit=l["credit"])
+        for l in lignes
+    ])
+    return releve
+
+
+def _lien(l):
+    return {"id": str(l.id), "date": l.date, "libelle": l.libelle, "debit": l.debit, "credit": l.credit}
+
+
+@transaction.atomic
+def rapprocher_auto(compte_bancaire, user):
+    """Rapproche les lignes de relevé non rapprochées avec les paiements validés non encore rapprochés :
+    même sens, montant égal (tolérance paramétrée), date proche (tolérance paramétrée). Une ligne n'est
+    rapprochée que si le candidat est unique, ou départagé par une référence identique."""
+    tol_j = timedelta(days=int(get_param("RAPPRO_TOLERANCE_JOURS")))
+    tol_m = get_param("RAPPRO_TOLERANCE_MONTANT")
+    lignes = list(
+        LigneReleve.objects.filter(releve__compte_bancaire=compte_bancaire, rapprochee=False)
+        .select_for_update(of=("self",)).order_by("date", "id")
+    )
+    deja = set(LigneReleve.objects.filter(paiement__isnull=False).values_list("paiement_id", flat=True))
+    paiements = [
+        p for p in Paiement.objects.filter(compte_bancaire=compte_bancaire, statut=Paiement.Statut.VALIDE)
+        if p.id not in deja
+    ]
+    prises, appariees, ambigues = set(), [], []
+    for l in lignes:
+        sens = Paiement.Sens.ENTREE if l.credit else Paiement.Sens.SORTIE
+        montant = l.credit or l.debit
+        cands = [
+            p for p in paiements
+            if p.id not in prises and p.sens == sens and abs(p.montant - montant) <= tol_m
+            and abs(p.date - l.date) <= tol_j
+        ]
+        if len(cands) > 1 and l.reference:
+            par_ref = [p for p in cands if p.reference and p.reference == l.reference]
+            cands = par_ref or cands
+        if len(cands) == 1:
+            prises.add(cands[0].id)
+            appariees.append((l, cands[0]))
+        elif len(cands) > 1:
+            ambigues.append(_lien(l))
+    rapprochement = None
+    if appariees:
+        rapprochement = RapprochementBancaire.objects.create(
+            compte_bancaire=compte_bancaire, created_by=user,
+            notes="Rapprochement automatique (montant, sens, date, référence).",
+        )
+        for l, p in appariees:
+            l.rapprochee, l.paiement = True, p
+            l.save(update_fields=["rapprochee", "paiement"])
+            LigneRapprochement.objects.create(rapprochement=rapprochement, ligne_releve=l)
+    apparies_ids = {l.id for l, _ in appariees}
+    ambigues_ids = {a["id"] for a in ambigues}
+    sans_paiement = [_lien(l) for l in lignes if l.id not in apparies_ids and str(l.id) not in ambigues_ids]
+    paiements_sans_ligne = [
+        {"id": str(p.id), "code": p.code, "date": p.date, "sens": p.sens, "montant": p.montant}
+        for p in paiements if p.id not in prises
+    ]
+    return {
+        "rapprochement": rapprochement, "rapprochees": len(appariees), "ambigues": ambigues,
+        "lignes_sans_paiement": sans_paiement, "paiements_sans_ligne": paiements_sans_ligne,
+    }
