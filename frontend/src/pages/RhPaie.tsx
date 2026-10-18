@@ -74,6 +74,11 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
         {b.disponible_le && <span className="badge ok"> {t("baremes.diffuse")}</span>}
         {b.move_number && <span className="badge brand"> {b.move_number}</span>}
       </span>
+      {b.avertissement && (
+        <p className="action-error" role="note" data-testid="avertissement-provisoire">
+          {b.avertissement}
+        </p>
+      )}
       <ActionBar
         actions={[
           ...(b.statut === "brouillon"

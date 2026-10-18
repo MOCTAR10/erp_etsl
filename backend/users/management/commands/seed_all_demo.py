@@ -284,6 +284,7 @@ SEED_ORDER = [
     "seed_hse_demo",
     "seed_maintenance_demo",
     "seed_rh_paie_demo",
+    "seed_baremes_legaux_provisoires",
     "seed_comptabilite_demo",
     "seed_controle_gestion_demo",
     "seed_juridique_demo",

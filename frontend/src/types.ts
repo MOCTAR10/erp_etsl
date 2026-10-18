@@ -619,6 +619,34 @@ export interface BaremeCotisation {
   date_effet: string;
   date_fin: string | null;
   ordre: number;
+  statut_valeur: "provisoire" | "confirme";
+  source: string;
+  reference_texte: string;
+  confirme_le: string | null;
+  est_provisoire: boolean;
+}
+
+export interface ParametrePaie {
+  id: string;
+  code: string;
+  label: string;
+  valeur: string;
+  unite: string;
+  date_effet: string;
+  date_fin: string | null;
+  statut_valeur: "provisoire" | "confirme";
+  source: string;
+  reference_texte: string;
+  est_provisoire: boolean;
+}
+
+export interface HistoriqueBareme {
+  id: string;
+  objet: string;
+  code: string;
+  action: string;
+  par_email: string | null;
+  le: string;
 }
 
 export type SourceNC = "controle" | "client" | "fournisseur" | "interne";
@@ -1283,6 +1311,8 @@ export interface BulletinLigne {
 }
 
 export interface BulletinPaie {
+  avertissement?: string;
+  baremes_provisoires?: string[];
   charges_patronales?: string | null;
   disponible_le?: string | null;
   consulte_le?: string | null;

@@ -21,6 +21,8 @@ from config.inputs import date_input
 from .models import (
     BaremeImpot,
     BaremeCotisation,
+    HistoriqueBareme,
+    ParametrePaie,
     BulletinPaie,
     ContratTravail,
     DemandeRecrutement,
@@ -34,6 +36,8 @@ from .models import (
 )
 from .serializers import (
     BaremeImpotSerializer,
+    HistoriqueBaremeSerializer,
+    ParametrePaieSerializer,
     MonBulletinSerializer,
     MonCongeSerializer,
     BaremeCotisationSerializer,
@@ -49,7 +53,16 @@ from .serializers import (
     SaisieTempsSerializer,
     SanctionSerializer,
 )
-from .services import CanManagePaie, CanManageRh, calculer_bulletin, comptabiliser_bulletin
+from .services import (
+    CanManagePaie,
+    CanManageRh,
+    bareme_fige,
+    calculer_bulletin,
+    comptabiliser_bulletin,
+    confirmer_valeur,
+    reviser_valeur,
+    tracer_changement,
+)
 
 
 class EmployeViewSet(viewsets.ModelViewSet):
@@ -578,8 +591,81 @@ class BulletinViewSet(viewsets.ModelViewSet):
         )
 
 
-class BaremeCotisationViewSet(viewsets.ModelViewSet):
+class BaremeVersionneMixin:
+    """Paramétrage sans développeur : cercle `CanManagePaie`, historique inaltérable, versions conservées.
+
+    - création / modification tracées dans `HistoriqueBareme` ;
+    - une valeur déjà appliquée à un bulletin validé n'est plus modifiable (→ `reviser`, nouvelle version) ;
+    - toute modification repasse la valeur à « provisoire » ; `confirmer` est une action explicite.
+    """
+
+    objet = ""
+    champs_valeurs = ()
+    permission_classes = [CanManagePaie]
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        tracer_changement(obj, self.objet, "creation", self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        from .services import _etat
+
+        # Instantané AVANT validation : le sérialiseur applique les valeurs sur l'instance (full_clean).
+        self._avant = _etat(self.get_object())
+        return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        avant = self._avant
+        if bareme_fige(serializer.instance) and any(c in self.request.data for c in self.champs_valeurs):
+            raise serializers.ValidationError(
+                {"detail": "Valeur déjà utilisée par un bulletin validé : créer une nouvelle version (action « reviser »)."}
+            )
+        obj = serializer.save(
+            statut_valeur="provisoire", confirme_par=None, confirme_le=None
+        ) if any(c in self.request.data for c in self.champs_valeurs) else serializer.save()
+        tracer_changement(obj, self.objet, "modification", self.request.user, avant)
+
+    def perform_destroy(self, instance):
+        from .services import _etat
+
+        if bareme_fige(instance):
+            raise serializers.ValidationError({"detail": "Valeur utilisée par un bulletin validé : suppression interdite."})
+        avant = _etat(instance)
+        tracer_changement(instance, self.objet, "suppression", self.request.user, avant)
+        instance.delete()
+
+    @extend_schema(request=None, responses=OpenApiTypes.OBJECT)
+    @action(detail=True, methods=["post"])
+    def confirmer(self, request, pk=None):
+        obj = confirmer_valeur(self.get_object(), self.objet, request.user)
+        return Response(self.get_serializer(obj).data)
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
+    @action(detail=True, methods=["post"])
+    def reviser(self, request, pk=None):
+        """Nouvelle version datée : `{"date_effet": "...", <champs modifiés>}`. L'ancienne est close la veille."""
+        data = request.data
+        champ_date = serializers.DateField().run_validation(data.get("date_effet"))
+        champs = {c: data[c] for c in self.champs_valeurs + ("source", "reference_texte") if c in data}
+        try:
+            nouvelle = reviser_valeur(self.get_object(), self.objet, request.user, champ_date, champs)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(nouvelle).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(responses=HistoriqueBaremeSerializer(many=True))
+    @action(detail=True, methods=["get"])
+    def historique(self, request, pk=None):
+        obj = self.get_object()
+        qs = HistoriqueBareme.objects.filter(objet=self.objet, code=obj.code)
+        return Response(HistoriqueBaremeSerializer(qs, many=True).data)
+
+
+class BaremeCotisationViewSet(BaremeVersionneMixin, viewsets.ModelViewSet):
     """Barèmes de cotisation versionnés (taux/plafonds = données, à valider avec ETSL)."""
+
+    objet = "cotisation"
+    champs_valeurs = ("taux", "plafond", "base", "nature", "organisme", "label")
 
     queryset = BaremeCotisation.objects.all()
     serializer_class = BaremeCotisationSerializer
@@ -677,9 +763,30 @@ class MonCongeAnnulerView(APIView):
         return Response(MonCongeSerializer(demande).data)
 
 
-class BaremeImpotViewSet(viewsets.ModelViewSet):
+class BaremeImpotViewSet(BaremeVersionneMixin, viewsets.ModelViewSet):
     """Barème progressif de l'impôt sur le revenu (tranches mensuelles par part) — donnée à valider avec ETSL."""
+
+    objet = "impot"
+    champs_valeurs = ("tranches", "abattement_pct", "cotisations_deductibles", "label")
 
     queryset = BaremeImpot.objects.all()
     serializer_class = BaremeImpotSerializer
     permission_classes = [CanManagePaie]
+
+
+class ParametrePaieViewSet(BaremeVersionneMixin, viewsets.ModelViewSet):
+    """Paramètres versionnés (SMIG, durée légale, majorations d'heures supplémentaires, taxes patronales)."""
+
+    objet = "parametre"
+    champs_valeurs = ("valeur", "unite", "label")
+    queryset = ParametrePaie.objects.all()
+    serializer_class = ParametrePaieSerializer
+
+
+class HistoriqueBaremeViewSet(viewsets.ReadOnlyModelViewSet):
+    """Journal inaltérable des changements de barèmes (lecture seule, cercle paie)."""
+
+    queryset = HistoriqueBareme.objects.select_related("par")
+    serializer_class = HistoriqueBaremeSerializer
+    permission_classes = [CanManagePaie]
+    filterset_fields = ["objet", "code"]
