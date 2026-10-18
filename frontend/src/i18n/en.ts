@@ -403,6 +403,7 @@ export const en = {
     },
   },
   purchases: {
+    search: "Search purchase orders (code, supplier)…",
     da: {
       title: "Purchase requests", new: "New purchase request", code: "Code", objet: "Subject", demandeur: "Requester",
       echeance: "Needed by", statut: "Status", service: "Department", urgente: "Urgent", oui: "Yes", non: "No",

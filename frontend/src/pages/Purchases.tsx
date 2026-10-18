@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { CheckCircle2, ShoppingCart, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { pagedQuery } from "../lib/usePagedList";
+import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SearchField } from "../components/ui";
 import type { Paginated, PoStatus, PurchaseOrder } from "../types";
 import { DemandesAchat } from "../components/workflow/DemandesAchat";
 import { AchatsPilotage } from "../components/achats/AchatsPilotage";
@@ -48,10 +50,13 @@ function OrderCard({ order, index }: { order: PurchaseOrder; index: number }) {
 
 export function PurchasesPage() {
   const { t } = useTranslation();
+  const [search, setSearch] = useState("");
 
+  // Kanban : jusqu'à 500 BC (plafond serveur) filtrés par la recherche ; « Voir plus » par colonne.
   const byStatus = useQuery({
-    queryKey: ["purchase-orders"],
-    queryFn: () => api.purchaseOrders(`?page_size=100`),
+    queryKey: ["purchase-orders", search],
+    queryFn: () => api.purchaseOrders(pagedQuery(1, 500, search)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<PurchaseOrder>) => {
       const groups: Groups = {
         brouillon: [],
@@ -64,7 +69,7 @@ export function PurchasesPage() {
       for (const o of page.results) {
         if (VALID_STATUSES.has(o.status)) groups[o.status].push(o);
       }
-      return { groups, grCount: page.results.filter((o) => o.is_global_rental).length } as const;
+      return { groups, count: page.count, grCount: page.results.filter((o) => o.is_global_rental).length } as const;
     },
   });
 
@@ -74,7 +79,7 @@ export function PurchasesPage() {
     return <ErrorState message={t("common.error")} onRetry={() => void byStatus.refetch()} retryLabel={t("common.retry")} />;
 
   const groups = data.groups;
-  const total = (Object.values(groups) as PurchaseOrder[][]).reduce((a, l) => a + l.length, 0);
+  const total = data.count;
 
   return (
     <>
@@ -86,6 +91,8 @@ export function PurchasesPage() {
         <Kpi label={t("purchases.gr")} value={data.grCount} icon={Truck} tone="warn" delay={0.1} />
       </div>
 
+      <SearchField value={search} onChange={setSearch} placeholder={t("purchases.search")} />
+
       <div style={{ overflowX: "auto" }}>
         <Board>
           {(["confirmee", "partielle", "cloturee", "brouillon"] as PoStatus[]).map((st, ci) => (
@@ -96,6 +103,7 @@ export function PurchasesPage() {
               tone={STATUS_BADGE[st]}
               delay={ci * 0.05}
               minWidth={260}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>

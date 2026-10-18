@@ -403,6 +403,7 @@ export const fr = {
     },
   },
   purchases: {
+    search: "Rechercher un bon de commande (code, fournisseur)…",
     da: {
       title: "Demandes d'achat", new: "Nouvelle demande d'achat", code: "Code", objet: "Objet", demandeur: "Demandeur",
       echeance: "Échéance souhaitée", statut: "Statut", service: "Service", urgente: "Urgente", oui: "Oui", non: "Non",
