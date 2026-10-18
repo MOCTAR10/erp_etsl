@@ -2164,3 +2164,35 @@ export interface RapprochementAuto {
   lignes_sans_paiement: { id: string; date: string; libelle: string; debit: string | null; credit: string | null }[];
   paiements_sans_ligne: { id: string; code: string; date: string; sens: string; montant: string | null }[];
 }
+
+export interface ModeleFacture {
+  id: string;
+  code: string;
+  entete: string;
+  mentions_legales: string;
+  conditions_paiement: string;
+  coordonnees_bancaires: string;
+  pied_page: string;
+  delai_paiement_jours: number;
+  statut_valeur: "provisoire" | "confirme";
+  est_provisoire: boolean;
+}
+
+export interface FactureClient {
+  id: string;
+  code: string;
+  nature: "facture" | "avoir";
+  statut: "brouillon" | "emise";
+  client: string;
+  client_name: string;
+  date: string;
+  montant_ht: string | null;
+  montant_tva: string | null;
+  montant_ttc: string | null;
+  avertissement_provisoire: boolean;
+}
+
+export interface AFacturer {
+  jalons: { id: string; affaire: string; label: string; montant: string | null }[];
+  situations: { id: string; code: string; affaire: string; label: string; montant: string | null }[];
+}

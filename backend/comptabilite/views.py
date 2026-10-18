@@ -12,8 +12,10 @@ from .models import (
     ControleInterne,
     DeclarationTva,
     Engagement,
+    FactureClient,
     Lettrage,
     LigneRapprochement,
+    ModeleFacture,
     LigneReleve,
     ParametreCompta,
     Paiement,
@@ -23,12 +25,15 @@ from .models import (
 )
 from config.inputs import date_input
 
+from . import facturation
 from .permissions import IsComptaAdmin
 from .serializers import (
     CompteBancaireSerializer,
     ControleInterneSerializer,
     DeclarationTvaSerializer,
     EngagementSerializer,
+    FactureClientSerializer,
+    ModeleFactureSerializer,
     LettrageSerializer,
     ParametreComptaSerializer,
     LigneReleveSerializer,
@@ -509,3 +514,132 @@ class LettrageViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
     def delettrer_action(self, request, pk=None):
         lettrage = delettrer(self.get_object(), request.user, request.data.get("motif", ""))
         return Response(self.get_serializer(lettrage).data)
+
+
+class ModeleFactureViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+    """Modèle de facture client : un seul enregistrement, modifiable par ETSL, provisoire jusqu'à confirmation."""
+
+    queryset = ModeleFacture.objects.all()
+    serializer_class = ModeleFactureSerializer
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        facturation.get_modele()
+        return super().get_queryset()
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        if self.action == "confirmer":
+            return [CanValidateCompta()]
+        return [IsComptaAdmin()]
+
+    def create(self, request, *args, **kwargs):
+        raise DRFValidationError("Le modèle est unique : modifiez-le.")
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        modele = self.get_object()
+        modele.statut_valeur = ModeleFacture.StatutValeur.CONFIRME
+        modele.confirme_par, modele.confirme_le = request.user, timezone.now()
+        modele.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(modele).data)
+
+
+class FactureClientViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+    """Factures et avoirs clients (M10) : brouillon modifiable, puis émission = écriture comptable + scellé."""
+
+    queryset = FactureClient.objects.select_related("client", "move", "taux_tva").prefetch_related("lignes").all()
+    serializer_class = FactureClientSerializer
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        if self.action == "emettre":
+            return [CanValidateCompta()]
+        return [CanManageCompta()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        p = self.request.query_params
+        for cle in ("nature", "statut", "client"):
+            if p.get(cle):
+                qs = qs.filter(**{cle: p[cle]})
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(cree_par=self.request.user)
+
+    def _brouillon(self):
+        facture = self.get_object()
+        if facture.statut != FactureClient.Statut.BROUILLON:
+            raise DRFValidationError("Facture émise : non modifiable, corrigez-la par un avoir.")
+        return facture
+
+    def update(self, request, *args, **kwargs):
+        self._brouillon()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._brouillon()
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"])
+    def emettre(self, request, pk=None):
+        facture = facturation.emettre_facture(self.get_object(), request.user)
+        return Response(self.get_serializer(facture).data)
+
+    @action(detail=True, methods=["post"])
+    def avoir(self, request, pk=None):
+        avoir = facturation.creer_avoir(
+            self.get_object(), request.user, request.data.get("montant_ht"), str(request.data.get("motif", ""))
+        )
+        return Response(self.get_serializer(avoir).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def pdf(self, request, pk=None):
+        from django.http import HttpResponse
+
+        facture = self.get_object()
+        if not can_see_amount(request.user):
+            raise DRFValidationError("Rôle non autorisé à consulter les montants.")
+        reponse = HttpResponse(facturation.facture_pdf(facture), content_type="application/pdf")
+        reponse["Content-Disposition"] = f'inline; filename="{facture.code}.pdf"'
+        return reponse
+
+    def _source(self, request, cle, modele, creer):
+        from config.inputs import fk_input
+
+        objet = fk_input(request.data.get(cle), modele.objects.all(), cle)
+        if objet is None:
+            raise DRFValidationError({cle: "Ce champ est obligatoire."})
+        facture = creer(objet, request.user)
+        return Response(self.get_serializer(facture).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="depuis-jalon")
+    def depuis_jalon(self, request):
+        from commercial.models import Milestone
+
+        return self._source(request, "jalon", Milestone, facturation.facture_depuis_jalon)
+
+    @action(detail=False, methods=["post"], url_path="depuis-situation")
+    def depuis_situation(self, request):
+        from operations.models import SituationTravaux
+
+        return self._source(request, "situation", SituationTravaux, facturation.facture_depuis_situation)
+
+    @action(detail=False, methods=["get"], url_path="a-facturer")
+    def a_facturer(self, request):
+        """Jalons réalisés et situations validées pas encore facturés (entrées de la facturation)."""
+        from commercial.models import Milestone
+        from operations.models import SituationTravaux
+
+        jalons = Milestone.objects.filter(actual_date__isnull=False, montant__gt=0, facture_le__isnull=True) \
+            .exclude(factures_clients__nature="facture").select_related("affaire")
+        situations = SituationTravaux.objects.filter(status=SituationTravaux.Status.VALIDEE, amount__gt=0) \
+            .exclude(factures_clients__nature="facture").select_related("affaire")
+        voit = can_see_amount(request.user)
+        return Response({
+            "jalons": [{"id": str(j.id), "affaire": j.affaire.code, "label": j.label, "montant": j.montant if voit else None} for j in jalons],
+            "situations": [{"id": str(s.id), "code": s.code, "affaire": s.affaire.code if s.affaire_id else "", "label": s.label, "montant": s.amount if voit else None} for s in situations],
+        })

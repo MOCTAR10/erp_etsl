@@ -51,3 +51,19 @@ test.describe("M10 Comptabilité : relevé bancaire", () => {
     await expect(page.getByTestId("rapprochement-resultat")).toContainText("rapprochée");
   });
 });
+
+// M10 : le modèle de facture client est une donnée ETSL, provisoire jusqu'à confirmation.
+test.describe("M10 Comptabilité : facturation client", () => {
+  test("le modèle de facture provisoire est signalé, modifié puis confirmé", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.finance);
+    await page.goto("/comptabilite");
+    await page.getByRole("heading", { name: /Modèle de facture/ }).locator("xpath=following-sibling::button[1]").click();
+    await page.getByLabel("En-tête").fill(`ETSL e2e ${Date.now() % 100000}`);
+    await page.getByRole("button", { name: "Valider" }).click();
+    await expect(page.getByTestId("alerte-modele-provisoire")).toContainText(/provisoire/);
+
+    page.once("dialog", (d) => void d.accept());
+    await page.getByRole("button", { name: "Confirmer le modèle" }).click();
+    await expect(page.getByTestId("alerte-modele-provisoire")).toHaveCount(0);
+  });
+});

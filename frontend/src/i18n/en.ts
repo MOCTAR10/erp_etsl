@@ -110,6 +110,18 @@ export const en = {
     reporting: "{{annee}} · headcount {{effectif}} · hires {{entrees}} · leavers {{sorties}} · turnover {{turnover}} % · absences {{absence}} d · absenteeism {{absenteisme}} %",
     integrer: "Import timesheets (overtime)",
   },
+  facturation: {
+    title: "Customer invoicing (M10)",
+    hint: "Completed milestones and validated progress statements are invoiced here. An issued invoice is posted (411 · 706 · 443), archived 10 years and sealed: corrections go through a credit note.",
+    warnModele: "Provisional invoice template: header and legal notices to be confirmed by ETSL (the PDF carries a warning).",
+    aFacturer: "{{count}} item(s) to invoice", facturer: "Create invoice", factures: "Invoices and credit notes · {{count}}", aucune: "No invoice yet.",
+    numero: "Number", client: "Customer", date: "Date", ttc: "Total incl. VAT", statut: "Status", avoir: "Credit note",
+    st: { brouillon: "Draft", emise: "Issued" }, emettre: "Issue", confirmEmettre: "Issue this invoice? The journal entry can no longer be changed (credit note only).",
+    faireAvoir: "Credit note", avoirPrompt: "Credit note amount excl. VAT (empty = full)?",
+    modele: "Invoice template", provisoire: "Provisional", confirme: "Confirmed", modifier: "Edit", valider: "Apply", annuler: "Cancel",
+    confirmer: "Confirm template", confirmModele: "Confirm this invoice template (validated by ETSL)?",
+    champ: { entete: "Header", mentions_legales: "Legal notices", conditions_paiement: "Payment terms", coordonnees_bancaires: "Bank details", pied_page: "Footer" },
+  },
   banque: {
     title: "Bank statement import and automatic reconciliation (M10)",
     hint: "MT940 and CFONB 120 formats (standard templates, to be validated against ETSL's real bank statements). Reconciliation pairs statement lines with validated payments; gaps are listed.",

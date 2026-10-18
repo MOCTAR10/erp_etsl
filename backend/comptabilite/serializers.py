@@ -7,8 +7,11 @@ from .models import (
     ControleInterne,
     DeclarationTva,
     Engagement,
+    FactureClient,
     Lettrage,
+    LigneFactureClient,
     LigneRapprochement,
+    ModeleFacture,
     ParametreCompta,
     LigneReleve,
     Paiement,
@@ -376,4 +379,105 @@ class LettrageSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         if not self._voit():
             data["ecart"] = None
+        return data
+
+
+class ModeleFactureSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ModeleFacture
+        fields = [
+            "id", "code", "entete", "mentions_legales", "conditions_paiement", "coordonnees_bancaires",
+            "pied_page", "delai_paiement_jours", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le",
+        ]
+        read_only_fields = ["code", "statut_valeur", "confirme_par", "confirme_le"]
+
+    def update(self, instance, validated_data):
+        # Toute modification du modèle le repasse en provisoire jusqu'à nouvelle confirmation.
+        instance.statut_valeur = ModeleFacture.StatutValeur.PROVISOIRE
+        instance.confirme_par, instance.confirme_le = None, None
+        return super().update(instance, validated_data)
+
+
+class LigneFactureClientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LigneFactureClient
+        fields = ["id", "designation", "quantite", "prix_unitaire", "montant", "compte_produit"]
+        read_only_fields = ["montant"]
+        extra_kwargs = {"compte_produit": {"required": False}}
+
+    def validate(self, data):
+        if data.get("quantite") is not None and data["quantite"] <= 0:
+            raise serializers.ValidationError({"quantite": "La quantité doit être strictement positive."})
+        if data.get("prix_unitaire") is not None and data["prix_unitaire"] < 0:
+            raise serializers.ValidationError({"prix_unitaire": "Le prix ne peut pas être négatif."})
+        return data
+
+
+class FactureClientSerializer(serializers.ModelSerializer):
+    lignes = LigneFactureClientSerializer(many=True, required=False)
+    client_name = serializers.CharField(source="client.name", read_only=True)
+    has_amount_access = serializers.SerializerMethodField()
+    avertissement_provisoire = serializers.SerializerMethodField()
+    move_number = serializers.CharField(source="move.number", read_only=True, default=None)
+
+    class Meta:
+        model = FactureClient
+        fields = [
+            "id", "code", "nature", "statut", "client", "client_name", "affaire", "jalon", "situation",
+            "facture_origine", "objet", "date", "echeance", "taux_tva", "montant_ht", "montant_tva",
+            "montant_ttc", "move", "move_number", "document", "emise_par", "emise_le", "lignes",
+            "has_amount_access", "avertissement_provisoire", "created_at",
+        ]
+        read_only_fields = [
+            "code", "nature", "statut", "affaire", "jalon", "situation", "facture_origine", "montant_ht",
+            "montant_tva", "montant_ttc", "move", "document", "emise_par", "emise_le",
+        ]
+
+    def get_has_amount_access(self, obj):
+        from .services import can_see_amount
+
+        return can_see_amount(getattr(self.context.get("request"), "user", None))
+
+    def get_avertissement_provisoire(self, obj):
+        from .facturation import get_modele
+
+        return obj.modele_provisoire if obj.statut == FactureClient.Statut.EMISE else get_modele().est_provisoire
+
+    def _ecrire_lignes(self, facture, lignes):
+        from .facturation import _compte
+
+        facture.lignes.all().delete()
+        for item in lignes:
+            item.setdefault("compte_produit", _compte("706000"))
+            LigneFactureClient.objects.create(facture=facture, **item)
+        facture.recalculer()
+
+    def create(self, validated_data):
+        lignes = validated_data.pop("lignes", [])
+        if not validated_data.get("taux_tva"):
+            from .facturation import _taux_defaut
+
+            validated_data["taux_tva"] = _taux_defaut()
+        facture = super().create(validated_data)
+        self._ecrire_lignes(facture, lignes)
+        return facture
+
+    def update(self, instance, validated_data):
+        lignes = validated_data.pop("lignes", None)
+        facture = super().update(instance, validated_data)
+        if lignes is not None:
+            self._ecrire_lignes(facture, lignes)
+        else:
+            facture.recalculer()
+        return facture
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data["has_amount_access"]:
+            for cle in ("montant_ht", "montant_tva", "montant_ttc"):
+                data[cle] = None
+            for l in data["lignes"]:
+                l["prix_unitaire"] = l["montant"] = None
         return data
