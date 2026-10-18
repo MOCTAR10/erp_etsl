@@ -1225,6 +1225,7 @@ export const fr = {
     analyser: "Rendre l'analyse",
     analyseLabel: "Explication de l'écart",
     act: { publier: "Publier", approuver: "Approuver", realiser: "Marquer réalisée", appliquer: "Appliquer" },
+    visa: { label: "Visa à apposer…", daf: "Visa DAF", cg: "Visa Contrôle de gestion", dafPose: "Visa DAF posé", cgPose: "Visa CG posé", dafAttente: "Visa DAF en attente", cgAttente: "Visa CG en attente" },
     col: { reporting: "Reporting", axe: "Axe analytique", taux: "Taux de marge", code: "Code", periode: "Période", dateCloture: "Date de clôture", delai: "Délai", statut: "Statut", budget: "Budget · révision", nouveauMontant: "Nouveau montant", auteur: "Auteur", commentaire: "Commentaire" },
     title: "Contrôle de gestion — Budgets, marges, écarts & clôtures (M11)",
     budgets: "Budgets",

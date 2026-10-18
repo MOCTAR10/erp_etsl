@@ -87,3 +87,31 @@ class DoubleVisaTests(APITestCase):
         self.assertEqual(self.viser(self.cg, url, "cg").status_code, 200)
         self.budget.refresh_from_db()
         self.assertEqual(self.budget.montant, Decimal("5500000"))
+
+    def test_lignes_et_suppression_scellees_apres_approbation(self):
+        from accounting_kernel.models import Period
+
+        self.client.force_authenticate(self.daf)
+        periode = Period.objects.filter(fiscal_year=self.budget.fiscal_year).first() or Period.objects.create(
+            fiscal_year=self.budget.fiscal_year, number=1,
+            start_date=self.budget.fiscal_year.start_date, end_date=date(self.budget.fiscal_year.year, 1, 31))
+        # Brouillon : la ligne se crée, se modifie, se supprime.
+        r = self.client.post(f"{BASE}budget-lignes/", {"budget": str(self.budget.pk), "period": periode.pk, "montant": "100"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        ligne = r.json()["id"]
+        self.assertEqual(self.client.patch(f"{BASE}budget-lignes/{ligne}/", {"montant": "150"}, format="json").status_code, 200)
+        # Approuvé : plus de création, modification ni suppression de ligne, ni suppression du budget.
+        url = f"{BASE}budgets/{self.budget.pk}/approuver/"
+        self.viser(self.daf, url, "daf")
+        self.viser(self.cg, url, "cg")
+        self.client.force_authenticate(self.daf)
+        self.assertEqual(self.client.patch(f"{BASE}budget-lignes/{ligne}/", {"montant": "999"}, format="json").status_code, 400)
+        self.assertEqual(self.client.delete(f"{BASE}budget-lignes/{ligne}/").status_code, 400)
+        r = self.client.post(f"{BASE}budget-lignes/", {"budget": str(self.budget.pk), "period": periode.pk, "montant": "1"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(self.client.delete(f"{BASE}budgets/{self.budget.pk}/").status_code, 400)
+        self.assertTrue(Budget.objects.filter(pk=self.budget.pk).exists())
+
+    def test_budget_brouillon_supprimable(self):
+        self.client.force_authenticate(self.daf)
+        self.assertEqual(self.client.delete(f"{BASE}budgets/{self.budget.pk}/").status_code, 204)

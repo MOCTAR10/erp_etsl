@@ -1225,6 +1225,7 @@ export const en = {
     analyser: "Submit analysis",
     analyseLabel: "Variance explanation",
     act: { publier: "Publish", approuver: "Approve", realiser: "Mark as done", appliquer: "Apply" },
+    visa: { label: "Sign-off to give…", daf: "CFO sign-off", cg: "Management control sign-off", dafPose: "CFO signed", cgPose: "MC signed", dafAttente: "CFO sign-off pending", cgAttente: "MC sign-off pending" },
     col: { reporting: "Reporting", axe: "Analytic axis", taux: "Margin rate", code: "Code", periode: "Period", dateCloture: "Closing date", delai: "Lead time", statut: "Status", budget: "Budget · revision", nouveauMontant: "New amount", auteur: "Author", commentaire: "Comment" },
     title: "Management control — Budgets, margins, variances & closings (M11)",
     budgets: "Budgets",

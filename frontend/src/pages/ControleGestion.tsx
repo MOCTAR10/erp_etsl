@@ -31,7 +31,28 @@ const BUD_BADGE: Record<StatutBudget, "ok" | "warn" | "err" | "brand"> = {
 const BUD_ORDER: StatutBudget[] = ["brouillon", "approuve", "cloture"];
 const BUD_VALID = new Set<StatutBudget>(BUD_ORDER);
 
-function BudgetCard({ b, index }: { b: Budget; index: number }) {
+type Visas = { visa_daf_par: string | null; visa_cg_par: string | null };
+
+/** Double visa DAF + CG : l'API exige `visa` dans le corps ; on ne propose que les visas encore manquants. */
+function visaPrompt(t: (key: string) => string, v: Visas) {
+  const options = [
+    ...(v.visa_daf_par ? [] : [{ value: "daf", label: t("controleGestion.visa.daf") }]),
+    ...(v.visa_cg_par ? [] : [{ value: "cg", label: t("controleGestion.visa.cg") }]),
+  ];
+  return { name: "visa", label: t("controleGestion.visa.label"), options };
+}
+
+function VisaStatus({ v }: { v: Visas }) {
+  const { t } = useTranslation();
+  return (
+    <div className="meta">
+      <Badge tone={v.visa_daf_par ? "ok" : "warn"}>{t(`controleGestion.visa.${v.visa_daf_par ? "dafPose" : "dafAttente"}`)}</Badge>{" "}
+      <Badge tone={v.visa_cg_par ? "ok" : "warn"}>{t(`controleGestion.visa.${v.visa_cg_par ? "cgPose" : "cgAttente"}`)}</Badge>
+    </div>
+  );
+}
+
+export function BudgetCard({ b, index }: { b: Budget; index: number }) {
   const { t } = useTranslation();
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
@@ -46,9 +67,12 @@ function BudgetCard({ b, index }: { b: Budget; index: number }) {
         {b.analytic_code ? ` · ${b.axis_code ?? "axe"}:${b.analytic_code}` : ""}
         {b.nb_revisions > 0 ? ` · R${b.nb_revisions}` : ""}
       </div>
+      {b.statut === "brouillon" && <VisaStatus v={b} />}
       <ActionBar
         actions={[
-          ...(b.statut === "brouillon" ? [{ label: t("controleGestion.act.approuver"), path: `/api/controle-gestion/budgets/${b.id}/approuver/` }] : []),
+          ...(b.statut === "brouillon"
+            ? [{ label: t("controleGestion.act.approuver"), path: `/api/controle-gestion/budgets/${b.id}/approuver/`, prompt: visaPrompt(t, b) }]
+            : []),
           ...(b.statut === "approuve"
             ? [{ label: t("actions.cloturer"), path: `/api/controle-gestion/budgets/${b.id}/cloturer/`, tone: "ghost" as const, confirm: t("actions.confirmCloturer") }]
             : []),
@@ -135,7 +159,7 @@ function clotureColumns(t: T): Column<ClotureGestion>[] {
   ];
 }
 
-function revisionColumns(t: T): Column<BudgetRevision>[] {
+export function revisionColumns(t: T): Column<BudgetRevision>[] {
   return [
     { key: "code", header: t("controleGestion.col.code"), render: (r) => r.code },
     { key: "budget", header: t("controleGestion.col.budget"), render: (r) => `${r.budget_code} · R${r.numero}` },
@@ -151,7 +175,12 @@ function revisionColumns(t: T): Column<BudgetRevision>[] {
             {t(`controleGestion.revision_statut.${r.statut}`)}
           </Badge>
           {r.statut === "brouillon" && (
-            <ActionBar actions={[{ label: t("controleGestion.act.appliquer"), path: `/api/controle-gestion/revisions/${r.id}/appliquer/` }]} />
+            <>
+              <VisaStatus v={r} />
+              <ActionBar
+                actions={[{ label: t("controleGestion.act.appliquer"), path: `/api/controle-gestion/revisions/${r.id}/appliquer/`, prompt: visaPrompt(t, r) }]}
+              />
+            </>
           )}
         </>
       ),
