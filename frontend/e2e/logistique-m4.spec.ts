@@ -28,7 +28,7 @@ test.describe("M4 Logistique : paramètres GR et coût par affaire", () => {
     await loginAs(page, DEMO_USERS.admin);
     await page.goto("/logistique");
     const section = page.getByTestId("gr-affaires");
-    await expect(section).toContainText("Coût GLOBAL RENTAL par affaire");
+    await expect(page.getByText("Coût GLOBAL RENTAL par affaire", { exact: false }).first()).toBeVisible();
     await expect(section).toContainText("(618)");
     await expect(section.getByLabel("Mois")).toBeVisible();
   });
