@@ -122,6 +122,7 @@ export const en = {
     envoyer: "Send to Management", rouvrir: "Reopen", motifPrompt: "Reason for reopening?",
   },
   facturation: {
+    search: "Search invoices (code, subject)…",
     title: "Customer invoicing (M10)",
     hint: "Completed milestones and validated progress statements are invoiced here. An issued invoice is posted (411 · 706 · 443), archived 10 years and sealed: corrections go through a credit note.",
     warnModele: "Provisional invoice template: header and legal notices to be confirmed by ETSL (the PDF carries a warning).",
@@ -585,6 +586,9 @@ export const en = {
     searchControles: "Search inspections (code, point)…",
     searchPvs: "Search reports (code, title)…",
     m6: {
+      searchInstruments: "Search instruments (code, designation, serial no.)…",
+      searchJoints: "Search joints (code, mark)…",
+      searchEpreuves: "Search tests (code)…",
       metrologie: "Metrology (calibration)", newInstrument: "New instrument", designation: "Designation", serie: "Serial no.", dernierEtalonnage: "Last calibration", echeance: "Calibration due date",
       utilisable: "In service", usageBloque: "Use blocked", etalonnerConforme: "Calibrated OK (+1 year)", confirmEtalonnage: "Record a passing calibration (due in 1 year)?", horsTolerance: "Out of tolerance", confirmHorsTolerance: "Mark the instrument out of tolerance? Its use will be blocked.",
       joints: "Weld joint register", jointsVide: "No joint recorded (an approved ITP is required before welding).", of: "WO", joint: "Joint", coulee: "Heat number", epreuves: "Hydrostatic / leak tests", epreuvesVide: "No test recorded.", pressionEssai: "Test pressure", releves: "P/T readings",

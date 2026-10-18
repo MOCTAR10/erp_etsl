@@ -122,6 +122,7 @@ export const fr = {
     envoyer: "Envoyer à la Direction", rouvrir: "Rouvrir", motifPrompt: "Motif de la réouverture ?",
   },
   facturation: {
+    search: "Rechercher une facture (code, objet)…",
     title: "Facturation client (M10)",
     hint: "Les jalons réalisés et les situations validées sont facturés ici. Une facture émise est comptabilisée (411 · 706 · 443), archivée en GED 10 ans et scellée : toute correction passe par un avoir.",
     warnModele: "Modèle de facture provisoire : en-tête et mentions légales à confirmer par ETSL (le PDF porte un avertissement).",
@@ -585,6 +586,9 @@ export const fr = {
     searchControles: "Rechercher un contrôle (code, point)…",
     searchPvs: "Rechercher un PV (code, intitulé)…",
     m6: {
+      searchInstruments: "Rechercher un instrument (code, désignation, n° de série)…",
+      searchJoints: "Rechercher un joint (code, repère)…",
+      searchEpreuves: "Rechercher une épreuve (code)…",
       metrologie: "Métrologie (étalonnage)", newInstrument: "Nouvel instrument", designation: "Désignation", serie: "N° de série", dernierEtalonnage: "Dernier étalonnage", echeance: "Échéance d'étalonnage",
       utilisable: "Utilisable", usageBloque: "Usage bloqué", etalonnerConforme: "Étalonné conforme (+1 an)", confirmEtalonnage: "Enregistrer un étalonnage conforme (échéance dans 1 an) ?", horsTolerance: "Hors tolérance", confirmHorsTolerance: "Déclarer l'instrument hors tolérance ? Son usage sera bloqué.",
       joints: "Registre des joints soudés", jointsVide: "Aucun joint enregistré (un ITP approuvé est requis avant soudage).", of: "OF", joint: "Joint", coulee: "N° de coulée", epreuves: "Épreuves hydrauliques / étanchéité", epreuvesVide: "Aucune épreuve enregistrée.", pressionEssai: "Pression d'essai", releves: "Relevés P/T",

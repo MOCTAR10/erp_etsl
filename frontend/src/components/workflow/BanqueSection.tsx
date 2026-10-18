@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { Paginated, ReleveBancaire, RapprochementAuto } from "../../types";
+import type { ReleveBancaire, RapprochementAuto } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
 interface Banque {
@@ -30,7 +30,7 @@ export function BanqueSection() {
 
   const banques = useQuery({
     queryKey: ["banque-comptes"],
-    queryFn: () => api.get<Paginated<Banque>>("/api/comptabilite/comptes-bancaires/?page_size=50").then((p) => p.results),
+    queryFn: () => api.listAll<Banque>("/api/comptabilite/comptes-bancaires/"),
     retry: 0,
   });
 

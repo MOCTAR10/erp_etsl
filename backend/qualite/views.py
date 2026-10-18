@@ -484,6 +484,7 @@ class EpreuvePressionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mix
                              viewsets.GenericViewSet):
     queryset = EpreuvePression.objects.select_related("ordre").all()
     serializer_class = EpreuvePressionSerializer
+    search_fields = ("code",)
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):
