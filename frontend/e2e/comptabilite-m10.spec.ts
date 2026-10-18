@@ -67,3 +67,17 @@ test.describe("M10 Comptabilité : facturation client", () => {
     await expect(page.getByTestId("alerte-modele-provisoire")).toHaveCount(0);
   });
 });
+
+// M10 : clôture mensuelle — les contrôles de pré-clôture s'affichent pour une période ouverte.
+test.describe("M10 Comptabilité : clôture mensuelle", () => {
+  test("les contrôles de pré-clôture sont listés pour la période choisie", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.finance);
+    await page.goto("/comptabilite");
+    const periode = page.getByLabel("Période à clôturer");
+    await expect.poll(async () => await periode.locator("option").count()).toBeGreaterThan(1);
+    await periode.selectOption({ index: 1 });
+    const tableau = page.getByTestId("cloture-controles");
+    await expect(tableau).toContainText("Écritures en brouillon");
+    await expect(tableau).toContainText("Bulletins de paie validés non comptabilisés");
+  });
+});

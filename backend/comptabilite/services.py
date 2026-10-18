@@ -117,7 +117,7 @@ def build_paiement_move(paiement, user):
     """
     from accounting_kernel.models import Journal
     from accounting_kernel.services import period_for_date, post_move
-    from referentiels.models import Account, Partner
+    from referentiels.models import Partner
 
     # Verrou : deux clics / deux utilisateurs simultanés ne produisent qu'une écriture.
     Paiement.objects.select_for_update().get(pk=paiement.pk)
@@ -253,6 +253,8 @@ PARAMETRES_DEFAUT = {
     "LETTRAGE_TOLERANCE": ("Tolérance d'écart de lettrage", Decimal("0"), "FCFA"),
     "LETTRAGE_DELAI_ANOMALIE_JOURS": (
         "Ancienneté d'une ligne non lettrée signalée en anomalie", Decimal("90"), "jours"),
+    "CLOTURE_OBJECTIF_HEURES": ("Durée cible de la clôture mensuelle", Decimal("2"), "heures"),
+    "CLOTURE_JOUR_ENVOI": ("Jour d'envoi de la synthèse à la Direction (J+n après la fin du mois)", Decimal("4"), "jours"),
     "RAPPRO_TOLERANCE_JOURS": ("Écart de date toléré entre relevé et paiement", Decimal("3"), "jours"),
     "RAPPRO_TOLERANCE_MONTANT": ("Écart de montant toléré entre relevé et paiement", Decimal("0"), "FCFA"),
 }

@@ -2196,3 +2196,33 @@ export interface AFacturer {
   jalons: { id: string; affaire: string; label: string; montant: string | null }[];
   situations: { id: string; code: string; affaire: string; label: string; montant: string | null }[];
 }
+
+export interface PeriodeRef {
+  id: number;
+  start_date: string;
+  end_date: string;
+  status: "open" | "closed";
+}
+
+export interface ControlesCloture {
+  periode: string;
+  bloquants: number;
+  controles: { code: string; label: string; nb: number; bloquant: boolean; detail: string }[];
+}
+
+export interface ClotureMensuelle {
+  id: string;
+  period: number;
+  periode: string;
+  periode_statut: "open" | "closed";
+  statut: "en_cours" | "cloturee";
+  duree_minutes: string | null;
+  dans_objectif: boolean | null;
+  objectif_minutes: number | null;
+  echeance_envoi: string | null;
+  synthese: Record<string, string>;
+  envoyee_le: string | null;
+  destinataires: string[];
+  retard: "cloture_en_retard" | "envoi_en_retard" | null;
+  has_amount_access: boolean;
+}

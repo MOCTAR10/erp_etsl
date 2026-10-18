@@ -827,3 +827,48 @@ class LigneFactureClient(models.Model):
     def save(self, *args, **kwargs):
         self.montant = (self.quantite * self.prix_unitaire).quantize(Decimal("0.01"))
         return super().save(*args, **kwargs)
+
+
+class ClotureMensuelle(models.Model):
+    """Clôture comptable d'une période (mois) : chronométrée (objectif < 2 h) et suivie jusqu'à l'envoi Direction.
+
+    `demarree_le` → `cloturee_le` donne la durée réelle ; la synthèse et les contrôles sont figés à la clôture.
+    """
+
+    class Statut(models.TextChoices):
+        EN_COURS = "en_cours", "En cours"
+        CLOTUREE = "cloturee", "Clôturée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    period = models.OneToOneField(
+        "accounting_kernel.Period", on_delete=models.PROTECT, related_name="cloture_mensuelle", verbose_name="Période"
+    )
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.EN_COURS, db_index=True)
+    demarree_le = models.DateTimeField(default=timezone.now)
+    demarree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    cloturee_le = models.DateTimeField(null=True, blank=True)
+    cloturee_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    duree_minutes = models.DecimalField(max_digits=10, decimal_places=1, null=True, blank=True)
+    dans_objectif = models.BooleanField(null=True, blank=True, help_text="Durée ≤ objectif paramétré (2 h par défaut).")
+    objectif_minutes = models.PositiveIntegerField(null=True, blank=True)
+    echeance_envoi = models.DateField(null=True, blank=True, verbose_name="Échéance d'envoi à la Direction (J+4)")
+    controles = models.JSONField(default=list, blank=True)
+    synthese = models.JSONField(default=dict, blank=True)
+    envoyee_le = models.DateTimeField(null=True, blank=True)
+    envoyee_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    destinataires = models.JSONField(default=list, blank=True)
+    reouvertures = models.JSONField(default=list, blank=True, help_text="Historique {par, le, motif} des réouvertures.")
+
+    class Meta:
+        ordering = ["-period__start_date"]
+        verbose_name = "Clôture mensuelle"
+        verbose_name_plural = "Clôtures mensuelles"
+
+    def __str__(self):
+        return f"Clôture {self.period}"

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { ClotureSection } from "../components/workflow/ClotureSection";
 import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
 import { LettrageSection } from "../components/workflow/LettrageSection";
@@ -369,6 +370,8 @@ export function ComptabilitePage() {
           </div>
         </SectionCard>
       )}
+
+      <ClotureSection />
 
       <FacturationSection />
 

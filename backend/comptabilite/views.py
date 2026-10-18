@@ -12,6 +12,7 @@ from .models import (
     ControleInterne,
     DeclarationTva,
     Engagement,
+    ClotureMensuelle,
     FactureClient,
     Lettrage,
     LigneRapprochement,
@@ -25,13 +26,14 @@ from .models import (
 )
 from config.inputs import date_input
 
-from . import facturation
+from . import cloture, facturation
 from .permissions import IsComptaAdmin
 from .serializers import (
     CompteBancaireSerializer,
     ControleInterneSerializer,
     DeclarationTvaSerializer,
     EngagementSerializer,
+    ClotureMensuelleSerializer,
     FactureClientSerializer,
     ModeleFactureSerializer,
     LettrageSerializer,
@@ -643,3 +645,59 @@ class FactureClientViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
             "jalons": [{"id": str(j.id), "affaire": j.affaire.code, "label": j.label, "montant": j.montant if voit else None} for j in jalons],
             "situations": [{"id": str(s.id), "code": s.code, "affaire": s.affaire.code if s.affaire_id else "", "label": s.label, "montant": s.amount if voit else None} for s in situations],
         })
+
+
+class ClotureMensuelleViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
+    """Clôture mensuelle : contrôles, chrono < 2 h, synthèse figée, envoi Direction à J+4."""
+
+    queryset = ClotureMensuelle.objects.select_related("period__fiscal_year").all()
+    serializer_class = ClotureMensuelleSerializer
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        return [CanValidateCompta()]
+
+    def _periode(self, request):
+        from accounting_kernel.models import Period
+
+        try:
+            return Period.objects.get(pk=request.data.get("period"))
+        except (Period.DoesNotExist, DjangoValidationError, ValueError, TypeError):
+            raise DRFValidationError({"period": "Période inconnue."})
+
+    @action(detail=False, methods=["get"], url_path="controles")
+    def controles(self, request):
+        """Contrôles de pré-clôture d'une période (sans rien modifier)."""
+        from accounting_kernel.models import Period
+
+        try:
+            periode = Period.objects.get(pk=request.query_params.get("period"))
+        except (Period.DoesNotExist, DjangoValidationError, ValueError, TypeError):
+            raise DRFValidationError({"period": "Période inconnue."})
+        liste = cloture.controles_cloture(periode)
+        return Response({
+            "periode": str(periode),
+            "bloquants": sum(1 for c in liste if c["bloquant"] and c["nb"]),
+            "controles": liste,
+        })
+
+    @action(detail=False, methods=["post"])
+    def demarrer(self, request):
+        c = cloture.demarrer(self._periode(request), request.user)
+        return Response(self.get_serializer(c).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def cloturer(self, request, pk=None):
+        c = cloture.cloturer(self.get_object(), request.user)
+        return Response(self.get_serializer(c).data)
+
+    @action(detail=True, methods=["post"], url_path="envoyer-direction")
+    def envoyer_direction(self, request, pk=None):
+        c = cloture.envoyer_direction(self.get_object(), request.user)
+        return Response(self.get_serializer(c).data)
+
+    @action(detail=True, methods=["post"])
+    def rouvrir(self, request, pk=None):
+        c = cloture.rouvrir(self.get_object(), request.user, request.data.get("motif", ""))
+        return Response(self.get_serializer(c).data)

@@ -5,6 +5,7 @@ from .views import (
     CompteBancaireViewSet,
     ControleInterneViewSet,
     DeclarationTvaViewSet,
+    ClotureMensuelleViewSet,
     EngagementViewSet,
     FactureClientViewSet,
     ModeleFactureViewSet,
@@ -29,6 +30,7 @@ router.register("lettrages", LettrageViewSet, basename="compta-lettrages")
 router.register("parametres", ParametreComptaViewSet, basename="compta-parametres")
 router.register("factures-clients", FactureClientViewSet, basename="compta-factures-clients")
 router.register("modele-facture", ModeleFactureViewSet, basename="compta-modele-facture")
+router.register("clotures-mensuelles", ClotureMensuelleViewSet, basename="compta-clotures-mensuelles")
 
 urlpatterns = [
     path("", include(router.urls)),
