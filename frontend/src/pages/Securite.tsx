@@ -3,9 +3,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, DataTable, EmptyState, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { ActionBar, Badge, DataTable, EmptyState, PageHeader, PagedDataTable, QuickForm, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatDateTime } from "../lib/format";
+import { usePagedList } from "../lib/usePagedList";
 import { useAuth } from "../store/auth";
 import type { Delegation, JournalAcces, Me, Paginated } from "../types";
 
@@ -29,16 +30,14 @@ export function SecuritePage() {
 
   const delegations = useQuery({
     queryKey: ["delegations"],
-    queryFn: () => api.get<Paginated<Delegation>>("/api/workflow/delegations/?page_size=50"),
-    select: (page) => page.results,
+    queryFn: () => api.listAll<Delegation>("/api/workflow/delegations/"),
   });
-  const journal = useQuery({
-    queryKey: ["journal-acces", evenement],
-    queryFn: () =>
-      api.get<Paginated<JournalAcces>>(`/api/users/journal-acces/?page_size=100${evenement ? `&evenement=${evenement}` : ""}`),
-    select: (page) => page.results,
-    enabled: admin,
-  });
+  // Journal d'accès : paginé (volume élevé), filtre d'événement transmis au serveur.
+  const journal = usePagedList<JournalAcces>(
+    "journal-acces",
+    (q) => api.get<Paginated<JournalAcces>>(`/api/users/journal-acces/${q}`),
+    { pageSize: 50, extra: evenement ? `evenement=${evenement}` : "", enabled: admin },
+  );
 
   const delegationColumns: Column<Delegation>[] = [
     { key: "code", header: "Code", render: (d) => d.code },
@@ -111,7 +110,10 @@ export function SecuritePage() {
         <SectionCard title={t("securite.journal")}>
           <p className="muted">{t("securite.journalIntro")}</p>
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-            <select value={evenement} onChange={(e) => setEvenement(e.target.value)} aria-label={t("securite.col.evenement")}>
+            <select value={evenement} onChange={(e) => {
+                setEvenement(e.target.value);
+                journal.setPage(1);
+              }} aria-label={t("securite.col.evenement")}>
               <option value="">{t("securite.tous")}</option>
               {EVENEMENTS.map((e) => (
                 <option key={e} value={e}>
@@ -127,7 +129,7 @@ export function SecuritePage() {
               {t("securite.exporter")}
             </button>
           </div>
-          <DataTable rows={journal.data ?? []} columns={journalColumns} caption={t("securite.journal")} />
+          <PagedDataTable list={journal} columns={journalColumns} caption={t("securite.journal")} />
         </SectionCard>
       ) : null}
     </>

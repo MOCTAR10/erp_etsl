@@ -19,7 +19,7 @@ export function pagedQuery(page: number, pageSize: number, search: string, extra
 export function usePagedList<T>(
   key: string,
   fetcher: (query: string) => Promise<Paginated<T>>,
-  { pageSize: initialSize = 20, extra = "" }: { pageSize?: number; extra?: string } = {},
+  { pageSize: initialSize = 20, extra = "", enabled = true }: { pageSize?: number; extra?: string; enabled?: boolean } = {},
 ) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(initialSize);
@@ -29,6 +29,7 @@ export function usePagedList<T>(
     queryKey: [key, page, pageSize, search, extra],
     queryFn: () => fetcher(pagedQuery(page, pageSize, search, extra)),
     placeholderData: keepPreviousData,
+    enabled,
   });
 
   const setSearch = useCallback((value: string) => {
