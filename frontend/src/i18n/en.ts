@@ -699,6 +699,13 @@ export const en = {
     interne: "Internal QA/QC",
   },
   hse: {
+    searchIncidents: "Search incidents (code, place)…",
+    searchPermis: "Search permits (code, location)…",
+    searchRisques: "Search risk assessments (code, place, activity)…",
+    searchAtex: "Search ATEX equipment (code, designation)…",
+    searchFormations: "Search training (code, topic)…",
+    searchEpis: "Search PPE (code, designation)…",
+    searchBsd: "Search waste slips (code, BSD no.)…",
     trir: "TRIR (year)",
     joursPerdus: "lost days",
     visaAttendu: "Awaiting sign-off", niveaux: { superviseur: "supervisor", hse: "HSE", dg: "Managing Director" },
