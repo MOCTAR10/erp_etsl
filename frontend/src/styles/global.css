@@ -2102,3 +2102,49 @@ kbd {
 }
 .quick-form-actions { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
 .quick-form-ok { color: var(--ok-text); font-weight: 600; margin: 0; }
+
+/* ---------------------------------------------------------------------------
+ * Pagination & recherche des listes
+ * ------------------------------------------------------------------------- */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pagination select,
+.search-field input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.45rem 0.65rem;
+  outline: none;
+}
+
+.pagination select:focus,
+.search-field input:focus {
+  border-color: var(--brand);
+  box-shadow: var(--ring);
+}
+
+.search-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-muted);
+}
+
+.search-field input {
+  min-width: min(100%, 260px);
+}

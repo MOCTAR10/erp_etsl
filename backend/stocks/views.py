@@ -44,6 +44,7 @@ from .services import (
 class DepotViewSet(viewsets.ModelViewSet):
     queryset = Depot.objects.select_related("responsable").all()
     serializer_class = DepotSerializer
+    search_fields = ("code", "label", "site",)
     permission_classes = [CanManageStocks]
 
     def get_queryset(self):
@@ -56,6 +57,7 @@ class DepotViewSet(viewsets.ModelViewSet):
 class LotMatiereViewSet(viewsets.ModelViewSet):
     queryset = LotMatiere.objects.select_related("article").all()
     serializer_class = LotMatiereSerializer
+    search_fields = ("code", "numero_lot", "article__code", "article__label",)
     permission_classes = [CanManageStocks]
 
     def get_queryset(self):
@@ -84,6 +86,7 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
         "article", "source", "destination", "lot", "ordre", "devise", "created_by"
     ).all()
     serializer_class = MouvementStockSerializer
+    search_fields = ("code", "document_reference", "article__code", "article__label",)
     permission_classes = [CanManageStocks]
     # Journal de stock : création seule (le mouvement est exécuté immédiatement).
     # Une erreur se corrige par un mouvement inverse / un ajustement, jamais par PATCH/DELETE.
@@ -157,6 +160,7 @@ class InventaireViewSet(viewsets.ModelViewSet):
         "depot", "responsable", "created_by"
     ).prefetch_related("lignes__article", "lignes__lot").all()
     serializer_class = InventaireSerializer
+    search_fields = ("code", "depot__code",)
     permission_classes = [CanManageStocks]
 
     def get_queryset(self):
@@ -195,6 +199,7 @@ class InventaireLigneViewSet(viewsets.ModelViewSet):
 class ArticleStockViewSet(viewsets.ModelViewSet):
     queryset = ArticleStock.objects.select_related("article").all()
     serializer_class = ArticleStockSerializer
+    search_fields = ("article__code", "article__label",)
     permission_classes = [CanManageStocks]
 
     def get_queryset(self):

@@ -37,3 +37,34 @@ class PaginationTests(APITestCase):
     def test_page_deux(self):
         data = self.client.get(self.url, {"page": 2}).json()
         self.assertGreaterEqual(len(data["results"]), 10)
+
+
+class RechercheTests(APITestCase):
+    """`?search=` filtre les listes métier (SearchFilter) et se combine avec la pagination."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from referentiels.models import Partner
+
+        cls.user = User.objects.create_user(email="adm2@etls.local", password="x", role="admin")
+        Partner.objects.bulk_create(
+            [Partner(code=f"P{i:03d}", name=f"Fournisseur {i:03d}") for i in range(25)]
+            + [Partner(code="PZZZ", name="Zanzibar Logistique")]
+        )
+
+    def setUp(self):
+        self.client.force_authenticate(self.user)
+
+    def test_recherche_par_nom(self):
+        data = self.client.get("/api/referentiels/partners/", {"search": "zanzibar"}).json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["results"][0]["code"], "PZZZ")
+
+    def test_recherche_pagine(self):
+        data = self.client.get("/api/referentiels/partners/", {"search": "Fournisseur", "page_size": 10, "page": 3}).json()
+        self.assertEqual(data["count"], 25)
+        self.assertEqual(len(data["results"]), 5)
+
+    def test_recherche_vide_ne_filtre_pas(self):
+        data = self.client.get("/api/referentiels/partners/", {"search": ""}).json()
+        self.assertGreaterEqual(data["count"], 26)

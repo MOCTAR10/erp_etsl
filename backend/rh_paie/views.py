@@ -79,6 +79,7 @@ from .services import (
 class EmployeViewSet(viewsets.ModelViewSet):
     queryset = Employe.objects.prefetch_related("contrats", "formations", "bulletins").all()
     serializer_class = EmployeSerializer
+    search_fields = ("code", "nom", "prenom", "fonction", "departement",)
     permission_classes = [CanManageRh]
 
     def get_queryset(self):
@@ -148,6 +149,7 @@ class EmployeViewSet(viewsets.ModelViewSet):
 class ContratViewSet(viewsets.ModelViewSet):
     queryset = ContratTravail.objects.select_related("employe").all()
     serializer_class = ContratSerializer
+    search_fields = ("employe__code", "employe__nom", "employe__prenom",)
     permission_classes = [CanManageRh]
 
     def get_queryset(self):
@@ -277,6 +279,7 @@ class FormationsViewSet(viewsets.ModelViewSet):
 class DemandeCongeViewSet(viewsets.ModelViewSet):
     queryset = DemandesConge.objects.select_related("employe").all()
     serializer_class = DemandeCongeSerializer
+    search_fields = ("employe__code", "employe__nom", "employe__prenom",)
     permission_classes = [CanManageRh]
 
     def get_queryset(self):
@@ -465,6 +468,7 @@ class RubriqueViewSet(viewsets.ModelViewSet):
 class BulletinViewSet(viewsets.ModelViewSet):
     queryset = BulletinPaie.objects.select_related("employe").prefetch_related("lignes__rubrique").all()
     serializer_class = BulletinSerializer
+    search_fields = ("employe__code", "employe__nom", "employe__prenom",)
     permission_classes = [CanManagePaie]
     http_method_names = ["get", "post", "head", "options"]  # pas de PUT/DELETE
 

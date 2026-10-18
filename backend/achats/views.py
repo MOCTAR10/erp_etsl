@@ -60,6 +60,7 @@ class _CommonViewSet(viewsets.ModelViewSet):
 
 class PurchaseRequestViewSet(_CommonViewSet):
     serializer_class = PurchaseRequestSerializer
+    search_fields = ("code", "title", "department",)
 
     def get_permissions(self):
         # _CommonViewSet.get_permissions ignore les permission_classes d'action : l'approbation est déclarée ici.
@@ -153,6 +154,7 @@ class PurchaseRequestLineViewSet(_CommonViewSet):
 
 class ConsultationRequestViewSet(_CommonViewSet):
     serializer_class = ConsultationRequestSerializer
+    search_fields = ("code", "subject",)
 
     def get_queryset(self):
         qs = ConsultationRequest.objects.select_related("request").all()
@@ -204,6 +206,7 @@ class ConsultationOfferViewSet(_CommonViewSet):
 
 class PurchaseOrderViewSet(_CommonViewSet):
     serializer_class = PurchaseOrderSerializer
+    search_fields = ("code", "supplier__name", "supplier__code",)
 
     def get_queryset(self):
         qs = PurchaseOrder.objects.select_related(
@@ -321,6 +324,7 @@ class PurchaseOrderLineViewSet(_CommonViewSet):
 
 class GoodsReceiptViewSet(_CommonViewSet):
     serializer_class = GoodsReceiptSerializer
+    search_fields = ("code", "purchase_order__code",)
 
     def get_queryset(self):
         qs = GoodsReceipt.objects.select_related("purchase_order", "received_by").all()
@@ -357,6 +361,7 @@ class LitigeFournisseurViewSet(_CommonViewSet):
     """Litiges fournisseurs (clôture M2) : relance, escalade en pré-contentieux M12, résolution motivée."""
 
     serializer_class = LitigeFournisseurSerializer
+    search_fields = ("code", "purchase_order__code",)
 
     def get_queryset(self):
         qs = LitigeFournisseur.objects.select_related("purchase_order__supplier", "contentieux")
@@ -442,6 +447,7 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
 
 class PurchaseInvoiceViewSet(_CommonViewSet):
     serializer_class = PurchaseInvoiceSerializer
+    search_fields = ("code", "invoice_ref", "supplier__name",)
 
     def get_queryset(self):
         qs = PurchaseInvoice.objects.select_related("purchase_order", "supplier", "currency").all()
