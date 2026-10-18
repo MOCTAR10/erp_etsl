@@ -24,6 +24,8 @@ if env_file.exists():
 
 # ── Security ──
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure-dev-only-change-me")
+# Clé Fernet (44 car. base64) du chiffrement des données personnelles (RIB, n° CNSS). Vide = dérivée de SECRET_KEY.
+FIELD_ENCRYPTION_KEY = env("FIELD_ENCRYPTION_KEY", default="")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 

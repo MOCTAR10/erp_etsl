@@ -22,6 +22,7 @@ from .models import (
     BaremeImpot,
     BaremeCotisation,
     CompteEmetteur,
+    DeclarationSociale,
     OrdreVirement,
     HistoriqueBareme,
     ParametrePaie,
@@ -39,6 +40,7 @@ from .models import (
 from .serializers import (
     BaremeImpotSerializer,
     CompteEmetteurSerializer,
+    DeclarationSocialeSerializer,
     OrdreVirementSerializer,
     HistoriqueBaremeSerializer,
     ParametrePaieSerializer,
@@ -62,7 +64,10 @@ from .services import (
     CanManageRh,
     archiver_bulletin,
     bareme_fige,
+    generer_declaration,
     generer_virement,
+    integrer_temps,
+    reporting_rh,
     calculer_bulletin,
     comptabiliser_bulletin,
     confirmer_valeur,
@@ -533,6 +538,15 @@ class BulletinViewSet(viewsets.ModelViewSet):
         bulletin.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(bulletin).data)
 
+    @action(detail=True, methods=["post"], url_path="integrer-temps")
+    def integrer_temps(self, request, pk=None):
+        """Intègre les heures supplémentaires des pointages du mois (durée légale et majorations paramétrées)."""
+        try:
+            bulletin, _ = integrer_temps(self.get_object())
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(bulletin).data)
+
     @action(detail=True, methods=["post"], url_path="archiver")
     def archiver(self, request, pk=None):
         """Scelle le PDF du bulletin en GED (conservation ≥ 10 ans, accès restreint RH)."""
@@ -881,3 +895,47 @@ class OrdreVirementViewSet(viewsets.ReadOnlyModelViewSet):
         rep = HttpResponse(ordre.contenu, content_type="text/plain; charset=ascii")
         rep["Content-Disposition"] = f'attachment; filename="{ordre.code}.cfonb"'
         return rep
+
+
+class DeclarationSocialeViewSet(viewsets.ReadOnlyModelViewSet):
+    """Déclarations CNSS / CNAMGS / IRPP (2460) / DADS générées depuis les bulletins, scellées."""
+
+    queryset = DeclarationSociale.objects.select_related("created_by")
+    serializer_class = DeclarationSocialeSerializer
+    permission_classes = [CanManagePaie]
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=DeclarationSocialeSerializer)
+    @action(detail=False, methods=["post"], url_path="generer")
+    def generer(self, request):
+        """`{"type": "cnss|cnamgs|irpp|dads", "periode_debut": "AAAA-MM-01", "periode_fin": "AAAA-MM-01"}`."""
+        data = request.data
+        debut = serializers.DateField().run_validation(data.get("periode_debut"))
+        fin = serializers.DateField().run_validation(data.get("periode_fin"))
+        try:
+            decl = generer_declaration(data.get("type"), debut, fin, user=request.user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(decl).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(responses=OpenApiTypes.BINARY)
+    @action(detail=True, methods=["get"], url_path="fichier")
+    def fichier(self, request, pk=None):
+        from django.http import HttpResponse
+
+        decl = self.get_object()
+        rep = HttpResponse(decl.contenu, content_type="text/csv; charset=utf-8")
+        rep["Content-Disposition"] = f'attachment; filename="{decl.code}_{decl.type}.csv"'
+        return rep
+
+
+class ReportingRhView(APIView):
+    """Turnover et absentéisme de l'année (`?annee=AAAA`)."""
+
+    permission_classes = [CanManageRh]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        annee = serializers.IntegerField(min_value=2000, max_value=2100).run_validation(
+            request.query_params.get("annee", timezone.localdate().year)
+        )
+        return Response(reporting_rh(annee))

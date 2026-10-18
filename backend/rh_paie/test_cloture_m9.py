@@ -383,3 +383,175 @@ class VirementCfonbTests(M9Base):
         _auth(self.client, "finance@etls.local")
         self.assertEqual(self.client.get(f"{BASE}employes/{self.employe.pk}/").json()["rib_compte"], "98765432101")
         self.assertIsNotNone(chef)
+
+
+class PiiChiffreesTests(M9Base):
+    def test_rib_et_n_cnss_chiffres_en_base_clairs_dans_l_orm(self):
+        from django.db import connection
+
+        from .models import Employe
+
+        e = Employe.objects.get(pk=self.employe.pk)
+        e.numero_securite_sociale, e.rib_compte = "CNSS0001234", "12345678901"
+        e.save()
+        e = Employe.objects.get(pk=self.employe.pk)
+        self.assertEqual((e.numero_securite_sociale, e.rib_compte), ("CNSS0001234", "12345678901"))
+        with connection.cursor() as cur:
+            cur.execute("select numero_securite_sociale, rib_compte from rh_paie_employe where id = %s", [str(e.pk)])
+            brut = cur.fetchone()
+        self.assertTrue(all(v.startswith("enc1:") for v in brut))
+        self.assertNotIn("CNSS0001234", brut[0])
+
+    def test_valeur_historique_en_clair_restee_lisible(self):
+        from django.db import connection
+
+        from .models import Employe
+
+        with connection.cursor() as cur:
+            cur.execute("update rh_paie_employe set matricule_cnps = 'ANCIEN-CLAIR' where id = %s", [str(self.employe.pk)])
+        self.assertEqual(Employe.objects.get(pk=self.employe.pk).matricule_cnps, "ANCIEN-CLAIR")
+
+
+class HeuresSupTests(M9Base):
+    def pointer(self, jour, heures, employe=None):
+        from .models import SaisieTemps
+
+        SaisieTemps.objects.create(employe=employe or self.employe, date=jour, heures=Decimal(heures))
+
+    def setUp(self):
+        super().setUp()
+        call_command("seed_baremes_legaux_provisoires")
+
+    def test_heures_sup_par_semaine_selon_parametres(self):
+        # semaine du 02/03/2026 : 50 h => 8 h a +25 % (41e-48e) et 2 h a +50 %
+        for jour in (2, 3, 4, 5, 6):
+            self.pointer(date(2026, 3, jour), 10)
+        b = self.bulletin()
+        b.lignes.all().delete()
+        _auth(self.client, "finance@etls.local")
+        r = self.client.post(f"{BASE}bulletins/{b.pk}/integrer-temps/")
+        self.assertEqual(r.status_code, 200, r.content)
+        ligne = BulletinLigne.objects.get(bulletin=b, rubrique__code="HS-TEMPS")
+        self.assertEqual(ligne.montant, Decimal("75000.00"))
+        # idempotent
+        self.client.post(f"{BASE}bulletins/{b.pk}/integrer-temps/")
+        self.assertEqual(BulletinLigne.objects.filter(bulletin=b, rubrique__code="HS-TEMPS").count(), 1)
+        # les parametres sont des donnees : changer la majoration change le montant
+        ParametrePaie.objects.filter(code="HS_MAJ_1").update(valeur=Decimal("50"))
+        self.client.post(f"{BASE}bulletins/{b.pk}/integrer-temps/")
+        self.assertEqual(BulletinLigne.objects.get(bulletin=b, rubrique__code="HS-TEMPS").montant, Decimal("86538.46"))
+
+    def test_bulletin_avertit_que_les_parametres_sont_provisoires(self):
+        self.pointer(date(2026, 3, 2), "45")
+        b = self.bulletin()
+        _auth(self.client, "finance@etls.local")
+        data = self.client.post(f"{BASE}bulletins/{b.pk}/integrer-temps/").json()
+        self.assertIn("HS_MAJ_1", data["baremes_provisoires"])
+        self.assertIn("provisoires", data["avertissement"])
+
+    def test_aucune_heure_sup_sous_la_duree_legale(self):
+        self.pointer(date(2026, 3, 2), "8")
+        b = self.bulletin()
+        _auth(self.client, "finance@etls.local")
+        self.client.post(f"{BASE}bulletins/{b.pk}/integrer-temps/")
+        self.assertFalse(BulletinLigne.objects.filter(bulletin=b, rubrique__code="HS-TEMPS").exists())
+
+    def test_parametre_absent_refuse_et_bulletin_valide_intouchable(self):
+        ParametrePaie.objects.all().delete()
+        b = self.bulletin()
+        _auth(self.client, "finance@etls.local")
+        r = self.client.post(f"{BASE}bulletins/{b.pk}/integrer-temps/")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("absent", str(r.json()))
+        BulletinPaie.objects.filter(pk=b.pk).update(statut="valide")
+        self.assertEqual(self.client.post(f"{BASE}bulletins/{b.pk}/integrer-temps/").status_code, 400)
+
+
+class DeclarationsTests(M9Base):
+    def setUp(self):
+        super().setUp()
+        call_command("seed_baremes_legaux_provisoires")
+        from .models import Employe
+
+        e = Employe.objects.get(pk=self.employe.pk)
+        e.numero_securite_sociale, e.matricule_cnps = "CNSS0001234", "AM-77"
+        e.save()
+        for mois in (3, 4):
+            b = calculer_bulletin(self.bulletin(date(2026, mois, 1)))
+            BulletinPaie.objects.filter(pk=b.pk).update(statut="valide")
+        self.payload = {"type": "cnss", "periode_debut": "2026-03-01", "periode_fin": "2026-04-01"}
+
+    def generer(self, **kw):
+        _auth(self.client, "finance@etls.local")
+        return self.client.post(f"{BASE}declarations/generer/", {**self.payload, **kw}, format="json")
+
+    def test_cnss_sans_ressaisie_avec_avertissement_provisoire(self):
+        r = self.generer()
+        self.assertEqual(r.status_code, 201, r.content)
+        d = r.json()
+        self.assertEqual(d["nb_salaries"], 1)
+        # 2 mois x brut 1 000 000 : salarial 5 % (50 000) ; patronal 11 + 5 + 2 = 18 % (180 000)
+        self.assertEqual(Decimal(d["total_salarial"]), Decimal("100000.00"))
+        self.assertEqual(Decimal(d["total_patronal"]), Decimal("360000.00"))
+        self.assertTrue(d["provisoire"])
+        self.assertIn("provisoires", d["avertissement"])
+        lignes = self.client.get(f"{BASE}declarations/{d['id']}/fichier/").content.decode().splitlines()
+        self.assertTrue(lignes[0].startswith("# Taux provisoires"))
+        self.assertIn("CNSS0001234", lignes[-1])
+        self.assertTrue(lignes[-1].endswith(";2000000.00;2000000.00;100000.00;360000.00"), lignes[-1])
+
+    def test_declaration_confirmee_sans_avertissement(self):
+        BaremeCotisation.objects.update(statut_valeur="confirme")
+        BaremeImpot.objects.update(statut_valeur="confirme")
+        for b in BulletinPaie.objects.all():
+            BulletinPaie.objects.filter(pk=b.pk).update(statut="brouillon")
+            calculer_bulletin(BulletinPaie.objects.get(pk=b.pk))
+            BulletinPaie.objects.filter(pk=b.pk).update(statut="valide")
+        d = self.generer().json()
+        self.assertFalse(d["provisoire"])
+        self.assertEqual(d["avertissement"], "")
+
+    def test_cnamgs_irpp_et_dads(self):
+        for type_ in ("cnamgs", "irpp", "dads"):
+            r = self.generer(type=type_)
+            self.assertEqual(r.status_code, 201, (type_, r.content))
+        dads = self.client.get(f"{BASE}declarations/{r.json()['id']}/fichier/").content.decode()
+        self.assertIn("n_cnss", dads)
+        self.assertIn("CNSS0001234", dads)
+
+    def test_scellee_et_sans_bulletin_refusee(self):
+        from .models import DeclarationSociale
+
+        d = DeclarationSociale.objects.get(pk=self.generer().json()["id"])
+        d.nb_salaries = 9
+        with self.assertRaises(ValidationError):
+            d.save()
+        with self.assertRaises(ValidationError):
+            d.delete()
+        r = self.generer(periode_debut="2027-01-01", periode_fin="2027-02-01")
+        self.assertEqual(r.status_code, 400)
+
+    def test_hors_cercle_paie_refuse(self):
+        _auth(self.client, "logistique@etls.local")
+        self.assertEqual(self.client.post(f"{BASE}declarations/generer/", self.payload, format="json").status_code, 403)
+        self.assertEqual(self.client.get(f"{BASE}declarations/").status_code, 403)
+
+
+class ReportingRhTests(M9Base):
+    def test_turnover_et_absenteisme(self):
+        from .models import DemandesConge, Employe
+
+        Employe.objects.filter(pk=self.employe.pk).update(date_embauche=date(2020, 1, 1))
+        Employe.objects.filter(pk=self.employe2.pk).update(date_embauche=date(2020, 1, 1), date_sortie=date(2026, 6, 30))
+        DemandesConge.objects.create(
+            employe=self.employe, type="maladie", date_debut=date(2026, 2, 2), date_fin=date(2026, 2, 6), nb_jours=5,
+            statut="valide",
+        )
+        _auth(self.client, "rh@etls.local")
+        d = self.client.get(f"{BASE}reporting/?annee=2026").json()
+        self.assertEqual((d["sorties"], d["jours_absence"]), (1, 5))
+        self.assertEqual(d["effectif_debut"], d["effectif_fin"] + 1)
+        self.assertIsNotNone(d["turnover_pct"])
+        self.assertIsNotNone(d["absenteisme_pct"])
+        _auth(self.client, "logistique@etls.local")
+        self.assertEqual(self.client.get(f"{BASE}reporting/?annee=2026").status_code, 403)

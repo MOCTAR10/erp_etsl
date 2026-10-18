@@ -8,6 +8,7 @@ from .models import (
     BaremeImpot,
     BaremeCotisation,
     CompteEmetteur,
+    DeclarationSociale,
     OrdreVirement,
     HistoriqueBareme,
     ParametrePaie,
@@ -451,5 +452,26 @@ class OrdreVirementSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "periode", "compte", "compte_label", "date_execution", "nb_virements", "total",
             "sha256", "created_by", "par_email", "created_at",
+        ]
+        read_only_fields = fields
+
+
+class DeclarationSocialeSerializer(serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_display", read_only=True)
+    provisoire = serializers.BooleanField(read_only=True)
+    avertissement = serializers.SerializerMethodField()
+    par_email = serializers.CharField(source="created_by.email", read_only=True, default=None)
+
+    def get_avertissement(self, obj):
+        from .services import avertissement_provisoire
+
+        return avertissement_provisoire(obj.baremes_provisoires)
+
+    class Meta:
+        model = DeclarationSociale
+        fields = [
+            "id", "code", "type", "type_label", "periode_debut", "periode_fin", "nb_salaries", "total_brut",
+            "total_salarial", "total_patronal", "total_impot", "sha256", "baremes_provisoires", "provisoire",
+            "avertissement", "created_by", "par_email", "created_at",
         ]
         read_only_fields = fields
