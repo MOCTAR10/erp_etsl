@@ -217,6 +217,12 @@ export const api = {
     raw<import("../types").Paginated<import("../types").Epi>>(`/api/hse/epis/${params}`),
   bordereauxDechets: (params = "") =>
     raw<import("../types").Paginated<import("../types").BordereauDechet>>(`/api/hse/bordereaux-dechets/${params}`),
+  auditsHse: (params = "") =>
+    raw<import("../types").Paginated<import("../types").AuditHse>>(`/api/hse/audits/${params}`),
+  duerHse: (params = "") =>
+    raw<import("../types").Paginated<import("../types").Duer>>(`/api/hse/duer/${params}`),
+  plansUrgence: (params = "") =>
+    raw<import("../types").Paginated<import("../types").PlanUrgence>>(`/api/hse/plans-urgence/${params}`),
   maintenanceStats: () => raw<import("../types").MaintenanceStats>("/api/maintenance/ordres/stats/"),
   actifs: (params = "") =>
     raw<import("../types").Paginated<import("../types").Actif>>(`/api/maintenance/actifs/${params}`),
