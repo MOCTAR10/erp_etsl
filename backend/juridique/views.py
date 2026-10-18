@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -16,9 +17,11 @@ from .models import (
     Convention,
     Courrier,
     DossierGlobalRental,
+    LienDocument,
     Reunion,
 )
 from .serializers import (
+    LienDocumentSerializer,
     AssuranceSerializer,
     CautionSerializer,
     ContentieuxSerializer,
@@ -32,6 +35,8 @@ from users.permissions import can_read_module
 from .services import (
     CanValidateDg,
     CanManageJuridique,
+    RECHERCHE_MIN,
+    rechercher_documents,
     CanValidateJuridique,
     compute_alertes,
     compute_stats,
@@ -400,3 +405,63 @@ class AlertesViewSet(viewsets.ViewSet):
 
     def list(self, request):
         return Response(compute_alertes())
+
+
+class LienDocumentViewSet(viewsets.ModelViewSet):
+    """Liens document GED ↔ objet métier M1-M11 (recherche juridique interconnectée, clôture M12)."""
+
+    serializer_class = LienDocumentSerializer
+    permission_classes = [CanManageJuridique]
+    http_method_names = ["get", "post", "delete", "head", "options"]
+
+    def get_queryset(self):
+        from documents.services import visible_documents
+
+        qs = LienDocument.objects.select_related("document").filter(
+            document__in=visible_documents(self.request.user)
+        )
+        params = self.request.query_params
+        if document := params.get("document"):
+            qs = qs.filter(document_id=document)
+        if objet_type := params.get("objet_type"):
+            qs = qs.filter(objet_type=objet_type)
+        if objet_id := params.get("objet_id"):
+            qs = qs.filter(objet_id=objet_id)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class RechercheJuridiqueView(viewsets.ViewSet):
+    """Recherche transverse : documents GED (ACL respectées) retrouvés par leur texte ou par un objet métier lié."""
+
+    permission_classes = [can_read_module("juridique")]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", type=str, required=True),
+            OpenApiParameter("module", type=str, required=False),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def list(self, request):
+        q = (request.query_params.get("q") or "").strip()
+        if len(q) < RECHERCHE_MIN:
+            raise DRFValidationError(f"Saisissez au moins {RECHERCHE_MIN} caractères.")
+        module = request.query_params.get("module") or None
+        docs = rechercher_documents(request.user, q, module)
+        return Response({
+            "q": q,
+            "documents": [
+                {
+                    "id": str(d.pk), "title": d.title, "status": d.status, "reference": d.reference,
+                    "counterparty": d.counterparty,
+                    "liens": [
+                        {"objet_type": l.objet_type, "objet_id": l.objet_id, "objet_label": l.objet_label, "module": l.module}
+                        for l in d.liens_metier.all()
+                    ],
+                }
+                for d in docs
+            ],
+        })

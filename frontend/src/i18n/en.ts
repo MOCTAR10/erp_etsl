@@ -1154,6 +1154,20 @@ export const en = {
       totalGr: "GR total", totalHorsGr: "Non-GR total",
     },
   },
+  rechercheJuridique: {
+    title: "Legal search linked to the modules (M12 ↔ M1-M11)",
+    hint: "Finds DMS documents by content or by the business object they are linked to (project, contract, PO, work order…). DMS access rights are enforced.",
+    terme: "Search term", module: "Module", tousModules: "All modules", chercher: "Search",
+    aucun: "No document found.", document: "Document", liens: "Linked objects", objetType: "Object type",
+    objetId: "Object identifier", lier: "Link the document", lie: "Document linked to the business object.",
+  },
+  docsOfficiels: {
+    title: "Official documents: signature and sealing (M12)",
+    hint: "A document of an official type is archived only with an advanced signature completed on its current version, then its content is sealed.",
+    warnProvisoire: "{{count}} provisional official type(s): list to be confirmed by ETSL.",
+    provisoire: "Provisional", confirme: "Confirmed", marquer: "Mark as official", retirer: "Remove", confirmer: "Confirm",
+    confirmConfirmer: "Confirm this type as an official document (validated by ETSL)?",
+  },
   grAffaires: {
     title: "GLOBAL RENTAL cost by project (meters to M11)", periode: "Month",
     hint: "GR meter readings valued per the rate grid and split by project. The cost stays in account 618, isolated from margins: the margin after GR cost is indicative.",

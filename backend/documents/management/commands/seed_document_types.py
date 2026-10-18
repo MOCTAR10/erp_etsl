@@ -25,6 +25,8 @@ class Command(BaseCommand):
         ("bordereaux_caisse_tickets", "Bordereaux de caisse / tickets", 10, False, None),
     ]
 
+    TYPES_OFFICIELS_PROVISOIRES = ("contrats", "documents_juridiques")
+
     def handle(self, *args, **options):
         from workflow.models import Circuit
 
@@ -40,6 +42,8 @@ class Command(BaseCommand):
                     "retention_years": retention_years,
                     "is_restricted_rh": restricted_rh,
                     "circuit": circuit,
+                    # Liste des types officiels (signes et scelles) : defaut PROVISOIRE, a confirmer par ETSL.
+                    "officiel": code in self.TYPES_OFFICIELS_PROVISOIRES,
                 },
             )
             created += was_created

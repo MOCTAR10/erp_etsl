@@ -2403,3 +2403,23 @@ export interface MaintenanceCoutsResult {
   rows: MaintenanceCoutRow[];
   totaux: { gr_618: string | null; hors_gr: string | null };
 }
+
+export interface DocumentTypeOfficiel {
+  id: string;
+  code: string;
+  label: string;
+  officiel: boolean;
+  officiel_provisoire: boolean;
+}
+
+export interface RechercheJuridiqueResult {
+  q: string;
+  documents: {
+    id: string;
+    title: string;
+    status: string;
+    reference: string;
+    counterparty: string;
+    liens: { objet_type: string; objet_id: string; objet_label: string; module: string }[];
+  }[];
+}

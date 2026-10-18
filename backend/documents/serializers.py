@@ -19,9 +19,18 @@ def compute_sha256(uploaded_file):
 
 
 class DocumentTypeSerializer(serializers.ModelSerializer):
+    officiel_provisoire = serializers.SerializerMethodField()
+
     class Meta:
         model = DocumentType
-        fields = ["id", "code", "label", "retention_years", "is_restricted_rh"]
+        fields = [
+            "id", "code", "label", "retention_years", "is_restricted_rh",
+            "officiel", "officiel_provisoire", "officiel_confirme_par", "officiel_confirme_le",
+        ]
+        read_only_fields = fields
+
+    def get_officiel_provisoire(self, obj):
+        return obj.officiel and obj.officiel_confirme_le is None
 
 
 class DossierSerializer(serializers.ModelSerializer):

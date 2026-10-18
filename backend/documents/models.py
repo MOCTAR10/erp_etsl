@@ -26,6 +26,15 @@ class DocumentType(models.Model):
         related_name="document_types",
         verbose_name="Circuit de validation (RF-29 à 31)",
     )
+    officiel = models.BooleanField(
+        default=False, verbose_name="Document officiel (signé et scellé)",
+        help_text="Archivage seulement avec une signature avancée achevée sur la version courante (CDC M12).",
+    )
+    officiel_confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Caractère officiel confirmé par",
+    )
+    officiel_confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
 
     class Meta:
         ordering = ["label"]

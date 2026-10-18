@@ -110,6 +110,12 @@ def complete_task(task, user):
     if next_step is None:
         # Dernière étape → archivage automatique (RF-40, RF-41).
         document = task.document
+        from documents.signatures import version_signee
+
+        if document.type_id and document.type.officiel and not version_signee(document.current_version):
+            raise ValidationError(
+                "Document officiel : signature avancée achevée sur la version courante requise avant archivage."
+            )
         document.status = Document.Status.ARCHIVED
         document.archived_at = timezone.now()
         document.save(update_fields=["status", "archived_at"])

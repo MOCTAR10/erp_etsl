@@ -28,6 +28,7 @@ class Command(BaseCommand):
     help = "Seed les données de démonstration du module Juridique & GED (M12)."
 
     def handle(self, *args, **options):
+        self._seed_liens()
         # Partenaires (banque / assureur / GR).
         banque, _ = Partner.objects.get_or_create(
             code="BANQUE-01",
@@ -130,4 +131,21 @@ class Command(BaseCommand):
                 f"cautions={Caution.objects.count()}, assurances={Assurance.objects.count()}, "
                 f"reunions={Reunion.objects.count()}, dossiers-GR={DossierGlobalRental.objects.count()}."
             )
+        )
+
+    def _seed_liens(self):
+        """Document de demonstration relie a une affaire (recherche juridique liee M1-M11)."""
+        from commercial.models import Affaire
+        from documents.models import Document
+        from juridique.models import LienDocument
+
+        affaire = Affaire.objects.order_by("code").first()
+        if affaire is None:
+            return
+        doc, _ = Document.objects.get_or_create(
+            title="Convention cadre de maintenance Oveng", defaults={"reference": "CONV-OVENG-01", "counterparty": "Oveng"},
+        )
+        LienDocument.objects.get_or_create(
+            document=doc, objet_type="commercial.affaire", objet_id=str(affaire.pk),
+            defaults={"objet_label": str(affaire)[:255], "module": "M1"},
         )
