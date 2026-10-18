@@ -127,12 +127,14 @@ class ConsultationOfferSerializer(AmountMaskMixin, serializers.ModelSerializer):
     amount_fields = ["amount"]
 
     supplier_name = serializers.CharField(source="supplier.name", read_only=True, default=None)
+    consultation_code = serializers.CharField(source="consultation.code", read_only=True)
 
     class Meta:
         model = ConsultationOffer
         fields = [
             "id",
             "consultation",
+            "consultation_code",
             "supplier",
             "supplier_name",
             "amount",
@@ -148,12 +150,14 @@ class PurchaseOrderLineSerializer(AmountMaskMixin, serializers.ModelSerializer):
 
     article_code = serializers.CharField(source="article.code", read_only=True, default=None)
     unit_label = serializers.CharField(source="unit.label", read_only=True, default=None)
+    order_code = serializers.CharField(source="purchase_order.code", read_only=True)
 
     class Meta:
         model = PurchaseOrderLine
         fields = [
             "id",
             "purchase_order",
+            "order_code",
             "article",
             "article_code",
             "label",

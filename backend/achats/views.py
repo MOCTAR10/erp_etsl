@@ -200,6 +200,7 @@ class ConsultationRequestViewSet(_CommonViewSet):
 
 class ConsultationOfferViewSet(_CommonViewSet):
     serializer_class = ConsultationOfferSerializer
+    search_fields = ("consultation__code", "supplier__name",)
 
     def get_queryset(self):
         qs = ConsultationOffer.objects.select_related("consultation", "supplier").all()
@@ -207,6 +208,21 @@ class ConsultationOfferViewSet(_CommonViewSet):
         if consultation:
             qs = qs.filter(consultation_id=consultation)
         return qs
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def retenir(self, request, pk=None):
+        """Retient cette offre (et une seule) tant que la consultation est ouverte."""
+        offre = ConsultationOffer.objects.select_for_update(of=("self",)).select_related("consultation").get(
+            pk=self.get_object().pk
+        )
+        if offre.consultation.status != ConsultationRequest.Status.OUVERTE:
+            return Response({"detail": "Seule une consultation ouverte permet de retenir une offre."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        offre.consultation.offers.exclude(pk=offre.pk).update(is_selected=False)
+        offre.is_selected = True
+        offre.save(update_fields=["is_selected"])
+        return Response(self.get_serializer(offre).data)
 
 
 class PurchaseOrderViewSet(_CommonViewSet):
@@ -489,6 +505,9 @@ class PurchaseInvoiceViewSet(_CommonViewSet):
 
     def get_queryset(self):
         qs = PurchaseInvoice.objects.select_related("purchase_order", "supplier", "currency", "move").all()
+        status_ = self.request.query_params.get("status")
+        if status_:
+            qs = qs.filter(status=status_)
         purchase_order = self.request.query_params.get("purchase_order")
         if purchase_order:
             qs = qs.filter(purchase_order_id=purchase_order)
