@@ -1315,6 +1315,13 @@ export const fr = {
     pendingNote: "Marges et écarts agrégés depuis les écritures comptabilisées (noyau comptable) ; coût GLOBAL RENTAL isolé au compte 618 (RF-ERP-A4). Clôtures de gestion < J+4 (RF-ERP-A3), budgets & révisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    searchConventions: "Rechercher une convention (code, titre)…",
+    searchCautions: "Rechercher une caution (code, bénéficiaire)…",
+    searchAssurances: "Rechercher une assurance (code, n° de police)…",
+    searchContentieux: "Rechercher un contentieux (code, objet, partie adverse)…",
+    searchCourriers: "Rechercher un courrier (code, objet, référence)…",
+    searchReunions: "Rechercher une réunion (code, objet)…",
+    searchGr: "Rechercher un dossier Global Rental (code, contrat)…",
     act: { enregistrer: "Enregistrer", classer: "Classer", archiver: "Archiver" },
     form: {
       title: "Enregistrer un courrier", entrant: "Entrant", sortant: "Sortant", reference: "Référence",

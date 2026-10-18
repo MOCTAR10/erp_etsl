@@ -1315,6 +1315,13 @@ export const en = {
     pendingNote: "Margins and variances aggregated from posted entries (accounting kernel); GLOBAL RENTAL cost isolated to account 618 (RF-ERP-A4). Period closings < J+4 (RF-ERP-A3), budgets & revisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    searchConventions: "Search agreements (code, title)…",
+    searchCautions: "Search guarantees (code, beneficiary)…",
+    searchAssurances: "Search insurance (code, policy no.)…",
+    searchContentieux: "Search disputes (code, subject, opposing party)…",
+    searchCourriers: "Search mail (code, subject, reference)…",
+    searchReunions: "Search meetings (code, subject)…",
+    searchGr: "Search Global Rental files (code, contract)…",
     act: { enregistrer: "Register", classer: "File", archiver: "Archive" },
     form: {
       title: "Register a letter", entrant: "Incoming", sortant: "Outgoing", reference: "Reference",

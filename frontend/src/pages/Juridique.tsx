@@ -1,12 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   AlertesResult,
   Assurance,
@@ -219,50 +221,28 @@ export function JuridiquePage() {
     queryFn: () => api.alertesJuridique(),
   });
 
-  const courriers = useQuery({
-    queryKey: ["juridique-courriers"],
-    queryFn: () => api.courriersJuridique("?page_size=50"),
-    select: (page: Paginated<Courrier>) => page.results,
-  });
+  const courriers = usePagedList<Courrier>("juridique-courriers", (q) => api.courriersJuridique(q));
 
+  const [convSearch, setConvSearch] = useState("");
   const conventions = useQuery({
-    queryKey: ["juridique-conventions"],
-    queryFn: () => api.conventionsJuridique("?page_size=100"),
+    queryKey: ["juridique-conventions", convSearch],
+    queryFn: () => api.conventionsJuridique(pagedQuery(1, 500, convSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<Convention>) => page.results,
   });
 
-  const cautions = useQuery({
-    queryKey: ["juridique-cautions"],
-    queryFn: () => api.cautionsJuridique("?page_size=50"),
-    select: (page: Paginated<Caution>) => page.results,
-  });
+  const cautions = usePagedList<Caution>("juridique-cautions", (q) => api.cautionsJuridique(q));
 
-  const assurances = useQuery({
-    queryKey: ["juridique-assurances"],
-    queryFn: () => api.assurancesJuridique("?page_size=50"),
-    select: (page: Paginated<Assurance>) => page.results,
-  });
+  const assurances = usePagedList<Assurance>("juridique-assurances", (q) => api.assurancesJuridique(q));
 
-  const contentieux = useQuery({
-    queryKey: ["juridique-contentieux"],
-    queryFn: () => api.contentieuxJuridique("?page_size=50"),
-    select: (page: Paginated<Contentieux>) => page.results,
-  });
+  const contentieux = usePagedList<Contentieux>("juridique-contentieux", (q) => api.contentieuxJuridique(q));
 
-  const reunions = useQuery({
-    queryKey: ["juridique-reunions"],
-    queryFn: () => api.reunionsJuridique("?page_size=50"),
-    select: (page: Paginated<Reunion>) => page.results,
-  });
+  const reunions = usePagedList<Reunion>("juridique-reunions", (q) => api.reunionsJuridique(q));
 
-  const dossiersGr = useQuery({
-    queryKey: ["juridique-dossiers-gr"],
-    queryFn: () => api.dossiersGrJuridique("?page_size=50"),
-    select: (page: Paginated<DossierGlobalRental>) => page.results,
-  });
+  const dossiersGr = usePagedList<DossierGlobalRental>("juridique-dossiers-gr", (q) => api.dossiersGrJuridique(q));
 
   const loading =
-    !stats.data || alertes.isLoading || conventions.isLoading || cautions.isLoading || assurances.isLoading;
+    !stats.data || alertes.isLoading || conventions.isLoading || cautions.query.isLoading || assurances.query.isLoading;
 
   if (loading) return <BoardSkeleton cols={4} rows={3} />;
 
@@ -273,13 +253,13 @@ export function JuridiquePage() {
         onRetry={() => {
           void stats.refetch();
           void alertes.refetch();
-          void courriers.refetch();
+          void courriers.query.refetch();
           void conventions.refetch();
-          void cautions.refetch();
-          void assurances.refetch();
-          void contentieux.refetch();
-          void reunions.refetch();
-          void dossiersGr.refetch();
+          void cautions.query.refetch();
+          void assurances.query.refetch();
+          void contentieux.query.refetch();
+          void reunions.query.refetch();
+          void dossiersGr.query.refetch();
         }}
         retryLabel={t("common.retry")}
       />
@@ -288,12 +268,6 @@ export function JuridiquePage() {
   const s = stats.data as JuridiqueStats;
   const a = alertes.data as AlertesResult;
   const convs = conventions.data ?? [];
-  const cautionsList = cautions.data ?? [];
-  const assurancesList = assurances.data ?? [];
-  const courts = courriers.data ?? [];
-  const litiges = contentieux.data ?? [];
-  const reunionsList = reunions.data ?? [];
-  const grs = dossiersGr.data ?? [];
 
   return (
     <>
@@ -381,11 +355,12 @@ export function JuridiquePage() {
         </>
       ) : null}
 
-      {convs.length > 0 ? (
+      {convs.length > 0 || convSearch ? (
         <>
           <h3 className="section-heading">
             {t("juridique.conventions")} · {convs.length}
           </h3>
+          <SearchField value={convSearch} onChange={setConvSearch} placeholder={t("juridique.searchConventions")} />
           <div style={{ overflowX: "auto" }}>
             <Board>
               {(["signe", "en_signature", "brouillon", "cloture", "resilie"] as StatutConvention[]).map((st, ci) => {
@@ -399,6 +374,7 @@ export function JuridiquePage() {
                     tone="warn"
                     delay={ci * 0.05}
                     minWidth={280}
+                    limit={20}
                   >
                     {items.map((c, i) => (
                       <ConventionCard key={c.id} c={c} index={i} />
@@ -411,37 +387,37 @@ export function JuridiquePage() {
         </>
       ) : null}
 
-      {cautionsList.length > 0 && (
-        <SectionCard title={`${t("juridique.cautions")} · ${cautionsList.length}`}>
-          <DataTable rows={cautionsList} columns={cautionColumns(t)} caption={t("juridique.cautions")} />
+      {(cautions.count > 0 || cautions.search) && (
+        <SectionCard title={`${t("juridique.cautions")} · ${cautions.count}`}>
+          <PagedDataTable list={cautions} columns={cautionColumns(t)} caption={t("juridique.cautions")} searchPlaceholder={t("juridique.searchCautions")} />
         </SectionCard>
       )}
-      {assurancesList.length > 0 && (
-        <SectionCard title={`${t("juridique.assurances")} · ${assurancesList.length}`}>
-          <DataTable rows={assurancesList} columns={assuranceColumns(t)} caption={t("juridique.assurances")} />
+      {(assurances.count > 0 || assurances.search) && (
+        <SectionCard title={`${t("juridique.assurances")} · ${assurances.count}`}>
+          <PagedDataTable list={assurances} columns={assuranceColumns(t)} caption={t("juridique.assurances")} searchPlaceholder={t("juridique.searchAssurances")} />
         </SectionCard>
       )}
-      {litiges.length > 0 && (
-        <SectionCard title={`${t("juridique.contentieux")} · ${litiges.length}`}>
-          <DataTable rows={litiges} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} />
+      {(contentieux.count > 0 || contentieux.search) && (
+        <SectionCard title={`${t("juridique.contentieux")} · ${contentieux.count}`}>
+          <PagedDataTable list={contentieux} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} searchPlaceholder={t("juridique.searchContentieux")} />
         </SectionCard>
       )}
-      {grs.length > 0 && (
-        <SectionCard title={`GLOBAL RENTAL · ${grs.length}`}>
-          <DataTable rows={grs} columns={grColumns(t)} caption="GLOBAL RENTAL" />
+      {(dossiersGr.count > 0 || dossiersGr.search) && (
+        <SectionCard title={`GLOBAL RENTAL · ${dossiersGr.count}`}>
+          <PagedDataTable list={dossiersGr} columns={grColumns(t)} caption="GLOBAL RENTAL" searchPlaceholder={t("juridique.searchGr")} />
         </SectionCard>
       )}
       <RechercheJuridiqueSection />
       <DocumentsOfficielsSection />
 
-      {courts.length > 0 && (
-        <SectionCard title={`${t("juridique.courriers")} · ${courts.length}`}>
-          <DataTable rows={courts} columns={courrierColumns(t)} caption={t("juridique.courriers")} />
+      {(courriers.count > 0 || courriers.search) && (
+        <SectionCard title={`${t("juridique.courriers")} · ${courriers.count}`}>
+          <PagedDataTable list={courriers} columns={courrierColumns(t)} caption={t("juridique.courriers")} searchPlaceholder={t("juridique.searchCourriers")} />
         </SectionCard>
       )}
-      {reunionsList.length > 0 && (
-        <SectionCard title={`${t("juridique.reunions")} · ${reunionsList.length}`}>
-          <DataTable rows={reunionsList} columns={reunionColumns(t)} caption={t("juridique.reunions")} />
+      {(reunions.count > 0 || reunions.search) && (
+        <SectionCard title={`${t("juridique.reunions")} · ${reunions.count}`}>
+          <PagedDataTable list={reunions} columns={reunionColumns(t)} caption={t("juridique.reunions")} searchPlaceholder={t("juridique.searchReunions")} />
         </SectionCard>
       )}
     </>
