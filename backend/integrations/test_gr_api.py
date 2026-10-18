@@ -31,7 +31,7 @@ def make_location(statut=LocationGR.Statut.ACTIVE, **kw):
         code=f"GR-{LocationGR.objects.count()}", name="GLOBAL RENTAL", kind="fournisseur", is_global_rental=True
     )
     eq = EquipementParc.objects.create(label="Grue GR 25t", categorie="levage", is_global_rental=True)
-    return LocationGR.objects.create(equipement=eq, partenaire=partner, statut=statut, lecture_initiale=100, **kw)
+    return LocationGR.objects.create(equipement=eq, partenaire=partner, statut=statut, lecture_initiale=100, **{"tarif": 1000, **kw})
 
 
 class GrBase(TestCase):

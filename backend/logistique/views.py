@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
 from .models import (
@@ -14,6 +15,7 @@ from .models import (
     EquipementParc,
     LectureCompteur,
     LocationGR,
+    ParametreLogistique,
     TarifGR,
 )
 from .serializers import (
@@ -22,19 +24,33 @@ from .serializers import (
     EquipementParcSerializer,
     LectureCompteurSerializer,
     LocationGRSerializer,
+    ParametreLogistiqueSerializer,
     TarifGRSerializer,
 )
 from config.inputs import date_input
 from users.permissions import can_read_module
 from outbox.models import publish
 from .services import (
+    LOGISTIQUE_CONFIRM_ROLES,
+    PARAMETRES_DEFAUT,
     CanManageLogistique,
     appliquer_tarif,
     calculer_penalite,
     can_see_amount,
+    compteur_glissant,
+    emettre_bc_gr,
+    get_param_logistique,
     reporter_compteur,
     stats_parc,
 )
+
+
+class IsConfirmateurLogistique(BasePermission):
+    """Confirmer une valeur provisoire : direction des opérations et au-dessus."""
+
+    def has_permission(self, request, view):
+        u = getattr(request, "user", None)
+        return bool(u and u.is_authenticated and (u.is_staff or u.role in LOGISTIQUE_CONFIRM_ROLES))
 
 
 class _CommonViewSet(viewsets.ModelViewSet):
@@ -189,6 +205,22 @@ class LocationGRViewSet(_CommonViewSet):
         """Parc, locations actives, compteurs (RF-ERP-30/32/33)."""
         return Response(stats_parc())
 
+    @action(detail=True, methods=["post"], url_path="emettre")
+    @transaction.atomic
+    def emettre(self, request, pk=None):
+        """Émission du BC / GR après validation automatique (équipement, tarif, 618, dates) — M4 clôture."""
+        location = LocationGR.objects.select_for_update(of=("self",)).select_related("partenaire", "equipement").get(
+            pk=self.get_object().pk
+        )
+        emettre_bc_gr(location, request.user)
+        return Response(self.get_serializer(location).data)
+
+    @action(detail=True, methods=["get"], url_path="glissant")
+    def glissant(self, request, pk=None):
+        """Formule glissante des compteurs : taux par jour sur la fenêtre paramétrée et projection."""
+        jour = date_input(request.query_params.get("date"), "date", default=timezone.localdate())
+        return Response(compteur_glissant(self.get_object(), aujourdhui=jour))
+
     @action(detail=True, methods=["post"], url_path="demarrer")
     @transaction.atomic
     def demarrer(self, request, pk=None):
@@ -208,7 +240,11 @@ class LocationGRViewSet(_CommonViewSet):
             raise ValidationError({"lecture_initiale": "Compteur numérique attendu."})
         if lecture < 0:
             raise ValidationError({"lecture_initiale": "Le compteur ne peut pas être négatif."})
-        appliquer_tarif(location)  # version en vigueur à la date de début, figée dès maintenant
+        if location.date_debut is None:  # le démarrage fixe le début de la prestation
+            location.date_debut = timezone.localdate()
+            location.save(update_fields=["date_debut", "updated_at"])
+        if not location.emis_le:
+            emettre_bc_gr(location, request.user)  # validation automatique + BC / GR numérotés
         location.lecture_initiale = lecture
         location.statut = LocationGR.Statut.ACTIVE
         location.save(update_fields=["lecture_initiale", "statut", "updated_at"])
@@ -313,3 +349,34 @@ class TarifGRViewSet(_CommonViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+class ParametreLogistiqueViewSet(viewsets.ModelViewSet):
+    """Paramètres M4 modifiables par ETSL ; création/suppression interdites (définis par le code)."""
+
+    queryset = ParametreLogistique.objects.all()
+    serializer_class = ParametreLogistiqueSerializer
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        for code in PARAMETRES_DEFAUT:
+            get_param_logistique(code)
+        return super().get_queryset()
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("logistique")()]
+        if getattr(self, "action", None) == "confirmer":
+            return [IsConfirmateurLogistique()]
+        return [CanManageLogistique()]
+
+    def create(self, request, *args, **kwargs):
+        return Response({"detail": "Les paramètres sont prédéfinis : modifiez leur valeur."}, status=405)
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        p = self.get_object()
+        p.statut_valeur = ParametreLogistique.StatutValeur.CONFIRME
+        p.confirme_par = request.user
+        p.confirme_le = timezone.now()
+        p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(p).data)

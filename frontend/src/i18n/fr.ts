@@ -455,7 +455,7 @@ export const fr = {
     },
   },
   logistique: {
-    act: { soumettre: "Soumettre", traiter: "Marquer traitée", compteurDepart: "Relevé du compteur au départ :", compteurFin: "Relevé du compteur au retour :" },
+    act: { emettre: "Émettre BC / GR", soumettre: "Soumettre", traiter: "Marquer traitée", compteurDepart: "Relevé du compteur au départ :", compteurFin: "Relevé du compteur au retour :" },
     col: { code: "Code", equipement: "Équipement", partenaire: "Partenaire", periodicite: "Périodicité", consommation: "Consommation", montant: "Montant estimé", statut: "Statut", besoin: "Besoin", departement: "Département", affaire: "Affaire" },
     title: "Logistique — Parc & GLOBAL RENTAL (M4)",
     parc: "Parc ETSL",
@@ -1124,6 +1124,18 @@ export const fr = {
       cloture: "Clôturé",
     },
     pendingNote: "Comptabilité SYSCOHADA révisée : écritures validées par le noyau (immuables, extournes). Règles de conservation proc. 4.3–4.8, refacturations GR au compte 618 (RF-ERP-90…94).",
+  },
+  grAffaires: {
+    title: "Coût GLOBAL RENTAL par affaire (compteurs → M11)", periode: "Mois",
+    hint: "Compteurs des prestations GR valorisés selon la grille, ventilés par affaire. Le coût reste au compte 618, isolé des marges : la marge après coût GR est indicative.",
+    warnProvisoire: "Valorisation au mois provisoire (jours par mois à confirmer par ETSL) : les montants portent cet avertissement.",
+    aucun: "Aucune prestation GR sur la période.", affaire: "Affaire", consommation: "Consommation", coutGr: "Coût GR", penalites: "Pénalités", margeApresGr: "Marge après coût GR", total: "Total GR",
+  },
+  paramLogistique: {
+    title: "Paramètres compteurs et valorisation GR (M4)",
+    hint: "Fenêtre de la formule glissante, horizon de projection et jours par mois : données ETSL modifiables ici, sans développeur.",
+    warnProvisoire: "{{count}} paramètre(s) logistique provisoire(s) à faire confirmer par ETSL.",
+    confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
   },
   pilotageGestion: {
     niveaux: "Marges brute, opérationnelle et nette", marge_brute: "Marge brute", marge_operationnelle: "Marge opérationnelle", marge_nette: "Marge nette",

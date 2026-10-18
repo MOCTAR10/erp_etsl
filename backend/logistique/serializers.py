@@ -8,6 +8,7 @@ from .models import (
     EquipementParc,
     LectureCompteur,
     LocationGR,
+    ParametreLogistique,
     TarifGR,
 )
 
@@ -188,6 +189,8 @@ class LocationGRSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSe
             "tarif_gr",
             "tarif_gr_code",
             "tarif_gr_version",
+            "emis_le",
+            "emis_par",
             "date_retour",
             "jours_retard",
             "penalite",
@@ -207,7 +210,7 @@ class LocationGRSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSe
             "lectures_count",
             "consommation",
             "created_at",
-            "updated_at", "statut", "tarif_gr", "date_retour", "jours_retard", "penalite"]
+            "updated_at", "statut", "tarif_gr", "date_retour", "jours_retard", "penalite", "emis_le", "emis_par"]
 
     # Champs figés dès le démarrage : la version de grille retenue fait foi (lot 14, CDC M4 §12.4).
     TARIF_FIGE = ("tarif", "periodicite", "partenaire", "equipement", "date_debut")
@@ -278,3 +281,27 @@ class LectureCompteurSerializer(ModelCleanMixin, serializers.ModelSerializer):
         if not obj.releve_par:
             return None
         return (obj.releve_par.first_name + " " + obj.releve_par.last_name).strip() or obj.releve_par.email
+
+class ParametreLogistiqueSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ParametreLogistique
+        fields = [
+            "id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire",
+            "confirme_par", "confirme_le",
+        ]
+        read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
+
+    def validate_valeur(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("La valeur doit être strictement positive.")
+        return value
+
+    def update(self, instance, validated_data):
+        # Une valeur modifiée redevient provisoire jusqu'à nouvelle confirmation.
+        if "valeur" in validated_data and validated_data["valeur"] != instance.valeur:
+            instance.statut_valeur = ParametreLogistique.StatutValeur.PROVISOIRE
+            instance.confirme_par = None
+            instance.confirme_le = None
+        return super().update(instance, validated_data)

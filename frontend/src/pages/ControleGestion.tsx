@@ -3,6 +3,7 @@ import { CalendarCheck, Coins, Inbox, PieChart, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { GrAffairesSection } from "../components/workflow/GrAffairesSection";
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
@@ -311,6 +312,7 @@ export function ControleGestionPage() {
       )}
 
       <PilotageGestionSection fiscalYear={fy.data?.id} />
+      <GrAffairesSection fiscalYear={fy.data?.id} />
 
       {closed.length > 0 && (
         <SectionCard title={`${t("controleGestion.clotures")} · ${closed.length}`}>

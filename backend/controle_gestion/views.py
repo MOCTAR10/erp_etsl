@@ -494,3 +494,54 @@ class AtterrissageView(viewsets.ViewSet):
         if not can_see_amount(request.user):
             return Response({"rows": [], "marge_a_terminaison": None, "totaux": None})
         return Response(result)
+
+
+class GrAffairesView(viewsets.ViewSet):
+    """Coût GLOBAL RENTAL ventilé par affaire, publié par M4 (clôture M4, CDC M4 §12.11 → M11) : sans ressaisie.
+
+    Le coût reste au compte 618 (isolé des marges) ; avec `fiscal_year`, chaque affaire porte sa marge comptable
+    hors GR (compute_marges) puis la marge après coût GR estimé.
+    """
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("periode", type=str, required=True),
+            OpenApiParameter("fiscal_year", type=int, required=False),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def list(self, request):
+        from logistique.services import ventilation_gr
+
+        periode = request.query_params.get("periode")
+        if not periode:
+            raise DRFValidationError("Paramètre `periode` (AAAA-MM) requis.")
+        result = ventilation_gr(periode)
+        fiscal_year = request.query_params.get("fiscal_year")
+        if fiscal_year and not fiscal_year.isdigit():
+            raise DRFValidationError("Paramètre `fiscal_year` doit être un entier.")
+        marges = {}
+        if fiscal_year:
+            marges = {r["analytic"]: r for r in compute_marges(fiscal_year)["rows"]}
+        voir = can_see_amount(request.user)
+
+        def montant(x):
+            return f"{x:.2f}" if voir else None
+
+        rows = []
+        for r in result["rows"]:
+            m = marges.get(r["analytic"]) if r["analytic"] else None
+            hors_gr = (m["marge"] if m else Decimal("0")) if fiscal_year and not r["non_affecte"] else None
+            rows.append({
+                **r,
+                "consommation": f"{r['consommation']:.2f}",
+                "cout_gr": montant(r["cout_gr"]), "penalites": montant(r["penalites"]), "total_gr": montant(r["total_gr"]),
+                "marge_hors_gr": montant(hors_gr) if hors_gr is not None else None,
+                "marge_apres_gr": montant(hors_gr - r["total_gr"]) if hors_gr is not None else None,
+            })
+        return Response({
+            "periode": result["periode"], "compte": result["compte"], "rows": rows,
+            "total_gr": montant(result["total_gr"]), "provisoire": result["provisoire"],
+        })

@@ -7,6 +7,7 @@ from .views import (
     EquipementParcViewSet,
     LectureCompteurViewSet,
     LocationGRViewSet,
+    ParametreLogistiqueViewSet,
     TarifGRViewSet,
 )
 
@@ -16,6 +17,7 @@ router.register("demandes", DemandeMobilisationViewSet, basename="demandemobilis
 router.register("affectations", AffectationParcViewSet, basename="affectationparc")
 router.register("locations", LocationGRViewSet, basename="locationgr")
 router.register("lectures", LectureCompteurViewSet, basename="lecturecompteur")
+router.register("parametres", ParametreLogistiqueViewSet, basename="parametrelogistique")
 router.register("tarifs-gr", TarifGRViewSet, basename="tarifgr")
 
 urlpatterns = [

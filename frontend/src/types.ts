@@ -310,6 +310,7 @@ export interface LocationGR {
   lecture_finale: string | null;
   consommation: string | null;
   imputation_618: boolean;
+  emis_le: string | null;
   statut: string;
   statut_label: string;
   lectures_count: number;
@@ -2302,4 +2303,37 @@ export interface AtterrissageResult {
   rows: AtterrissageRow[];
   marge_a_terminaison: string | null;
   totaux: { produit: string; charge: string } | null;
+}
+
+export interface ParametreLogistique {
+  id: string;
+  code: string;
+  label: string;
+  valeur: string;
+  unite: string;
+  statut_valeur: "provisoire" | "confirme";
+  est_provisoire: boolean;
+}
+
+export interface GrAffaireRow {
+  affaire: string | null;
+  titre: string;
+  analytic: number | null;
+  non_affecte: boolean;
+  compte: string;
+  consommation: string;
+  cout_gr: string | null;
+  penalites: string | null;
+  total_gr: string | null;
+  marge_hors_gr: string | null;
+  marge_apres_gr: string | null;
+  locations: string[];
+}
+
+export interface GrAffairesResult {
+  periode: string;
+  compte: string;
+  rows: GrAffaireRow[];
+  total_gr: string | null;
+  provisoire: boolean;
 }
