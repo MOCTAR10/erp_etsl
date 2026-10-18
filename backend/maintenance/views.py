@@ -12,10 +12,22 @@ from rest_framework.response import Response
 from config.inputs import choice_input, date_input, fk_input
 from users.models import User
 
-from .models import Actif, Inspection, OrdreTravail, PlanPreventif
+from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PlanPreventif
 from .preventif import declencher_plans, rearmer_plan
-from .serializers import ActifSerializer, InspectionSerializer, OrdreTravailSerializer, PlanPreventifSerializer
-from .services import CanManageMaintenance
+from .serializers import (
+    ActifSerializer,
+    InspectionSerializer,
+    OrdreTravailSerializer,
+    ParametreMaintenanceSerializer,
+    PlanPreventifSerializer,
+)
+from .services import (
+    PARAMETRES_DEFAUT,
+    CanManageMaintenance,
+    IsConfirmateurMaintenance,
+    fiabilite_actifs,
+    get_param_maintenance,
+)
 
 
 def _montant_positif(raw, field):
@@ -52,6 +64,11 @@ class ActifViewSet(viewsets.ModelViewSet):
         if params.get("global_rental") == "1":
             qs = qs.filter(is_global_rental=True)
         return qs
+
+    @action(detail=False, methods=["get"], url_path="fiabilite")
+    def fiabilite(self, request):
+        """MTBF / MTTR / disponibilité par machine (période d'observation paramétrable, valeurs provisoires signalées)."""
+        return Response(fiabilite_actifs())
 
     @action(detail=True, methods=["post"], url_path="releve-compteur")
     @transaction.atomic
@@ -360,3 +377,32 @@ class InspectionViewSet(viewsets.ModelViewSet):
             {"id": str(ot.pk), "code": ot.code, "statut": ot.statut},
             status=status.HTTP_201_CREATED,
         )
+
+class ParametreMaintenanceViewSet(viewsets.ModelViewSet):
+    """Paramètres M8 modifiables par ETSL ; création/suppression interdites (définis par le code)."""
+
+    queryset = ParametreMaintenance.objects.all()
+    serializer_class = ParametreMaintenanceSerializer
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        for code in PARAMETRES_DEFAUT:
+            get_param_maintenance(code)
+        return super().get_queryset()
+
+    def get_permissions(self):
+        if getattr(self, "action", None) == "confirmer":
+            return [IsConfirmateurMaintenance()]
+        return [CanManageMaintenance()]
+
+    def create(self, request, *args, **kwargs):
+        return Response({"detail": "Les paramètres sont prédéfinis : modifiez leur valeur."}, status=405)
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        p = self.get_object()
+        p.statut_valeur = ParametreMaintenance.StatutValeur.CONFIRME
+        p.confirme_par = request.user
+        p.confirme_le = timezone.now()
+        p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(p).data)

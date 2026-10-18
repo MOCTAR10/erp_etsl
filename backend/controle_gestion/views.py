@@ -496,6 +496,42 @@ class AtterrissageView(viewsets.ViewSet):
         return Response(result)
 
 
+class MaintenanceCoutsView(viewsets.ViewSet):
+    """Coût de maintenance par machine et par mois publié par M8 (clôture M8 → M11) : sans ressaisie ni écriture.
+
+    Les machines GLOBAL RENTAL restent au compte 618 (isolé), le reste au 624 ; montants masqués hors cercle RF-59.
+    """
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    @extend_schema(
+        parameters=[OpenApiParameter("periode", type=str, required=True)], responses={200: OpenApiTypes.OBJECT}
+    )
+    def list(self, request):
+        from maintenance.services import couts_maintenance
+
+        periode = request.query_params.get("periode")
+        if not periode:
+            raise DRFValidationError("Paramètre `periode` (AAAA-MM) requis.")
+        try:
+            result = couts_maintenance(periode)
+        except ValueError as exc:
+            raise DRFValidationError(str(exc))
+        voir = can_see_amount(request.user)
+
+        def montant(x):
+            return f"{x:.2f}" if voir else None
+
+        rows = [
+            {**r, "main_oeuvre": montant(r["main_oeuvre"]), "pieces": montant(r["pieces"]), "total": montant(r["total"])}
+            for r in result["rows"]
+        ]
+        return Response({
+            "periode": periode, "rows": rows,
+            "totaux": {k: montant(v) for k, v in result["totaux"].items()},
+        })
+
+
 class GrAffairesView(viewsets.ViewSet):
     """Coût GLOBAL RENTAL ventilé par affaire, publié par M4 (clôture M4, CDC M4 §12.11 → M11) : sans ressaisie.
 

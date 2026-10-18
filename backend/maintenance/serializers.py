@@ -3,7 +3,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Actif, Inspection, OrdreTravail, PlanPreventif
+from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PlanPreventif
 from .services import can_see_amount
 
 
@@ -162,3 +162,27 @@ class InspectionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
+
+class ParametreMaintenanceSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ParametreMaintenance
+        fields = [
+            "id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire",
+            "confirme_par", "confirme_le",
+        ]
+        read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
+
+    def validate_valeur(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("La valeur doit être strictement positive.")
+        return value
+
+    def update(self, instance, validated_data):
+        # Une valeur modifiée redevient provisoire jusqu'à nouvelle confirmation.
+        if "valeur" in validated_data and validated_data["valeur"] != instance.valeur:
+            instance.statut_valeur = ParametreMaintenance.StatutValeur.PROVISOIRE
+            instance.confirme_par = None
+            instance.confirme_le = None
+        return super().update(instance, validated_data)
