@@ -138,6 +138,8 @@ def _instantane(bareme, type_):
     }
     if type_ == "cotisation":
         snap.update(taux=str(bareme.taux), plafond=str(bareme.plafond) if bareme.plafond is not None else None)
+    elif type_ == "parametre":
+        snap.update(valeur=str(bareme.valeur))
     else:
         snap.update(abattement_pct=str(bareme.abattement_pct), tranches=bareme.tranches)
     return snap
@@ -233,7 +235,7 @@ def calculer_bulletin(bulletin):
         (l.montant for l in bulletin.lignes.filter(rubrique__nature=RubriquePaie.Nature.GAIN)), Decimal("0")
     )
     patronal = Decimal("0")
-    utilises = []
+    utilises = [s for s in (bulletin.baremes_utilises or []) if s.get("type") == "parametre"]  # paramètres d'intégration temps
     for bareme in baremes_en_vigueur(bulletin.periode):
         utilises.append(_instantane(bareme, "cotisation"))
         assiette = gains if bareme.base == bareme.Base.BRUT else bulletin.salaire_base
@@ -511,3 +513,216 @@ def generer_virement(periode, compte, date_execution, user=None):
     )
     BulletinPaie.objects.filter(pk__in=[b.pk for b in bulletins]).update(ordre_virement=ordre)
     return ordre
+
+
+# --------------------------------------------------------------------------------------------
+# Pointages M3 -> heures supplémentaires, déclarations sans ressaisie, reporting RH (clôture M9)
+# --------------------------------------------------------------------------------------------
+HS_RUBRIQUE = "HS-TEMPS"
+JOURS_OUVRES_AN = Decimal("220")  # base d'absentéisme (jours ouvrés/an) ; à confirmer avec la convention collective
+
+
+def parametre(code, periode):
+    """Paramètre de paie en vigueur à `periode` (ParametrePaie versionné) ; absent => erreur explicite."""
+    from django.db.models import Q
+
+    from .models import ParametrePaie
+
+    p = (
+        ParametrePaie.objects.filter(code=code, date_effet__lte=periode)
+        .filter(Q(date_fin__isnull=True) | Q(date_fin__gte=periode))
+        .order_by("-date_effet")
+        .first()
+    )
+    if p is None:
+        raise ValidationError(f"Paramètre de paie « {code} » absent : à saisir dans le paramétrage de la paie.")
+    return p
+
+
+def heures_supplementaires(employe, periode, salaire_base):
+    """Heures sup. du mois depuis les pointages (M3 / saisies), calculées PAR SEMAINE ISO.
+
+    Au-delà de la durée légale (`DUREE_LEGALE_HEBDO`) : tranche 1 majorée de `HS_MAJ_1` % jusqu'au seuil
+    `HS_SEUIL_2`, tranche 2 majorée de `HS_MAJ_2` %. Tous les paramètres sont des données (provisoires tant que non
+    confirmées). Retourne un dict (heures, montant, paramètres utilisés)."""
+    from collections import defaultdict
+
+    from .models import SaisieTemps
+
+    legale = parametre("DUREE_LEGALE_HEBDO", periode)
+    maj1, maj2, seuil2 = parametre("HS_MAJ_1", periode), parametre("HS_MAJ_2", periode), parametre("HS_SEUIL_2", periode)
+    saisies = SaisieTemps.objects.filter(
+        employe=employe, date__year=periode.year, date__month=periode.month,
+        type__in=(SaisieTemps.Type.NORMAL, SaisieTemps.Type.SUPPLEMENTAIRE),
+    )
+    semaines = defaultdict(Decimal)
+    for st in saisies:
+        semaines[st.date.isocalendar()[:2]] += st.heures
+    h1 = h2 = Decimal("0")
+    for total in semaines.values():
+        h1 += max(Decimal("0"), min(total, seuil2.valeur) - legale.valeur)
+        h2 += max(Decimal("0"), total - seuil2.valeur)
+    taux_horaire = Decimal(salaire_base) / (legale.valeur * Decimal("52") / Decimal("12"))
+    montant = _arrondi(
+        h1 * taux_horaire * (1 + maj1.valeur / 100) + h2 * taux_horaire * (1 + maj2.valeur / 100)
+    )
+    return {
+        "heures_tranche_1": h1, "heures_tranche_2": h2, "taux_horaire": _arrondi(taux_horaire), "montant": montant,
+        "heures_productives": sum(semaines.values(), Decimal("0")),
+        "parametres": [legale, maj1, maj2, seuil2],
+        "saisies": list(saisies),
+    }
+
+
+@transaction.atomic
+def integrer_temps(bulletin):
+    """Intègre les heures sup. des pointages du mois dans le bulletin brouillon (gain `HS-TEMPS`) puis recalcule."""
+    from .models import BulletinLigne, BulletinPaie, RubriquePaie, SaisieTemps
+
+    bulletin = BulletinPaie.objects.select_for_update().get(pk=bulletin.pk)
+    if bulletin.statut != BulletinPaie.Statut.BROUILLON:
+        raise ValidationError("Seul un bulletin brouillon peut recevoir les heures des pointages.")
+    res = heures_supplementaires(bulletin.employe, bulletin.periode, bulletin.salaire_base)
+    rubrique, _ = RubriquePaie.objects.get_or_create(
+        code=HS_RUBRIQUE,
+        defaults={"label": "Heures supplémentaires (pointages)", "nature": RubriquePaie.Nature.GAIN, "ordre": 20},
+    )
+    if res["montant"] > 0:
+        h = res["heures_tranche_1"] + res["heures_tranche_2"]
+        BulletinLigne.objects.update_or_create(
+            bulletin=bulletin, rubrique=rubrique,
+            defaults={"libelle": f"Heures supplémentaires ({h} h)", "montant": res["montant"]},
+        )
+    else:
+        bulletin.lignes.filter(rubrique=rubrique).delete()
+    SaisieTemps.objects.filter(pk__in=[s.pk for s in res["saisies"]]).update(statut=SaisieTemps.Statut.TRANSFERE_PAIE)
+    snaps = [s for s in (bulletin.baremes_utilises or []) if s.get("type") != "parametre"]
+    bulletin.baremes_utilises = snaps + [_instantane(p, "parametre") for p in res["parametres"]]
+    bulletin.save(update_fields=["baremes_utilises", "updated_at"])
+    return calculer_bulletin(bulletin), res
+
+
+def ventilation_bulletin(bulletin):
+    """Cotisations du bulletin ventilées par organisme / nature, recalculées depuis les barèmes de l'instantané."""
+    from .models import BaremeCotisation
+
+    ids = [s["id"] for s in (bulletin.baremes_utilises or []) if s.get("type") == "cotisation"]
+    sortie = []
+    for b in BaremeCotisation.objects.filter(pk__in=ids):
+        assiette = bulletin.brut if b.base == b.Base.BRUT else bulletin.salaire_base
+        if b.plafond is not None:
+            assiette = min(assiette, b.plafond)
+        sortie.append({
+            "organisme": b.organisme, "nature": b.nature, "code": b.code, "assiette": assiette,
+            "montant": _arrondi(assiette * b.taux / 100),
+        })
+    return sortie
+
+
+def _impot_bulletin(bulletin):
+    return sum((l.montant for l in bulletin.lignes.filter(rubrique__code__startswith=IMP_PREFIX)), Decimal("0"))
+
+
+def generer_declaration(type_, debut, fin, user=None):
+    """Déclaration CNSS / CNAMGS / IRPP (2460) / DADS depuis les bulletins validés ou clôturés de la période."""
+    import csv
+    import hashlib
+    import io
+
+    from .models import BulletinPaie, DeclarationSociale
+
+    debut, fin = debut.replace(day=1), fin.replace(day=1)
+    if fin < debut:
+        raise ValidationError("La période de fin précède la période de début.")
+    if type_ not in DeclarationSociale.Type.values:
+        raise ValidationError("Type de déclaration inconnu.")
+    bulletins = list(
+        BulletinPaie.objects.select_related("employe")
+        .prefetch_related("lignes__rubrique")
+        .filter(periode__gte=debut, periode__lte=fin, statut__in=(BulletinPaie.Statut.VALIDE, BulletinPaie.Statut.CLOTURE))
+        .order_by("employe__nom", "periode")
+    )
+    if not bulletins:
+        raise ValidationError("Aucun bulletin validé sur cette période : rien à déclarer.")
+    organisme = {"cnss": "CNSS", "cnamgs": "CNAMGS"}.get(type_)
+    par_employe = {}
+    provisoires = set()
+    tot = {"brut": Decimal("0"), "sal": Decimal("0"), "pat": Decimal("0"), "imp": Decimal("0")}
+    for b in bulletins:
+        provisoires.update(b.baremes_provisoires)
+        ligne = par_employe.setdefault(b.employe_id, {"e": b.employe, "brut": Decimal("0"), "assiette": Decimal("0"),
+                                                        "sal": Decimal("0"), "pat": Decimal("0"), "imp": Decimal("0"),
+                                                        "net": Decimal("0")})
+        ligne["brut"] += b.brut
+        ligne["net"] += b.net
+        impot = _impot_bulletin(b)
+        ligne["imp"] += impot
+        tot["brut"] += b.brut
+        tot["imp"] += impot
+        assiettes = []
+        for v in ventilation_bulletin(b):
+            if organisme and v["organisme"] != organisme:
+                continue
+            assiettes.append(v["assiette"])
+            if v["nature"] == "salariale":
+                ligne["sal"] += v["montant"]
+            else:
+                ligne["pat"] += v["montant"]
+        ligne["assiette"] += max(assiettes, default=Decimal("0"))  # assiette comptée une fois par bulletin
+    out = io.StringIO()
+    w = csv.writer(out, delimiter=";", lineterminator="\n")
+    if provisoires:
+        out.write("# " + avertissement_provisoire(sorted(provisoires)) + "\n")
+    out.write("# GABARIT PROPOSÉ — format officiel du fichier à valider avec l'organisme destinataire.\n")
+    if type_ in ("cnss", "cnamgs"):
+        w.writerow(["matricule", "nom", "n_affiliation", "brut", "assiette", "cotisation_salariale", "cotisation_patronale"])
+    elif type_ == "irpp":
+        w.writerow(["matricule", "nom", "parts", "brut", "impot_retenu"])
+    else:
+        w.writerow(["matricule", "nom", "n_cnss", "brut_annuel", "cotisations_salariales", "impot_retenu", "net_paye"])
+    for ligne in par_employe.values():
+        e = ligne["e"]
+        tot["sal"] += ligne["sal"]
+        tot["pat"] += ligne["pat"]
+        if type_ == "cnss":
+            w.writerow([e.code, e.nom_complet, e.numero_securite_sociale, ligne["brut"], ligne["assiette"], ligne["sal"], ligne["pat"]])
+        elif type_ == "cnamgs":
+            w.writerow([e.code, e.nom_complet, e.matricule_cnps, ligne["brut"], ligne["assiette"], ligne["sal"], ligne["pat"]])
+        elif type_ == "irpp":
+            w.writerow([e.code, e.nom_complet, e.parts_fiscales, ligne["brut"], ligne["imp"]])
+        else:
+            w.writerow([e.code, e.nom_complet, e.numero_securite_sociale, ligne["brut"], ligne["sal"], ligne["imp"], ligne["net"]])
+    contenu = out.getvalue()
+    return DeclarationSociale.objects.create(
+        type=type_, periode_debut=debut, periode_fin=fin, nb_salaries=len(par_employe), total_brut=tot["brut"],
+        total_salarial=tot["sal"], total_patronal=tot["pat"], total_impot=tot["imp"], contenu=contenu,
+        sha256=hashlib.sha256(contenu.encode("utf-8")).hexdigest(), baremes_provisoires=sorted(provisoires),
+        created_by=user,
+    )
+
+
+def reporting_rh(annee):
+    """Turnover et absentéisme de l'année (indicateurs RH)."""
+    from .models import DemandesConge, Employe
+
+    debut, fin = date(annee, 1, 1), date(annee, 12, 31)
+    en_poste = lambda jour: Employe.objects.filter(  # noqa: E731
+        date_embauche__lte=jour
+    ).exclude(date_sortie__lte=jour).count()
+    effectif_debut, effectif_fin = en_poste(debut), en_poste(fin)
+    entrees = Employe.objects.filter(date_embauche__gt=debut, date_embauche__lte=fin).count()
+    sorties = Employe.objects.filter(date_sortie__gte=debut, date_sortie__lte=fin).count()
+    moyen = Decimal(effectif_debut + effectif_fin) / 2
+    absents = DemandesConge.objects.filter(
+        date_debut__year=annee,
+        statut__in=(DemandesConge.Statut.APPROUVE, DemandesConge.Statut.VALIDE_RH),
+        type__in=(DemandesConge.Type.MALADIE, DemandesConge.Type.SANS_SOLDE, DemandesConge.Type.EXCEPTIONNEL),
+    )
+    jours = sum(c.nb_jours for c in absents)
+    pct = lambda num, den: (str(_arrondi(Decimal(num) * 100 / den)) if den else None)  # noqa: E731
+    return {
+        "annee": annee, "effectif_debut": effectif_debut, "effectif_fin": effectif_fin, "entrees": entrees,
+        "sorties": sorties, "turnover_pct": pct(Decimal(entrees + sorties) / 2, moyen),
+        "jours_absence": jours, "jours_ouvres_an": str(JOURS_OUVRES_AN),
+        "absenteisme_pct": pct(jours, moyen * JOURS_OUVRES_AN),
+    }

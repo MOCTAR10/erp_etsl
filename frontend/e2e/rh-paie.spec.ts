@@ -70,3 +70,17 @@ test.describe("M9 : bulletin PDF et virement des salaires", () => {
     await expect(page.getByRole("option", { name: new RegExp(num) })).toBeAttached();
   });
 });
+
+test.describe("M9 : déclarations sans ressaisie et indicateurs RH", () => {
+  test("la section déclarations affiche turnover/absentéisme et refuse une période vide de bulletins", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.rh);
+    await page.goto("/rh-paie");
+    await expect(page.getByText("Déclarations sociales et fiscales")).toBeVisible();
+    await expect(page.getByTestId("reporting-rh")).toContainText(/turnover/);
+    const form = page.locator("form", { has: page.getByLabel("Type de déclaration") });
+    await form.getByLabel("Du (1er du mois)").fill("2030-01-01");
+    await form.getByLabel("Au (1er du mois)").fill("2030-01-01");
+    await form.getByRole("button", { name: "Générer la déclaration" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: /Aucun bulletin validé/ })).toBeVisible();
+  });
+});

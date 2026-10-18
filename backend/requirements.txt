@@ -14,4 +14,5 @@ django-celery-results>=2.5
 drf-spectacular>=0.28
 gunicorn>=22.0
 openpyxl>=3.1
+cryptography>=43
 reportlab>=4.2

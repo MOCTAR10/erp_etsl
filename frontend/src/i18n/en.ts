@@ -103,6 +103,13 @@ export const en = {
     banque: "Bank (5 ch.)", guichet: "Branch (5 ch.)", numCompte: "Account no.", cle: "RIB key", ribTitle: "Employee bank details",
     employe: "Employee", domiciliation: "Bank name", ajouterCompte: "Add the account", majRib: "Update the RIB", pdf: "PDF", archiver: "Archive (10-year DMS)", archive: "Archived",
   },
+  declarations: {
+    title: "Social and tax filings",
+    hint: "CNSS, CNAMGS, income tax (form 2460) and DADS generated from validated payslips, no re-keying, then sealed. Proposed column layouts: official formats to be validated with the agencies.",
+    type: "Filing type", du: "From (1st of month)", au: "To (1st of month)", generer: "Generate the filing",
+    reporting: "{{annee}} · headcount {{effectif}} · hires {{entrees}} · leavers {{sorties}} · turnover {{turnover}} % · absences {{absence}} d · absenteeism {{absenteisme}} %",
+    integrer: "Import timesheets (overtime)",
+  },
   baremes: {
     modifier: "Edit", annuler: "Cancel", impotTitle: "Income tax (progressive scale, monthly amounts per share)", tranche: "Bracket ceiling (F)", derniere: "above", abattement: "Allowance (%)",
     addTranche: "Add a bracket", editHint: "Editing a value sets it back to “provisional”. A value already used by a validated payslip requires “New version”.",

@@ -14,6 +14,7 @@ import type {
   StatutConge,
 } from "../types";
 import { BaremesSection } from "../components/workflow/BaremesSection";
+import { DeclarationsSection } from "../components/workflow/DeclarationsSection";
 import { VirementsSection } from "../components/workflow/VirementsSection";
 
 type CongeGroups = Record<StatutConge, DemandeConge[]>;
@@ -91,6 +92,7 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
           ...(b.statut === "brouillon"
             ? [
                 { label: t("actions.calculer"), path: `/api/rh-paie/bulletins/${b.id}/calculer/`, tone: "ghost" as const },
+                { label: t("declarations.integrer"), path: `/api/rh-paie/bulletins/${b.id}/integrer-temps/`, tone: "ghost" as const },
                 { label: t("actions.valider"), path: `/api/rh-paie/bulletins/${b.id}/valider/` },
               ]
             : []),
@@ -260,6 +262,7 @@ export function RhPaiePage() {
           </div>
         </>
       ) : null}
+      <DeclarationsSection />
       <VirementsSection />
       <BaremesSection />
     </>

@@ -103,6 +103,13 @@ export const fr = {
     banque: "Banque (5 ch.)", guichet: "Guichet (5 ch.)", numCompte: "N° de compte", cle: "Clé RIB", ribTitle: "Coordonnées bancaires d'un salarié",
     employe: "Salarié", domiciliation: "Domiciliation", ajouterCompte: "Ajouter le compte", majRib: "Mettre à jour le RIB", pdf: "PDF", archiver: "Archiver (GED 10 ans)", archive: "Archivé",
   },
+  declarations: {
+    title: "Déclarations sociales et fiscales",
+    hint: "CNSS, CNAMGS, IRPP (état 2460) et DADS générés depuis les bulletins validés, sans ressaisie, puis scellés. Gabarits de colonnes proposés : formats officiels à valider avec les organismes.",
+    type: "Type de déclaration", du: "Du (1er du mois)", au: "Au (1er du mois)", generer: "Générer la déclaration",
+    reporting: "{{annee}} · effectif {{effectif}} · entrées {{entrees}} · sorties {{sorties}} · turnover {{turnover}} % · absences {{absence}} j · absentéisme {{absenteisme}} %",
+    integrer: "Intégrer les pointages (heures sup.)",
+  },
   baremes: {
     modifier: "Modifier", annuler: "Annuler", impotTitle: "Impôt sur le revenu (barème progressif, montants mensuels par part)", tranche: "Plafond de tranche (F)", derniere: "au-delà", abattement: "Abattement (%)",
     addTranche: "Ajouter une tranche", editHint: "Modifier une valeur la repasse en « provisoire ». Une valeur déjà utilisée par un bulletin validé exige « Nouvelle version ».",

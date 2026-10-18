@@ -16,6 +16,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
+from config.fields import EncryptedCharField
+
 
 class RhPaieSequence(models.Model):
     """Numérotation séquentielle par type (EMP, CTR, REC, FOR, CON, SAN, BUL...)."""
@@ -72,9 +74,7 @@ class Employe(models.Model):
     date_naissance = models.DateField(null=True, blank=True, verbose_name="Date de naissance")
     lieu_naissance = models.CharField(max_length=120, blank=True, verbose_name="Lieu de naissance")
     nationalite = models.CharField(max_length=80, blank=True, verbose_name="Nationalité")
-    numero_securite_sociale = models.CharField(
-        max_length=40, blank=True, verbose_name="N° sécurité sociale (CNSS)"
-    )
+    numero_securite_sociale = EncryptedCharField(blank=True, verbose_name="N° sécurité sociale (CNSS)")
     telephone = models.CharField(max_length=40, blank=True, verbose_name="Téléphone")
     email = models.EmailField(blank=True, verbose_name="Email personnel")
     adresse = models.CharField(max_length=200, blank=True, verbose_name="Adresse")
@@ -88,7 +88,7 @@ class Employe(models.Model):
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.ACTIF, verbose_name="Statut"
     )
-    matricule_cnps = models.CharField(max_length=40, blank=True, verbose_name="Matricule CNAMGS")
+    matricule_cnps = EncryptedCharField(blank=True, verbose_name="Matricule CNAMGS")
     date_embauche = models.DateField(null=True, blank=True, verbose_name="Date d'embauche")
     date_sortie = models.DateField(null=True, blank=True, verbose_name="Date de sortie")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -96,10 +96,10 @@ class Employe(models.Model):
 
 
     # Coordonnées bancaires (RIB 5/5/11/2) pour le virement des salaires — données sensibles : cercle paie seul.
-    rib_banque = models.CharField(max_length=5, blank=True, verbose_name="RIB — code banque")
-    rib_guichet = models.CharField(max_length=5, blank=True, verbose_name="RIB — code guichet")
-    rib_compte = models.CharField(max_length=11, blank=True, verbose_name="RIB — numéro de compte")
-    rib_cle = models.CharField(max_length=2, blank=True, verbose_name="RIB — clé")
+    rib_banque = EncryptedCharField(blank=True, verbose_name="RIB — code banque")
+    rib_guichet = EncryptedCharField(blank=True, verbose_name="RIB — code guichet")
+    rib_compte = EncryptedCharField(blank=True, verbose_name="RIB — numéro de compte")
+    rib_cle = EncryptedCharField(blank=True, verbose_name="RIB — clé")
     banque_nom = models.CharField(max_length=24, blank=True, verbose_name="Domiciliation bancaire")
     parts_fiscales = models.DecimalField(
         max_digits=4, decimal_places=2, default=1, verbose_name="Parts fiscales (quotient familial)",
@@ -980,3 +980,58 @@ class OrdreVirement(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Un ordre de virement généré est scellé.")
+
+
+class DeclarationSociale(models.Model):
+    """Déclaration sociale / fiscale générée depuis les bulletins (sans ressaisie) — scellée à la génération.
+
+    Les gabarits de colonnes sont des PROPOSITIONS à valider avec les organismes (CNSS, CNAMGS, DGI) : les formats
+    officiels de fichier (DADS, état 2460) n'ont pas pu être consultés. Un avertissement est imprimé tant qu'un
+    barème utilisé est provisoire.
+    """
+
+    class Type(models.TextChoices):
+        CNSS = "cnss", "CNSS — cotisations"
+        CNAMGS = "cnamgs", "CNAMGS — déclaration trimestrielle des salaires"
+        IRPP = "irpp", "IRPP — état des retenues (2460)"
+        DADS = "dads", "DADS — déclaration annuelle des salaires"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    type = models.CharField(max_length=10, choices=Type.choices, verbose_name="Type")
+    periode_debut = models.DateField(verbose_name="Du (1er du mois)")
+    periode_fin = models.DateField(verbose_name="Au (1er du mois)")
+    nb_salaries = models.PositiveIntegerField(default=0)
+    total_brut = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    total_salarial = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    total_patronal = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    total_impot = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    contenu = models.TextField(verbose_name="Fichier CSV")
+    sha256 = models.CharField(max_length=64)
+    baremes_provisoires = models.JSONField(default=list, blank=True, verbose_name="Barèmes provisoires utilisés")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Généré par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Déclaration sociale"
+        verbose_name_plural = "Déclarations sociales"
+
+    def __str__(self):
+        return f"{self.code} — {self.get_type_display()}"
+
+    @property
+    def provisoire(self):
+        return bool(self.baremes_provisoires)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Une déclaration générée est scellée.")
+        if not self.code:
+            self.code = RhPaieSequence.next_for("DEC", "DEC")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Une déclaration générée est scellée.")
