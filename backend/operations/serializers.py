@@ -3,7 +3,10 @@ from rest_framework import serializers
 from config.serializers import ModelCleanMixin
 
 from .models import (
+    AffectationEquipe,
     CapaciteAtelier,
+    Equipe,
+    PresenceChantier,
     DossierOperationnel,
     GammeOperatoire,
     GammeOperation,
@@ -291,3 +294,72 @@ class DossierOperationnelSerializer(serializers.ModelSerializer):
         model = DossierOperationnel
         fields = ["id", "ordre", "ordre_code", "contenu", "sha256", "retention_years", "created_at"]
         read_only_fields = fields
+
+
+class EquipeSerializer(serializers.ModelSerializer):
+    metier_label = serializers.CharField(source="get_metier_display", read_only=True)
+    effectif = serializers.IntegerField(source="membres.count", read_only=True)
+
+    class Meta:
+        model = Equipe
+        fields = ["id", "code", "label", "metier", "metier_label", "chef", "membres", "effectif", "actif", "created_at"]
+        read_only_fields = ["id", "code", "created_at"]
+
+
+class AffectationEquipeSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    equipe_label = serializers.CharField(source="equipe.label", read_only=True)
+    metier = serializers.CharField(source="equipe.metier", read_only=True)
+    ordre_code = serializers.CharField(source="ordre.code", read_only=True)
+
+    class Meta:
+        model = AffectationEquipe
+        fields = [
+            "id", "code", "equipe", "equipe_label", "metier", "ordre", "ordre_code", "date_debut", "date_fin",
+            "effectif", "statut", "statut_label", "mobilise_par", "mobilise_le", "created_by", "created_at",
+        ]
+        read_only_fields = ["id", "code", "statut", "mobilise_par", "mobilise_le", "created_by", "created_at"]
+
+    def validate(self, attrs):
+        # `clean()` n'est pas appelé par DRF pour les règles transverses (piège backend n°1).
+        debut = attrs.get("date_debut", getattr(self.instance, "date_debut", None))
+        fin = attrs.get("date_fin", getattr(self.instance, "date_fin", None))
+        if debut and fin and fin < debut:
+            raise serializers.ValidationError({"date_fin": "La fin doit être postérieure au début."})
+        equipe = attrs.get("equipe", getattr(self.instance, "equipe", None))
+        if equipe is not None and not equipe.actif:
+            raise serializers.ValidationError({"equipe": "Équipe inactive : affectation impossible."})
+        return attrs
+
+
+class PresenceChantierSerializer(serializers.ModelSerializer):
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    employe_nom = serializers.SerializerMethodField()
+    ordre_code = serializers.CharField(source="ordre.code", read_only=True)
+
+    class Meta:
+        model = PresenceChantier
+        fields = [
+            "id", "ordre", "ordre_code", "employe", "employe_nom", "date", "statut", "statut_label", "motif",
+            "releve_par", "created_at",
+        ]
+        read_only_fields = ["id", "releve_par", "created_at"]
+
+    def get_employe_nom(self, obj):
+        return f"{obj.employe.nom} {obj.employe.prenom}".strip()
+
+    def validate(self, attrs):
+        statut = attrs.get("statut", getattr(self.instance, "statut", PresenceChantier.Statut.PRESENT))
+        motif = attrs.get("motif", getattr(self.instance, "motif", ""))
+        if statut != PresenceChantier.Statut.PRESENT and not motif:
+            raise serializers.ValidationError({"motif": "Un motif est obligatoire pour une absence ou un retard."})
+        ordre = attrs.get("ordre", getattr(self.instance, "ordre", None))
+        employe = attrs.get("employe", getattr(self.instance, "employe", None))
+        jour = attrs.get("date", getattr(self.instance, "date", None))
+        if ordre and employe and jour:
+            doublon = PresenceChantier.objects.filter(ordre=ordre, employe=employe, date=jour)
+            if self.instance:
+                doublon = doublon.exclude(pk=self.instance.pk)
+            if doublon.exists():
+                raise serializers.ValidationError("Présence déjà relevée pour ce salarié, cet OF et ce jour.")
+        return attrs

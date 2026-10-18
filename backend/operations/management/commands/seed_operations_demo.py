@@ -2,12 +2,16 @@ from django.core.management.base import BaseCommand
 
 from commercial.models import Affaire, ClientProfile, Opportunity
 from operations.models import (
+    AffectationEquipe,
+    Equipe,
+    PresenceChantier,
     GammeOperatoire,
     GammeOperation,
     OrdreFabrication,
     PointageChantier,
     SituationTravaux,
 )
+from rh_paie.models import Employe
 from referentiels.models import Article, Currency, Partner, UnitOfMeasure
 from users.models import User
 
@@ -20,7 +24,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options["force"]:
-            for model in (SituationTravaux, PointageChantier, OrdreFabrication,
+            for model in (PresenceChantier, AffectationEquipe, Equipe, SituationTravaux, PointageChantier, OrdreFabrication,
                           GammeOperation, GammeOperatoire):
                 model.objects.all().delete()
 
@@ -125,6 +129,26 @@ class Command(BaseCommand):
         )
         if created:
             sit.ordres.add(of)
+
+        # Équipes, affectation mobilisée et registre de présence (CDC M3 §6.3).
+        equipe, _ = Equipe.objects.get_or_create(
+            label="Soudeurs — tuyauterie gaz", defaults={"metier": Equipe.Metier.SOUDEUR, "chef": chef},
+        )
+        soudeur, _ = Employe.objects.get_or_create(
+            code="EMP-M3-01", defaults={"civilite": "masculin", "nom": "Obame", "prenom": "Jean"},
+        )
+        equipe.membres.add(soudeur)
+        AffectationEquipe.objects.get_or_create(
+            equipe=equipe, ordre=of,
+            defaults={
+                "date_debut": "2026-09-01", "date_fin": "2026-10-15", "effectif": 4,
+                "statut": AffectationEquipe.Statut.MOBILISEE, "mobilise_par": chef,
+            },
+        )
+        PresenceChantier.objects.get_or_create(
+            ordre=of, employe=soudeur, date="2026-09-10",
+            defaults={"statut": PresenceChantier.Statut.PRESENT, "releve_par": chef},
+        )
 
         self.stdout.write(
             self.style.SUCCESS(
