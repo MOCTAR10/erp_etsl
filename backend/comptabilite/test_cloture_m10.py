@@ -8,7 +8,6 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.utils import timezone
-from rest_framework import status
 
 from accounting_kernel.models import AccountMove, AccountMoveLine, Journal
 from accounting_kernel.services import period_for_date, post_move

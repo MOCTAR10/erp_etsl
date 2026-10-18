@@ -37,6 +37,11 @@ SCHEDULES = [
         "controle_gestion.tasks.detecter_ecarts_budgetaires",
         {"minute": "0", "hour": "7", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
     ),
+    (
+        "ETSL — clôture mensuelle : envoi Direction J+4 et alerte de retard (M10)",
+        "comptabilite.tasks.suivre_clotures_mensuelles",
+        {"minute": "45", "hour": "7", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
+    ),
 ]
 
 # Tâches périodiques supprimées : l'app `ingestion` (IMAP, RF-04) n'existe pas dans le code ; planifier une tâche

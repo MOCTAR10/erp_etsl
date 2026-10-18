@@ -110,6 +110,17 @@ export const en = {
     reporting: "{{annee}} · headcount {{effectif}} · hires {{entrees}} · leavers {{sorties}} · turnover {{turnover}} % · absences {{absence}} d · absenteeism {{absenteisme}} %",
     integrer: "Import timesheets (overtime)",
   },
+  cloture: {
+    title: "Month-end closing (M10)",
+    hint: "Start the clock, clear the blocking checks, then close: the summary is frozen and sent to Management on day 4. Target and send day are ETSL settings.",
+    periode: "Period to close", choisir: "Choose a period…", demarrer: "Start closing", cloturer: "Close the period",
+    ok: "OK", bloquant: "Blocking", avertissement: "To review", suivi: "Closing follow-up",
+    st: { en_cours: "In progress", cloturee: "Closed" }, duree: "{{min}} min (target {{objectif}} min)",
+    retard: { cloture_en_retard: "Closing late", envoi_en_retard: "Management send late" },
+    m: { produits: "Income", charges: "Expenses", resultat: "Result", tresorerie: "Cash", creances_clients: "Receivables", dettes_fournisseurs: "Payables", tva_nette: "Net VAT" },
+    envoyee: "Summary sent to Management on {{date}} ({{n}} recipient(s)).", echeance: "Management send due by {{date}}.",
+    envoyer: "Send to Management", rouvrir: "Reopen", motifPrompt: "Reason for reopening?",
+  },
   facturation: {
     title: "Customer invoicing (M10)",
     hint: "Completed milestones and validated progress statements are invoiced here. An issued invoice is posted (411 · 706 · 443), archived 10 years and sealed: corrections go through a credit note.",

@@ -7,6 +7,7 @@ from .models import (
     ControleInterne,
     DeclarationTva,
     Engagement,
+    ClotureMensuelle,
     FactureClient,
     Lettrage,
     LigneFactureClient,
@@ -480,4 +481,41 @@ class FactureClientSerializer(serializers.ModelSerializer):
                 data[cle] = None
             for l in data["lignes"]:
                 l["prix_unitaire"] = l["montant"] = None
+        return data
+
+
+class ClotureMensuelleSerializer(serializers.ModelSerializer):
+    periode = serializers.SerializerMethodField()
+    periode_statut = serializers.CharField(source="period.status", read_only=True)
+    fin_periode = serializers.DateField(source="period.end_date", read_only=True)
+    retard = serializers.SerializerMethodField()
+    has_amount_access = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClotureMensuelle
+        fields = [
+            "id", "period", "periode", "periode_statut", "fin_periode", "statut", "demarree_le", "demarree_par",
+            "cloturee_le", "cloturee_par", "duree_minutes", "dans_objectif", "objectif_minutes", "echeance_envoi",
+            "controles", "synthese", "envoyee_le", "envoyee_par", "destinataires", "reouvertures", "retard",
+            "has_amount_access",
+        ]
+        read_only_fields = fields
+
+    def get_periode(self, obj):
+        return str(obj.period)
+
+    def get_retard(self, obj):
+        from .cloture import retard_cloture
+
+        return retard_cloture(obj)
+
+    def get_has_amount_access(self, obj):
+        from .services import can_see_amount
+
+        return can_see_amount(getattr(self.context.get("request"), "user", None))
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data["has_amount_access"]:
+            data["synthese"] = {}
         return data

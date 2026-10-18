@@ -110,6 +110,17 @@ export const fr = {
     reporting: "{{annee}} · effectif {{effectif}} · entrées {{entrees}} · sorties {{sorties}} · turnover {{turnover}} % · absences {{absence}} j · absentéisme {{absenteisme}} %",
     integrer: "Intégrer les pointages (heures sup.)",
   },
+  cloture: {
+    title: "Clôture mensuelle (M10)",
+    hint: "Démarrez le chrono, traitez les contrôles bloquants, puis clôturez : la synthèse est figée et envoyée à la Direction à J+4. Objectif et jour d'envoi : paramètres ETSL.",
+    periode: "Période à clôturer", choisir: "Choisir une période…", demarrer: "Démarrer la clôture", cloturer: "Clôturer la période",
+    ok: "OK", bloquant: "Bloquant", avertissement: "À examiner", suivi: "Suivi des clôtures",
+    st: { en_cours: "En cours", cloturee: "Clôturée" }, duree: "{{min}} min (objectif {{objectif}} min)",
+    retard: { cloture_en_retard: "Clôture en retard", envoi_en_retard: "Envoi Direction en retard" },
+    m: { produits: "Produits", charges: "Charges", resultat: "Résultat", tresorerie: "Trésorerie", creances_clients: "Créances clients", dettes_fournisseurs: "Dettes fournisseurs", tva_nette: "TVA nette" },
+    envoyee: "Synthèse envoyée à la Direction le {{date}} ({{n}} destinataire(s)).", echeance: "Envoi à la Direction attendu au plus tard le {{date}}.",
+    envoyer: "Envoyer à la Direction", rouvrir: "Rouvrir", motifPrompt: "Motif de la réouverture ?",
+  },
   facturation: {
     title: "Facturation client (M10)",
     hint: "Les jalons réalisés et les situations validées sont facturés ici. Une facture émise est comptabilisée (411 · 706 · 443), archivée en GED 10 ans et scellée : toute correction passe par un avoir.",
