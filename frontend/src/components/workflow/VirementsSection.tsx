@@ -164,7 +164,7 @@ export function VirementsSection() {
         {f("numero_compte", t("virements.numCompte"))}
         {f("cle_rib", t("virements.cle"))}
         <button className="btn" type="submit" disabled={addCompte.isPending}>
-          {t("baremes.save")}
+          {t("virements.ajouterCompte")}
         </button>
       </form>
 
@@ -190,7 +190,7 @@ export function VirementsSection() {
         {r("rib_cle", t("virements.cle"))}
         {r("banque_nom", t("virements.domiciliation"))}
         <button className="btn" type="submit" disabled={saveRib.isPending}>
-          {t("baremes.save")}
+          {t("virements.majRib")}
         </button>
       </form>
     </SectionCard>

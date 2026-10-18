@@ -66,7 +66,7 @@ test.describe("M9 : bulletin PDF et virement des salaires", () => {
     await form.getByPlaceholder("Guichet (5 ch.)").fill("00123");
     await form.getByPlaceholder("N° de compte").fill(num);
     await form.getByPlaceholder("Clé RIB").fill("45");
-    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await form.getByRole("button", { name: "Ajouter le compte" }).click();
     await expect(page.getByRole("option", { name: new RegExp(num) })).toBeAttached();
   });
 });

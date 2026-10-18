@@ -101,7 +101,7 @@ export const en = {
     generer: "Generate the transfer order", periode: "Period (1st of month)", compte: "Issuer account", execution: "Execution date",
     telecharger: "Download the file", compteTitle: "Issuer account", raison: "Company name (24 chars)", emetteur: "Issuer no. (6)",
     banque: "Bank (5 ch.)", guichet: "Branch (5 ch.)", numCompte: "Account no.", cle: "RIB key", ribTitle: "Employee bank details",
-    employe: "Employee", domiciliation: "Bank name", pdf: "PDF", archiver: "Archive (10-year DMS)", archive: "Archived",
+    employe: "Employee", domiciliation: "Bank name", ajouterCompte: "Add the account", majRib: "Update the RIB", pdf: "PDF", archiver: "Archive (10-year DMS)", archive: "Archived",
   },
   baremes: {
     modifier: "Edit", annuler: "Cancel", impotTitle: "Income tax (progressive scale, monthly amounts per share)", tranche: "Bracket ceiling (F)", derniere: "above", abattement: "Allowance (%)",
