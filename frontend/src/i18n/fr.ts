@@ -1154,6 +1154,20 @@ export const fr = {
       totalGr: "Total GR", totalHorsGr: "Total hors GR",
     },
   },
+  rechercheJuridique: {
+    title: "Recherche juridique liée aux modules (M12 ↔ M1-M11)",
+    hint: "Retrouve les documents GED par leur contenu ou par l'objet métier auquel ils sont liés (affaire, contrat, BC, OT…). Les droits d'accès à la GED sont respectés.",
+    terme: "Terme recherché", module: "Module", tousModules: "Tous les modules", chercher: "Rechercher",
+    aucun: "Aucun document trouvé.", document: "Document", liens: "Objets liés", objetType: "Type d'objet",
+    objetId: "Identifiant de l'objet", lier: "Lier le document", lie: "Document lié à l'objet métier.",
+  },
+  docsOfficiels: {
+    title: "Documents officiels : signature et scellement (M12)",
+    hint: "Un document d'un type officiel ne s'archive qu'avec une signature avancée achevée sur sa version courante, puis son contenu est scellé.",
+    warnProvisoire: "{{count}} type(s) officiel(s) provisoire(s) : liste à faire confirmer par ETSL.",
+    provisoire: "Provisoire", confirme: "Confirmé", marquer: "Marquer officiel", retirer: "Retirer", confirmer: "Confirmer",
+    confirmConfirmer: "Confirmer ce type comme document officiel (validé par ETSL) ?",
+  },
   grAffaires: {
     title: "Coût GLOBAL RENTAL par affaire (compteurs → M11)", periode: "Mois",
     hint: "Compteurs des prestations GR valorisés selon la grille, ventilés par affaire. Le coût reste au compte 618, isolé des marges : la marge après coût GR est indicative.",

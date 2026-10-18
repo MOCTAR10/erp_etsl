@@ -3,6 +3,7 @@ import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
@@ -430,6 +431,9 @@ export function JuridiquePage() {
           <DataTable rows={grs} columns={grColumns(t)} caption="GLOBAL RENTAL" />
         </SectionCard>
       )}
+      <RechercheJuridiqueSection />
+      <DocumentsOfficielsSection />
+
       {courts.length > 0 && (
         <SectionCard title={`${t("juridique.courriers")} · ${courts.length}`}>
           <DataTable rows={courts} columns={courrierColumns(t)} caption={t("juridique.courriers")} />

@@ -212,3 +212,69 @@ def compute_stats():
             statut=DossierGlobalRental.Statut.OUVERT
         ).count(),
     }
+
+# --------------------------------------------------------------------------------------------------
+# Clôture M12 : recherche juridique interconnectée (documents GED ↔ objets métier M1-M11)
+# --------------------------------------------------------------------------------------------------
+OBJETS_LIEABLES = {
+    "commercial.affaire": "M1",
+    "commercial.contract": "M1",
+    "commercial.avenant": "M1",
+    "commercial.estimate": "M1",
+    "achats.purchaserequest": "M2",
+    "achats.purchaseorder": "M2",
+    "achats.litigefournisseur": "M2",
+    "operations.ordrefabrication": "M3",
+    "operations.dossieroperationnel": "M3",
+    "logistique.locationgr": "M4",
+    "stocks.lotmatiere": "M5",
+    "qualite.nonconformite": "M6",
+    "qualite.pvcontrole": "M6",
+    "hse.permistravail": "M7",
+    "hse.incident": "M7",
+    "maintenance.ordretravail": "M8",
+    "comptabilite.factureclient": "M10",
+    "controle_gestion.budget": "M11",
+}
+RECHERCHE_MIN = 2
+
+
+def resoudre_objet(objet_type, objet_id):
+    """(libellé, module) de l'objet métier désigné ; ValueError si type hors liste blanche ou objet inconnu."""
+    from django.apps import apps
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    if objet_type not in OBJETS_LIEABLES:
+        raise ValueError(f"Type d'objet non liable : {objet_type}.")
+    app_label, model_name = objet_type.split(".")
+    modele = apps.get_model(app_label, model_name)
+    try:
+        objet = modele.objects.filter(pk=objet_id).first()
+    except (DjangoValidationError, ValueError):
+        objet = None
+    if objet is None:
+        raise ValueError("Objet métier introuvable.")
+    return str(objet)[:255], OBJETS_LIEABLES[objet_type]
+
+
+def rechercher_documents(user, q, module=None):
+    """Documents visibles (ACL GED) dont le contenu, les métadonnées ou un objet métier lié correspond à `q`."""
+    from django.contrib.postgres.search import SearchQuery
+    from django.db.models import Q
+
+    from documents.services import visible_documents
+
+    from .models import LienDocument
+
+    liens = LienDocument.objects.filter(objet_label__icontains=q)
+    if module:
+        liens = liens.filter(module=module)
+    ids_liens = liens.values_list("document_id", flat=True)
+    texte = (
+        Q(search_vector=SearchQuery(q, config="french"))
+        | Q(title__icontains=q) | Q(reference__icontains=q) | Q(counterparty__icontains=q) | Q(project__icontains=q)
+    )
+    qs = visible_documents(user).filter(texte | Q(pk__in=ids_liens))
+    if module:
+        qs = qs.filter(liens_metier__module=module)
+    return qs.distinct().prefetch_related("liens_metier")[:100]

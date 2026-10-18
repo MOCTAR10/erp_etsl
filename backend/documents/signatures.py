@@ -233,3 +233,15 @@ def certificate(req: SignatureRequest) -> dict:
         "method": "Signature électronique avancée interne : authentification (mot de passe + code e-mail), "
         "empreinte SHA-256 du document, sceau HMAC-SHA256 chaîné.",
     }
+
+
+def version_signee(version) -> bool:
+    """Vrai si une signature avancée est achevée sur l'empreinte exacte de cette version (CL-OM-06)."""
+    return bool(version) and SignatureRequest.objects.filter(
+        version=version, status=SignatureRequest.Status.COMPLETED, document_sha256=version.sha256
+    ).exists()
+
+
+def document_officiel_signe(document) -> bool:
+    """Document de type officiel dont la version courante est signée : contenu scellé."""
+    return bool(document.type_id and document.type.officiel and version_signee(document.current_version))

@@ -9,6 +9,8 @@ from .views import (
     ConventionViewSet,
     CourrierViewSet,
     DossierGlobalRentalViewSet,
+    LienDocumentViewSet,
+    RechercheJuridiqueView,
     ReunionViewSet,
 )
 
@@ -20,6 +22,8 @@ router.register("cautions", CautionViewSet, basename="juridique-cautions")
 router.register("assurances", AssuranceViewSet, basename="juridique-assurances")
 router.register("reunions", ReunionViewSet, basename="juridique-reunions")
 router.register("dossiers-gr", DossierGlobalRentalViewSet, basename="juridique-dossiers-gr")
+router.register("liens", LienDocumentViewSet, basename="juridique-liens")
+router.register("recherche", RechercheJuridiqueView, basename="juridique-recherche")
 router.register("alertes", AlertesViewSet, basename="juridique-alertes")
 
 urlpatterns = [

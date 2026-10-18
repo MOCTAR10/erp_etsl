@@ -740,3 +740,37 @@ class DossierGlobalRental(models.Model):
             raise ValueError("Seul un dossier ouvert peut être clôturé.")
         self.statut = self.Statut.CLOTURE
         return self.save(update_fields=["statut", "updated_at"])
+
+class LienDocument(models.Model):
+    """Lien entre un document GED et un objet métier M1-M11 (recherche juridique interconnectée, CDC M12).
+
+    Lien générique (type « app.modele » + identifiant) restreint à une liste blanche (`services.OBJETS_LIEABLES`) ;
+    le libellé de l'objet est figé à la création pour que la recherche n'ait pas à parcourir les modules.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(
+        "documents.Document", on_delete=models.CASCADE, related_name="liens_metier", verbose_name="Document"
+    )
+    objet_type = models.CharField(max_length=60, verbose_name="Type d'objet (app.modele)")
+    objet_id = models.CharField(max_length=64, verbose_name="Identifiant de l'objet")
+    objet_label = models.CharField(max_length=255, verbose_name="Libellé de l'objet")
+    module = models.CharField(max_length=4, verbose_name="Module ERP")
+    note = models.CharField(max_length=255, blank=True, verbose_name="Note")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Lié par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Lien document ↔ objet métier"
+        verbose_name_plural = "Liens documents ↔ objets métier"
+        constraints = [
+            models.UniqueConstraint(fields=["document", "objet_type", "objet_id"], name="lien_document_uniq"),
+        ]
+        indexes = [models.Index(fields=["objet_type", "objet_id"])]
+
+    def __str__(self):
+        return f"{self.document_id} → {self.objet_type}:{self.objet_label}"

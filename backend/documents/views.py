@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .audit import log_audit, request_ip
+from .signatures import document_officiel_signe
 from .models import (
     AuditLog,
     Document,
@@ -47,6 +48,32 @@ from .services import (
 class DocumentTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = DocumentType.objects.all()
     serializer_class = DocumentTypeSerializer
+
+    def _direction_only(self, request):
+        from juridique.services import can_validate_dg
+
+        if not can_validate_dg(request.user):
+            raise PermissionDenied("Réservé à la Direction Générale (liste des types officiels, CDC M12).")
+
+    @action(detail=True, methods=["post"], url_path="definir-officiel")
+    def definir_officiel(self, request, pk=None):
+        """Marque / démarque un type comme officiel ; la liste repasse en provisoire jusqu'à confirmation."""
+        self._direction_only(request)
+        t = self.get_object()
+        t.officiel = request.data.get("officiel") in (True, "true", "True", "1", 1)
+        t.officiel_confirme_par = None
+        t.officiel_confirme_le = None
+        t.save(update_fields=["officiel", "officiel_confirme_par", "officiel_confirme_le"])
+        return Response(self.get_serializer(t).data)
+
+    @action(detail=True, methods=["post"], url_path="confirmer-officiel")
+    def confirmer_officiel(self, request, pk=None):
+        self._direction_only(request)
+        t = self.get_object()
+        t.officiel_confirme_par = request.user
+        t.officiel_confirme_le = timezone.now()
+        t.save(update_fields=["officiel_confirme_par", "officiel_confirme_le"])
+        return Response(self.get_serializer(t).data)
 
 
 class DossierViewSet(viewsets.ModelViewSet):
@@ -253,12 +280,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 "Document archivé ou en validation : contenu non modifiable "
                 "(les validateurs et la rétention légale s'appuient sur la version soumise)."
             )
+        if document_officiel_signe(document):
+            raise DRFValidationError(
+                "Document officiel signé : contenu scellé (une nouvelle version invaliderait la signature)."
+            )
 
     def perform_destroy(self, instance):
         if instance.status in self.FROZEN:
             raise DRFValidationError(
                 "Suppression interdite : document archivé (rétention légale) ou en validation."
             )
+        if document_officiel_signe(instance):
+            raise DRFValidationError("Suppression interdite : document officiel signé (scellé).")
         log_audit(
             self.request.user,
             AuditLog.Action.DELETE,

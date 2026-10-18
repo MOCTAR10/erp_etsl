@@ -9,6 +9,7 @@ from .models import (
     Convention,
     Courrier,
     DossierGlobalRental,
+    LienDocument,
     Reunion,
 )
 from .services import can_see_amount
@@ -336,4 +337,33 @@ class DossierGlobalRentalSerializer(AmountMaskMixin, serializers.ModelSerializer
             raise serializers.ValidationError(
                 {"partenaire_gr": "Le partenaire doit être flaggé GLOBAL RENTAL (RF-ERP-B4)."}
             )
+        return attrs
+
+class LienDocumentSerializer(serializers.ModelSerializer):
+    document_title = serializers.CharField(source="document.title", read_only=True)
+
+    class Meta:
+        model = LienDocument
+        fields = [
+            "id", "document", "document_title", "objet_type", "objet_id", "objet_label", "module", "note",
+            "created_by", "created_at",
+        ]
+        read_only_fields = ["objet_label", "module", "created_by", "created_at"]
+
+    def validate(self, attrs):
+        from documents.services import visible_documents
+
+        from .services import resoudre_objet
+
+        request = self.context["request"]
+        if not visible_documents(request.user).filter(pk=attrs["document"].pk).exists():
+            raise serializers.ValidationError({"document": "Document inaccessible."})
+        try:
+            attrs["objet_label"], attrs["module"] = resoudre_objet(attrs["objet_type"], attrs["objet_id"])
+        except ValueError as exc:
+            raise serializers.ValidationError({"objet_id": str(exc)})
+        if LienDocument.objects.filter(
+            document=attrs["document"], objet_type=attrs["objet_type"], objet_id=attrs["objet_id"]
+        ).exists():
+            raise serializers.ValidationError({"detail": "Ce document est déjà lié à cet objet."})
         return attrs
