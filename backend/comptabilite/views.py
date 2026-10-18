@@ -12,8 +12,10 @@ from .models import (
     ControleInterne,
     DeclarationTva,
     Engagement,
+    Lettrage,
     LigneRapprochement,
     LigneReleve,
+    ParametreCompta,
     Paiement,
     RapprochementBancaire,
     ReleveBancaire,
@@ -27,6 +29,8 @@ from .serializers import (
     ControleInterneSerializer,
     DeclarationTvaSerializer,
     EngagementSerializer,
+    LettrageSerializer,
+    ParametreComptaSerializer,
     LigneReleveSerializer,
     PaiementSerializer,
     RapprochementBancaireSerializer,
@@ -37,8 +41,16 @@ from users.permissions import can_read_module
 from .services import (
     CanManageCompta,
     CanValidateCompta,
+    PARAMETRES_DEFAUT,
+    anomalies_lettrage,
     build_paiement_move,
+    can_see_amount,
     compute_declaration_tva,
+    delettrer,
+    get_param,
+    lettrer_auto,
+    lettrer_lignes,
+    parametres_provisoires,
 )
 
 
@@ -352,3 +364,95 @@ class ControleInterneViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         controle.statut = ControleInterne.Statut.CLOTURE
         controle.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(controle).data)
+
+
+class ParametreComptaViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+    """Paramètres modifiables par ETSL ; création/suppression interdites (définis par le code)."""
+
+    queryset = ParametreCompta.objects.all()
+    serializer_class = ParametreComptaSerializer
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        for code in PARAMETRES_DEFAUT:
+            get_param(code)
+        return super().get_queryset()
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        if self.action == "confirmer":
+            return [CanValidateCompta()]
+        return [IsComptaAdmin()]
+
+    def create(self, request, *args, **kwargs):
+        raise DRFValidationError("Les paramètres sont prédéfinis : modifiez leur valeur.")
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        p = self.get_object()
+        p.statut_valeur = ParametreCompta.StatutValeur.CONFIRME
+        p.confirme_par = request.user
+        p.confirme_le = timezone.now()
+        p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(p).data)
+
+
+class LettrageViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
+    queryset = Lettrage.objects.select_related("compte").prefetch_related("lignes__ligne__move").all()
+    serializer_class = LettrageSerializer
+    permission_classes = [CanManageCompta]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        p = self.request.query_params
+        if p.get("compte"):
+            qs = qs.filter(compte_id=p["compte"])
+        if p.get("statut"):
+            qs = qs.filter(statut=p["statut"])
+        return qs
+
+    def create(self, request):
+        from accounting_kernel.models import AccountMoveLine
+
+        ids = request.data.get("lignes")
+        if not isinstance(ids, list) or not ids:
+            raise DRFValidationError("Fournissez une liste `lignes` non vide.")
+        try:
+            lignes = list(AccountMoveLine.objects.filter(id__in=ids))
+        except (DjangoValidationError, ValueError):
+            raise DRFValidationError("Identifiant de ligne invalide.")
+        if len(lignes) != len(set(map(str, ids))):
+            raise DRFValidationError("Ligne d'écriture introuvable.")
+        lettrage = lettrer_lignes(lignes, request.user)
+        return Response(self.get_serializer(lettrage).data, status=status.HTTP_201_CREATED)
+
+    def _compte(self, request):
+        from referentiels.models import Account
+
+        try:
+            return Account.objects.get(pk=request.query_params.get("compte") or request.data.get("compte"))
+        except (Account.DoesNotExist, DjangoValidationError, ValueError, TypeError):
+            raise DRFValidationError("Compte inconnu : fournissez `compte`.")
+
+    @action(detail=False, methods=["post"], url_path="lettrer-auto")
+    def lettrer_auto_action(self, request):
+        crees, restantes = lettrer_auto(self._compte(request), request.user)
+        return Response({"lettrages": crees, "non_lettrees": restantes})
+
+    @action(detail=False, methods=["get"], url_path="anomalies")
+    def anomalies_action(self, request):
+        delai, rows = anomalies_lettrage(self._compte(request))
+        if not can_see_amount(request.user):
+            for r in rows:
+                r["debit"] = r["credit"] = None
+        return Response({
+            "delai_jours": delai,
+            "parametres_provisoires": parametres_provisoires(["LETTRAGE_TOLERANCE", "LETTRAGE_DELAI_ANOMALIE_JOURS"]),
+            "anomalies": rows,
+        })
+
+    @action(detail=True, methods=["post"], url_path="delettrer")
+    def delettrer_action(self, request, pk=None):
+        lettrage = delettrer(self.get_object(), request.user, request.data.get("motif", ""))
+        return Response(self.get_serializer(lettrage).data)

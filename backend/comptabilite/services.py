@@ -8,16 +8,19 @@ refacturation intra-groupe s'appuie sur le partenaire flaggé `is_global_rental`
 et le compte 618 (M4/M5, RF-ERP-93).
 """
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
+from accounting_kernel.models import AccountMove, AccountMoveLine
 from users.models import User
 from users.rbac import can_read_app
 
-from .models import Paiement
+from .models import Lettrage, LigneLettree, ParametreCompta, Paiement
 
 COMPTA_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -230,3 +233,154 @@ def compute_declaration_tva(declaration):
         ]
     )
     return declaration
+
+
+# --------------------------------------------------------------------------------------------------
+# Paramètres modifiables (valeur = donnée ETSL, défaut provisoire créé à la volée)
+# --------------------------------------------------------------------------------------------------
+PARAMETRES_DEFAUT = {
+    "LETTRAGE_TOLERANCE": ("Tolérance d'écart de lettrage", Decimal("0"), "FCFA"),
+    "LETTRAGE_DELAI_ANOMALIE_JOURS": (
+        "Ancienneté d'une ligne non lettrée signalée en anomalie", Decimal("90"), "jours"),
+}
+
+
+def get_param(code):
+    """Valeur du paramètre `code` ; crée le défaut provisoire si absent."""
+    label, valeur, unite = PARAMETRES_DEFAUT[code]
+    obj, _ = ParametreCompta.objects.get_or_create(
+        code=code, defaults={"label": label, "valeur": valeur, "unite": unite}
+    )
+    return obj.valeur
+
+
+def parametres_provisoires(codes):
+    """Vrai si l'un des paramètres `codes` n'est pas encore confirmé par ETSL."""
+    for c in codes:
+        get_param(c)
+    return ParametreCompta.objects.filter(code__in=codes).exclude(statut_valeur="confirme").exists()
+
+
+# --------------------------------------------------------------------------------------------------
+# Lettrage (RF-ERP-91) — n'écrit jamais dans les lignes d'écriture (immuables)
+# --------------------------------------------------------------------------------------------------
+LIGNES_COMPTABILISEES = (AccountMove.Status.POSTED, AccountMove.Status.REVERSED)
+
+
+def _lignes_libres(compte, partner=None):
+    qs = AccountMoveLine.objects.filter(
+        account=compte, move__status__in=LIGNES_COMPTABILISEES, lettrage_actif__isnull=True
+    ).select_related("move")
+    if partner is not None:
+        qs = qs.filter(partner=partner)
+    return qs.order_by("move__date", "id")
+
+
+@transaction.atomic
+def lettrer_lignes(lignes, user, automatique=False):
+    """Crée un lettrage sur `lignes` (AccountMoveLine) ; ValidationError si incohérent."""
+    ids = [l.id for l in lignes]
+    if len(set(ids)) < 2:
+        raise ValidationError("Un lettrage porte sur au moins deux lignes.")
+    lignes = list(
+        AccountMoveLine.objects.select_for_update(of=("self",))
+        .select_related("move", "account", "partner").filter(id__in=ids)
+    )
+    if len({l.account_id for l in lignes}) != 1:
+        raise ValidationError("Toutes les lignes doivent appartenir au même compte.")
+    compte = lignes[0].account
+    if not compte.reconcile:
+        raise ValidationError(f"Le compte {compte.code} n'est pas lettrable.")
+    if any(l.move.status not in LIGNES_COMPTABILISEES for l in lignes):
+        raise ValidationError("Seules les lignes d'écritures comptabilisées sont lettrables.")
+    if LigneLettree.objects.filter(ligne_id__in=ids).exists():
+        raise ValidationError("Une des lignes est déjà lettrée.")
+    if len({l.partner_id for l in lignes}) != 1:
+        raise ValidationError("Toutes les lignes doivent concerner le même tiers.")
+    ecart = abs(sum((l.debit - l.credit for l in lignes), Decimal("0")))
+    if ecart > get_param("LETTRAGE_TOLERANCE"):
+        raise ValidationError(f"Lettrage déséquilibré : écart {ecart} supérieur à la tolérance.")
+    lettrage = Lettrage.objects.create(
+        compte=compte, partner=lignes[0].partner, ecart=ecart, automatique=automatique, created_by=user
+    )
+    LigneLettree.objects.bulk_create([LigneLettree(lettrage=lettrage, ligne=l) for l in lignes])
+    return lettrage
+
+
+@transaction.atomic
+def delettrer(lettrage, user, motif):
+    lettrage = Lettrage.objects.select_for_update().get(pk=lettrage.pk)
+    if lettrage.statut != Lettrage.Statut.ACTIF:
+        raise ValidationError("Lettrage déjà annulé.")
+    if not (motif or "").strip():
+        raise ValidationError("Le motif du dé-lettrage est obligatoire.")
+    lettrage.lignes.all().delete()
+    lettrage.statut = Lettrage.Statut.ANNULE
+    lettrage.annule_par = user
+    lettrage.annule_le = timezone.now()
+    lettrage.motif_annulation = motif.strip()[:250]
+    lettrage.save()
+    return lettrage
+
+
+def _essayer(lignes, user):
+    try:
+        with transaction.atomic():
+            return lettrer_lignes(lignes, user, automatique=True)
+    except ValidationError:
+        return None
+
+
+@transaction.atomic
+def lettrer_auto(compte, user, partner=None):
+    """Lettrage automatique : (1) groupes de même tiers + même référence qui s'équilibrent ;
+    (2) montants uniques côté débit et côté crédit pour un même tiers. Retourne (lettrages créés, lignes restantes)."""
+    if not compte.reconcile:
+        raise ValidationError(f"Le compte {compte.code} n'est pas lettrable.")
+    tol = get_param("LETTRAGE_TOLERANCE")
+    crees = 0
+    par_tiers = {}
+    for l in _lignes_libres(compte, partner):
+        if l.partner_id:
+            par_tiers.setdefault(l.partner_id, []).append(l)
+    for lignes in par_tiers.values():
+        restantes, groupes = [], {}
+        for l in lignes:
+            cle = (l.move.reference or l.move.source_ref or "").strip()
+            (groupes.setdefault(cle, []) if cle else restantes).append(l)
+        for g in groupes.values():
+            equilibre = abs(sum((x.debit - x.credit for x in g), Decimal("0"))) <= tol
+            if len(g) >= 2 and any(x.debit for x in g) and any(x.credit for x in g) and equilibre:
+                crees += 1 if _essayer(g, user) else 0
+            else:
+                restantes.extend(g)
+        debits, credits = {}, {}
+        for l in restantes:
+            if l.debit:
+                debits.setdefault(l.debit, []).append(l)
+            else:
+                credits.setdefault(l.credit, []).append(l)
+        for montant, d in debits.items():
+            c = credits.get(montant)
+            if c and len(d) == 1 and len(c) == 1:
+                crees += 1 if _essayer([d[0], c[0]], user) else 0
+    return crees, _lignes_libres(compte, partner).count()
+
+
+def anomalies_lettrage(compte):
+    """Lignes non lettrées jugées anormales : sans tiers, ou plus anciennes que le délai paramétré."""
+    delai = int(get_param("LETTRAGE_DELAI_ANOMALIE_JOURS"))
+    limite = timezone.localdate() - timedelta(days=delai)
+    out = []
+    for l in _lignes_libres(compte):
+        if not l.partner_id:
+            motif = "sans_tiers"
+        elif l.move.date < limite:
+            motif = "ancienne"
+        else:
+            continue
+        out.append({
+            "ligne": str(l.id), "motif": motif, "date": l.move.date, "reference": l.move.reference,
+            "debit": l.debit, "credit": l.credit, "tiers": str(l.partner_id) if l.partner_id else None,
+        })
+    return delai, out

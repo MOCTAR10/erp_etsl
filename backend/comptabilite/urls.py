@@ -6,6 +6,8 @@ from .views import (
     ControleInterneViewSet,
     DeclarationTvaViewSet,
     EngagementViewSet,
+    LettrageViewSet,
+    ParametreComptaViewSet,
     PaiementViewSet,
     RapprochementBancaireViewSet,
     ReleveBancaireViewSet,
@@ -21,6 +23,8 @@ router.register("engagements", EngagementViewSet, basename="compta-engagements")
 router.register("paiements", PaiementViewSet, basename="compta-paiements")
 router.register("declarations-tva", DeclarationTvaViewSet, basename="compta-declarations-tva")
 router.register("controles", ControleInterneViewSet, basename="compta-controles")
+router.register("lettrages", LettrageViewSet, basename="compta-lettrages")
+router.register("parametres", ParametreComptaViewSet, basename="compta-parametres")
 
 urlpatterns = [
     path("", include(router.urls)),

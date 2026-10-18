@@ -7,7 +7,9 @@ from .models import (
     ControleInterne,
     DeclarationTva,
     Engagement,
+    Lettrage,
     LigneRapprochement,
+    ParametreCompta,
     LigneReleve,
     Paiement,
     RapprochementBancaire,
@@ -307,3 +309,70 @@ class ControleInterneSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["code", "date_realise", "statut"]
+
+class ParametreComptaSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ParametreCompta
+        fields = [
+            "id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire",
+            "confirme_par", "confirme_le",
+        ]
+        read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
+
+    def validate_valeur(self, value):
+        if value < 0:
+            raise serializers.ValidationError("La valeur ne peut pas être négative.")
+        return value
+
+    def update(self, instance, validated_data):
+        # Une valeur modifiée redevient provisoire jusqu'à nouvelle confirmation.
+        if "valeur" in validated_data and validated_data["valeur"] != instance.valeur:
+            instance.statut_valeur = ParametreCompta.StatutValeur.PROVISOIRE
+            instance.confirme_par = None
+            instance.confirme_le = None
+        return super().update(instance, validated_data)
+
+
+class LettrageSerializer(serializers.ModelSerializer):
+    lignes = serializers.SerializerMethodField()
+    compte_code = serializers.CharField(source="compte.code", read_only=True)
+    has_amount_access = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Lettrage
+        fields = [
+            "id", "code", "compte", "compte_code", "partner", "date", "ecart", "automatique", "statut",
+            "created_by", "created_at", "annule_par", "annule_le", "motif_annulation", "lignes",
+            "has_amount_access",
+        ]
+        read_only_fields = fields
+
+    def _voit(self):
+        from .services import can_see_amount
+
+        return can_see_amount(getattr(self.context.get("request"), "user", None))
+
+    def get_has_amount_access(self, obj):
+        return self._voit()
+
+    def get_lignes(self, obj):
+        voit = self._voit()
+        return [
+            {
+                "id": str(ll.ligne_id),
+                "piece": ll.ligne.move.number,
+                "date": ll.ligne.move.date,
+                "reference": ll.ligne.move.reference,
+                "debit": ll.ligne.debit if voit else None,
+                "credit": ll.ligne.credit if voit else None,
+            }
+            for ll in obj.lignes.all()
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self._voit():
+            data["ecart"] = None
+        return data
