@@ -471,3 +471,114 @@ def compute_doctrine(fiscal_year):
         "cible_coherente": cible["A"] + cible["B"] + cible["C"] == 100,
         "provisoire": parametres_gestion_provisoires(CODES_DOCTRINE),
     }
+
+
+# --------------------------------------------------------------------------------------------------
+# Reporting Direction J+4 / J+6 (paramètres provisoires REPORTING_JOUR_J4 / J6)
+# --------------------------------------------------------------------------------------------------
+CODES_REPORTING = ("REPORTING_JOUR_J4", "REPORTING_JOUR_J6")
+FENETRE_RELANCE_JOURS = 62  # on ne relance que les mois récents : les mois d'avant la mise en service sont ignorés
+
+
+def suivre_reporting(today=None):
+    """Crée la clôture de gestion manquante et relance (une fois) les mois dont la publication dépasse J+6."""
+    from datetime import timedelta
+
+    from accounting_kernel.models import Period
+    from workflow.notifications import notify
+
+    from .models import ClotureGestion
+
+    today = today or timezone.localdate()
+    j6 = timedelta(days=int(get_param_gestion("REPORTING_JOUR_J6")))
+    destinataires = list(
+        User.objects.filter(role__in=(User.Role.FINANCE, User.Role.DGA, User.Role.PDG), is_active=True)
+    )
+    relances = []
+    periods = Period.objects.filter(
+        end_date__lt=today - j6, end_date__gte=today - timedelta(days=FENETRE_RELANCE_JOURS)
+    )
+    for period in periods:
+        cloture, _ = ClotureGestion.objects.get_or_create(period=period)
+        if cloture.date_publication or cloture.alerte_j6_le:
+            continue
+        cloture.alerte_j6_le = today
+        cloture.save(update_fields=["alerte_j6_le", "updated_at"])
+        relances.append(cloture)
+        for user in destinataires:
+            notify(
+                user, f"Reporting Direction en retard : {period}",
+                f"Le reporting de gestion de {period} n'est pas publié à J+{int(j6.days)} "
+                f"({cloture.echeance_j6:%d/%m/%Y}).",
+                kind="escalation",
+            )
+    return relances
+
+
+# --------------------------------------------------------------------------------------------------
+# Marges brute / opérationnelle / nette et atterrissage (définitions provisoires, cf. fiche M11)
+# --------------------------------------------------------------------------------------------------
+def compute_niveaux_marge(fiscal_year):
+    """Trois niveaux de marge réelle sur les écritures comptabilisées.
+
+    brute = produits − charges directes (axes projet / chantier) ; opérationnelle = brute − charges de structure
+    (centres de coût, sites, charges sans axe) ; nette = opérationnelle − coût GLOBAL RENTAL (618 isolé, A4).
+    """
+    from referentiels.models import Account, AnalyticAxis
+
+    qs = _posted_lines_qs(fiscal_year).filter(account__account_class__in=(6, 7))
+    is_gr = Q(account__code="618000")
+    directs = Q(analytic_account__axis__axis_type__in=(AnalyticAxis.AxisType.PROJET, AnalyticAxis.AxisType.CHANTIER))
+    charge = Q(account__account_type=Account.AccountType.EXPENSE) & ~is_gr
+    agg = qs.aggregate(
+        produits=Sum(_net(Q(account__account_type=Account.AccountType.INCOME), "credit", "debit")),
+        directes=Sum(_net(charge & directs, "debit", "credit")),
+        structure=Sum(_net(charge & ~directs, "debit", "credit")),
+        cout_gr=Sum(_net(is_gr, "debit", "credit")),
+    )
+    produits, directes, structure, cout_gr = (agg[k] or ZERO for k in ("produits", "directes", "structure", "cout_gr"))
+    brute = produits - directes
+    operationnelle = brute - structure
+    nette = operationnelle - cout_gr
+
+    def taux(m):
+        return (m * 100 / produits).quantize(Decimal("0.01")) if produits else None
+
+    return {
+        "produits": produits, "charges_directes": directes, "charges_structure": structure, "cout_gr": cout_gr,
+        "marge_brute": brute, "marge_operationnelle": operationnelle, "marge_nette": nette,
+        "taux_brute": taux(brute), "taux_operationnelle": taux(operationnelle), "taux_nette": taux(nette),
+    }
+
+
+def compute_atterrissage(fiscal_year, today=None):
+    """Atterrissage de fin d'exercice par budget : réalisé des périodes écoulées + budget des périodes à venir.
+
+    La marge à terminaison = atterrissage des budgets de produits − atterrissage des budgets de charges.
+    """
+    from accounting_kernel.models import Period
+
+    from .models import Budget
+
+    today = today or timezone.localdate()
+    ecoulees = set(
+        Period.objects.filter(fiscal_year_id=fiscal_year, end_date__lt=today).values_list("id", flat=True)
+    )
+    rows = []
+    totaux = {"produit": ZERO, "charge": ZERO}
+    budgets = Budget.objects.filter(
+        fiscal_year_id=fiscal_year, statut__in=(Budget.Statut.APPROUVE, Budget.Statut.CLOTURE)
+    )
+    for budget in budgets:
+        lignes = compute_variance(budget)["lignes"]
+        realise = sum((x["realise"] for x in lignes if x["period"] in ecoulees), ZERO)
+        a_venir = sum((x["montant"] for x in lignes if x["period"] not in ecoulees), ZERO)
+        total_budget = sum((x["montant"] for x in lignes), ZERO)
+        atterrissage = realise + a_venir
+        totaux[budget.type_budget] += atterrissage
+        rows.append({
+            "code": budget.code, "label": budget.label, "type_budget": budget.type_budget,
+            "budget": budget.pk, "budget_annuel": total_budget, "realise": realise, "reste_a_venir": a_venir,
+            "atterrissage": atterrissage, "ecart_objectif": atterrissage - total_budget,
+        })
+    return {"rows": rows, "marge_a_terminaison": totaux["produit"] - totaux["charge"], "totaux": totaux}

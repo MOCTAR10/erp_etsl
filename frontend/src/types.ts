@@ -1597,6 +1597,11 @@ export interface ClotureGestion {
   statut_label: string;
   jours_ecoulement: number | null;
   conforme_j4: boolean;
+  echeance_j4: string;
+  echeance_j6: string;
+  date_publication: string | null;
+  reporting_statut: "a_temps" | "j6" | "hors_delai" | "en_attente";
+  reporting_provisoire: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -2266,4 +2271,35 @@ export interface DoctrineResult {
   non_classes: number;
   cible_coherente: boolean;
   provisoire: boolean;
+}
+
+export interface NiveauxMarge {
+  produits: string | null;
+  charges_directes: string | null;
+  charges_structure: string | null;
+  cout_gr: string | null;
+  marge_brute: string | null;
+  marge_operationnelle: string | null;
+  marge_nette: string | null;
+  taux_brute: string | null;
+  taux_operationnelle: string | null;
+  taux_nette: string | null;
+}
+
+export interface AtterrissageRow {
+  budget: string;
+  code: string;
+  label: string;
+  type_budget: "charge" | "produit";
+  budget_annuel: string;
+  realise: string;
+  reste_a_venir: string;
+  atterrissage: string;
+  ecart_objectif: string;
+}
+
+export interface AtterrissageResult {
+  rows: AtterrissageRow[];
+  marge_a_terminaison: string | null;
+  totaux: { produit: string; charge: string } | null;
 }

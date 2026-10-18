@@ -56,7 +56,7 @@ function BudgetCard({ b, index }: { b: Budget; index: number }) {
   );
 }
 
-type T = (key: string) => string;
+type T = (key: string, opts?: Record<string, unknown>) => string;
 type MargeLigne = MargeRow & { id: string };
 
 const money = (access: boolean, v: string | number | null) => (access && v !== null ? `${formatNumber(v)} F` : "••••••");
@@ -96,11 +96,33 @@ function clotureColumns(t: T): Column<ClotureGestion>[] {
       render: (c) => (c.jours_ecoulement !== null ? `${c.jours_ecoulement} ${t("controleGestion.jours")}` : t("controleGestion.enAttente")),
     },
     {
+      key: "reporting",
+      header: t("controleGestion.col.reporting"),
+      render: (c) => (
+        <>
+          <Badge tone={c.reporting_statut === "a_temps" ? "ok" : c.reporting_statut === "hors_delai" ? "err" : "warn"}>
+            {t(`controleGestion.reporting_statut.${c.reporting_statut}`)}
+          </Badge>
+          <div className="meta">
+            J+4 {formatDate(c.echeance_j4)} · J+6 {formatDate(c.echeance_j6)}
+            {c.reporting_provisoire ? ` · ${t("controleGestion.joursProvisoires")}` : ""}
+          </div>
+        </>
+      ),
+    },
+    {
       key: "statut",
       header: t("controleGestion.col.statut"),
       render: (c) =>
         c.statut === "realisee" ? (
-          <Badge tone={c.conforme_j4 ? "ok" : "err"}>{c.conforme_j4 ? t("controleGestion.conformeJ4") : t("controleGestion.horsJ4")}</Badge>
+          <>
+            <Badge tone={c.conforme_j4 ? "ok" : "err"}>{c.conforme_j4 ? t("controleGestion.conformeJ4") : t("controleGestion.horsJ4")}</Badge>
+            {c.date_publication ? (
+              <div className="meta">{t("controleGestion.publieLe", { date: formatDate(c.date_publication) })}</div>
+            ) : (
+              <ActionBar actions={[{ label: t("controleGestion.act.publier"), path: `/api/controle-gestion/clotures/${c.id}/publier/` }]} />
+            )}
+          </>
         ) : (
           <>
             <Badge tone="warn">{t(`controleGestion.cloture_statut.${c.statut}`)}</Badge>
