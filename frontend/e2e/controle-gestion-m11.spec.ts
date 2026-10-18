@@ -9,7 +9,7 @@ test.describe("M11 Contrôle de gestion : paramètres de pilotage", () => {
     await page.goto("/controle-gestion");
     const section = page.getByTestId("pilotage-gestion");
     await expect(section.getByTestId("alerte-provisoire-gestion")).toContainText(/provisoire/);
-    await expect(section.getByText("Mix A")).toBeVisible();
+    await expect(section.getByRole("cell", { name: "Mix A", exact: true })).toBeVisible();
 
     const ligne = section.getByRole("row", { name: /Sous-activité maximale du centre 90/ });
     // Valeur différente de l'actuelle : une valeur inchangée resterait « confirmée » d'une exécution à l'autre.
