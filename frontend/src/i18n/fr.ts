@@ -344,6 +344,9 @@ export const fr = {
     task: "tâche",
   },
   commercial: {
+    searchOffres: "Rechercher une offre (code, titre, client)…",
+    searchAffaires: "Rechercher une affaire (code, titre, client)…",
+    searchContrats: "Rechercher un contrat (code, client)…",
     offres: "Offres (versions)",
     affaires: "Affaires",
     contrats: "Contrats (CLM)",
@@ -379,6 +382,8 @@ export const fr = {
     masked: "Montant restreint",
   },
   achatsPilotage: {
+    searchReceptions: "Rechercher une réception (code, BC)…",
+    searchLitiges: "Rechercher un litige (code, BC)…",
     receptions: "Réceptions et contrôle qualité",
     receptionsIntro: "Chaque réception (même partielle) déclenche un contrôle qualité à réception (M6) ; elle n'est validée qu'avec un contrôle conforme ou accepté sous réserve.",
     validerReception: "Valider la réception",
@@ -405,6 +410,7 @@ export const fr = {
   purchases: {
     search: "Rechercher un bon de commande (code, fournisseur)…",
     da: {
+      search: "Rechercher une demande d'achat (code, objet, service)…",
       title: "Demandes d'achat", new: "Nouvelle demande d'achat", code: "Code", objet: "Objet", demandeur: "Demandeur",
       echeance: "Échéance souhaitée", statut: "Statut", service: "Service", urgente: "Urgente", oui: "Oui", non: "Non",
       notes: "Justification / notes", soumettre: "Soumettre", motif: "Motif du rejet :",

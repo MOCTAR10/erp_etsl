@@ -4,8 +4,9 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
+import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
-import { ActionBar, Badge, DataTable, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, PagedDataTable, SectionCard } from "../ui";
 import type { ActionDef, Column } from "../ui";
 
 /** Clôture M1 : offres versionnées, affaires, contrats signés / avenants, marges par axe (CDC §3.4-§3.11). */
@@ -105,21 +106,9 @@ function actionsContrat(c: Contrat, t: (k: string) => string): ActionDef[] {
 export function CommercialSections() {
   const { t } = useTranslation();
   const [axe, setAxe] = useState("client");
-  const offres = useQuery({
-    queryKey: ["commercial-offres"],
-    queryFn: () => api.get<Paginated<Offre>>("/api/commercial/estimates/?page_size=50"),
-    select: (p) => p.results,
-  });
-  const affaires = useQuery({
-    queryKey: ["commercial-affaires"],
-    queryFn: () => api.get<Paginated<Affaire>>("/api/commercial/affaires/?page_size=50"),
-    select: (p) => p.results,
-  });
-  const contrats = useQuery({
-    queryKey: ["commercial-contrats"],
-    queryFn: () => api.get<Paginated<Contrat>>("/api/commercial/contracts/?page_size=50"),
-    select: (p) => p.results,
-  });
+  const offres = usePagedList<Offre>("commercial-offres", (q) => api.get<Paginated<Offre>>(`/api/commercial/estimates/${q}`));
+  const affaires = usePagedList<Affaire>("commercial-affaires", (q) => api.get<Paginated<Affaire>>(`/api/commercial/affaires/${q}`));
+  const contrats = usePagedList<Contrat>("commercial-contrats", (q) => api.get<Paginated<Contrat>>(`/api/commercial/contracts/${q}`));
   const marges = useQuery({
     queryKey: ["commercial-marges", axe],
     queryFn: () => api.get<{ lignes: (LigneMarge & { id: string })[] }>(`/api/commercial/affaires/marges/?par=${axe}`),
@@ -166,14 +155,14 @@ export function CommercialSections() {
 
   return (
     <>
-      <SectionCard title={`${t("commercial.offres")} · ${offres.data?.length ?? 0}`}>
-        <DataTable rows={offres.data ?? []} columns={colOffres} caption={t("commercial.offres")} />
+      <SectionCard title={`${t("commercial.offres")} · ${offres.count}`}>
+        <PagedDataTable list={offres} columns={colOffres} caption={t("commercial.offres")} searchPlaceholder={t("commercial.searchOffres")} />
       </SectionCard>
-      <SectionCard title={`${t("commercial.affaires")} · ${affaires.data?.length ?? 0}`}>
-        <DataTable rows={affaires.data ?? []} columns={colAffaires} caption={t("commercial.affaires")} />
+      <SectionCard title={`${t("commercial.affaires")} · ${affaires.count}`}>
+        <PagedDataTable list={affaires} columns={colAffaires} caption={t("commercial.affaires")} searchPlaceholder={t("commercial.searchAffaires")} />
       </SectionCard>
-      <SectionCard title={`${t("commercial.contrats")} · ${contrats.data?.length ?? 0}`}>
-        <DataTable rows={contrats.data ?? []} columns={colContrats} caption={t("commercial.contrats")} />
+      <SectionCard title={`${t("commercial.contrats")} · ${contrats.count}`}>
+        <PagedDataTable list={contrats} columns={colContrats} caption={t("commercial.contrats")} searchPlaceholder={t("commercial.searchContrats")} />
       </SectionCard>
       <SectionCard title={t("commercial.marges")}>
         <select value={axe} onChange={(e) => setAxe(e.target.value)} aria-label={t("commercial.marges")} style={{ marginBottom: "0.5rem" }}>

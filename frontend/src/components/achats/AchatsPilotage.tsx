@@ -3,8 +3,9 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
+import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, PagedDataTable, QuickForm, SectionCard } from "../ui";
 import type { ActionDef, Column } from "../ui";
 
 /** Clôture M2 : réceptions sous contrôle qualité, litiges fournisseurs, notation et reporting achats (CDC §5.4-§5.11). */
@@ -59,16 +60,8 @@ function actionsLitige(l: Litige, t: (k: string) => string): ActionDef[] {
 
 export function AchatsPilotage() {
   const { t } = useTranslation();
-  const receptions = useQuery({
-    queryKey: ["achats-receptions"],
-    queryFn: () => api.get<Paginated<Reception>>("/api/achats/receipts/?page_size=50"),
-    select: (p) => p.results,
-  });
-  const litiges = useQuery({
-    queryKey: ["achats-litiges"],
-    queryFn: () => api.get<Paginated<Litige>>("/api/achats/litiges/?page_size=50"),
-    select: (p) => p.results,
-  });
+  const receptions = usePagedList<Reception>("achats-receptions", (q) => api.get<Paginated<Reception>>(`/api/achats/receipts/${q}`));
+  const litiges = usePagedList<Litige>("achats-litiges", (q) => api.get<Paginated<Litige>>(`/api/achats/litiges/${q}`));
   const reporting = useQuery({
     queryKey: ["achats-reporting"],
     queryFn: () => api.get<Reporting & { fournisseurs: Fournisseur[] }>("/api/achats/orders/reporting/"),
@@ -138,11 +131,11 @@ export function AchatsPilotage() {
   const r = reporting.data;
   return (
     <>
-      <SectionCard title={`${t("achatsPilotage.receptions")} · ${receptions.data?.length ?? 0}`}>
+      <SectionCard title={`${t("achatsPilotage.receptions")} · ${receptions.count}`}>
         <p className="muted">{t("achatsPilotage.receptionsIntro")}</p>
-        <DataTable rows={receptions.data ?? []} columns={colReceptions} caption={t("achatsPilotage.receptions")} />
+        <PagedDataTable list={receptions} columns={colReceptions} caption={t("achatsPilotage.receptions")} searchPlaceholder={t("achatsPilotage.searchReceptions")} />
       </SectionCard>
-      <SectionCard title={`${t("achatsPilotage.litiges")} · ${litiges.data?.length ?? 0}`}>
+      <SectionCard title={`${t("achatsPilotage.litiges")} · ${litiges.count}`}>
         <QuickForm
           title={t("achatsPilotage.nouveauLitige")}
           endpoint="/api/achats/litiges/"
@@ -159,7 +152,7 @@ export function AchatsPilotage() {
             { name: "montant_en_jeu", label: t("achatsPilotage.montant"), type: "number" },
           ]}
         />
-        <DataTable rows={litiges.data ?? []} columns={colLitiges} caption={t("achatsPilotage.litiges")} />
+        <PagedDataTable list={litiges} columns={colLitiges} caption={t("achatsPilotage.litiges")} searchPlaceholder={t("achatsPilotage.searchLitiges")} />
       </SectionCard>
       <SectionCard title={t("achatsPilotage.fournisseurs")}>
         <DataTable rows={(r?.fournisseurs ?? []).map((f) => ({ ...f, id: f.fournisseur_id }))} columns={colFournisseurs} caption={t("achatsPilotage.fournisseurs")} />

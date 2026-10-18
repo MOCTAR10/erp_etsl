@@ -344,6 +344,9 @@ export const en = {
     task: "task",
   },
   commercial: {
+    searchOffres: "Search quotes (code, title, client)…",
+    searchAffaires: "Search projects (code, title, client)…",
+    searchContrats: "Search contracts (code, client)…",
     offres: "Quotes (versions)",
     affaires: "Deals",
     contrats: "Contracts (CLM)",
@@ -379,6 +382,8 @@ export const en = {
     masked: "Amount restricted",
   },
   achatsPilotage: {
+    searchReceptions: "Search receipts (code, PO)…",
+    searchLitiges: "Search disputes (code, PO)…",
     receptions: "Receipts and quality control",
     receptionsIntro: "Each receipt (even partial) triggers an incoming quality inspection (M6); it is validated only once the inspection is compliant or accepted with reservations.",
     validerReception: "Validate receipt",
@@ -405,6 +410,7 @@ export const en = {
   purchases: {
     search: "Search purchase orders (code, supplier)…",
     da: {
+      search: "Search purchase requests (code, subject, department)…",
       title: "Purchase requests", new: "New purchase request", code: "Code", objet: "Subject", demandeur: "Requester",
       echeance: "Needed by", statut: "Status", service: "Department", urgente: "Urgent", oui: "Yes", non: "No",
       notes: "Justification / notes", soumettre: "Submit", motif: "Rejection reason:",
