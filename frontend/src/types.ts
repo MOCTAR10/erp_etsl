@@ -1563,6 +1563,10 @@ export interface Budget {
   statut_label: string;
   lignes: BudgetLigne[];
   nb_revisions: number;
+  visa_daf_par: string | null;
+  visa_daf_le: string | null;
+  visa_cg_par: string | null;
+  visa_cg_le: string | null;
   created_by: string | null;
   has_amount_access: boolean;
   created_at: string;
@@ -1581,6 +1585,10 @@ export interface BudgetRevision {
   commentaire: string;
   statut: StatutRevision;
   statut_label: string;
+  visa_daf_par: string | null;
+  visa_daf_le: string | null;
+  visa_cg_par: string | null;
+  visa_cg_le: string | null;
   created_by: string | null;
   created_by_name: string | null;
   has_amount_access: boolean;
@@ -2452,4 +2460,9 @@ export interface ParametreCube {
   unite: string;
   statut_valeur: "provisoire" | "confirme";
   est_provisoire: boolean;
+}
+
+export interface ConsommationsStock {
+  depots: { periode: string; depot: string; valeur_stock: string | null; consommation: string | null }[];
+  consommations_par_axe: { axe: string; valeur: string | null }[];
 }

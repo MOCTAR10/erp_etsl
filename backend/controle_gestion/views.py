@@ -119,6 +119,11 @@ class BudgetViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
             raise DRFValidationError("Budget approuvé (version scellée) : modification par révision R1-R4 uniquement.")
         serializer.save()
 
+    def perform_destroy(self, instance):
+        if instance.statut != Budget.Statut.BROUILLON:
+            raise DRFValidationError("Budget approuvé ou clôturé (version scellée) : suppression interdite.")
+        instance.delete()
+
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def approuver(self, request, pk=None):
@@ -152,6 +157,25 @@ class BudgetLigneViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         if budget:
             qs = qs.filter(budget_id=budget)
         return qs
+
+    @staticmethod
+    def _verifier_brouillon(budget):
+        # Les lignes mensuelles font partie de la version budgétaire : scellées avec elle (révision R1-R4 sur le total).
+        if budget is not None and budget.statut != Budget.Statut.BROUILLON:
+            raise DRFValidationError("Budget approuvé (version scellée) : lignes mensuelles non modifiables.")
+
+    def perform_create(self, serializer):
+        self._verifier_brouillon(serializer.validated_data.get("budget"))
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._verifier_brouillon(serializer.instance.budget)
+        self._verifier_brouillon(serializer.validated_data.get("budget"))
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._verifier_brouillon(instance.budget)
+        instance.delete()
 
 
 class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
