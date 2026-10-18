@@ -29,6 +29,8 @@ class Command(BaseCommand):
             self.stdout.write("Aucun utilisateur Maintenance - seed interrompu.")
             return
 
+        self._seed_pieces()
+
         if Actif.objects.exists():
             self.stdout.write("Deja seed - rien a faire.")
             return
@@ -148,3 +150,26 @@ class Command(BaseCommand):
             f"OK: {Actif.objects.count()} actifs, {OrdreTravail.objects.count()} OT "
             f"({ot_correctif.code} en cours), {Inspection.objects.count()} inspections."
         )
+    def _seed_pieces(self):
+        """Pièce de rechange de démo : stock M5 (CUMP) sous le seuil de réappro, pour la sortie liée à l'OT."""
+        from decimal import Decimal
+
+        from referentiels.models import Article, UnitOfMeasure
+        from stocks.models import ArticleStock, Depot, MouvementStock
+        from stocks.services import apply_move
+
+        unit, _ = UnitOfMeasure.objects.get_or_create(code="U", defaults={"label": "Unité"})
+        article, _ = Article.objects.get_or_create(
+            code="PR-JOINT-VERIN", defaults={
+                "label": "Joint de verin hydraulique", "article_type": "consommable", "unit": unit,
+                "is_stockable": True, "purchase_price": Decimal("45000"),
+            },
+        )
+        depot, _ = Depot.objects.get_or_create(code="DEP-PIECES", defaults={"label": "Magasin pieces de rechange"})
+        ArticleStock.objects.get_or_create(article=article, defaults={"seuil_minimal": Decimal("6")})
+        if not MouvementStock.objects.filter(article=article, destination=depot).exists():
+            apply_move(MouvementStock.objects.create(
+                type_mouvement=MouvementStock.Type.RECEPTION, article=article, quantite=Decimal("6"),
+                prix_unitaire=Decimal("45000"), destination=depot, date=timezone.localdate(),
+                document_reference="DEMO-M8",
+            ))

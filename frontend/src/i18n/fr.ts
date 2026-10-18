@@ -1125,6 +1125,35 @@ export const fr = {
     },
     pendingNote: "Comptabilité SYSCOHADA révisée : écritures validées par le noyau (immuables, extournes). Règles de conservation proc. 4.3–4.8, refacturations GR au compte 618 (RF-ERP-90…94).",
   },
+  m8: {
+    fiabilite: {
+      title: "Fiabilité du parc : MTBF, MTTR, disponibilité (M8)",
+      hint: "Calculée sur {{jours}} jours d'observation à partir des OT terminés ; publiée à la Couche D (BI).",
+      warnProvisoire: "Période d'observation et heures de service provisoires : à faire confirmer par ETSL.",
+      machine: "Machine", pannes: "Pannes", dispo: "Disponibilité",
+    },
+    params: {
+      title: "Paramètres de fiabilité (M8)",
+      hint: "Période d'observation et heures de service par jour : données ETSL modifiables ici, sans développeur.",
+      warnProvisoire: "{{count}} paramètre(s) de maintenance provisoire(s) à faire confirmer par ETSL.",
+      confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
+    },
+    pieces: {
+      title: "Pièces de rechange : sortie du stock et réapprovisionnement (M8 ↔ M5)",
+      hint: "La pièce sort du stock M5, valorisée au coût moyen pondéré, et son coût s'ajoute à l'OT.",
+      ot: "OT", piece: "Pièce", depot: "Dépôt", quantite: "Quantité", sortir: "Sortir la pièce",
+      sortie: "Pièce sortie du stock et imputée à l'OT.", total: "Coût",
+      reappro: "Réapprovisionnement sous le seuil minimum", aucunBesoin: "Aucune pièce sous le seuil minimum.",
+      stock: "Stock", seuil: "Seuil", aCommander: "À commander", genererDa: "Générer la demande d'achat",
+      daCreee: "Demande d'achat {{da}} créée en brouillon ({{n}} ligne(s)).", rienAGenerer: "Aucune nouvelle ligne à demander.",
+    },
+    couts: {
+      title: "Coût de maintenance par machine (M8 → M11)",
+      hint: "OT terminés du mois, valorisés main-d'œuvre + pièces. Les machines GLOBAL RENTAL restent au compte 618, aucune écriture comptable n'est générée.",
+      periode: "Mois", aucun: "Aucun OT terminé sur la période.", mo: "Main-d'œuvre", pieces: "Pièces", total: "Total",
+      totalGr: "Total GR", totalHorsGr: "Total hors GR",
+    },
+  },
   grAffaires: {
     title: "Coût GLOBAL RENTAL par affaire (compteurs → M11)", periode: "Mois",
     hint: "Compteurs des prestations GR valorisés selon la grille, ventilés par affaire. Le coût reste au compte 618, isolé des marges : la marge après coût GR est indicative.",

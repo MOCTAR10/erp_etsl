@@ -3,7 +3,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PlanPreventif
+from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
 from .services import can_see_amount
 
 
@@ -102,6 +102,10 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"detail": "OT clôturé ou archivé : pièce scellée, non modifiable."}
             )
+        if self.instance and "cout_pieces" in attrs and self.instance.pieces.exists():
+            raise serializers.ValidationError(
+                {"cout_pieces": "Coût pièces calculé depuis les sorties de stock : saisie libre interdite."}
+            )
         return _apply_and_validate(self, attrs)
 
 
@@ -186,3 +190,29 @@ class ParametreMaintenanceSerializer(serializers.ModelSerializer):
             instance.confirme_par = None
             instance.confirme_le = None
         return super().update(instance, validated_data)
+
+
+class PieceOTSerializer(serializers.ModelSerializer):
+    article_code = serializers.CharField(source="article.code", read_only=True)
+    article_label = serializers.CharField(source="article.label", read_only=True)
+    depot_code = serializers.CharField(source="depot.code", read_only=True)
+    mouvement_code = serializers.CharField(source="mouvement.code", read_only=True)
+    cout_total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PieceOT
+        fields = [
+            "id", "ot", "article", "article_code", "article_label", "depot", "depot_code", "quantite",
+            "cout_unitaire", "cout_total", "mouvement", "mouvement_code", "sorti_par", "sorti_le",
+        ]
+        read_only_fields = fields
+
+    def get_cout_total(self, obj):
+        return obj.cout_total
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not can_see_amount(getattr(self.context.get("request"), "user", None)):
+            data["cout_unitaire"] = None
+            data["cout_total"] = None
+        return data

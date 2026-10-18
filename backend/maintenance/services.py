@@ -201,3 +201,87 @@ def couts_maintenance(periode):
             "hors_gr": sum((r["total"] for r in rows if not r["gr"]), Decimal("0")),
         },
     }
+
+
+# --------------------------------------------------------------------------------------------------
+# Pièces de rechange : sortie du stock M5 liée à l'OT, valorisation CUMP, réappro sous seuil
+# --------------------------------------------------------------------------------------------------
+STATUTS_SORTIE_PIECE = ("planifie", "en_cours")
+TITRE_DA_REAPPRO = "Réapprovisionnement pièces de rechange (M8)"
+
+
+def sortir_piece(ot, article, depot, quantite, user):
+    """Sortie d'une pièce du stock M5 pour `ot` (appelé sous verrou de l'OT) ; lève ValueError si refusée."""
+    from stocks.models import MouvementStock
+    from stocks.services import apply_move
+
+    from .models import PieceOT
+
+    if ot.statut not in STATUTS_SORTIE_PIECE:
+        raise ValueError("Les pièces se sortent sur un OT planifié ou en cours.")
+    if quantite <= 0:
+        raise ValueError("La quantité doit être strictement positive.")
+    mouvement = MouvementStock(
+        type_mouvement=MouvementStock.Type.CONSOMMATION, article=article, quantite=quantite, source=depot,
+        document_reference=ot.code, date=timezone.localdate(), created_by=user,
+        notes=f"Pièce de rechange — OT {ot.code} ({ot.actif.code})",
+    )
+    mouvement.clean()
+    mouvement.save()
+    apply_move(mouvement)  # ValueError si stock insuffisant, lot bloqué…
+    piece = PieceOT.objects.create(
+        ot=ot, article=article, depot=depot, quantite=quantite, cout_unitaire=mouvement.cout_unitaire,
+        mouvement=mouvement, sorti_par=user,
+    )
+    ot.cout_pieces = (ot.cout_pieces + piece.cout_total).quantize(CENT, rounding=ROUND_HALF_UP)
+    ot.save(update_fields=["cout_pieces", "updated_at"])
+    return piece
+
+
+def besoins_reappro():
+    """Pièces de rechange (déjà sorties pour un OT) dont le stock total est sous le seuil minimum M5."""
+    from django.db.models import Sum
+
+    from stocks.models import ArticleStock
+
+    from .models import PieceOT
+
+    articles = PieceOT.objects.values_list("article_id", flat=True).distinct()
+    rows = []
+    for cfg in ArticleStock.objects.filter(
+        article_id__in=articles, is_active=True, seuil_minimal__gt=0
+    ).select_related("article"):
+        stock = cfg.article.quants.aggregate(t=Sum("quantity"))["t"] or Decimal("0")
+        if stock < cfg.seuil_minimal:
+            rows.append({
+                "article_id": cfg.article_id, "article": cfg.article.code, "designation": cfg.article.label,
+                "stock": stock, "seuil": cfg.seuil_minimal, "a_commander": cfg.seuil_minimal - stock,
+            })
+    return rows
+
+
+def generer_da_reappro(user):
+    """DA brouillon (M2) pour les pièces sous seuil ; idempotent : une pièce déjà demandée n'est pas redemandée."""
+    from achats.models import PurchaseRequest, PurchaseRequestLine
+
+    besoins = besoins_reappro()
+    deja = set(
+        PurchaseRequestLine.objects.filter(
+            request__title=TITRE_DA_REAPPRO, request__status__in=("brouillon", "soumise", "approuvee")
+        ).values_list("article_id", flat=True)
+    )
+    a_ajouter = [b for b in besoins if b["article_id"] not in deja]
+    if not a_ajouter:
+        return {"da": None, "lignes_ajoutees": 0}
+    da = PurchaseRequest.objects.filter(title=TITRE_DA_REAPPRO, status="brouillon").first()
+    if da is None:
+        da = PurchaseRequest.objects.create(title=TITRE_DA_REAPPRO, requester=user, department="Maintenance")
+    from referentiels.models import Article
+
+    for b in a_ajouter:
+        art = Article.objects.get(pk=b["article_id"])
+        PurchaseRequestLine.objects.create(
+            request=da, article=art, label=art.label, quantity=b["a_commander"], unit=art.unit,
+            estimated_price=art.purchase_price or 0,
+        )
+    return {"da": da.code, "lignes_ajoutees": len(a_ajouter)}

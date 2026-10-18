@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
 import { formatDate } from "../lib/format";
 import type {
   Actif,
@@ -240,6 +241,10 @@ export function MaintenancePage() {
           </div>
         </SectionCard>
       )}
+
+      <FiabiliteSection />
+      <PiecesRechangeSection />
+      <ParametresMaintenanceSection />
 
       {inspectionsAll.length > 0 && (
         <SectionCard title={`${t("maintenance.inspections")} · ${inspectionsAll.length}`}>

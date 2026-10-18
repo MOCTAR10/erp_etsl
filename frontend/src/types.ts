@@ -2337,3 +2337,69 @@ export interface GrAffairesResult {
   total_gr: string | null;
   provisoire: boolean;
 }
+
+export interface ParametreMaintenance {
+  id: string;
+  code: string;
+  label: string;
+  valeur: string;
+  unite: string;
+  statut_valeur: "provisoire" | "confirme";
+  est_provisoire: boolean;
+}
+
+export interface FiabiliteRow {
+  actif: string;
+  designation: string;
+  gr: boolean;
+  pannes: number;
+  heures_arret: string;
+  heures_requises: string;
+  mttr_h: string | null;
+  mtbf_h: string | null;
+  disponibilite_pct: string | null;
+}
+
+export interface FiabiliteResult {
+  observation_jours: number;
+  heures_par_jour: string;
+  provisoire: boolean;
+  rows: FiabiliteRow[];
+}
+
+export interface PieceOT {
+  id: string;
+  article_code: string;
+  article_label: string;
+  depot_code: string;
+  quantite: string;
+  cout_unitaire: string | null;
+  cout_total: string | null;
+  mouvement_code: string;
+}
+
+export interface ReapproBesoin {
+  article_id: string;
+  article: string;
+  designation: string;
+  stock: string;
+  seuil: string;
+  a_commander: string;
+}
+
+export interface MaintenanceCoutRow {
+  actif: string;
+  designation: string;
+  gr: boolean;
+  compte: string;
+  nb_ot: number;
+  main_oeuvre: string | null;
+  pieces: string | null;
+  total: string | null;
+}
+
+export interface MaintenanceCoutsResult {
+  periode: string;
+  rows: MaintenanceCoutRow[];
+  totaux: { gr_618: string | null; hors_gr: string | null };
+}

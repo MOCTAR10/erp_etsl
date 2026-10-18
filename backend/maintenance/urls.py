@@ -6,6 +6,7 @@ from .views import (
     InspectionViewSet,
     OrdreTravailViewSet,
     ParametreMaintenanceViewSet,
+    PiecesViewSet,
     PlanPreventifViewSet,
 )
 
@@ -15,6 +16,7 @@ router.register("ordres", OrdreTravailViewSet, basename="ordres")
 router.register("inspections", InspectionViewSet, basename="inspections")
 router.register("plans", PlanPreventifViewSet, basename="plans")
 router.register("parametres", ParametreMaintenanceViewSet, basename="parametremaintenance")
+router.register("pieces", PiecesViewSet, basename="pieces")
 
 urlpatterns = [
     path("", include(router.urls)),

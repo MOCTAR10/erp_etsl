@@ -509,3 +509,41 @@ class ParametreMaintenance(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class PieceOT(models.Model):
+    """Pièce de rechange sortie du stock M5 pour un OT (clôture M8) : mouvement de consommation valorisé au CUMP.
+
+    Créée uniquement par l'action `sortir-piece` de l'OT (jamais à la main) ; le coût de l'OT en découle.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ot = models.ForeignKey(OrdreTravail, on_delete=models.PROTECT, related_name="pieces", verbose_name="OT")
+    article = models.ForeignKey(
+        "referentiels.Article", on_delete=models.PROTECT, related_name="+", verbose_name="Pièce"
+    )
+    depot = models.ForeignKey("stocks.Depot", on_delete=models.PROTECT, related_name="+", verbose_name="Dépôt")
+    quantite = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Quantité")
+    cout_unitaire = models.DecimalField(
+        max_digits=16, decimal_places=4, verbose_name="Coût unitaire (CUMP à la sortie)"
+    )
+    mouvement = models.OneToOneField(
+        "stocks.MouvementStock", on_delete=models.PROTECT, related_name="piece_ot", verbose_name="Mouvement de stock"
+    )
+    sorti_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Sorti par",
+    )
+    sorti_le = models.DateTimeField(default=timezone.now, verbose_name="Sorti le")
+
+    class Meta:
+        ordering = ["sorti_le"]
+        verbose_name = "Pièce de rechange d'OT"
+        verbose_name_plural = "Pièces de rechange d'OT"
+
+    def __str__(self):
+        return f"{self.ot.code} — {self.article.code} × {self.quantite}"
+
+    @property
+    def cout_total(self):
+        return self.quantite * self.cout_unitaire
