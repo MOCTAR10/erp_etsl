@@ -121,6 +121,7 @@ export const api = {
   get: <T,>(path: string) => raw<T>(path),
   post: <T,>(path: string, body?: unknown) =>
     raw<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
+  patch: <T,>(path: string, body: unknown) => raw<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   /** Téléchargement authentifié d'un export (CSV, XLSX, PDF) : le serveur journalise l'export (EX-G-10). */
   download: async (path: string, filename: string) => {
     const res = await fetch(apiUrl(path), {

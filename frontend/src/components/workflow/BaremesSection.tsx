@@ -5,8 +5,9 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { BaremeCotisation, Paginated } from "../../types";
+import type { BaremeCotisation, HistoriqueBareme, Paginated, ParametrePaie } from "../../types";
 import { Badge, SectionCard } from "../ui";
+import { ImpotSection } from "./ImpotSection";
 
 const EMPTY = { code: "", label: "", organisme: "", nature: "salariale", base: "brut", taux: "", plafond: "", date_effet: "" };
 
@@ -22,6 +23,13 @@ export function BaremesSection() {
     queryFn: () => api.get<Paginated<BaremeCotisation>>("/api/rh-paie/baremes/").then((p) => p.results),
     retry: 0,
   });
+  const params = useQuery({
+    queryKey: ["parametres-paie"],
+    queryFn: () => api.get<Paginated<ParametrePaie>>("/api/rh-paie/parametres-paie/").then((p) => p.results),
+    retry: 0,
+  });
+  const [histoire, setHistoire] = useState<{ code: string; rows: HistoriqueBareme[] } | null>(null);
+  const [edit, setEdit] = useState<{ url: string; valeur: string; plafond?: string; source: string } | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,12 +44,59 @@ export function BaremesSection() {
     onError: (e) => setError(describeError(e)),
   });
 
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["baremes"] });
+    void qc.invalidateQueries({ queryKey: ["parametres-paie"] });
+  };
+  const confirmer = useMutation({
+    mutationFn: (url: string) => api.post(`${url}confirmer/`),
+    onSuccess: refresh,
+    onError: (e) => setError(describeError(e)),
+  });
+  const enregistrer = useMutation({
+    mutationFn: (e: NonNullable<typeof edit>) =>
+      api.patch(e.url, {
+        ...(e.plafond !== undefined ? { taux: e.valeur, plafond: e.plafond || null } : { valeur: e.valeur }),
+        source: e.source,
+      }),
+    onSuccess: () => {
+      setEdit(null);
+      setError(null);
+      refresh();
+    },
+    onError: (e) => setError(describeError(e)),
+  });
+  const reviser = useMutation({
+    mutationFn: (v: { id: string; date_effet: string; taux: string }) =>
+      api.post(`/api/rh-paie/baremes/${v.id}/reviser/`, { date_effet: v.date_effet, taux: v.taux }),
+    onSuccess: () => {
+      setError(null);
+      refresh();
+    },
+    onError: (e) => setError(describeError(e)),
+  });
+
   if (baremes.isError) return null; // pas de droit sur la paie : la section n'apparaît pas
   const rows = baremes.data ?? [];
+  const provisoires = rows.filter((b) => b.statut_valeur !== "confirme").length + (params.data ?? []).filter((p) => p.statut_valeur !== "confirme").length;
+  const proposerRevision = (b: BaremeCotisation) => {
+    const date_effet = window.prompt(t("baremes.revisionDate"));
+    const taux = date_effet ? window.prompt(t("baremes.revisionTaux"), b.taux) : null;
+    if (date_effet && taux) reviser.mutate({ id: b.id, date_effet, taux });
+  };
+  const voirHistorique = async (b: BaremeCotisation) => {
+    const rowsH = await api.get<HistoriqueBareme[]>(`/api/rh-paie/baremes/${b.id}/historique/`);
+    setHistoire({ code: b.code, rows: rowsH });
+  };
 
   return (
     <SectionCard title={t("baremes.title")}>
       <p className="muted">{t("baremes.hint")}</p>
+      {provisoires > 0 && (
+        <p className="action-error" role="note" data-testid="alerte-provisoire">
+          {t("baremes.warnProvisoire", { count: provisoires })}
+        </p>
+      )}
       {rows.length === 0 ? (
         <p className="muted">{t("baremes.none")}</p>
       ) : (
@@ -53,6 +108,8 @@ export function BaremesSection() {
               <th>{t("baremes.taux")}</th>
               <th>{t("baremes.plafond")}</th>
               <th>{t("baremes.effet")}</th>
+              <th>{t("baremes.statut")}</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -68,17 +125,148 @@ export function BaremesSection() {
                 <td>
                   <Badge tone={b.nature === "salariale" ? "brand" : "warn"}>{b.nature_label}</Badge>
                 </td>
-                <td>{b.taux} %</td>
-                <td>{b.plafond ? `${formatNumber(b.plafond)} F` : "—"}</td>
+                {edit?.url === `/api/rh-paie/baremes/${b.id}/` ? (
+                  <>
+                    <td>
+                      <input type="number" step="0.001" min="0" aria-label={t("baremes.taux")} value={edit.valeur} onChange={(e) => setEdit({ ...edit, valeur: e.target.value })} />
+                    </td>
+                    <td>
+                      <input type="number" step="1" min="0" aria-label={t("baremes.plafond")} value={edit.plafond ?? ""} onChange={(e) => setEdit({ ...edit, plafond: e.target.value })} />
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td>{b.taux} %</td>
+                    <td>{b.plafond ? `${formatNumber(b.plafond)} F` : "—"}</td>
+                  </>
+                )}
                 <td>
                   {formatDate(b.date_effet)}
                   {b.date_fin ? ` → ${formatDate(b.date_fin)}` : ""}
+                </td>
+                <td title={`${b.source} ${b.reference_texte}`.trim()}>
+                  <Badge tone={b.statut_valeur === "confirme" ? "ok" : "warn"}>{t(`baremes.${b.statut_valeur}`)}</Badge>
+                </td>
+                <td>
+                  {b.statut_valeur !== "confirme" && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => window.confirm(t("baremes.confirmConfirmer")) && confirmer.mutate(`/api/rh-paie/baremes/${b.id}/`)}
+                    >
+                      {t("baremes.confirmer")}
+                    </button>
+                  )}{" "}
+                  {edit?.url === `/api/rh-paie/baremes/${b.id}/` ? (
+                    <>
+                      <button type="button" className="btn" onClick={() => enregistrer.mutate(edit)}>
+                        {t("baremes.save")}
+                      </button>{" "}
+                      <button type="button" className="btn" onClick={() => setEdit(null)}>
+                        {t("baremes.annuler")}
+                      </button>{" "}
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setEdit({ url: `/api/rh-paie/baremes/${b.id}/`, valeur: b.taux, plafond: b.plafond ?? "", source: b.source })}
+                      >
+                        {t("baremes.modifier")}
+                      </button>{" "}
+                    </>
+                  )}
+                  <button type="button" className="btn" onClick={() => proposerRevision(b)}>
+                    {t("baremes.reviser")}
+                  </button>{" "}
+                  <button type="button" className="btn" onClick={() => void voirHistorique(b)}>
+                    {t("baremes.historique")}
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
+
+      {histoire && (
+        <div>
+          <h4 className="subtitle">
+            {t("baremes.history")} — {histoire.code}
+          </h4>
+          <ul className="muted">
+            {histoire.rows.map((h) => (
+              <li key={h.id}>
+                {formatDate(h.le)} · {h.action} · {h.par_email ?? "—"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <h4 className="subtitle">{t("baremes.paramsTitle")}</h4>
+      <table className="table">
+        <tbody>
+          {(params.data ?? []).map((p) => (
+            <tr key={p.id}>
+              <td>
+                <strong>{p.code}</strong>
+                <div className="muted">{p.label}</div>
+              </td>
+              <td>
+                {edit?.url === `/api/rh-paie/parametres-paie/${p.id}/` ? (
+                  <input type="number" step="0.001" aria-label={t("baremes.valeur")} value={edit.valeur} onChange={(e) => setEdit({ ...edit, valeur: e.target.value })} />
+                ) : (
+                  <>
+                    {p.valeur} {p.unite}
+                  </>
+                )}
+              </td>
+              <td title={`${p.source} ${p.reference_texte}`.trim()}>
+                <Badge tone={p.statut_valeur === "confirme" ? "ok" : "warn"}>{t(`baremes.${p.statut_valeur}`)}</Badge>
+              </td>
+              <td>
+                {edit?.url === `/api/rh-paie/parametres-paie/${p.id}/` ? (
+                  <>
+                    <button type="button" className="btn" onClick={() => enregistrer.mutate(edit)}>
+                      {t("baremes.save")}
+                    </button>{" "}
+                    <button type="button" className="btn" onClick={() => setEdit(null)}>
+                      {t("baremes.annuler")}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setEdit({ url: `/api/rh-paie/parametres-paie/${p.id}/`, valeur: p.valeur, source: p.source })}
+                  >
+                    {t("baremes.modifier")}
+                  </button>
+                )}{" "}
+                {p.statut_valeur !== "confirme" && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => window.confirm(t("baremes.confirmConfirmer")) && confirmer.mutate(`/api/rh-paie/parametres-paie/${p.id}/`)}
+                  >
+                    {t("baremes.confirmer")}
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p className="muted">{t("baremes.editHint")}</p>
+      {error && (
+        <p className="action-error" role="alert">
+          {error}
+        </p>
+      )}
+      <ImpotSection onChanged={refresh} />
 
       <h4 className="subtitle">{t("baremes.add")}</h4>
       <form

@@ -582,7 +582,95 @@ class RubriquePaie(models.Model):
         return f"{self.code} — {self.label}"
 
 
-class BaremeCotisation(models.Model):
+class ValeurLegale(models.Model):
+    """Traçabilité d'une valeur légale paramétrable (taux, plafond, tranches…).
+
+    Tant que `statut_valeur` = « provisoire », bulletins et déclarations qui l'utilisent portent un
+    avertissement. « Confirmé » = validé par ETSL / le cabinet de paie (posé côté serveur par `confirmer`).
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
+        verbose_name="Statut de la valeur",
+    )
+    source = models.CharField(max_length=300, blank=True, verbose_name="Source (URL / organisme)")
+    reference_texte = models.CharField(
+        max_length=200, blank=True, verbose_name="Référence du texte (loi, décret, communiqué)"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+", verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        abstract = True
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class ParametrePaie(ValeurLegale):
+    """Paramètre de paie versionné par date d'effet (SMIG, durée légale, majorations d'heures sup., taxes
+    patronales…). Valeur = DONNÉE, jamais codée en dur."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, verbose_name="Code")
+    label = models.CharField(max_length=150, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=3, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité (%, FCFA, h…)")
+    date_effet = models.DateField(verbose_name="Date d'effet")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin")
+
+    class Meta:
+        ordering = ["code", "-date_effet"]
+        verbose_name = "Paramètre de paie"
+        verbose_name_plural = "Paramètres de paie"
+        constraints = [models.UniqueConstraint(fields=["code", "date_effet"], name="uniq_param_paie_effet")]
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite} dès {self.date_effet}"
+
+    def clean(self):
+        if self.date_fin and self.date_fin < self.date_effet:
+            raise ValidationError({"date_fin": "La date de fin précède la date d'effet."})
+
+
+class HistoriqueBareme(models.Model):
+    """Journal INALTÉRABLE des changements de barèmes / paramètres (création, modification, confirmation)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    objet = models.CharField(max_length=20, verbose_name="Type (cotisation, impot, parametre)")
+    objet_id = models.UUIDField(verbose_name="Identifiant de l'objet")
+    code = models.CharField(max_length=40, verbose_name="Code")
+    action = models.CharField(max_length=20, verbose_name="Action")
+    avant = models.JSONField(null=True, blank=True)
+    apres = models.JSONField(null=True, blank=True)
+    par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Par"
+    )
+    le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-le"]
+        verbose_name = "Historique de barème"
+        verbose_name_plural = "Historique des barèmes"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("L'historique des barèmes est inaltérable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("L'historique des barèmes est inaltérable.")
+
+
+class BaremeCotisation(ValeurLegale):
     """Barème de cotisation sociale, **versionné par date d'effet** (RF-ERP-82).
 
     Les taux sont des DONNÉES paramétrables, jamais codées en dur : à renseigner et valider avec
@@ -630,7 +718,7 @@ class BaremeCotisation(models.Model):
             raise ValidationError({"date_fin": "La date de fin précède la date d'effet."})
 
 
-class BaremeImpot(models.Model):
+class BaremeImpot(ValeurLegale):
     """Barème PROGRESSIF de l'impôt sur le revenu (IRPP), versionné par date d'effet.
 
     `tranches` = liste ordonnée `[{"plafond": 500000, "taux": 0}, {"plafond": 1000000, "taux": 10},
@@ -729,6 +817,11 @@ class BulletinPaie(models.Model):
         max_digits=14, decimal_places=2, default=0, verbose_name="Charges patronales (FCFA)",
         help_text="Cotisations à la charge de l'employeur (barèmes « patronale ») — hors net du salarié.",
     )
+    baremes_utilises = models.JSONField(
+        default=list, blank=True, verbose_name="Barèmes appliqués (instantané)",
+        help_text="Version, taux et statut de chaque barème utilisé au dernier calcul : permet de rejouer "
+        "un bulletin passé et d'afficher l'avertissement « provisoire ».",
+    )
     move = models.ForeignKey(
         "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.SET_NULL,
         related_name="bulletins_paie", verbose_name="Écriture comptable",
@@ -763,6 +856,10 @@ class BulletinPaie(models.Model):
         if isinstance(self.periode, date):
             self.periode = self.periode.replace(day=1)
         return super().save(*args, **kwargs)
+
+    @property
+    def baremes_provisoires(self):
+        return [b["code"] for b in (self.baremes_utilises or []) if b.get("statut") != "confirme"]
 
     @property
     def total_gains(self):

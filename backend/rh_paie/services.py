@@ -6,11 +6,14 @@ Montants (salaire, brut, net) masqués hors rôles autorisés (pattern RF-59).
 """
 
 import calendar
-from datetime import date
+import json
+import uuid
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
 from users.models import User
@@ -121,6 +124,96 @@ def baremes_impot_en_vigueur(periode):
     )
 
 
+AVERTISSEMENT_PROVISOIRE = (
+    "Taux provisoires : ce document utilise des barèmes non confirmés par ETSL / le cabinet de paie "
+    "({codes}). Ne pas l'utiliser pour une déclaration officielle avant confirmation."
+)
+
+
+def _instantane(bareme, type_):
+    """Photographie d'un barème au moment du calcul (version, valeur, statut)."""
+    snap = {
+        "type": type_, "id": str(bareme.pk), "code": bareme.code, "date_effet": bareme.date_effet.isoformat(),
+        "statut": bareme.statut_valeur,
+    }
+    if type_ == "cotisation":
+        snap.update(taux=str(bareme.taux), plafond=str(bareme.plafond) if bareme.plafond is not None else None)
+    else:
+        snap.update(abattement_pct=str(bareme.abattement_pct), tranches=bareme.tranches)
+    return snap
+
+
+def avertissement_provisoire(codes):
+    """Texte d'avertissement si au moins un barème utilisé est provisoire, sinon chaîne vide."""
+    return AVERTISSEMENT_PROVISOIRE.format(codes=", ".join(codes)) if codes else ""
+
+
+def _etat(obj):
+    """Valeurs auditables d'un barème / paramètre (JSON-compatible)."""
+    from django.forms.models import model_to_dict
+
+    return json.loads(json.dumps(
+        {k: v for k, v in model_to_dict(obj).items() if k not in ("confirme_par",)}, default=str
+    ))
+
+
+def tracer_changement(obj, objet, action, user, avant=None):
+    from .models import HistoriqueBareme
+
+    return HistoriqueBareme.objects.create(
+        objet=objet, objet_id=obj.pk, code=obj.code, action=action, avant=avant,
+        apres=None if action == "suppression" else _etat(obj), par=user if getattr(user, "is_authenticated", False) else None,
+    )
+
+
+def bareme_fige(obj):
+    """Vrai si un bulletin non brouillon a été calculé avec ce barème (valeurs à ne plus modifier)."""
+    from .models import BulletinPaie
+
+    fige = BulletinPaie.objects.exclude(statut=BulletinPaie.Statut.BROUILLON).exclude(baremes_utilises=[])
+    return any(
+        str(obj.pk) in [b.get("id") for b in (bul.baremes_utilises or [])] for bul in fige.only("baremes_utilises")
+    )
+
+
+@transaction.atomic
+def confirmer_valeur(obj, objet, user):
+    """Passe un barème / paramètre à « confirmé » (utilisateur et date posés côté serveur)."""
+    avant = _etat(obj)
+    obj.statut_valeur = obj.StatutValeur.CONFIRME
+    obj.confirme_par = user
+    obj.confirme_le = timezone.now()
+    obj.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+    tracer_changement(obj, objet, "confirmation", user, avant)
+    return obj
+
+
+@transaction.atomic
+def reviser_valeur(obj, objet, user, date_effet, champs):
+    """Nouvelle version à `date_effet` : l'ancienne est close la veille (conservée pour les bulletins passés)."""
+    if date_effet <= obj.date_effet:
+        raise ValidationError("La date d'effet de la nouvelle version doit être postérieure à l'actuelle.")
+    if obj.date_fin and obj.date_fin < date_effet:
+        raise ValidationError("La version actuelle est déjà close avant cette date.")
+    avant = _etat(obj)
+    nouvelle = type(obj).objects.get(pk=obj.pk)
+    nouvelle.pk = None
+    nouvelle.id = uuid.uuid4()
+    nouvelle._state.adding = True
+    for champ, valeur in champs.items():
+        setattr(nouvelle, champ, valeur)
+    nouvelle.date_effet, nouvelle.date_fin = date_effet, None
+    nouvelle.statut_valeur = nouvelle.StatutValeur.PROVISOIRE
+    nouvelle.confirme_par, nouvelle.confirme_le = None, None
+    nouvelle.full_clean()
+    obj.date_fin = date_effet - timedelta(days=1)
+    obj.save(update_fields=["date_fin"])
+    nouvelle.save()
+    tracer_changement(obj, objet, "cloture_version", user, avant)
+    tracer_changement(nouvelle, objet, "revision", user)
+    return nouvelle
+
+
 @transaction.atomic
 def calculer_bulletin(bulletin):
     """Recalcule brut, cotisations salariales (lignes `COT-*`), charges patronales et net.
@@ -140,7 +233,9 @@ def calculer_bulletin(bulletin):
         (l.montant for l in bulletin.lignes.filter(rubrique__nature=RubriquePaie.Nature.GAIN)), Decimal("0")
     )
     patronal = Decimal("0")
+    utilises = []
     for bareme in baremes_en_vigueur(bulletin.periode):
+        utilises.append(_instantane(bareme, "cotisation"))
         assiette = gains if bareme.base == bareme.Base.BRUT else bulletin.salaire_base
         if bareme.plafond is not None:
             assiette = min(assiette, bareme.plafond)
@@ -163,6 +258,7 @@ def calculer_bulletin(bulletin):
         (l.montant for l in bulletin.lignes.filter(rubrique__code__startswith=COT_PREFIX)), Decimal("0")
     )
     for bareme in baremes_impot_en_vigueur(bulletin.periode):
+        utilises.append(_instantane(bareme, "impot"))
         base = gains - (cotisations if bareme.cotisations_deductibles else Decimal("0"))
         base = max(base * (Decimal("1") - bareme.abattement_pct / 100), Decimal("0"))
         parts = max(Decimal(bulletin.employe.parts_fiscales or 1), Decimal("1"))
@@ -182,9 +278,10 @@ def calculer_bulletin(bulletin):
     bulletin.brut = _arrondi(gains)
     bulletin.net = _arrondi(gains - retenues)
     bulletin.charges_patronales = _arrondi(patronal)
-    bulletin.save(update_fields=["brut", "net", "charges_patronales", "updated_at"])
+    bulletin.baremes_utilises = utilises
+    bulletin.save(update_fields=["brut", "net", "charges_patronales", "baremes_utilises", "updated_at"])
     # l'instance de l'appelant reflète le résultat (sérialisation de la réponse API)
-    for champ in ("brut", "net", "charges_patronales", "updated_at"):
+    for champ in ("brut", "net", "charges_patronales", "baremes_utilises", "updated_at"):
         setattr(original, champ, getattr(bulletin, champ))
     return original
 

@@ -9,6 +9,8 @@ from .views import (
     MonProfilView,
     BaremeCotisationViewSet,
     BaremeImpotViewSet,
+    HistoriqueBaremeViewSet,
+    ParametrePaieViewSet,
     BulletinViewSet,
     ContratViewSet,
     DemandeCongeViewSet,
@@ -34,6 +36,8 @@ router.register("rubriques", RubriqueViewSet, basename="rh-rubriques")
 router.register("bulletins", BulletinViewSet, basename="rh-bulletins")
 router.register("baremes", BaremeCotisationViewSet, basename="rh-baremes")
 router.register("baremes-impot", BaremeImpotViewSet, basename="rh-baremes-impot")
+router.register("parametres-paie", ParametrePaieViewSet, basename="rh-parametres-paie")
+router.register("historique-baremes", HistoriqueBaremeViewSet, basename="rh-historique-baremes")
 
 urlpatterns = [
     path("mon-espace/profil/", MonProfilView.as_view(), name="mon-profil"),

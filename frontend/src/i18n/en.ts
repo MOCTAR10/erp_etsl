@@ -96,6 +96,12 @@ export const en = {
     confirmComptabiliser: "Generate the payroll journal entry? It cannot be edited (reversal only).",
   },
   baremes: {
+    modifier: "Edit", annuler: "Cancel", impotTitle: "Income tax (progressive scale, monthly amounts per share)", tranche: "Bracket ceiling (F)", derniere: "above", abattement: "Allowance (%)",
+    addTranche: "Add a bracket", editHint: "Editing a value sets it back to “provisional”. A value already used by a validated payslip requires “New version”.",
+    statut: "Status", provisoire: "Provisional", confirme: "Confirmed", confirmer: "Confirm", confirmConfirmer: "Confirm this value (validated by ETSL / the payroll firm)?",
+    source: "Source", reference: "Legal reference", historique: "History", reviser: "New version", revisionDate: "Effective date of the new version (YYYY-MM-DD)", revisionTaux: "New rate (%)",
+    warnProvisoire: "{{count}} provisional payroll value(s) to be confirmed by ETSL / the payroll firm: payslips and filings using them carry a warning.",
+    paramsTitle: "Payroll parameters (minimum wage, legal hours, overtime, penalties)", valeur: "Value", history: "Change history",
     title: "Contribution scales",
     hint: "Rates and ceilings must be entered and validated with ETSL / CNSSG / CNAMGS — no legal value is hard-coded.",
     none: "No scale: payslips are computed without automatic contributions.",

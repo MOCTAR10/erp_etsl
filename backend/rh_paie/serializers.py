@@ -7,6 +7,8 @@ from rest_framework.exceptions import PermissionDenied
 from .models import (
     BaremeImpot,
     BaremeCotisation,
+    HistoriqueBareme,
+    ParametrePaie,
     BulletinLigne,
     BulletinPaie,
     ContratTravail,
@@ -264,18 +266,25 @@ class BulletinSerializer(serializers.ModelSerializer):
     lignes = BulletinLigneSerializer(many=True, read_only=True)
     move_number = serializers.CharField(source="move.number", read_only=True, default=None)
     has_amount_access = serializers.SerializerMethodField()
+    baremes_provisoires = serializers.ListField(child=serializers.CharField(), read_only=True)
+    avertissement = serializers.SerializerMethodField()
+
+    def get_avertissement(self, obj):
+        from .services import avertissement_provisoire
+
+        return avertissement_provisoire(obj.baremes_provisoires)
 
     class Meta:
         model = BulletinPaie
         fields = [
-            "id", "code", "employe", "employe_nom", "matricule", "periode",
+            "baremes_provisoires", "avertissement", "baremes_utilises", "id", "code", "employe", "employe_nom", "matricule", "periode",
             "salaire_base", "brut", "net", "charges_patronales", "total_gains", "total_retenues",
             "lignes", "statut", "statut_label", "move", "move_number", "has_amount_access",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "code", "brut", "net", "charges_patronales", "total_gains", "total_retenues",
-            "lignes", "statut", "move", "move_number",
+            "lignes", "statut", "move", "move_number", "baremes_utilises",
         ]
 
     def get_has_amount_access(self, obj):
@@ -322,6 +331,10 @@ class BulletinAvecLignesSerializer(BulletinSerializer):
         calculer_bulletin(bulletin)  # cotisations des barèmes en vigueur + brut/net
 
 
+VALEUR_LEGALE_FIELDS = ["statut_valeur", "source", "reference_texte", "confirme_par", "confirme_le", "est_provisoire"]
+VALEUR_LEGALE_READONLY = ["statut_valeur", "confirme_par", "confirme_le", "est_provisoire"]
+
+
 class BaremeCotisationSerializer(serializers.ModelSerializer):
     nature_label = serializers.CharField(source="get_nature_display", read_only=True)
     base_label = serializers.CharField(source="get_base_display", read_only=True)
@@ -330,8 +343,9 @@ class BaremeCotisationSerializer(serializers.ModelSerializer):
         model = BaremeCotisation
         fields = [
             "id", "code", "label", "organisme", "nature", "nature_label", "base", "base_label",
-            "taux", "plafond", "date_effet", "date_fin", "ordre",
+            "taux", "plafond", "date_effet", "date_fin", "ordre", *VALEUR_LEGALE_FIELDS,
         ]
+        read_only_fields = VALEUR_LEGALE_READONLY
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs, exclude=())
@@ -342,12 +356,18 @@ class MonBulletinSerializer(serializers.ModelSerializer):
 
     lignes = BulletinLigneSerializer(many=True, read_only=True)
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    avertissement = serializers.SerializerMethodField()
+
+    def get_avertissement(self, obj):
+        from .services import avertissement_provisoire
+
+        return avertissement_provisoire(obj.baremes_provisoires)
 
     class Meta:
         model = BulletinPaie
         fields = [
             "id", "code", "periode", "salaire_base", "brut", "net", "lignes", "statut",
-            "statut_label", "disponible_le", "consulte_le",
+            "statut_label", "disponible_le", "consulte_le", "avertissement",
         ]
         read_only_fields = fields
 
@@ -374,7 +394,30 @@ class MonCongeSerializer(serializers.ModelSerializer):
 class BaremeImpotSerializer(serializers.ModelSerializer):
     class Meta:
         model = BaremeImpot
-        fields = ["id", "code", "label", "tranches", "abattement_pct", "cotisations_deductibles", "date_effet", "date_fin"]
+        fields = [
+            "id", "code", "label", "tranches", "abattement_pct", "cotisations_deductibles",
+            "date_effet", "date_fin", *VALEUR_LEGALE_FIELDS,
+        ]
+        read_only_fields = VALEUR_LEGALE_READONLY
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs, exclude=())
+
+
+class ParametrePaieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParametrePaie
+        fields = ["id", "code", "label", "valeur", "unite", "date_effet", "date_fin", *VALEUR_LEGALE_FIELDS]
+        read_only_fields = VALEUR_LEGALE_READONLY
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs, exclude=())
+
+
+class HistoriqueBaremeSerializer(serializers.ModelSerializer):
+    par_email = serializers.CharField(source="par.email", read_only=True, default=None)
+
+    class Meta:
+        model = HistoriqueBareme
+        fields = ["id", "objet", "objet_id", "code", "action", "avant", "apres", "par", "par_email", "le"]
+        read_only_fields = fields
