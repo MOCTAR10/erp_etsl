@@ -571,3 +571,103 @@ def clean(self):
             raise ValidationError(
                 {"reference_procedure": "Référence invalide — attendue 'proc. 4.x'."}
             )
+
+
+class ParametreCompta(models.Model):
+    """Paramètre de comptabilité modifiable par ETSL sans développeur (tolérances, délais, jours d'envoi…).
+
+    Tant que `statut_valeur` = « provisoire », les écrans et les états qui l'utilisent affichent un
+    avertissement. Le défaut est créé à la volée par `services.get_param` (valeur = DONNÉE, jamais figée).
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
+        verbose_name="Statut de la valeur",
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+", verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre de comptabilité"
+        verbose_name_plural = "Paramètres de comptabilité"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class Lettrage(models.Model):
+    """Lettrage d'un groupe de lignes d'un même compte lettrable (débits = crédits, à tolérance près).
+
+    Vit dans ses propres tables : les lignes d'écriture comptabilisées restent immuables.
+    Un dé-lettrage est tracé (statut « annulé », motif, auteur) et libère les lignes.
+    """
+
+    class Statut(models.TextChoices):
+        ACTIF = "actif", "Actif"
+        ANNULE = "annule", "Annulé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Lettre")
+    compte = models.ForeignKey(
+        "referentiels.Account", on_delete=models.PROTECT, related_name="lettrages", verbose_name="Compte"
+    )
+    partner = models.ForeignKey(
+        "referentiels.Partner", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="lettrages", verbose_name="Tiers",
+    )
+    date = models.DateField(default=timezone.localdate, verbose_name="Date")
+    ecart = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Écart accepté")
+    automatique = models.BooleanField(default=False, verbose_name="Lettrage automatique")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.ACTIF, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="lettrages"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    annule_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    annule_le = models.DateTimeField(null=True, blank=True)
+    motif_annulation = models.CharField(max_length=250, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Lettrage"
+        verbose_name_plural = "Lettrages"
+
+    def __str__(self):
+        return f"{self.code} — {self.compte_id}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ComptabiliteSequence.next_for("LET", "LET")
+        return super().save(*args, **kwargs)
+
+
+class LigneLettree(models.Model):
+    """Rattachement d'une ligne d'écriture à un lettrage actif (une ligne n'est lettrée qu'une fois)."""
+
+    lettrage = models.ForeignKey(Lettrage, on_delete=models.CASCADE, related_name="lignes")
+    ligne = models.OneToOneField(
+        "accounting_kernel.AccountMoveLine", on_delete=models.PROTECT, related_name="lettrage_actif"
+    )
+
+    class Meta:
+        verbose_name = "Ligne lettrée"
+        verbose_name_plural = "Lignes lettrées"

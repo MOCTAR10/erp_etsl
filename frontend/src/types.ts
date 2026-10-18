@@ -2125,3 +2125,32 @@ export interface PlanUrgence {
   prochain_exercice: string | null;
   en_retard: boolean;
 }
+
+
+export interface ParametreCompta {
+  id: string;
+  code: string;
+  label: string;
+  valeur: string;
+  unite: string;
+  statut_valeur: "provisoire" | "confirme";
+  est_provisoire: boolean;
+}
+
+export interface Lettrage {
+  id: string;
+  code: string;
+  compte: string;
+  compte_code: string;
+  automatique: boolean;
+  statut: "actif" | "annule";
+  ecart: string | null;
+  lignes: { id: string; piece: string | null; date: string; reference: string; debit: string | null; credit: string | null }[];
+  has_amount_access: boolean;
+}
+
+export interface LettrageAnomalies {
+  delai_jours: number;
+  parametres_provisoires: boolean;
+  anomalies: { ligne: string; motif: "sans_tiers" | "ancienne"; date: string; reference: string; debit: string | null; credit: string | null }[];
+}
