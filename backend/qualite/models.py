@@ -238,6 +238,12 @@ class ControleQualite(models.Model):
         PEINTURE = "peinture", "Peinture / anticorrosion"
         RECEPTION = "reception", "Contrôle à réception (achats M2)"
 
+    class MethodeCnd(models.TextChoices):
+        RT = "RT", "Radiographie (RT)"
+        UT = "UT", "Ultrasons (UT)"
+        PT = "PT", "Ressuage (PT)"
+        MT = "MT", "Magnétoscopie (MT)"
+
     class OrganismeCnd(models.TextChoices):
         INTERNE = "interne", "Interne QA/QC"
         ORGANISME_AGREE = "agrege", "Organisme agréé"
@@ -320,6 +326,19 @@ class ControleQualite(models.Model):
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.EN_ATTENTE, verbose_name="Statut"
     )
+    methode_cnd = models.CharField(
+        max_length=2, choices=MethodeCnd.choices, blank=True, verbose_name="Méthode CND"
+    )
+    instrument = models.ForeignKey(
+        "InstrumentMesure", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="controles", verbose_name="Instrument de mesure",
+    )
+    # Approbation du plan (ITP) : préalable à tout soudage sur l'OF ; le plan est ensuite figé.
+    approuve_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="itp_approuves", verbose_name="ITP approuvé par",
+    )
+    approuve_le = models.DateTimeField(null=True, blank=True, verbose_name="ITP approuvé le")
     notes = models.TextField(blank=True, verbose_name="Notes / observations")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -345,6 +364,10 @@ class ControleQualite(models.Model):
         if not self.code:
             self.code = QualiteSequence.next_for("CTR", "CTR")
         return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.methode_cnd and self.type_controle != self.TypeControle.CND:
+            raise ValidationError({"methode_cnd": "La méthode (RT/UT/PT/MT) est réservée aux contrôles de type CND."})
 
 
 class NonConformite(models.Model):
@@ -408,6 +431,19 @@ class NonConformite(models.Model):
     )
     date_decision = models.DateField(null=True, blank=True, verbose_name="Date de décision")
     archive = models.BooleanField(default=False, verbose_name="Archivée (10 ans Oil & Gas)")
+    # NCR-SD : variante soudage du socle NC ; clôturée uniquement par un re-CND conforme.
+    type_ncr = models.CharField(
+        max_length=10, choices=[("generique", "Générique"), ("soudage", "Soudage (NCR-SD)")],
+        default="generique", verbose_name="Type de NC",
+    )
+    joint = models.ForeignKey(
+        "JointSoude", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="non_conformites", verbose_name="Joint soudé",
+    )
+    recontrole = models.ForeignKey(
+        ControleQualite, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="ncr_cloturees", verbose_name="Re-CND de clôture",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -428,6 +464,8 @@ class NonConformite(models.Model):
     def clean(self):
         if not self.description.strip():
             raise ValidationError({"description": "La description de la non-conformité est requise."})
+        if self.type_ncr == "soudage" and not self.joint_id:
+            raise ValidationError({"joint": "Une NCR-SD (soudage) se rattache à un joint soudé."})
 
 
 class ActionCorrective(models.Model):
@@ -614,3 +652,149 @@ class PointInspection(models.Model):
     def clean(self):
         if self.controle_id and self.controle.type_controle != ControleQualite.TypeControle.ITP:
             raise ValidationError({"controle": "Des points d'inspection se rattachent à un contrôle de type ITP."})
+
+
+class InstrumentMesure(models.Model):
+    """Instrument de mesure soumis à étalonnage (métrologie). Hors échéance ou hors tolérance : usage bloqué."""
+
+    class Statut(models.TextChoices):
+        ACTIF = "actif", "En service"
+        BLOQUE = "bloque", "Bloqué (hors tolérance)"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    designation = models.CharField(max_length=150, verbose_name="Désignation")
+    numero_serie = models.CharField(max_length=80, verbose_name="N° de série")
+    date_etalonnage = models.DateField(verbose_name="Dernier étalonnage")
+    echeance_etalonnage = models.DateField(verbose_name="Échéance d'étalonnage")
+    statut = models.CharField(max_length=8, choices=Statut.choices, default=Statut.ACTIF, verbose_name="Statut")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["echeance_etalonnage"]
+        verbose_name = "Instrument de mesure"
+        verbose_name_plural = "Instruments de mesure"
+
+    def __str__(self):
+        return f"{self.code} — {self.designation}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("MET", "MET-")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.echeance_etalonnage and self.date_etalonnage and self.echeance_etalonnage < self.date_etalonnage:
+            raise ValidationError({"echeance_etalonnage": "L'échéance précède la date d'étalonnage."})
+
+    @property
+    def utilisable(self):
+        return self.statut == self.Statut.ACTIF and self.echeance_etalonnage >= timezone.localdate()
+
+
+class Etalonnage(models.Model):
+    """Historique des étalonnages d'un instrument (preuve, non modifiable)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    instrument = models.ForeignKey(InstrumentMesure, on_delete=models.CASCADE, related_name="etalonnages")
+    date = models.DateField(default=timezone.localdate)
+    echeance = models.DateField(null=True, blank=True)
+    conforme = models.BooleanField(default=True, verbose_name="Dans la tolérance")
+    certificat = models.CharField(max_length=80, blank=True, verbose_name="N° certificat")
+    par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["-date", "-id"]
+
+
+class JointSoude(models.Model):
+    """Registre des joints : un joint = OF + repère + soudeur + WPS + coulée (traçabilité des soudures)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ordre = models.ForeignKey(
+        "operations.OrdreFabrication", on_delete=models.PROTECT, related_name="joints", verbose_name="OF"
+    )
+    repere = models.CharField(max_length=60, verbose_name="N° de joint")
+    soudeur = models.ForeignKey(Soudeur, on_delete=models.PROTECT, related_name="joints")
+    wps = models.ForeignKey(WpsWpqr, null=True, blank=True, on_delete=models.PROTECT, related_name="joints")
+    numero_coulee = models.CharField(max_length=60, blank=True, verbose_name="N° de coulée (heat number)")
+    consommable = models.CharField(max_length=120, blank=True, verbose_name="Consommable (lot de fil / électrode)")
+    date_soudage = models.DateField(default=timezone.localdate)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ordre", "repere"]
+        verbose_name = "Joint soudé"
+        verbose_name_plural = "Joints soudés"
+        constraints = [models.UniqueConstraint(fields=["ordre", "repere"], name="uniq_joint_of_repere")]
+
+    def __str__(self):
+        return f"{self.code} — {self.repere}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("JNT", "JNT-")
+        return super().save(*args, **kwargs)
+
+
+class ImageControle(models.Model):
+    """Image / film CND archivé (empreinte SHA-256) ; pièce d'archive, non modifiable."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    controle = models.ForeignKey(ControleQualite, on_delete=models.PROTECT, related_name="images")
+    fichier = models.FileField(upload_to="qualite/cnd/%Y/%m/")
+    legende = models.CharField(max_length=200, blank=True)
+    sha256 = models.CharField(max_length=64, editable=False)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+
+class EpreuvePression(models.Model):
+    """Épreuve hydraulique / d'étanchéité : relevés P/T dans le temps, conclusion calculée puis scellée."""
+
+    class Type(models.TextChoices):
+        HYDRAULIQUE = "hydraulique", "Épreuve hydraulique"
+        ETANCHEITE = "etancheite", "Test d'étanchéité (leak test)"
+
+    class Statut(models.TextChoices):
+        EN_COURS = "en_cours", "En cours"
+        CONCLUE = "conclue", "Conclue"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ordre = models.ForeignKey(
+        "operations.OrdreFabrication", on_delete=models.PROTECT, related_name="epreuves", verbose_name="OF"
+    )
+    joint = models.ForeignKey(JointSoude, null=True, blank=True, on_delete=models.PROTECT, related_name="epreuves")
+    instrument = models.ForeignKey(
+        InstrumentMesure, null=True, blank=True, on_delete=models.PROTECT, related_name="epreuves"
+    )
+    type_epreuve = models.CharField(max_length=12, choices=Type.choices, default=Type.HYDRAULIQUE)
+    pression_essai = models.DecimalField(max_digits=9, decimal_places=2, verbose_name="Pression d'essai (bar)")
+    duree_minutes = models.PositiveIntegerField(verbose_name="Durée de maintien (min)")
+    chute_max = models.DecimalField(max_digits=9, decimal_places=2, verbose_name="Chute de pression admissible (bar)")
+    releves = models.JSONField(default=list, blank=True, verbose_name="Relevés (minute, pression, température)")
+    statut = models.CharField(max_length=8, choices=Statut.choices, default=Statut.EN_COURS)
+    resultat = models.CharField(max_length=14, choices=ControleQualite.Resultat.choices, blank=True)
+    conclu_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    conclu_le = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Épreuve de pression"
+        verbose_name_plural = "Épreuves de pression"
+
+    def __str__(self):
+        return f"{self.code} — {self.get_type_epreuve_display()}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("EPR", "EPR-")
+        return super().save(*args, **kwargs)

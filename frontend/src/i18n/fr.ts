@@ -105,6 +105,7 @@ export const fr = {
     patronales: "Charges patronales", diffuse: "Diffusé",
   },
   itp: {
+    approuver: "Approuver l'ITP", confirmApprouver: "Approuver cet ITP ? Le plan sera figé et le soudage autorisé.", approuve: "Approuvé",
     title: "Plans d'inspection et d'essais (ITP)",
     arret: "Point d'arrêt", observation: "Point d'observation", add: "Ajouter le point", type: "Type de point",
     pointPlaceholder: "Point d'inspection (ex. contrôle fit-up avant soudage)",
@@ -486,6 +487,12 @@ export const fr = {
     totalMvt: "Mouvements",
   },
   qualite: {
+    m6: {
+      metrologie: "Métrologie (étalonnage)", newInstrument: "Nouvel instrument", designation: "Désignation", serie: "N° de série", dernierEtalonnage: "Dernier étalonnage", echeance: "Échéance d'étalonnage",
+      utilisable: "Utilisable", usageBloque: "Usage bloqué", etalonnerConforme: "Étalonné conforme (+1 an)", confirmEtalonnage: "Enregistrer un étalonnage conforme (échéance dans 1 an) ?", horsTolerance: "Hors tolérance", confirmHorsTolerance: "Déclarer l'instrument hors tolérance ? Son usage sera bloqué.",
+      joints: "Registre des joints soudés", jointsVide: "Aucun joint enregistré (un ITP approuvé est requis avant soudage).", of: "OF", joint: "Joint", coulee: "N° de coulée", epreuves: "Épreuves hydrauliques / étanchéité", epreuvesVide: "Aucune épreuve enregistrée.", pressionEssai: "Pression d'essai", releves: "Relevés P/T",
+      conclure: "Conclure", confirmConclure: "Conclure l'épreuve ? Les relevés seront scellés.", res: { conforme: "Conforme", non_conforme: "Non conforme" },
+    },
     act: { traiter: "Décider du traitement", choisirTraitement: "Traitement…" },
     form: { title: "Signaler une non-conformité", gravite: "Gravité", description: "Description de l'écart" },
     col: { code: "Code", soudeur: "Soudeur", norme: "Norme", procede: "Procédé · position", validite: "Validité", statut: "Statut", type: "Type", reference: "Référence", materiau: "Matériau", point: "Point de contrôle", objet: "Affaire / OF / lot", organisme: "Organisme agréé", resultat: "Résultat", date: "Date", retention: "Conservation", ans: "ans" },

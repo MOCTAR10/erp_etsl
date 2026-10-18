@@ -30,7 +30,7 @@ function AddPoint({ itp, next }: { itp: ControleQualite; next: number }) {
     },
     onError: (e) => setError(describeError(e)),
   });
-  if (itp.statut === "valide" || itp.statut === "annule") return null;
+  if (itp.statut === "valide" || itp.statut === "annule" || itp.approuve_le) return null;
   return (
     <form
       className="itp-add"
@@ -79,6 +79,11 @@ export function ItpSection() {
                   {itp.code} · {itp.point_controle}
                 </strong>
                 <Badge tone={itp.statut === "valide" ? "ok" : "warn"}>{itp.statut_label}</Badge>
+                {itp.approuve_le ? (
+                  <Badge tone="ok">{t("itp.approuve")}</Badge>
+                ) : (
+                  <ActionBar actions={[{ label: t("itp.approuver"), path: `/api/qualite/controles/${itp.id}/approuver/`, confirm: t("itp.confirmApprouver") }]} />
+                )}
               </header>
               <ProgressBar label={`${itp.code} · ${t("itp.title")}`} value={levés} max={Math.max(points.length, 1)} tone={levés === points.length && points.length > 0 ? "ok" : "brand"} />
               <span className="muted">

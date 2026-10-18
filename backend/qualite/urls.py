@@ -2,6 +2,10 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    EpreuvePressionViewSet,
+    ImageControleViewSet,
+    InstrumentMesureViewSet,
+    JointSoudeViewSet,
     PointInspectionViewSet,
     ActionCorrectiveViewSet,
     ControleQualiteViewSet,
@@ -21,6 +25,10 @@ router.register("points-inspection", PointInspectionViewSet, basename="points-in
 router.register("pvs", PvControleViewSet, basename="pvs")
 router.register("non-conformites", NonConformiteViewSet, basename="non-conformites")
 router.register("actions-correctives", ActionCorrectiveViewSet, basename="actions-correctives")
+router.register("instruments", InstrumentMesureViewSet, basename="instruments")
+router.register("joints", JointSoudeViewSet, basename="joints")
+router.register("images-controle", ImageControleViewSet, basename="images-controle")
+router.register("epreuves", EpreuvePressionViewSet, basename="epreuves")
 
 urlpatterns = [
     path("", include(router.urls)),

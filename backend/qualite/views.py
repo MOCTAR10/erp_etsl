@@ -1,13 +1,23 @@
 """Vues API M6 — Qualité industrielle, Soudage & Contrôle Qualité / Inspection."""
 
+import hashlib
+from datetime import timedelta
+from decimal import Decimal, InvalidOperation
+
+from django.db import transaction
 from django.utils import timezone
 from integrations.idempotency import idempotent
-from rest_framework import status, viewsets
+from rest_framework import mixins, serializers as drf_serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .models import (
+    Etalonnage,
+    EpreuvePression,
+    ImageControle,
+    InstrumentMesure,
+    JointSoude,
     PointInspection,
     ActionCorrective,
     ControleQualite,
@@ -18,6 +28,10 @@ from .models import (
     WpsWpqr,
 )
 from .serializers import (
+    EpreuvePressionSerializer,
+    ImageControleSerializer,
+    InstrumentMesureSerializer,
+    JointSoudeSerializer,
     PointInspectionSerializer,
     ActionCorrectiveSerializer,
     ControleQualiteSerializer,
@@ -35,6 +49,15 @@ def _as_bool(value):
     if isinstance(value, bool):
         return value
     return str(value or "").strip().lower() in ("true", "1", "yes")
+
+
+def _uuid_or_none(value):
+    import uuid
+
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError):
+        return None
 
 
 class SoudeurViewSet(viewsets.ModelViewSet):
@@ -128,6 +151,25 @@ class ControleQualiteViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    @action(detail=True, methods=["post"], url_path="approuver")
+    @transaction.atomic
+    def approuver(self, request, pk=None):
+        """Approuve l'ITP (préalable au soudage) : plan figé, approbation tracée."""
+        if not can_validate_pv(request.user):
+            return Response({"detail": "Approbation réservée à QA/QC et à la hiérarchie."},
+                            status=status.HTTP_403_FORBIDDEN)
+        itp = ControleQualite.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if itp.type_controle != ControleQualite.TypeControle.ITP:
+            raise DRFValidationError("Seul un contrôle de type ITP s'approuve.")
+        if itp.approuve_le:
+            raise DRFValidationError("ITP déjà approuvé.")
+        if not itp.points.exists():
+            raise DRFValidationError("ITP sans point d'inspection : rien à approuver.")
+        itp.approuve_par = request.user
+        itp.approuve_le = timezone.now()
+        itp.save(update_fields=["approuve_par", "approuve_le", "updated_at"])
+        return Response(self.get_serializer(itp).data)
+
     @idempotent
     def create(self, request, *args, **kwargs):  # contrôle / CND saisi sur le terrain, rejouable
         return super().create(request, *args, **kwargs)
@@ -170,7 +212,7 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
         nc.decided_by = request.user
         nc.date_decision = timezone.localdate()
         nc.save()
-        if traitement == NonConformite.Traitement.REJET:
+        if traitement == NonConformite.Traitement.REJET and nc.type_ncr != "soudage":
             nc.statut = NonConformite.Statut.CLOTUREE
             nc.archive = True
             nc.save()
@@ -183,6 +225,20 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
         if nc.statut != NonConformite.Statut.EN_TRAITEMENT:
             return Response({"detail": f"NC {nc.get_statut_display().lower()} : décidez d'abord du traitement."},
                             status=status.HTTP_400_BAD_REQUEST)
+        if nc.type_ncr == "soudage":
+            # NCR-SD : seule une CND de recontrôle validée et conforme clôt la non-conformité.
+            recontrole = ControleQualite.objects.filter(pk=_uuid_or_none(request.data.get("recontrole"))).first()
+            if recontrole is None:
+                return Response({"detail": "NCR-SD : renseignez le re-CND (contrôle CND de recontrôle)."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if (
+                recontrole.type_controle != ControleQualite.TypeControle.CND
+                or recontrole.statut != ControleQualite.Statut.VALIDE
+                or recontrole.resultat != ControleQualite.Resultat.CONFORME
+            ):
+                return Response({"detail": "Le re-CND doit être un contrôle CND validé et conforme."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            nc.recontrole = recontrole
         nc.statut = NonConformite.Statut.CLOTUREE
         nc.archive = True
         nc.save()
@@ -329,3 +385,146 @@ class PointInspectionViewSet(viewsets.ModelViewSet):
         point.commentaire = str(request.data.get("commentaire", ""))[:250]
         point.save()
         return Response(self.get_serializer(point).data)
+
+
+class InstrumentMesureViewSet(viewsets.ModelViewSet):
+    queryset = InstrumentMesure.objects.prefetch_related("etalonnages").all()
+    serializer_class = InstrumentMesureSerializer
+    permission_classes = [CanManageQualite]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if jours := self.request.query_params.get("a_etalonner"):
+            try:
+                limite = timezone.localdate() + timedelta(days=int(jours))
+            except ValueError:
+                raise DRFValidationError({"a_etalonner": "Nombre de jours attendu."})
+            qs = qs.filter(echeance_etalonnage__lte=limite)
+        return qs
+
+    @action(detail=True, methods=["post"], url_path="etalonner")
+    @transaction.atomic
+    def etalonner(self, request, pk=None):
+        """Enregistre un étalonnage : hors tolérance => usage bloqué ; conforme => nouvelle échéance, déblocage."""
+        inst = InstrumentMesure.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        conforme = _as_bool(request.data.get("conforme", True))
+        aujourdhui = timezone.localdate()
+        echeance = None
+        if conforme:
+            raw = request.data.get("echeance")
+            if not raw:
+                raise DRFValidationError({"echeance": "Nouvelle échéance requise pour un étalonnage conforme."})
+            echeance = drf_serializers.DateField().run_validation(raw)
+            if echeance <= aujourdhui:
+                raise DRFValidationError({"echeance": "L'échéance doit être postérieure à aujourd'hui."})
+            inst.statut = InstrumentMesure.Statut.ACTIF
+            inst.date_etalonnage = aujourdhui
+            inst.echeance_etalonnage = echeance
+        else:
+            inst.statut = InstrumentMesure.Statut.BLOQUE
+        inst.save()
+        Etalonnage.objects.create(
+            instrument=inst, date=aujourdhui, echeance=echeance, conforme=conforme,
+            certificat=str(request.data.get("certificat", ""))[:80], par=request.user,
+        )
+        return Response(self.get_serializer(inst).data)
+
+
+class JointSoudeViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
+    """Registre des joints : inscription seule (la traçabilité ne se réécrit pas)."""
+
+    queryset = JointSoude.objects.select_related("ordre", "soudeur", "wps").all()
+    serializer_class = JointSoudeSerializer
+    permission_classes = [CanManageQualite]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if ordre := self.request.query_params.get("ordre"):
+            qs = qs.filter(ordre_id=ordre)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class ImageControleViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           viewsets.GenericViewSet):
+    """Archive des films / images CND : dépôt et lecture, jamais de modification ni suppression."""
+
+    queryset = ImageControle.objects.all()
+    serializer_class = ImageControleSerializer
+    permission_classes = [CanManageQualite]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if controle := self.request.query_params.get("controle"):
+            qs = qs.filter(controle_id=controle)
+        return qs
+
+    def perform_create(self, serializer):
+        fichier = serializer.validated_data["fichier"]
+        digest = hashlib.sha256()
+        for chunk in fichier.chunks():
+            digest.update(chunk)
+        fichier.seek(0)
+        serializer.save(created_by=self.request.user, sha256=digest.hexdigest())
+
+
+class EpreuvePressionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                             viewsets.GenericViewSet):
+    queryset = EpreuvePression.objects.select_related("ordre").all()
+    serializer_class = EpreuvePressionSerializer
+    permission_classes = [CanManageQualite]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if ordre := self.request.query_params.get("ordre"):
+            qs = qs.filter(ordre_id=ordre)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def _en_cours(self, pk):
+        ep = EpreuvePression.objects.select_for_update(of=("self",)).get(pk=pk)
+        if ep.statut == EpreuvePression.Statut.CONCLUE:
+            raise DRFValidationError("Épreuve conclue : relevés scellés.")
+        return ep
+
+    @action(detail=True, methods=["post"], url_path="releve")
+    @transaction.atomic
+    def releve(self, request, pk=None):
+        ep = self._en_cours(self.get_object().pk)
+        try:
+            point = {
+                "minute": int(request.data["minute"]),
+                "pression": str(Decimal(str(request.data["pression"]))),
+                "temperature": str(Decimal(str(request.data.get("temperature", "0")))),
+            }
+        except (KeyError, ValueError, InvalidOperation):
+            raise DRFValidationError("Relevé attendu : minute, pression, temperature (nombres).")
+        if ep.releves and point["minute"] <= ep.releves[-1]["minute"]:
+            raise DRFValidationError({"minute": "Les relevés se saisissent par minute croissante."})
+        ep.releves = [*ep.releves, point]
+        ep.save(update_fields=["releves"])
+        return Response(self.get_serializer(ep).data)
+
+    @action(detail=True, methods=["post"], url_path="conclure")
+    @transaction.atomic
+    def conclure(self, request, pk=None):
+        """Conclusion calculée sur la courbe : maintien >= durée, pression d'essai atteinte, chute <= admissible."""
+        ep = self._en_cours(self.get_object().pk)
+        if len(ep.releves) < 2:
+            raise DRFValidationError("Au moins deux relevés P/T sont nécessaires.")
+        if ep.releves[-1]["minute"] - ep.releves[0]["minute"] < ep.duree_minutes:
+            raise DRFValidationError(f"Maintien insuffisant : {ep.duree_minutes} min requises.")
+        pressions = [Decimal(r["pression"]) for r in ep.releves]
+        chute = max(pressions) - pressions[-1]
+        ok = max(pressions) >= ep.pression_essai and chute <= ep.chute_max
+        ep.resultat = "conforme" if ok else "non_conforme"
+        ep.statut = EpreuvePression.Statut.CONCLUE
+        ep.conclu_par = request.user
+        ep.conclu_le = timezone.now()
+        ep.save()
+        return Response(self.get_serializer(ep).data)

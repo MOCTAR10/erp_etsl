@@ -1,0 +1,207 @@
+import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+
+import { api } from "../../api/client";
+import { formatDate } from "../../lib/format";
+import type { Paginated } from "../../types";
+import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+
+interface Instrument {
+  id: string;
+  code: string;
+  designation: string;
+  numero_serie: string;
+  echeance_etalonnage: string;
+  statut: "actif" | "bloque";
+  statut_label: string;
+  utilisable: boolean;
+}
+
+interface Joint {
+  id: string;
+  code: string;
+  ordre_code: string | null;
+  repere: string;
+  soudeur_nom: string;
+  wps_code: string | null;
+  numero_coulee: string;
+  date_soudage: string;
+}
+
+interface Epreuve {
+  id: string;
+  code: string;
+  ordre_code: string | null;
+  type_epreuve: "hydraulique" | "etancheite";
+  pression_essai: string;
+  duree_minutes: number;
+  chute_max: string;
+  releves: Array<{ minute: number; pression: string; temperature: string }>;
+  statut: "en_cours" | "conclue";
+  statut_label: string;
+  resultat: "" | "conforme" | "non_conforme";
+}
+
+function useList<T>(key: string, path: string) {
+  return useQuery({
+    queryKey: [key],
+    queryFn: () => api.get<Paginated<T>>(path).then((p) => p.results),
+  });
+}
+
+/** Clôture M6 : métrologie (étalonnage, blocage d'usage), registre des joints, épreuves hydrauliques P/T. */
+export function ClotureM6Section() {
+  const { t, i18n } = useTranslation();
+  const instruments = useList<Instrument>("instruments", "/api/qualite/instruments/?page_size=50");
+  const joints = useList<Joint>("joints", "/api/qualite/joints/?page_size=50");
+  const epreuves = useList<Epreuve>("epreuves", "/api/qualite/epreuves/?page_size=50");
+  const instRows = instruments.data ?? [];
+  const jointRows = joints.data ?? [];
+  const epRows = epreuves.data ?? [];
+  const nextYear = () => new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10);
+
+  return (
+    <>
+      <SectionCard title={`${t("qualite.m6.metrologie")} · ${instRows.length}`}>
+        <QuickForm
+          title={t("qualite.m6.newInstrument")}
+          endpoint="/api/qualite/instruments/"
+          fields={[
+            { name: "designation", label: t("qualite.m6.designation"), required: true },
+            { name: "numero_serie", label: t("qualite.m6.serie"), required: true },
+            { name: "date_etalonnage", label: t("qualite.m6.dernierEtalonnage"), type: "date", required: true },
+            { name: "echeance_etalonnage", label: t("qualite.m6.echeance"), type: "date", required: true },
+          ]}
+        />
+        {instRows.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("qualite.col.code")}</th>
+                  <th>{t("qualite.m6.designation")}</th>
+                  <th>{t("qualite.m6.echeance")}</th>
+                  <th>{t("qualite.col.statut")}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {instRows.map((i) => (
+                  <tr key={i.id}>
+                    <td>{i.code}</td>
+                    <td>
+                      {i.designation} <span className="muted">· {i.numero_serie}</span>
+                    </td>
+                    <td>{formatDate(i.echeance_etalonnage, i18n.language)}</td>
+                    <td>
+                      <Badge tone={i.utilisable ? "ok" : "err"}>{i.utilisable ? t("qualite.m6.utilisable") : t("qualite.m6.usageBloque")}</Badge>
+                    </td>
+                    <td>
+                      <ActionBar
+                        actions={[
+                          {
+                            label: t("qualite.m6.etalonnerConforme"),
+                            path: `/api/qualite/instruments/${i.id}/etalonner/`,
+                            body: { conforme: true, echeance: nextYear() },
+                            confirm: t("qualite.m6.confirmEtalonnage"),
+                          },
+                          {
+                            label: t("qualite.m6.horsTolerance"),
+                            path: `/api/qualite/instruments/${i.id}/etalonner/`,
+                            body: { conforme: false },
+                            tone: "danger",
+                            confirm: t("qualite.m6.confirmHorsTolerance"),
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title={`${t("qualite.m6.joints")} · ${jointRows.length}`}>
+        {jointRows.length === 0 ? (
+          <p className="muted">{t("qualite.m6.jointsVide")}</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("qualite.col.code")}</th>
+                  <th>{t("qualite.m6.of")}</th>
+                  <th>{t("qualite.m6.joint")}</th>
+                  <th>{t("qualite.col.soudeur")}</th>
+                  <th>WPS</th>
+                  <th>{t("qualite.m6.coulee")}</th>
+                  <th>{t("qualite.col.date")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jointRows.map((j) => (
+                  <tr key={j.id}>
+                    <td>{j.code}</td>
+                    <td>{j.ordre_code}</td>
+                    <td>{j.repere}</td>
+                    <td>{j.soudeur_nom}</td>
+                    <td>{j.wps_code}</td>
+                    <td>{j.numero_coulee}</td>
+                    <td>{formatDate(j.date_soudage, i18n.language)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title={`${t("qualite.m6.epreuves")} · ${epRows.length}`}>
+        {epRows.length === 0 ? (
+          <p className="muted">{t("qualite.m6.epreuvesVide")}</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("qualite.col.code")}</th>
+                  <th>{t("qualite.m6.of")}</th>
+                  <th className="num">{t("qualite.m6.pressionEssai")}</th>
+                  <th className="num">{t("qualite.m6.releves")}</th>
+                  <th>{t("qualite.col.resultat")}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {epRows.map((e) => (
+                  <tr key={e.id}>
+                    <td>{e.code}</td>
+                    <td>{e.ordre_code}</td>
+                    <td className="num">
+                      {e.pression_essai} bar · {e.duree_minutes} min
+                    </td>
+                    <td className="num">{e.releves.length}</td>
+                    <td>
+                      {e.statut === "conclue" ? (
+                        <Badge tone={e.resultat === "conforme" ? "ok" : "err"}>{t(`qualite.m6.res.${e.resultat}`)}</Badge>
+                      ) : (
+                        <Badge tone="warn">{e.statut_label}</Badge>
+                      )}
+                    </td>
+                    <td>
+                      {e.statut === "en_cours" && (
+                        <ActionBar actions={[{ label: t("qualite.m6.conclure"), path: `/api/qualite/epreuves/${e.id}/conclure/`, confirm: t("qualite.m6.confirmConclure") }]} />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+    </>
+  );
+}
