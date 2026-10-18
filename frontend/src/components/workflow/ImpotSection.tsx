@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { BaremeImpot, Paginated } from "../../types";
+import type { BaremeImpot } from "../../types";
 import { Badge } from "../ui";
 
 type Tranche = { plafond: string; taux: string };
@@ -16,7 +16,7 @@ export function ImpotSection({ onChanged }: { onChanged: () => void }) {
   const qc = useQueryClient();
   const impots = useQuery({
     queryKey: ["baremes-impot"],
-    queryFn: () => api.get<Paginated<BaremeImpot>>("/api/rh-paie/baremes-impot/").then((p) => p.results),
+    queryFn: () => api.listAll<BaremeImpot>("/api/rh-paie/baremes-impot/"),
     retry: 0,
   });
   const [editId, setEditId] = useState<string | null>(null);

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { Lettrage, LettrageAnomalies, Paginated, ParametreCompta } from "../../types";
+import type { Lettrage, LettrageAnomalies, ParametreCompta } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
 interface CompteRef {
@@ -35,12 +35,12 @@ export function LettrageSection() {
   });
   const params = useQuery({
     queryKey: ["compta-parametres"],
-    queryFn: () => api.get<Paginated<ParametreCompta>>("/api/comptabilite/parametres/").then((p) => p.results),
+    queryFn: () => api.listAll<ParametreCompta>("/api/comptabilite/parametres/"),
     retry: 0,
   });
   const lettrages = useQuery({
     queryKey: ["lettrages", compte],
-    queryFn: () => api.get<Paginated<Lettrage>>(`/api/comptabilite/lettrages/?compte=${compte}&page_size=20`).then((p) => p.results),
+    queryFn: () => api.listAll<Lettrage>(`/api/comptabilite/lettrages/?compte=${compte}`),
     enabled: !!compte,
     retry: 0,
   });

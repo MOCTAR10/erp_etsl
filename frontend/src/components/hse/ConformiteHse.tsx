@@ -2,30 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, PagedDataTable, QuickForm, SectionCard } from "../ui";
 import type { ActionDef } from "../ui";
 import type { Column } from "../ui";
 import { formatDate } from "../../lib/format";
-import type { AuditHse, Duer, Paginated, PlanUrgence } from "../../types";
+import { usePagedList } from "../../lib/usePagedList";
+import type { AuditHse, Duer, PlanUrgence } from "../../types";
 
 /** M7 — clôture : audits & inspections, DUER formel, plans d'urgence et exercices (ISO 14001 / 45001). */
 export function ConformiteHse() {
   const { t } = useTranslation();
-  const audits = useQuery({
-    queryKey: ["hse-audits"],
-    queryFn: () => api.auditsHse(`?page_size=30`),
-    select: (p: Paginated<AuditHse>) => p.results,
-  });
-  const duers = useQuery({
-    queryKey: ["hse-duer"],
-    queryFn: () => api.duerHse(`?page_size=30`),
-    select: (p: Paginated<Duer>) => p.results,
-  });
-  const plans = useQuery({
-    queryKey: ["hse-plans-urgence"],
-    queryFn: () => api.plansUrgence(`?page_size=30`),
-    select: (p: Paginated<PlanUrgence>) => p.results,
-  });
+  const audits = usePagedList<AuditHse>("hse-audits", (q) => api.auditsHse(q));
+  const duers = usePagedList<Duer>("hse-duer", (q) => api.duerHse(q));
+  const plans = usePagedList<PlanUrgence>("hse-plans-urgence", (q) => api.plansUrgence(q));
+  // Choix du plan dans le formulaire d'exercice : tous les plans, pas seulement la page affichée.
+  const plansTous = useQuery({ queryKey: ["hse-plans-urgence-choix"], queryFn: () => api.listAll<PlanUrgence>("/api/hse/plans-urgence/") });
 
   const auditCols: Column<AuditHse>[] = [
     { key: "code", header: t("hse.m7.code"), render: (a) => a.code },
@@ -93,11 +84,11 @@ export function ConformiteHse() {
     },
   ];
 
-  const planOptions = (plans.data ?? []).map((p) => ({ value: p.id, label: `${p.code} — ${p.intitule}` }));
+  const planOptions = (plansTous.data ?? []).map((p) => ({ value: p.id, label: `${p.code} — ${p.intitule}` }));
 
   return (
     <>
-      <SectionCard title={`${t("hse.m7.audits")} · ${audits.data?.length ?? 0}`}>
+      <SectionCard title={`${t("hse.m7.audits")} · ${audits.count}`}>
         <QuickForm
           title={t("hse.m7.newAudit")}
           endpoint="/api/hse/audits/"
@@ -117,10 +108,10 @@ export function ConformiteHse() {
             { name: "date_prevue", label: t("hse.m7.datePrevue"), type: "date", required: true },
           ]}
         />
-        <DataTable rows={audits.data ?? []} columns={auditCols} caption={t("hse.m7.audits")} />
+        <PagedDataTable list={audits} columns={auditCols} caption={t("hse.m7.audits")} searchPlaceholder={t("hse.m7.searchAudits")} />
       </SectionCard>
 
-      <SectionCard title={`${t("hse.m7.duer")} · ${duers.data?.length ?? 0}`}>
+      <SectionCard title={`${t("hse.m7.duer")} · ${duers.count}`}>
         <QuickForm
           title={t("hse.m7.newDuer")}
           endpoint="/api/hse/duer/"
@@ -129,10 +120,10 @@ export function ConformiteHse() {
             { name: "perimetre", label: t("hse.m7.perimetre"), required: true },
           ]}
         />
-        <DataTable rows={duers.data ?? []} columns={duerCols} caption={t("hse.m7.duer")} />
+        <PagedDataTable list={duers} columns={duerCols} caption={t("hse.m7.duer")} searchPlaceholder={t("hse.m7.searchDuer")} />
       </SectionCard>
 
-      <SectionCard title={`${t("hse.m7.plans")} · ${plans.data?.length ?? 0}`}>
+      <SectionCard title={`${t("hse.m7.plans")} · ${plans.count}`}>
         <QuickForm
           title={t("hse.m7.newPlan")}
           endpoint="/api/hse/plans-urgence/"
@@ -164,7 +155,7 @@ export function ConformiteHse() {
             ]}
           />
         ) : null}
-        <DataTable rows={plans.data ?? []} columns={planCols} caption={t("hse.m7.plans")} />
+        <PagedDataTable list={plans} columns={planCols} caption={t("hse.m7.plans")} searchPlaceholder={t("hse.m7.searchPlans")} />
       </SectionCard>
     </>
   );

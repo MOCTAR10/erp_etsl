@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDateTime } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { ControleQualite, Paginated, PointInspection } from "../../types";
+import type { ControleQualite, PointInspection } from "../../types";
 import { ActionBar, Badge, ProgressBar, SectionCard } from "../ui";
 
 const TONE: Record<PointInspection["statut"], "ok" | "warn" | "err"> = {
@@ -61,7 +61,7 @@ export function ItpSection() {
   const { t, i18n } = useTranslation();
   const itps = useQuery({
     queryKey: ["itps"],
-    queryFn: () => api.get<Paginated<ControleQualite>>("/api/qualite/controles/?type=itp").then((p) => p.results),
+    queryFn: () => api.listAll<ControleQualite>("/api/qualite/controles/?type=itp"),
   });
   const rows = itps.data ?? [];
   if (itps.isError || rows.length === 0) return null;

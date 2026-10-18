@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { GrAffairesResult, Paginated, ParametreLogistique } from "../../types";
+import type { GrAffairesResult, ParametreLogistique } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
 const montant = (v: string | null) => (v === null ? "••••••" : formatNumber(Number(v)));
@@ -81,7 +81,7 @@ export function ParametresLogistiqueSection() {
   const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
   const params = useQuery({
     queryKey: ["log-parametres"],
-    queryFn: () => api.get<Paginated<ParametreLogistique>>("/api/logistique/parametres/").then((p) => p.results),
+    queryFn: () => api.listAll<ParametreLogistique>("/api/logistique/parametres/"),
     retry: 0,
   });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["log-parametres"] });

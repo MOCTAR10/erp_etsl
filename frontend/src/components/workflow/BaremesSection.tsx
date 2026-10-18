@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { BaremeCotisation, HistoriqueBareme, Paginated, ParametrePaie } from "../../types";
+import type { BaremeCotisation, HistoriqueBareme, ParametrePaie } from "../../types";
 import { Badge, SectionCard } from "../ui";
 import { ImpotSection } from "./ImpotSection";
 
@@ -20,12 +20,12 @@ export function BaremesSection() {
   const qc = useQueryClient();
   const baremes = useQuery({
     queryKey: ["baremes"],
-    queryFn: () => api.get<Paginated<BaremeCotisation>>("/api/rh-paie/baremes/").then((p) => p.results),
+    queryFn: () => api.listAll<BaremeCotisation>("/api/rh-paie/baremes/"),
     retry: 0,
   });
   const params = useQuery({
     queryKey: ["parametres-paie"],
-    queryFn: () => api.get<Paginated<ParametrePaie>>("/api/rh-paie/parametres-paie/").then((p) => p.results),
+    queryFn: () => api.listAll<ParametrePaie>("/api/rh-paie/parametres-paie/"),
     retry: 0,
   });
   const [histoire, setHistoire] = useState<{ code: string; rows: HistoriqueBareme[] } | null>(null);

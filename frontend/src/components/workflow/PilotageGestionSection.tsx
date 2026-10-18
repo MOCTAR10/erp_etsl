@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { AtterrissageResult, DoctrineResult, NiveauxMarge, Paginated, ParametreGestion, SousActiviteResult } from "../../types";
+import type { AtterrissageResult, DoctrineResult, NiveauxMarge, ParametreGestion, SousActiviteResult } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
 const montant = (v: string | null) => (v === null ? "••••••" : formatNumber(Number(v)));
@@ -23,7 +23,7 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
 
   const params = useQuery({
     queryKey: ["cg-parametres"],
-    queryFn: () => api.get<Paginated<ParametreGestion>>("/api/controle-gestion/parametres/").then((p) => p.results),
+    queryFn: () => api.listAll<ParametreGestion>("/api/controle-gestion/parametres/"),
     retry: 0,
   });
   const sousActivite = useQuery({

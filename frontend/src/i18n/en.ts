@@ -741,6 +741,9 @@ export const en = {
     epi: "PPE",
     bsd: "Waste transfer notes",
     m7: {
+      searchAudits: "Search audits (code, area)…",
+      searchDuer: "Search risk registers (code, scope)…",
+      searchPlans: "Search emergency plans (code, title)…",
       audits: "Audits & inspections",
       duer: "Risk assessment record (DUER)",
       plans: "Emergency plans & drills",

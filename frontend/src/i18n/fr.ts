@@ -741,6 +741,9 @@ export const fr = {
     epi: "EPI",
     bsd: "Bordereaux de déchets",
     m7: {
+      searchAudits: "Rechercher un audit (code, zone)…",
+      searchDuer: "Rechercher un DUER (code, périmètre)…",
+      searchPlans: "Rechercher un plan d'urgence (code, intitulé)…",
       audits: "Audits & inspections",
       duer: "DUER (document unique)",
       plans: "Plans d'urgence & exercices",

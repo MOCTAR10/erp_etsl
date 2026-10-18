@@ -122,14 +122,12 @@ export function StocksPage() {
 
   const valoMensuelles = useQuery({
     queryKey: ["valorisations-mensuelles"],
-    queryFn: () => api.valorisationsMensuelles(),
-    select: (page: Paginated<ValorisationMensuelle>) => page.results,
+    queryFn: () => api.listAll<ValorisationMensuelle>("/api/stocks/valorisations/"),
   });
 
   const plans = useQuery({
     queryKey: ["plans-inventaire"],
-    queryFn: () => api.plansInventaire(),
-    select: (page: Paginated<PlanInventaireTournant>) => page.results,
+    queryFn: () => api.listAll<PlanInventaireTournant>("/api/stocks/plans-inventaire/"),
   });
 
   if (lots.isLoading || quants.isLoading) return <BoardSkeleton cols={4} rows={3} />;

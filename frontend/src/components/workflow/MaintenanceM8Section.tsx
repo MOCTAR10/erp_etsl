@@ -10,7 +10,7 @@ import type {
   FiabiliteResult,
   MaintenanceCoutsResult,
   OrdreTravail,
-  Paginated,
+  
   ParametreMaintenance,
   PieceOT,
   ReapproBesoin,
@@ -74,7 +74,7 @@ export function ParametresMaintenanceSection() {
   const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
   const params = useQuery({
     queryKey: ["maint-parametres"],
-    queryFn: () => api.get<Paginated<ParametreMaintenance>>("/api/maintenance/parametres/").then((p) => p.results),
+    queryFn: () => api.listAll<ParametreMaintenance>("/api/maintenance/parametres/"),
     retry: 0,
   });
   const refresh = () => {
