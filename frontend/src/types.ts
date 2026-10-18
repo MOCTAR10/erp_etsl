@@ -560,6 +560,9 @@ export type StatutControle = "en_attente" | "en_cours" | "valide" | "annule";
 
 export interface ControleQualite {
   id: string;
+  approuve_le?: string | null;
+  methode_cnd?: "" | "RT" | "UT" | "PT" | "MT";
+  images_count?: number;
   code: string;
   type_controle: TypeControleQualite;
   type_label: string;

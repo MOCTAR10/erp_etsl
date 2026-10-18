@@ -105,6 +105,7 @@ export const en = {
     patronales: "Employer charges", diffuse: "Published",
   },
   itp: {
+    approuver: "Approve ITP", confirmApprouver: "Approve this ITP? The plan will be frozen and welding allowed.", approuve: "Approved",
     title: "Inspection and test plans (ITP)",
     arret: "Hold point", observation: "Witness point", add: "Add point", type: "Point type",
     pointPlaceholder: "Inspection point (e.g. fit-up check before welding)",
@@ -486,6 +487,12 @@ export const en = {
     totalMvt: "Moves",
   },
   qualite: {
+    m6: {
+      metrologie: "Metrology (calibration)", newInstrument: "New instrument", designation: "Designation", serie: "Serial no.", dernierEtalonnage: "Last calibration", echeance: "Calibration due date",
+      utilisable: "In service", usageBloque: "Use blocked", etalonnerConforme: "Calibrated OK (+1 year)", confirmEtalonnage: "Record a passing calibration (due in 1 year)?", horsTolerance: "Out of tolerance", confirmHorsTolerance: "Mark the instrument out of tolerance? Its use will be blocked.",
+      joints: "Weld joint register", jointsVide: "No joint recorded (an approved ITP is required before welding).", of: "WO", joint: "Joint", coulee: "Heat number", epreuves: "Hydrostatic / leak tests", epreuvesVide: "No test recorded.", pressionEssai: "Test pressure", releves: "P/T readings",
+      conclure: "Conclude", confirmConclure: "Conclude the test? Readings will be sealed.", res: { conforme: "Conforming", non_conforme: "Non-conforming" },
+    },
     act: { traiter: "Decide treatment", choisirTraitement: "Treatment…" },
     form: { title: "Report a non-conformity", gravite: "Severity", description: "Description of the deviation" },
     col: { code: "Code", soudeur: "Welder", norme: "Standard", procede: "Process · position", validite: "Valid until", statut: "Status", type: "Type", reference: "Reference", materiau: "Material", point: "Check point", objet: "Project / WO / lot", organisme: "Accredited body", resultat: "Result", date: "Date", retention: "Retention", ans: "yrs" },

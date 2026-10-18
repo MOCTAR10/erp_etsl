@@ -15,6 +15,7 @@ import type {
   StatutNC,
   WpsWpqr,
 } from "../types";
+import { ClotureM6Section } from "../components/qualite/ClotureM6Section";
 import { ItpSection } from "../components/workflow/ItpSection";
 
 type NcGroups = Record<StatutNC, NonConformite[]>;
@@ -324,6 +325,7 @@ export function QualitePage() {
         </SectionCard>
       )}
       <ItpSection />
+      <ClotureM6Section />
     </>
   );
 }
