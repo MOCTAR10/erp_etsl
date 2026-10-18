@@ -1125,6 +1125,18 @@ export const fr = {
     },
     pendingNote: "Comptabilité SYSCOHADA révisée : écritures validées par le noyau (immuables, extournes). Règles de conservation proc. 4.3–4.8, refacturations GR au compte 618 (RF-ERP-90…94).",
   },
+  pilotageGestion: {
+    title: "Pilotage : sous-activité, doctrine d'imputation et paramètres (M11)",
+    hint: "Les seuils des centres 90 / 91 / 99 et la doctrine Mix A / B / C sont des données ETSL : modifiables ici, sans développeur.",
+    warnProvisoire: "{{count}} paramètre(s) de gestion provisoire(s) à faire confirmer par ETSL : les états qui les utilisent portent un avertissement.",
+    sousActivite: "Sous-activité par budget (périodes écoulées)", aucun: "Aucun budget approuvé avec une période écoulée.",
+    budget: "Budget", prevu: "Budget écoulé", realise: "Réalisé", taux: "Sous-activité", centre: "Centre", centreN: "Centre {{n}}",
+    doctrine: "Doctrine d'imputation Mix A / B / C", classe: "Classe", montant: "Montant", part: "Part réelle", cible: "Cible", conformite: "Conformité",
+    conforme: "Conforme", ecart: "Écart", cibleIncoherente: "Les cibles A + B + C ne totalisent pas 100 % : à corriger avec ETSL.",
+    nonClasses: "{{count}} budget(s) sans classe de Mix, non pris en compte.",
+    params: "Paramètres modifiables par ETSL", modifier: "Modifier", valider: "Valider", annuler: "Annuler",
+    provisoire: "Provisoire", confirme: "Confirmé", confirmer: "Confirmer", confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
+  },
   controleGestion: {
     analysesEcart: "Écarts > 10 % à analyser",
     echeanceAnalyse: "analyse attendue avant le",

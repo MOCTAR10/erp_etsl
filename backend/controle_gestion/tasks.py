@@ -2,10 +2,11 @@
 
 from celery import shared_task
 
-from .services import detecter_ecarts
+from .services import alerter_sous_activite, detecter_ecarts
 
 
 @shared_task
 def detecter_ecarts_budgetaires():
     """Ouvre chaque jour les analyses d'écart des périodes écoulées (échéance J+5)."""
+    alerter_sous_activite()  # budgets qui entrent au centre 99
     return [analyse.code for analyse in detecter_ecarts()]

@@ -1125,6 +1125,18 @@ export const en = {
     },
     pendingNote: "SYSCOHADA-revised accounting: entries validated by the kernel (immutable, reversals). Retention rules proc. 4.3–4.8, inter-company refactoring to account 618 (RF-ERP-90…94).",
   },
+  pilotageGestion: {
+    title: "Steering: under-activity, allocation doctrine and settings (M11)",
+    hint: "Centre 90 / 91 / 99 thresholds and the Mix A / B / C doctrine are ETSL data: editable here, no developer needed.",
+    warnProvisoire: "{{count}} provisional management setting(s) awaiting ETSL confirmation: reports using them carry a warning.",
+    sousActivite: "Under-activity per budget (elapsed periods)", aucun: "No approved budget with an elapsed period.",
+    budget: "Budget", prevu: "Elapsed budget", realise: "Actual", taux: "Under-activity", centre: "Centre", centreN: "Centre {{n}}",
+    doctrine: "Allocation doctrine Mix A / B / C", classe: "Class", montant: "Amount", part: "Actual share", cible: "Target", conformite: "Compliance",
+    conforme: "Compliant", ecart: "Gap", cibleIncoherente: "A + B + C targets do not add up to 100%: to be fixed with ETSL.",
+    nonClasses: "{{count}} budget(s) without a Mix class, not counted.",
+    params: "Settings editable by ETSL", modifier: "Edit", valider: "Apply", annuler: "Cancel",
+    provisoire: "Provisional", confirme: "Confirmed", confirmer: "Confirm", confirmConfirmer: "Confirm this value (validated by ETSL)?",
+  },
   controleGestion: {
     analysesEcart: "Variances > 10 % to analyse",
     echeanceAnalyse: "analysis due by",
