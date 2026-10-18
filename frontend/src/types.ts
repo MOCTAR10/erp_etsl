@@ -2423,3 +2423,33 @@ export interface RechercheJuridiqueResult {
     liens: { objet_type: string; objet_id: string; objet_label: string; module: string }[];
   }[];
 }
+
+export type CubeAxe = "affaire" | "chantier" | "site" | "activite" | "centre" | "periode";
+
+export interface CubeLecture {
+  axes: CubeAxe[];
+  rows: ({ produits: string; charges: string; cout_gr: string; marge: string } & Partial<Record<CubeAxe, string>>)[];
+  totaux: { produits: string; charges: string; cout_gr: string; marge: string };
+  periodes_archivees: string[];
+  parametres_provisoires: boolean;
+}
+
+export interface CubeArchive {
+  id: string;
+  periode: string;
+  nb_faits: number;
+  sha256: string;
+  conserve_jusqu_au: string;
+  retention_provisoire: boolean;
+  integre: boolean;
+}
+
+export interface ParametreCube {
+  id: string;
+  code: string;
+  label: string;
+  valeur: string;
+  unite: string;
+  statut_valeur: "provisoire" | "confirme";
+  est_provisoire: boolean;
+}

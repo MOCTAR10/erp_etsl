@@ -1,5 +1,7 @@
 """Tâches Celery de la couche D — notifications d'échéance J-90 / J-30 / J-15 / J-0 (CDC EX-G-05)."""
 
+from datetime import timedelta
+
 from celery import shared_task
 from django.utils import timezone
 
@@ -50,3 +52,19 @@ def notifier_echeances():
             notify(user, sujet, message, kind="reminder")
             envoyees += 1
     return envoyees
+
+
+@shared_task
+def alimenter_cubes():
+    """Alimente chaque jour, sans ressaisie, les cubes du mois courant et du mois précédent (si non archivés)."""
+    from . import cubes
+
+    aujourdhui = timezone.localdate()
+    mois = [aujourdhui.strftime("%Y-%m"), (aujourdhui.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")]
+    faits = 0
+    for periode in mois:
+        try:
+            faits += cubes.alimenter_cube(periode)
+        except ValueError:
+            continue  # mois déjà archivé : on ne le touche plus
+    return faits

@@ -23,6 +23,7 @@ import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { api } from "../api/client";
+import { CubesSection } from "../components/workflow/CubesSection";
 import { ChartCard, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, ProgressBar, SectionTitle, Sparkline } from "../components/ui";
 import { formatNumber } from "../lib/format";
 import { useThemeMode } from "../lib/useThemeMode";
@@ -312,6 +313,8 @@ function DirectionInner() {
         <Kpi label={t("direction.permisAtex")} value={p.hse.permis_atex} hint={t("direction.u.quarantaine", { count: p.hse.equipements_atex_quarantaine })} icon={Flame} tone="warn" delay={delay(4)} />
         <Kpi label={t("direction.epiRenouveler")} value={p.hse.epi_a_renouveler} hint={t("direction.u.permisActifs", { count: p.hse.permis_actifs })} icon={UserCheck} tone="accent" delay={delay(5)} />
       </div>
+
+      <CubesSection />
 
       <section id="echeances">
         <SectionTitle>{`${t("direction.alertes")} · ${a.total}`}</SectionTitle>

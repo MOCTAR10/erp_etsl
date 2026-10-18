@@ -38,6 +38,11 @@ SCHEDULES = [
         {"minute": "0", "hour": "7", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
     ),
     (
+        "ETSL — cubes OLAP à 6 axes : alimentation quotidienne (Couche D)",
+        "analytics.tasks.alimenter_cubes",
+        {"minute": "0", "hour": "5", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
+    ),
+    (
         "ETSL — clôture mensuelle : envoi Direction J+4 et alerte de retard (M10)",
         "comptabilite.tasks.suivre_clotures_mensuelles",
         {"minute": "45", "hour": "7", "day_of_week": "*", "day_of_month": "*", "month_of_year": "*"},
