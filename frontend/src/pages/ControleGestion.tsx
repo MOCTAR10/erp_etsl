@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { GrAffairesSection } from "../components/workflow/GrAffairesSection";
 import { MaintenanceCoutsSection } from "../components/workflow/MaintenanceM8Section";
+import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaireSection";
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
@@ -341,6 +342,7 @@ export function ControleGestionPage() {
         </SectionCard>
       )}
 
+      <SaisieBudgetaireSection fiscalYear={fy.data.id} budgets={[...groups.brouillon, ...groups.approuve, ...groups.cloture]} />
       <PilotageGestionSection fiscalYear={fy.data?.id} />
       <GrAffairesSection fiscalYear={fy.data?.id} />
       <MaintenanceCoutsSection />

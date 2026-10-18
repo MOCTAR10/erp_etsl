@@ -34,3 +34,47 @@ test.describe("M11 Contrôle de gestion : paramètres de pilotage", () => {
     await expect(page.getByTestId("pilotage-gestion")).toContainText("Atterrissage de fin d'exercice");
   });
 });
+
+// M11 : budget saisi à l'écran puis double visa DAF + CG par deux personnes distinctes.
+test.describe("M11 Contrôle de gestion : saisie budgétaire et double visa", () => {
+  test("un budget créé à l'écran n'entre en vigueur qu'avec deux visas de deux personnes", async ({ page }) => {
+    const label = `Budget recette ${Date.now()}`;
+    await loginAs(page, DEMO_USERS.finance);
+    await page.goto("/controle-gestion");
+    await page.getByTestId("saisie-budgetaire").getByRole("button", { name: "Nouveau budget" }).click();
+    const form = page.getByRole("form", { name: "Nouveau budget" });
+    await form.getByLabel(/Intitulé/).fill(label);
+    await form.getByLabel(/Montant annuel/).fill("1200000");
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByText("Enregistré.")).toBeVisible();
+
+    const carte = () => page.locator(".task-card", { hasText: label });
+    await expect(carte()).toContainText("Visa DAF en attente");
+    await carte().getByRole("button", { name: "Approuver" }).click();
+    await carte().getByLabel("Visa à apposer…").selectOption("daf");
+    await carte().getByRole("button", { name: "Confirmer" }).click();
+    await expect(carte()).toContainText("Visa DAF posé");
+    // La même personne ne peut pas poser aussi le visa CG.
+    await carte().getByRole("button", { name: "Approuver" }).click();
+    await carte().getByLabel("Visa à apposer…").selectOption("cg");
+    await carte().getByRole("button", { name: "Confirmer" }).click();
+    await expect(carte().getByRole("alert")).toContainText(/autre personne/);
+
+    await loginAs(page, DEMO_USERS.admin);
+    await page.goto("/controle-gestion");
+    await expect(carte()).toContainText("Visa DAF posé");
+    await carte().getByRole("button", { name: "Approuver" }).click();
+    await carte().getByLabel("Visa à apposer…").selectOption("cg");
+    await carte().getByRole("button", { name: "Confirmer" }).click();
+    // Budget approuvé : plus de visa à poser, la clôture devient possible.
+    await expect(carte().getByRole("button", { name: "Clôturer" })).toBeVisible();
+    await expect(carte()).not.toContainText("Visa DAF en attente");
+  });
+
+  test("la détection des écarts > 10 % répond à l'écran", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.finance);
+    await page.goto("/controle-gestion");
+    await page.getByRole("button", { name: /Détecter les écarts/ }).click();
+    await expect(page.getByTestId("saisie-budgetaire").locator("xpath=following-sibling::p").first()).toContainText(/analyse|écart/);
+  });
+});

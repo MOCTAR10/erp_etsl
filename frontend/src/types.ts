@@ -2461,3 +2461,8 @@ export interface ParametreCube {
   statut_valeur: "provisoire" | "confirme";
   est_provisoire: boolean;
 }
+
+export interface ConsommationsStock {
+  depots: { periode: string; depot: string; valeur_stock: string | null; consommation: string | null }[];
+  consommations_par_axe: { axe: string; valeur: string | null }[];
+}
