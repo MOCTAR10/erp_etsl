@@ -110,6 +110,16 @@ export const en = {
     reporting: "{{annee}} · headcount {{effectif}} · hires {{entrees}} · leavers {{sorties}} · turnover {{turnover}} % · absences {{absence}} d · absenteeism {{absenteisme}} %",
     integrer: "Import timesheets (overtime)",
   },
+  banque: {
+    title: "Bank statement import and automatic reconciliation (M10)",
+    hint: "MT940 and CFONB 120 formats (standard templates, to be validated against ETSL's real bank statements). Reconciliation pairs statement lines with validated payments; gaps are listed.",
+    compte: "Statement account", choisir: "Choose a bank account…", format: "File format", auto: "Automatic detection",
+    fichier: "Statement file", importer: "Import statement", rapprocher: "Reconcile automatically",
+    importe: "{{n}} line(s) imported from {{debut}} to {{fin}}.", nbAnomalies: "{{count}} anomaly(ies)", aucuneAnomalie: "No anomaly",
+    rapprochees: "{{n}} line(s) reconciled.", tolerancesProvisoires: "Provisional tolerances",
+    ambigues: "{{count}} ambiguous line(s) (several possible payments): reconcile manually.",
+    lignesSansPaiement: "{{count}} statement line(s) without payment", paiementsSansLigne: "{{count}} payment(s) without statement line",
+  },
   lettrage: {
     title: "Matching and closing settings (M10)",
     hint: "Matching pairs debits and credits of one third party on a reconcilable account. Posted entries are never modified; an unmatch is traced with its reason.",

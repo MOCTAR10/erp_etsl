@@ -110,6 +110,16 @@ export const fr = {
     reporting: "{{annee}} · effectif {{effectif}} · entrées {{entrees}} · sorties {{sorties}} · turnover {{turnover}} % · absences {{absence}} j · absentéisme {{absenteisme}} %",
     integrer: "Intégrer les pointages (heures sup.)",
   },
+  banque: {
+    title: "Import des relevés bancaires et rapprochement automatique (M10)",
+    hint: "Formats MT940 et CFONB 120 (gabarits standard, à valider sur les relevés réels de la banque d'ETSL). Le rapprochement associe lignes de relevé et paiements validés ; les écarts sont listés.",
+    compte: "Compte du relevé", choisir: "Choisir un compte bancaire…", format: "Format du fichier", auto: "Détection automatique",
+    fichier: "Fichier de relevé", importer: "Importer le relevé", rapprocher: "Rapprocher automatiquement",
+    importe: "{{n}} ligne(s) importée(s) du {{debut}} au {{fin}}.", nbAnomalies: "{{count}} anomalie(s)", aucuneAnomalie: "Aucune anomalie",
+    rapprochees: "{{n}} ligne(s) rapprochée(s).", tolerancesProvisoires: "Tolérances provisoires",
+    ambigues: "{{count}} ligne(s) ambiguë(s) (plusieurs paiements possibles) : rapprochement manuel.",
+    lignesSansPaiement: "{{count}} ligne(s) de relevé sans paiement", paiementsSansLigne: "{{count}} paiement(s) sans ligne de relevé",
+  },
   lettrage: {
     title: "Lettrage et paramètres de clôture (M10)",
     hint: "Le lettrage rapproche débits et crédits d'un même tiers sur un compte lettrable. Les écritures comptabilisées ne sont jamais modifiées ; un dé-lettrage est tracé avec son motif.",

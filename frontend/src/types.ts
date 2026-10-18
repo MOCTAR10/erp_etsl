@@ -1419,6 +1419,7 @@ export interface ReleveBancaire {
   total_debit: string;
   total_credit: string;
   lignes: LigneReleve[];
+  anomalies: { type: string; message: string }[];
   created_at: string;
 }
 
@@ -2153,4 +2154,13 @@ export interface LettrageAnomalies {
   delai_jours: number;
   parametres_provisoires: boolean;
   anomalies: { ligne: string; motif: "sans_tiers" | "ancienne"; date: string; reference: string; debit: string | null; credit: string | null }[];
+}
+
+export interface RapprochementAuto {
+  rapprochees: number;
+  rapprochement: string | null;
+  parametres_provisoires: boolean;
+  ambigues: { id: string; date: string; libelle: string; debit: string | null; credit: string | null }[];
+  lignes_sans_paiement: { id: string; date: string; libelle: string; debit: string | null; credit: string | null }[];
+  paiements_sans_ligne: { id: string; code: string; date: string; sens: string; montant: string | null }[];
 }
