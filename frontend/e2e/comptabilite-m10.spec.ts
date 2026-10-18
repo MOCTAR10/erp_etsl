@@ -26,8 +26,7 @@ const MT940 = [
   ":60F:C260601XAF1000000,00",
   ":61:2606020602C500000,00NTRFNONREF//E2E1", ":86:VIREMENT CLIENT E2E",
   ":62F:C260630XAF1500000,00",
-].join("
-");
+].join("\n");
 
 // M10 : import d'un relevé MT940 (gabarit standard) et rapprochement automatique.
 test.describe("M10 Comptabilité : relevé bancaire", () => {
