@@ -153,7 +153,11 @@ def build_paiement_move(paiement, user):
     # Détermination des comptes.
     tiers = paiement.tiers
     if paiement.sens == paiement.Sens.SORTIE:
-        if paiement.imputation_618:
+        if paiement.facture_id and paiement.facture.move_id:
+            # Facture déjà comptabilisée (charge + TVA au 401) : le paiement solde la dette, jamais une 2e charge.
+            gr = paiement.facture.purchase_order.is_global_rental or (tiers is not None and tiers.is_global_rental)
+            compte_depense = _account("401100" if gr else "401000")
+        elif paiement.imputation_618:
             compte_depense = _account("618000")
         elif paiement.engagement_id:
             compte_depense = paiement.engagement.compte_depense

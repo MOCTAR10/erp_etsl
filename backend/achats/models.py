@@ -566,6 +566,7 @@ class PurchaseInvoice(models.Model):
     class Status(models.TextChoices):
         EN_ATTENTE = "en_attente", "En attente de rapprochement"
         RAPPROCHEE = "rapprochee", "Rapprochée"
+        COMPTABILISEE = "comptabilisee", "Comptabilisée"
         ANNULEE = "annulee", "Annulée"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -587,7 +588,7 @@ class PurchaseInvoice(models.Model):
     invoice_ref = models.CharField(max_length=100, default="", blank=True, verbose_name="Réf. fournisseur")
     invoice_date = models.DateField(default=timezone.localdate, verbose_name="Date de facture")
     status = models.CharField(
-        max_length=12, choices=Status.choices, default=Status.EN_ATTENTE, verbose_name="Statut"
+        max_length=14, choices=Status.choices, default=Status.EN_ATTENTE, verbose_name="Statut"
     )
     currency = models.ForeignKey(
         "referentiels.Currency",
@@ -597,6 +598,24 @@ class PurchaseInvoice(models.Model):
         related_name="+",
         verbose_name="Devise",
     )
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="factures_fournisseurs",
+        verbose_name="Écriture comptable",
+        help_text="Écriture d'achat (charge + TVA déductible / fournisseur) posée par la comptabilisation.",
+    )
+    comptabilise_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="Comptabilisée par",
+    )
+    comptabilise_le = models.DateTimeField(null=True, blank=True, verbose_name="Comptabilisée le")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -610,7 +629,16 @@ class PurchaseInvoice(models.Model):
 
     @property
     def total(self):
+        """Total hors taxes."""
         return sum((line.price_total for line in self.lines.all()), 0) if self.id else 0
+
+    @property
+    def total_tva(self):
+        return sum((line.tva_amount for line in self.lines.all()), Decimal("0")) if self.id else Decimal("0")
+
+    @property
+    def total_ttc(self):
+        return self.total + self.total_tva
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -643,6 +671,15 @@ class PurchaseInvoiceLine(models.Model):
     price_total = models.DecimalField(
         max_digits=14, decimal_places=2, default=0, verbose_name="Total ligne"
     )
+    taux_tva = models.ForeignKey(
+        "comptabilite.TauxTva",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="Taux de TVA",
+        help_text="Vide = taux par défaut paramétré en Comptabilité → TVA.",
+    )
 
     class Meta:
         ordering = ["invoice", "id"]
@@ -651,6 +688,14 @@ class PurchaseInvoiceLine(models.Model):
 
     def __str__(self):
         return f"{self.purchase_order_line.label} × {self.quantity}"
+
+    @property
+    def tva_amount(self):
+        """TVA déductible de la ligne (taux de la ligne, sinon taux par défaut ; 0 si aucun taux)."""
+        from .comptabilisation import taux_effectif
+
+        taux = taux_effectif(self)
+        return (self.price_total * taux.taux / Decimal("100")).quantize(Decimal("0.01")) if taux else Decimal("0")
 
     def save(self, *args, **kwargs):
         self.price_total = self.quantity * self.unit_price

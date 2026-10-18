@@ -356,7 +356,11 @@ class PaiementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelVie
     def comptabiliser(self, request, pk=None):
         paiement = self.get_object()
         # CDC M2 §5.8 : rapprochement 3-way (BR / BC / facture) obligatoire avant comptabilisation.
-        if paiement.facture_id and paiement.facture.status != paiement.facture.Status.RAPPROCHEE:
+        if paiement.facture_id and paiement.facture.status == paiement.facture.Status.RAPPROCHEE:
+            raise DRFValidationError(
+                f"Facture {paiement.facture.code} rapprochée mais non comptabilisée : comptabilisez-la (Achats) avant le paiement."
+            )
+        if paiement.facture_id and paiement.facture.status != paiement.facture.Status.COMPTABILISEE:
             raise DRFValidationError(
                 f"Facture {paiement.facture.code} non rapprochée (3-way BR / BC / facture) : comptabilisation impossible."
             )
