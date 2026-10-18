@@ -7,6 +7,8 @@ from rest_framework.exceptions import PermissionDenied
 from .models import (
     BaremeImpot,
     BaremeCotisation,
+    CompteEmetteur,
+    OrdreVirement,
     HistoriqueBareme,
     ParametrePaie,
     BulletinLigne,
@@ -52,6 +54,9 @@ class ContratActifSerializer(serializers.Serializer):
     a_renouveler = serializers.BooleanField(read_only=True)
 
 
+RIB_FIELDS = ["rib_banque", "rib_guichet", "rib_compte", "rib_cle", "banque_nom"]
+
+
 class EmployeSerializer(serializers.ModelSerializer):
     nom_complet = serializers.CharField(read_only=True)
     contrat_actif = ContratActifSerializer(read_only=True)
@@ -64,7 +69,7 @@ class EmployeSerializer(serializers.ModelSerializer):
             "date_naissance", "lieu_naissance", "nationalite", "numero_securite_sociale",
             "telephone", "email", "adresse", "categorie", "fonction", "departement",
             "site", "statut", "matricule_cnps", "date_embauche", "date_sortie", "user",
-            "contrat_actif", "solde_conges", "created_at", "updated_at",
+            "contrat_actif", "solde_conges", "created_at", "updated_at", *RIB_FIELDS,
         ]
         read_only_fields = ["code", "nom_complet", "statut"]
 
@@ -77,6 +82,8 @@ class EmployeSerializer(serializers.ModelSerializer):
             new = attrs["user"].pk if attrs["user"] else None
             if new != current:
                 raise PermissionDenied("Rattachement d'un compte à une fiche salarié : cercle paie uniquement (RF-33).")
+        if any(c in attrs for c in RIB_FIELDS) and not can_manage_paie(getattr(request, "user", None)):
+            raise PermissionDenied("Coordonnées bancaires : cercle paie uniquement (RF-33).")
         return _apply_and_validate(self, attrs)
 
     def to_representation(self, instance):
@@ -84,6 +91,9 @@ class EmployeSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not can_see_amount(getattr(request, "user", None)):
             data["contrat_actif"] = None
+        if not can_manage_paie(getattr(request, "user", None)):
+            for champ in RIB_FIELDS:  # RIB : jamais visible hors du cercle paie
+                data.pop(champ, None)
         return data
 
 
@@ -277,14 +287,14 @@ class BulletinSerializer(serializers.ModelSerializer):
     class Meta:
         model = BulletinPaie
         fields = [
-            "baremes_provisoires", "avertissement", "baremes_utilises", "id", "code", "employe", "employe_nom", "matricule", "periode",
+            "baremes_provisoires", "avertissement", "baremes_utilises", "document", "ordre_virement", "id", "code", "employe", "employe_nom", "matricule", "periode",
             "salaire_base", "brut", "net", "charges_patronales", "total_gains", "total_retenues",
             "lignes", "statut", "statut_label", "move", "move_number", "has_amount_access",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "code", "brut", "net", "charges_patronales", "total_gains", "total_retenues",
-            "lignes", "statut", "move", "move_number", "baremes_utilises",
+            "lignes", "statut", "move", "move_number", "baremes_utilises", "document", "ordre_virement",
         ]
 
     def get_has_amount_access(self, obj):
@@ -420,4 +430,26 @@ class HistoriqueBaremeSerializer(serializers.ModelSerializer):
     class Meta:
         model = HistoriqueBareme
         fields = ["id", "objet", "objet_id", "code", "action", "avant", "apres", "par", "par_email", "le"]
+        read_only_fields = fields
+
+
+class CompteEmetteurSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompteEmetteur
+        fields = ["id", "raison_sociale", "numero_emetteur", "code_banque", "code_guichet", "numero_compte", "cle_rib", "actif"]
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs, exclude=())
+
+
+class OrdreVirementSerializer(serializers.ModelSerializer):
+    compte_label = serializers.CharField(source="compte.raison_sociale", read_only=True)
+    par_email = serializers.CharField(source="created_by.email", read_only=True, default=None)
+
+    class Meta:
+        model = OrdreVirement
+        fields = [
+            "id", "code", "periode", "compte", "compte_label", "date_execution", "nb_virements", "total",
+            "sha256", "created_by", "par_email", "created_at",
+        ]
         read_only_fields = fields

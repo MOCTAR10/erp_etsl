@@ -46,3 +46,27 @@ test.describe("M9 : ETSL modifie les taux lui-même", () => {
     await expect(page.getByRole("row", { name: /CNSS-VIEIL-S/ })).toContainText("Provisoire");
   });
 });
+
+test.describe("M9 : bulletin PDF et virement des salaires", () => {
+  test("le bulletin se télécharge en PDF et un compte émetteur se saisit", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.rh);
+    await page.goto("/rh-paie");
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "PDF", exact: true }).first().click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+
+    await expect(page.getByText("Virement des salaires (CFONB 160)")).toBeVisible();
+    const num = String(Date.now() % 100000000000).padStart(11, "0");
+    const form = page.locator("form", { has: page.getByPlaceholder("Raison sociale (24 car.)") });
+    await form.getByPlaceholder("Raison sociale (24 car.)").fill("ETSL E2E");
+    await form.getByPlaceholder("N° d'émetteur (6)").fill("123456");
+    await form.getByPlaceholder("Code banque").fill("30001");
+    await form.getByPlaceholder("Code guichet").fill("00123");
+    await form.getByPlaceholder("N° de compte").fill(num);
+    await form.getByPlaceholder("Clé RIB").fill("45");
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(page.getByRole("option", { name: new RegExp(num) })).toBeAttached();
+  });
+});

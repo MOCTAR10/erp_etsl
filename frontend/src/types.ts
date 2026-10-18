@@ -1325,6 +1325,8 @@ export interface BulletinLigne {
 }
 
 export interface BulletinPaie {
+  document?: string | null;
+  ordre_virement?: string | null;
   avertissement?: string;
   baremes_provisoires?: string[];
   charges_patronales?: string | null;

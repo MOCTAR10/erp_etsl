@@ -95,6 +95,14 @@ export const fr = {
     confirmCloturer: "Clôturer définitivement ?",
     confirmComptabiliser: "Générer l'écriture comptable de paie ? Action non modifiable (extourne uniquement).",
   },
+  virements: {
+    title: "Virement des salaires (CFONB 160)",
+    hint: "Fichier de virements des bulletins validés du mois, une seule fois par bulletin. Gabarit CFONB 160 standard : à faire valider par la banque d'ETSL. RIB réservés au cercle paie.",
+    generer: "Générer l'ordre de virement", periode: "Période (1er du mois)", compte: "Compte émetteur", execution: "Date d'exécution",
+    telecharger: "Télécharger le fichier", compteTitle: "Compte émetteur", raison: "Raison sociale (24 car.)", emetteur: "N° d'émetteur (6)",
+    banque: "Code banque", guichet: "Code guichet", numCompte: "N° de compte", cle: "Clé RIB", ribTitle: "Coordonnées bancaires d'un salarié",
+    employe: "Salarié", domiciliation: "Domiciliation", pdf: "PDF", archiver: "Archiver (GED 10 ans)", archive: "Archivé",
+  },
   baremes: {
     modifier: "Modifier", annuler: "Annuler", impotTitle: "Impôt sur le revenu (barème progressif, montants mensuels par part)", tranche: "Plafond de tranche (F)", derniere: "au-delà", abattement: "Abattement (%)",
     addTranche: "Ajouter une tranche", editHint: "Modifier une valeur la repasse en « provisoire ». Une valeur déjà utilisée par un bulletin validé exige « Nouvelle version ».",

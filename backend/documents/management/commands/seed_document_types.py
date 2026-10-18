@@ -13,7 +13,7 @@ class Command(BaseCommand):
         ("factures_fournisseurs", "Factures fournisseurs", 10, False, "circuit_comptabilite"),
         ("devis_bons_de_commande", "Devis / Bons de commande", 5, False, "circuit_controle_gestion"),
         ("contrats", "Contrats clients / fournisseurs / prêts", 5, False, "circuit_controle_gestion"),
-        ("bulletins_de_paie", "Bulletins de paie", 3, True, None),
+        ("bulletins_de_paie", "Bulletins de paie", 10, True, None),
         ("documents_rh", "Documents RH (CV, contrats, absences)", 1, True, None),
         ("courriers", "Courriers entrants / sortants", None, False, "circuit_reception"),
         ("comptes_rendus_reunion", "Comptes rendus de réunion", None, False, "circuit_reception"),
