@@ -3,6 +3,7 @@
 from integrations.idempotency import idempotent
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -39,6 +40,10 @@ from .serializers import (
 from users.permissions import can_read_module
 from controle_gestion import budget_control
 
+from comptabilite.services import CanValidateCompta
+
+from .comptabilisation import comptabiliser_facture
+from .stock_link import entrer_en_stock
 from .services import CanApproveDa, CanManageAchats, can_see_amount, can_viser_dg
 
 
@@ -195,6 +200,7 @@ class ConsultationRequestViewSet(_CommonViewSet):
 
 class ConsultationOfferViewSet(_CommonViewSet):
     serializer_class = ConsultationOfferSerializer
+    search_fields = ("consultation__code", "supplier__name",)
 
     def get_queryset(self):
         qs = ConsultationOffer.objects.select_related("consultation", "supplier").all()
@@ -202,6 +208,21 @@ class ConsultationOfferViewSet(_CommonViewSet):
         if consultation:
             qs = qs.filter(consultation_id=consultation)
         return qs
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def retenir(self, request, pk=None):
+        """Retient cette offre (et une seule) tant que la consultation est ouverte."""
+        offre = ConsultationOffer.objects.select_for_update(of=("self",)).select_related("consultation").get(
+            pk=self.get_object().pk
+        )
+        if offre.consultation.status != ConsultationRequest.Status.OUVERTE:
+            return Response({"detail": "Seule une consultation ouverte permet de retenir une offre."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        offre.consultation.offers.exclude(pk=offre.pk).update(is_selected=False)
+        offre.is_selected = True
+        offre.save(update_fields=["is_selected"])
+        return Response(self.get_serializer(offre).data)
 
 
 class PurchaseOrderViewSet(_CommonViewSet):
@@ -352,9 +373,18 @@ class GoodsReceiptViewSet(_CommonViewSet):
         if ctrl.resultat == ControleQualite.Resultat.NON_CONFORME:
             return Response({"detail": f"Contrôle qualité {ctrl.code} non conforme : ouvrez un litige fournisseur."},
                             status=status.HTTP_400_BAD_REQUEST)
+        try:
+            entrer_en_stock(receipt, request.user, request.data.get("depot"))
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages})
         receipt.status = GoodsReceipt.Status.VALIDE
         receipt.save(update_fields=["status", "updated_at"])
         return Response(self.get_serializer(receipt).data)
+
+    def perform_destroy(self, instance):
+        if instance.status != GoodsReceipt.Status.EN_ATTENTE:
+            raise ValidationError({"detail": "Réception validée : suppression impossible (le stock a été alimenté)."})
+        instance.delete()
 
 
 class LitigeFournisseurViewSet(_CommonViewSet):
@@ -444,13 +474,40 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
     def create(self, request, *args, **kwargs):  # réception magasin rejouable (hors-ligne)
         return super().create(request, *args, **kwargs)
 
+    @staticmethod
+    def _garde_reception_ouverte(receipt):
+        # Réception validée = stock alimenté : ses lignes ne bougent plus (correction = mouvement de stock inverse).
+        if receipt.status != GoodsReceipt.Status.EN_ATTENTE:
+            raise ValidationError({"detail": "Réception validée : lignes non modifiables."})
+
+    def perform_create(self, serializer):
+        self._garde_reception_ouverte(serializer.validated_data["receipt"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._garde_reception_ouverte(serializer.instance.receipt)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._garde_reception_ouverte(instance.receipt)
+        instance.delete()
+
 
 class PurchaseInvoiceViewSet(_CommonViewSet):
     serializer_class = PurchaseInvoiceSerializer
     search_fields = ("code", "invoice_ref", "supplier__name",)
 
+    def get_permissions(self):
+        # La comptabilisation relève du cercle comptable (CanValidateCompta), pas des rôles d'écriture Achats.
+        if self.action == "comptabiliser":
+            return [CanValidateCompta()]
+        return super().get_permissions()
+
     def get_queryset(self):
-        qs = PurchaseInvoice.objects.select_related("purchase_order", "supplier", "currency").all()
+        qs = PurchaseInvoice.objects.select_related("purchase_order", "supplier", "currency", "move").all()
+        status_ = self.request.query_params.get("status")
+        if status_:
+            qs = qs.filter(status=status_)
         purchase_order = self.request.query_params.get("purchase_order")
         if purchase_order:
             qs = qs.filter(purchase_order_id=purchase_order)
@@ -482,9 +539,36 @@ class PurchaseInvoiceViewSet(_CommonViewSet):
         invoice.save(update_fields=["status", "updated_at"])
         return Response(self.get_serializer(invoice).data)
 
+    @action(detail=True, methods=["post"])
+    def comptabiliser(self, request, pk=None):
+        """Écriture d'achat (CDC M2 §5.10) : Dr charge HT (618 si BC GR) + Dr TVA déductible / Cr 401. Facture scellée."""
+        try:
+            invoice = comptabiliser_facture(self.get_object(), request.user)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages})
+        return Response(self.get_serializer(invoice).data)
+
 
 class PurchaseInvoiceLineViewSet(_CommonViewSet):
     serializer_class = PurchaseInvoiceLineSerializer
+
+    @staticmethod
+    def _garde_facture_ouverte(invoice):
+        # Facture rapprochée ou comptabilisée = pièce scellée : plus d'ajout, de modification ni de suppression de ligne.
+        if invoice.status != PurchaseInvoice.Status.EN_ATTENTE:
+            raise ValidationError({"detail": f"Facture {invoice.get_status_display().lower()} : lignes non modifiables."})
+
+    def perform_create(self, serializer):
+        self._garde_facture_ouverte(serializer.validated_data["invoice"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._garde_facture_ouverte(serializer.instance.invoice)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._garde_facture_ouverte(instance.invoice)
+        instance.delete()
 
     def get_queryset(self):
         qs = PurchaseInvoiceLine.objects.select_related("invoice", "purchase_order_line").all()

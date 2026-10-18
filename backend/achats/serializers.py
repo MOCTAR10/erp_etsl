@@ -127,12 +127,14 @@ class ConsultationOfferSerializer(AmountMaskMixin, serializers.ModelSerializer):
     amount_fields = ["amount"]
 
     supplier_name = serializers.CharField(source="supplier.name", read_only=True, default=None)
+    consultation_code = serializers.CharField(source="consultation.code", read_only=True)
 
     class Meta:
         model = ConsultationOffer
         fields = [
             "id",
             "consultation",
+            "consultation_code",
             "supplier",
             "supplier_name",
             "amount",
@@ -148,12 +150,14 @@ class PurchaseOrderLineSerializer(AmountMaskMixin, serializers.ModelSerializer):
 
     article_code = serializers.CharField(source="article.code", read_only=True, default=None)
     unit_label = serializers.CharField(source="unit.label", read_only=True, default=None)
+    order_code = serializers.CharField(source="purchase_order.code", read_only=True)
 
     class Meta:
         model = PurchaseOrderLine
         fields = [
             "id",
             "purchase_order",
+            "order_code",
             "article",
             "article_code",
             "label",
@@ -295,12 +299,15 @@ class GoodsReceiptLineSerializer(serializers.ModelSerializer):
 
 
 class PurchaseInvoiceSerializer(AmountMaskMixin, serializers.ModelSerializer):
-    amount_fields = ["total"]
+    amount_fields = ["total", "total_tva", "total_ttc"]
 
     order_code = serializers.CharField(source="purchase_order.code", read_only=True)
     supplier_name = serializers.CharField(source="supplier.name", read_only=True, default=None)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     total = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    total_tva = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    total_ttc = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    move_number = serializers.CharField(source="move.number", read_only=True, default=None)
     lines_count = serializers.IntegerField(source="lines.count", read_only=True)
 
     class Meta:
@@ -318,11 +325,19 @@ class PurchaseInvoiceSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "status_label",
             "currency",
             "total",
+            "total_tva",
+            "total_ttc",
+            "move",
+            "move_number",
+            "comptabilise_le",
             "lines_count",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "status", "total", "created_at", "updated_at"]
+        read_only_fields = [
+            "id", "code", "status", "total", "total_tva", "total_ttc",
+            "move", "comptabilise_le", "created_at", "updated_at",
+        ]
 
 
 class PurchaseInvoiceLineSerializer(AmountMaskMixin, serializers.ModelSerializer):
@@ -346,6 +361,7 @@ class PurchaseInvoiceLineSerializer(AmountMaskMixin, serializers.ModelSerializer
             "quantity",
             "unit_price",
             "price_total",
+            "taux_tva",
         ]
         read_only_fields = ["id", "price_total"]
 

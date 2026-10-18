@@ -61,6 +61,12 @@ function actionsLitige(l: Litige, t: (k: string) => string): ActionDef[] {
 export function AchatsPilotage() {
   const { t } = useTranslation();
   const receptions = usePagedList<Reception>("achats-receptions", (q) => api.get<Paginated<Reception>>(`/api/achats/receipts/${q}`));
+  const depotsQuery = useQuery({
+    queryKey: ["achats-ref", "depots"],
+    queryFn: () => api.listAll<{ id: string; code: string; label: string; is_active: boolean }>("/api/stocks/depots/"),
+    retry: 0,
+  });
+  const depots = (depotsQuery.data ?? []).filter((d) => d.is_active).map((d) => ({ value: d.id, label: `${d.code} — ${d.label}` }));
   const litiges = usePagedList<Litige>("achats-litiges", (q) => api.get<Paginated<Litige>>(`/api/achats/litiges/${q}`));
   const reporting = useQuery({
     queryKey: ["achats-reporting"],
@@ -88,7 +94,16 @@ export function AchatsPilotage() {
       header: "",
       render: (r) =>
         r.status === "en_attente" ? (
-          <ActionBar actions={[{ label: t("achatsPilotage.validerReception"), path: `/api/achats/receipts/${r.id}/valider/` }]} />
+          <ActionBar
+            actions={[
+              {
+                label: t("achatsPilotage.validerReception"),
+                path: `/api/achats/receipts/${r.id}/valider/`,
+                // Plusieurs dépôts actifs : la mise en stock exige de choisir le dépôt de réception.
+                ...(depots.length > 1 ? { prompt: { name: "depot", label: t("achatsSaisie.depot"), options: depots } } : {}),
+              },
+            ]}
+          />
         ) : null,
     },
   ];

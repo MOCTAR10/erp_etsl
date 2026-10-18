@@ -4,6 +4,8 @@ import { api } from "../../api/client";
 import { formatDate } from "../../lib/format";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
+import { DaLigneForm } from "../achats/AchatsSaisie";
+import { useAnalytiques } from "../achats/refs";
 import { ActionBar, Badge, PagedDataTable, QuickForm, SectionCard, type Column } from "../ui";
 
 interface DemandeAchat {
@@ -29,6 +31,7 @@ const TONE: Record<DemandeAchat["status"], "ok" | "warn" | "err" | "brand"> = {
 /** Demandes d'achat : saisie + circuit soumettre → approuver / rejeter (validation hiérarchique côté API). */
 export function DemandesAchat() {
   const { t } = useTranslation();
+  const analytiques = useAnalytiques();
   const list = usePagedList<DemandeAchat>("achats-da", (q) => api.get<Paginated<DemandeAchat>>(`/api/achats/requests/${q}`));
 
   const columns: Column<DemandeAchat>[] = [
@@ -93,10 +96,12 @@ export function DemandesAchat() {
               { value: "true", label: t("purchases.da.oui") },
             ],
           },
+          { name: "analytic", label: t("achatsSaisie.f.analytique"), type: "select", options: analytiques },
           { name: "notes", label: t("purchases.da.notes"), type: "textarea" },
         ]}
         transform={(v) => ({ ...v, is_urgent: v.is_urgent === "true" })}
       />
+      <DaLigneForm />
       {(list.count > 0 || list.search) && (
         <PagedDataTable list={list} columns={columns} caption={t("purchases.da.title")} searchPlaceholder={t("purchases.da.search")} />
       )}

@@ -10,6 +10,7 @@ import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHead
 import type { Paginated, PoStatus, PurchaseOrder } from "../types";
 import { DemandesAchat } from "../components/workflow/DemandesAchat";
 import { AchatsPilotage } from "../components/achats/AchatsPilotage";
+import { AchatsSaisie } from "../components/achats/AchatsSaisie";
 
 type Groups = Record<PoStatus, PurchaseOrder[]>;
 
@@ -118,6 +119,8 @@ export function PurchasesPage() {
       </div>
 
       <DemandesAchat />
+
+      <AchatsSaisie />
 
       <AchatsPilotage />
     </>
