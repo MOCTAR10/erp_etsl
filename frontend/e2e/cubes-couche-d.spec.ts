@@ -9,7 +9,7 @@ test.describe("Couche D : cubes à 6 axes et archive 10 ans", () => {
     await loginAs(page, DEMO_USERS.admin);
     await page.goto("/direction");
     const section = page.getByTestId("cube-olap");
-    await expect(section).toContainText("6 axes");
+    await expect(section).toContainText("grand livre");
 
     // Les six axes sont proposés ; la lecture suit les axes cochés.
     for (const axe of ["Affaire", "Chantier", "Site", "Activité", "Centre", "Période"]) {
