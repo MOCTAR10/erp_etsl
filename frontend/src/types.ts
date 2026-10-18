@@ -219,6 +219,31 @@ export interface SituationTravaux {
   validated_at: string | null;
 }
 
+export interface EquipeAffectation {
+  id: string;
+  code: string;
+  equipe: string;
+  equipe_label: string;
+  metier: string;
+  ordre: string;
+  ordre_code: string;
+  date_debut: string;
+  date_fin: string;
+  effectif: number;
+  statut: "planifiee" | "mobilisee" | "terminee";
+  statut_label: string;
+}
+
+export interface PresenceChantier {
+  id: string;
+  ordre_code: string;
+  employe_nom: string;
+  date: string;
+  statut: "present" | "absent" | "retard";
+  statut_label: string;
+  motif: string;
+}
+
 export interface ChargeRow {
   code: string;
   label: string;

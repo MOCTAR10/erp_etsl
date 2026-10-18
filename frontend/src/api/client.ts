@@ -166,6 +166,12 @@ export const api = {
   charge: () => raw<import("../types").ChargeStats>("/api/operations/ordres/charge/"),
   situations: (params = "") =>
     raw<import("../types").Paginated<import("../types").SituationTravaux>>(`/api/operations/situations/${params}`),
+  equipes: (params = "") =>
+    raw<import("../types").Paginated<{ id: string; code: string; label: string }>>(`/api/operations/equipes/${params}`),
+  affectations: (params = "") =>
+    raw<import("../types").Paginated<import("../types").EquipeAffectation>>(`/api/operations/affectations/${params}`),
+  presences: (params = "") =>
+    raw<import("../types").Paginated<import("../types").PresenceChantier>>(`/api/operations/presences/${params}`),
   equipements: (params = "") =>
     raw<import("../types").Paginated<import("../types").EquipementParc>>(`/api/logistique/equipements/${params}`),
   locationsGR: (params = "") =>

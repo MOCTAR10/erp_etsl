@@ -7,6 +7,7 @@ Procédures MANUEL 5.3-5.7.
 """
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -71,6 +72,10 @@ class GammeOperatoire(models.Model):
         if not self.code:
             self.code = OperationsSequence.next_for("GAM", "GAM")
         return super().save(*args, **kwargs)
+
+    @property
+    def total_hours_decimal(self):
+        return sum((op.planned_hours for op in self.operations.all()), Decimal("0")) if self.id else Decimal("0")
 
     @property
     def total_planned_hours(self):
@@ -205,6 +210,9 @@ class OrdreFabrication(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = OperationsSequence.next_for("OF", "OF")
+        if self.gamme_id and not self.calculated_hours:
+            # Heures calculées = temps de la gamme × quantité (jusqu'ici saisies à la main, donc à 0 pour un OF auto).
+            self.calculated_hours = self.gamme.total_hours_decimal * (self.quantity or 1)
         return super().save(*args, **kwargs)
 
     def clean(self):
@@ -428,3 +436,130 @@ class DossierOperationnel(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Dossier opérationnel scellé : suppression interdite.")
+
+
+class Equipe(models.Model):
+    """Équipe de métier affectable aux OF / chantiers (CDC M3 §6.3 : affectation des équipes)."""
+
+    class Metier(models.TextChoices):
+        SOUDEUR = "soudeur", "Soudeurs"
+        CHAUDRONNIER = "chaudronnier", "Chaudronniers"
+        TUYAUTEUR = "tuyauteur", "Tuyauteurs"
+        MONTEUR = "monteur", "Monteurs"
+        PEINTRE = "peintre", "Peintres"
+        GENIE_CIVIL = "genie_civil", "Génie civil"
+        ELECTRICIEN = "electricien", "Électriciens"
+        INSTRUMENTISTE = "instrumentiste", "Instrumentistes"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    label = models.CharField(max_length=150, verbose_name="Équipe")
+    metier = models.CharField(max_length=16, choices=Metier.choices, verbose_name="Corps de métier")
+    chef = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="operations_equipes_dirigees", verbose_name="Chef d'équipe",
+    )
+    membres = models.ManyToManyField(
+        "rh_paie.Employe", blank=True, related_name="equipes_operations", verbose_name="Membres",
+    )
+    actif = models.BooleanField(default=True, verbose_name="Active")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["metier", "label"]
+        verbose_name = "Équipe"
+        verbose_name_plural = "Équipes"
+
+    def __str__(self):
+        return f"{self.code} — {self.label}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = OperationsSequence.next_for("EQP", "EQP")
+        return super().save(*args, **kwargs)
+
+
+class AffectationEquipe(models.Model):
+    """Tableau d'affectation : une équipe sur un OF pour une période ; la mobilisation est attestée (fiche de mobilisation)."""
+
+    class Statut(models.TextChoices):
+        PLANIFIEE = "planifiee", "Planifiée"
+        MOBILISEE = "mobilisee", "Mobilisée"
+        TERMINEE = "terminee", "Terminée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    equipe = models.ForeignKey(Equipe, on_delete=models.PROTECT, related_name="affectations", verbose_name="Équipe")
+    ordre = models.ForeignKey(
+        OrdreFabrication, on_delete=models.CASCADE, related_name="affectations", verbose_name="Ordre de fabrication",
+    )
+    date_debut = models.DateField(verbose_name="Du")
+    date_fin = models.DateField(verbose_name="Au")
+    effectif = models.PositiveSmallIntegerField(default=1, verbose_name="Effectif mobilisé")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.PLANIFIEE, verbose_name="Statut")
+    mobilise_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="operations_mobilisations", verbose_name="Mobilisée par",
+    )
+    mobilise_le = models.DateTimeField(null=True, blank=True, verbose_name="Mobilisée le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="operations_affectations_creees", verbose_name="Créée par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_debut", "-created_at"]
+        verbose_name = "Affectation d'équipe"
+        verbose_name_plural = "Affectations d'équipes"
+        indexes = [models.Index(fields=["ordre", "statut"]), models.Index(fields=["equipe", "date_debut"])]
+
+    def __str__(self):
+        return f"{self.code} — {self.equipe.label} / {self.ordre.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = OperationsSequence.next_for("AFE", "AFE")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
+            raise ValidationError({"date_fin": "La fin doit être postérieure au début."})
+        if self.effectif < 1:
+            raise ValidationError({"effectif": "L'effectif doit être d'au moins 1."})
+
+
+class PresenceChantier(models.Model):
+    """Registre de présence : un salarié, un OF, un jour (une seule ligne par jour)."""
+
+    class Statut(models.TextChoices):
+        PRESENT = "present", "Présent"
+        ABSENT = "absent", "Absent"
+        RETARD = "retard", "En retard"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ordre = models.ForeignKey(OrdreFabrication, on_delete=models.CASCADE, related_name="presences", verbose_name="OF")
+    employe = models.ForeignKey(
+        "rh_paie.Employe", on_delete=models.PROTECT, related_name="presences_chantier", verbose_name="Salarié",
+    )
+    date = models.DateField(verbose_name="Date")
+    statut = models.CharField(max_length=8, choices=Statut.choices, default=Statut.PRESENT, verbose_name="Présence")
+    motif = models.CharField(max_length=200, blank=True, verbose_name="Motif (absence / retard)")
+    releve_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="operations_presences_relevees", verbose_name="Relevé par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "employe__nom"]
+        unique_together = [("ordre", "employe", "date")]
+        verbose_name = "Présence chantier"
+        verbose_name_plural = "Registre de présence"
+
+    def __str__(self):
+        return f"{self.employe} — {self.ordre.code} — {self.date} ({self.get_statut_display()})"
+
+    def clean(self):
+        if self.statut != self.Statut.PRESENT and not self.motif:
+            raise ValidationError({"motif": "Un motif est obligatoire pour une absence ou un retard."})

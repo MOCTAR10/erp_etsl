@@ -11,7 +11,10 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .models import (
+    AffectationEquipe,
     CapaciteAtelier,
+    Equipe,
+    PresenceChantier,
     DossierOperationnel,
     GammeOperatoire,
     GammeOperation,
@@ -20,7 +23,10 @@ from .models import (
     SituationTravaux,
 )
 from .serializers import (
+    AffectationEquipeSerializer,
     CapaciteAtelierSerializer,
+    EquipeSerializer,
+    PresenceChantierSerializer,
     DossierOperationnelSerializer,
     GammeOperatoireSerializer,
     GammeOperationSerializer,
@@ -150,6 +156,86 @@ class CapaciteAtelierViewSet(_CommonViewSet):
     queryset = CapaciteAtelier.objects.all()
 
 
+class EquipeViewSet(_CommonViewSet):
+    serializer_class = EquipeSerializer
+
+    def get_queryset(self):
+        qs = Equipe.objects.prefetch_related("membres")
+        metier = self.request.query_params.get("metier")
+        return qs.filter(metier=metier) if metier else qs
+
+
+class AffectationEquipeViewSet(_CommonViewSet):
+    serializer_class = AffectationEquipeSerializer
+
+    def get_queryset(self):
+        qs = AffectationEquipe.objects.select_related("equipe", "ordre")
+        for param, champ in (("ordre", "ordre_id"), ("equipe", "equipe_id"), ("statut", "statut")):
+            valeur = self.request.query_params.get(param)
+            if valeur:
+                qs = qs.filter(**{champ: valeur})
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def _assert_planifiee(self):
+        if self.get_object().statut != AffectationEquipe.Statut.PLANIFIEE:
+            raise DRFValidationError("Affectation mobilisée ou terminée : non modifiable ni supprimable.")
+
+    def update(self, request, *args, **kwargs):
+        self._assert_planifiee()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._assert_planifiee()
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def mobiliser(self, request, pk=None):
+        """Fiche de mobilisation : atteste la mobilisation de l'équipe (serveur) ; l'OF ne doit pas être clos."""
+        aff = AffectationEquipe.objects.select_for_update(of=("self",)).select_related("ordre").get(pk=self.get_object().pk)
+        if aff.statut != AffectationEquipe.Statut.PLANIFIEE:
+            raise DRFValidationError("Seule une affectation planifiée peut être mobilisée.")
+        if aff.ordre.status in (OrdreFabrication.Status.CLOTURE, OrdreFabrication.Status.ANNULE):
+            raise DRFValidationError(f"OF {aff.ordre.code} clos ou annulé : mobilisation impossible.")
+        aff.statut = AffectationEquipe.Statut.MOBILISEE
+        aff.mobilise_par = request.user
+        aff.mobilise_le = timezone.now()
+        aff.save(update_fields=["statut", "mobilise_par", "mobilise_le"])
+        return Response(self.get_serializer(aff).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def terminer(self, request, pk=None):
+        aff = AffectationEquipe.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if aff.statut != AffectationEquipe.Statut.MOBILISEE:
+            raise DRFValidationError("Seule une affectation mobilisée peut être terminée.")
+        aff.statut = AffectationEquipe.Statut.TERMINEE
+        aff.save(update_fields=["statut"])
+        return Response(self.get_serializer(aff).data)
+
+
+class PresenceChantierViewSet(_CommonViewSet):
+    serializer_class = PresenceChantierSerializer
+
+    def get_queryset(self):
+        qs = PresenceChantier.objects.select_related("ordre", "employe")
+        for param, champ in (("ordre", "ordre_id"), ("employe", "employe_id"), ("statut", "statut")):
+            valeur = self.request.query_params.get(param)
+            if valeur:
+                qs = qs.filter(**{champ: valeur})
+        if self.request.query_params.get("from"):
+            qs = qs.filter(date__gte=self.request.query_params["from"])
+        if self.request.query_params.get("to"):
+            qs = qs.filter(date__lte=self.request.query_params["to"])
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(releve_par=self.request.user)
+
+
 class DossierOperationnelViewSet(viewsets.ReadOnlyModelViewSet):
     """Dossiers opérationnels scellés à la libération des OF (lecture seule)."""
 
@@ -250,10 +336,24 @@ class SituationTravauxViewSet(_CommonViewSet):
         self._assert_unlocked()
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def soumettre(self, request, pk=None):
+        """Brouillon → soumise à validation (circuit : le créateur soumet, un tiers valide)."""
+        situation = SituationTravaux.objects.select_for_update().get(pk=self.get_object().pk)
+        if situation.status != SituationTravaux.Status.BROUILLON:
+            raise DRFValidationError("Seule une situation en brouillon peut être soumise.")
+        situation.status = SituationTravaux.Status.SOUMISE
+        situation.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(situation).data)
+
     @action(detail=True, methods=["post"], url_path="validate")
+    @transaction.atomic
     def validate(self, request, pk=None):
-        """Validation d'une situation de travaux (RF-ERP-22) — une seule fois."""
-        situation = self.get_object()
+        """Validation d'une situation de travaux (RF-ERP-22) — une seule fois, par un tiers du créateur."""
+        situation = SituationTravaux.objects.select_for_update().get(pk=self.get_object().pk)
+        if situation.created_by_id and situation.created_by_id == request.user.id:
+            raise DRFValidationError("Séparation des tâches : le créateur d'une situation ne peut pas la valider.")
         if situation.status not in (
             SituationTravaux.Status.BROUILLON,
             SituationTravaux.Status.SOUMISE,
