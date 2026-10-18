@@ -680,3 +680,150 @@ class LigneLettree(models.Model):
     class Meta:
         verbose_name = "Ligne lettrée"
         verbose_name_plural = "Lignes lettrées"
+
+
+class ModeleFacture(models.Model):
+    """Modèle de facture client (en-tête, mentions légales, conditions) — modifiable par ETSL sans développeur.
+
+    Un seul enregistrement (`code="DEFAUT"`), créé à la volée avec des textes PROVISOIRES : le PDF porte un
+    avertissement tant qu'ETSL n'a pas confirmé son modèle (NIF, RCCM, banque, mentions légales).
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    code = models.CharField(max_length=20, unique=True, default="DEFAUT")
+    entete = models.TextField(verbose_name="En-tête (raison sociale, adresse, NIF, RCCM)")
+    mentions_legales = models.TextField(blank=True, verbose_name="Mentions légales")
+    conditions_paiement = models.TextField(blank=True, verbose_name="Conditions de paiement")
+    coordonnees_bancaires = models.TextField(blank=True, verbose_name="Coordonnées bancaires")
+    pied_page = models.TextField(blank=True, verbose_name="Pied de page")
+    delai_paiement_jours = models.PositiveSmallIntegerField(default=30, verbose_name="Délai de paiement (jours)")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
+        verbose_name="Statut du modèle",
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Modèle de facture client"
+        verbose_name_plural = "Modèles de facture client"
+
+    def __str__(self):
+        return f"Modèle {self.code} ({self.statut_valeur})"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class FactureClient(models.Model):
+    """Facture ou avoir client — émise via le noyau comptable (411 / 706 / 443), puis scellée.
+
+    Toute correction d'une facture émise passe par un avoir (jamais de modification)."""
+
+    class Nature(models.TextChoices):
+        FACTURE = "facture", "Facture"
+        AVOIR = "avoir", "Avoir"
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        EMISE = "emise", "Émise"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Numéro")
+    nature = models.CharField(max_length=8, choices=Nature.choices, default=Nature.FACTURE, db_index=True)
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, db_index=True)
+    client = models.ForeignKey(
+        "referentiels.Partner", on_delete=models.PROTECT, related_name="factures_clients", verbose_name="Client"
+    )
+    affaire = models.ForeignKey(
+        "commercial.Affaire", null=True, blank=True, on_delete=models.SET_NULL, related_name="factures_clients"
+    )
+    jalon = models.ForeignKey(
+        "commercial.Milestone", null=True, blank=True, on_delete=models.SET_NULL, related_name="factures_clients"
+    )
+    situation = models.ForeignKey(
+        "operations.SituationTravaux", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="factures_clients",
+    )
+    facture_origine = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="avoirs",
+        verbose_name="Facture d'origine (avoir)",
+    )
+    objet = models.CharField(max_length=250, blank=True, verbose_name="Objet")
+    date = models.DateField(default=timezone.localdate, verbose_name="Date de facture")
+    echeance = models.DateField(null=True, blank=True, verbose_name="Échéance")
+    taux_tva = models.ForeignKey(
+        TauxTva, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Taux de TVA"
+    )
+    montant_ht = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    montant_tva = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    montant_ttc = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="factures_clients",
+    )
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="PDF archivé en GED",
+    )
+    modele_provisoire = models.BooleanField(
+        default=False, help_text="Le modèle de facture était provisoire à l'émission (avertissement sur le PDF)."
+    )
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    emise_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    emise_le = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Facture client"
+        verbose_name_plural = "Factures clients"
+
+    def __str__(self):
+        return f"{self.code} — {self.client_id}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = (
+                ComptabiliteSequence.next_for("AVO", "AVO") if self.nature == self.Nature.AVOIR
+                else ComptabiliteSequence.next_for("FAC", "FAC")
+            )
+        return super().save(*args, **kwargs)
+
+    def recalculer(self):
+        """Totaux depuis les lignes et le taux de TVA (arrondi au franc, FCFA sans décimales significatives)."""
+        ht = sum((l.montant for l in self.lignes.all()), Decimal("0"))
+        taux = self.taux_tva.taux if self.taux_tva_id else Decimal("0")
+        tva = (ht * taux / Decimal("100")).quantize(Decimal("0.01"))
+        self.montant_ht, self.montant_tva, self.montant_ttc = ht, tva, ht + tva
+        self.save(update_fields=["montant_ht", "montant_tva", "montant_ttc"])
+
+
+class LigneFactureClient(models.Model):
+    facture = models.ForeignKey(FactureClient, on_delete=models.CASCADE, related_name="lignes")
+    designation = models.CharField(max_length=250, verbose_name="Désignation")
+    quantite = models.DecimalField(max_digits=12, decimal_places=3, default=1, verbose_name="Quantité")
+    prix_unitaire = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Prix unitaire HT")
+    montant = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Montant HT")
+    compte_produit = models.ForeignKey(
+        "referentiels.Account", on_delete=models.PROTECT, related_name="+", verbose_name="Compte de produit"
+    )
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Ligne de facture client"
+        verbose_name_plural = "Lignes de facture client"
+
+    def save(self, *args, **kwargs):
+        self.montant = (self.quantite * self.prix_unitaire).quantize(Decimal("0.01"))
+        return super().save(*args, **kwargs)

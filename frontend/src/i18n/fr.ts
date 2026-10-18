@@ -110,6 +110,18 @@ export const fr = {
     reporting: "{{annee}} · effectif {{effectif}} · entrées {{entrees}} · sorties {{sorties}} · turnover {{turnover}} % · absences {{absence}} j · absentéisme {{absenteisme}} %",
     integrer: "Intégrer les pointages (heures sup.)",
   },
+  facturation: {
+    title: "Facturation client (M10)",
+    hint: "Les jalons réalisés et les situations validées sont facturés ici. Une facture émise est comptabilisée (411 · 706 · 443), archivée en GED 10 ans et scellée : toute correction passe par un avoir.",
+    warnModele: "Modèle de facture provisoire : en-tête et mentions légales à confirmer par ETSL (le PDF porte un avertissement).",
+    aFacturer: "{{count}} élément(s) à facturer", facturer: "Créer la facture", factures: "Factures et avoirs · {{count}}", aucune: "Aucune facture pour l'instant.",
+    numero: "Numéro", client: "Client", date: "Date", ttc: "Total TTC", statut: "Statut", avoir: "Avoir",
+    st: { brouillon: "Brouillon", emise: "Émise" }, emettre: "Émettre", confirmEmettre: "Émettre cette facture ? L'écriture comptable ne se modifie plus (avoir uniquement).",
+    faireAvoir: "Avoir", avoirPrompt: "Montant HT de l'avoir (vide = avoir total) ?",
+    modele: "Modèle de facture", provisoire: "Provisoire", confirme: "Confirmé", modifier: "Modifier", valider: "Valider", annuler: "Annuler",
+    confirmer: "Confirmer le modèle", confirmModele: "Confirmer ce modèle de facture (validé par ETSL) ?",
+    champ: { entete: "En-tête", mentions_legales: "Mentions légales", conditions_paiement: "Conditions de paiement", coordonnees_bancaires: "Coordonnées bancaires", pied_page: "Pied de page" },
+  },
   banque: {
     title: "Import des relevés bancaires et rapprochement automatique (M10)",
     hint: "Formats MT940 et CFONB 120 (gabarits standard, à valider sur les relevés réels de la banque d'ETSL). Le rapprochement associe lignes de relevé et paiements validés ; les écarts sont listés.",
