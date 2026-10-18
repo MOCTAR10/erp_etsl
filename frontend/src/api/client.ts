@@ -1,4 +1,5 @@
 import { useAuth } from "../store/auth";
+import { listAll, type ListAllOptions } from "../lib/listAll";
 import type { Me, Tokens } from "../types";
 
 // BASE_URL = "/" en dev/racine, "/erp_etsl/" sous sous-chemin nginx → préfixe tous les /api.
@@ -122,6 +123,9 @@ export const api = {
   post: <T,>(path: string, body?: unknown) =>
     raw<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T,>(path: string, body: unknown) => raw<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  /** Toutes les pages d'une liste (listes de choix des formulaires) : suit `next` jusqu'à `maxPages`. */
+  listAll: <T,>(path: string, opts?: ListAllOptions) =>
+    listAll<T>((p) => raw<import("../types").Paginated<T>>(p), path, opts),
   /** Téléchargement authentifié d'un export (CSV, XLSX, PDF) : le serveur journalise l'export (EX-G-10). */
   download: async (path: string, filename: string) => {
     const res = await fetch(apiUrl(path), {
