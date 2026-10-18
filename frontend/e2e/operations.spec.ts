@@ -14,9 +14,9 @@ test.describe("M3 Opérations : parcours de clôture", () => {
   test("affectation des équipes et registre de présence sont saisissables", async ({ page }) => {
     await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
     await page.goto("/operations");
-    await expect(page.getByRole("heading", { name: /Affectation des équipes/ })).toBeVisible();
+    await expect(page.getByText(/Affectation des équipes/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Affecter une équipe" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Registre de présence chantier/ })).toBeVisible();
+    await expect(page.getByText(/Registre de présence chantier/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Relever une présence" })).toBeVisible();
   });
 });

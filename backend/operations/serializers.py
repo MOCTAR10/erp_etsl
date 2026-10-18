@@ -332,7 +332,7 @@ class AffectationEquipeSerializer(ModelCleanMixin, serializers.ModelSerializer):
         return attrs
 
 
-class PresenceChantierSerializer(serializers.ModelSerializer):
+class PresenceChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     employe_nom = serializers.SerializerMethodField()
     ordre_code = serializers.CharField(source="ordre.code", read_only=True)
