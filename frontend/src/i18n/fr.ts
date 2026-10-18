@@ -466,6 +466,9 @@ export const fr = {
     },
   },
   logistique: {
+    searchEquipements: "Rechercher un équipement (code, libellé, immatriculation)…",
+    searchLocations: "Rechercher une location (code, références)…",
+    searchDemandes: "Rechercher une demande (code, libellé)…",
     act: { emettre: "Émettre BC / GR", soumettre: "Soumettre", traiter: "Marquer traitée", compteurDepart: "Relevé du compteur au départ :", compteurFin: "Relevé du compteur au retour :" },
     col: { code: "Code", equipement: "Équipement", partenaire: "Partenaire", periodicite: "Périodicité", consommation: "Consommation", montant: "Montant estimé", statut: "Statut", besoin: "Besoin", departement: "Département", affaire: "Affaire" },
     title: "Logistique — Parc & GLOBAL RENTAL (M4)",
@@ -866,6 +869,9 @@ export const fr = {
     },
   },
   maintenance: {
+    searchOt: "Rechercher un ordre de travail (code, actif)…",
+    searchActifs: "Rechercher un actif (code, désignation, n° de série)…",
+    searchInspections: "Rechercher une inspection (code, organisme)…",
     act: { planifier: "Planifier", terminer: "Terminer", annuler: "Annuler", confirmAnnuler: "Annuler cet ordre de travail ?", archiver: "Archiver", confirmArchiver: "Archiver cet OT ? Il deviendra non modifiable." },
     form: { title: "Nouvel ordre de travail", actif: "Équipement", priorite: "Priorité", datePlanifiee: "Date planifiée", description: "Description de l'intervention" },
     col: { code: "Code", designation: "Désignation", category: "Catégorie", site: "Site", status: "Statut", type: "Type", date: "Date", ot: "OT généré" },

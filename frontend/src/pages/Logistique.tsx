@@ -1,11 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ClipboardList, MapPin, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { GrAffairesSection, ParametresLogistiqueSection } from "../components/workflow/GrAffairesSection";
 import { formatDate, formatNumber } from "../lib/format";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import type {
   DemandeMobilisation,
@@ -139,9 +141,11 @@ function demandeColumns(t: T): Column<DemandeMobilisation>[] {
 export function LogistiquePage() {
   const { t } = useTranslation();
 
+  const [eqSearch, setEqSearch] = useState("");
   const byStatus = useQuery({
-    queryKey: ["equipements"],
-    queryFn: () => api.equipements(`?page_size=100`),
+    queryKey: ["equipements", eqSearch],
+    queryFn: () => api.equipements(pagedQuery(1, 500, eqSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<EquipementParc>) => {
       const groups: Groups = {
         disponible: [],
@@ -162,17 +166,8 @@ export function LogistiquePage() {
     queryFn: () => api.parcStats(),
   });
 
-  const locations = useQuery({
-    queryKey: ["locations"],
-    queryFn: () => api.locationsGR(`?page_size=100`),
-    select: (page: Paginated<LocationGR>) => page.results,
-  });
-
-  const demandes = useQuery({
-    queryKey: ["demandes"],
-    queryFn: () => api.demandesLog(`?page_size=50`),
-    select: (page: Paginated<DemandeMobilisation>) => page.results,
-  });
+  const locations = usePagedList<LocationGR>("locations", (q) => api.locationsGR(q));
+  const demandes = usePagedList<DemandeMobilisation>("demandes", (q) => api.demandesLog(q));
 
   if (byStatus.isLoading || parc.isLoading) return <BoardSkeleton cols={5} rows={3} />;
   if (byStatus.isError || parc.isError || !byStatus.data)
@@ -182,8 +177,8 @@ export function LogistiquePage() {
         onRetry={() => {
           void byStatus.refetch();
           void parc.refetch();
-          void locations.refetch();
-          void demandes.refetch();
+          void locations.query.refetch();
+          void demandes.query.refetch();
         }}
         retryLabel={t("common.retry")}
       />
@@ -219,8 +214,10 @@ export function LogistiquePage() {
           tone="accent"
           delay={0.05}
         />
-        <Kpi label={t("logistique.demandes")} value={demandes.data?.length ?? "—"} icon={ClipboardList} tone="warn" delay={0.1} />
+        <Kpi label={t("logistique.demandes")} value={demandes.count} icon={ClipboardList} tone="warn" delay={0.1} />
       </div>
+
+      <SearchField value={eqSearch} onChange={setEqSearch} placeholder={t("logistique.searchEquipements")} />
 
       <div style={{ overflowX: "auto" }}>
         <Board>
@@ -232,6 +229,7 @@ export function LogistiquePage() {
               tone={STATUS_BADGE[st]}
               delay={ci * 0.05}
               minWidth={260}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
@@ -245,16 +243,16 @@ export function LogistiquePage() {
         </Board>
       </div>
 
-      {(locations.data ?? []).length > 0 && (
+      {(locations.count > 0 || locations.search) && (
         <SectionCard title={`${t("logistique.locationsActives")} — GLOBAL RENTAL`}>
-          <DataTable rows={locations.data ?? []} columns={locationColumns(t)} caption={t("logistique.locationsActives")} />
+          <PagedDataTable list={locations} columns={locationColumns(t)} caption={t("logistique.locationsActives")} searchPlaceholder={t("logistique.searchLocations")} />
         </SectionCard>
       )}
       <GrAffairesSection />
       <ParametresLogistiqueSection />
-      {(demandes.data ?? []).length > 0 && (
-        <SectionCard title={`${t("logistique.demandes")} · ${(demandes.data ?? []).length}`}>
-          <DataTable rows={demandes.data ?? []} columns={demandeColumns(t)} caption={t("logistique.demandes")} />
+      {(demandes.count > 0 || demandes.search) && (
+        <SectionCard title={`${t("logistique.demandes")} · ${demandes.count}`}>
+          <PagedDataTable list={demandes} columns={demandeColumns(t)} caption={t("logistique.demandes")} searchPlaceholder={t("logistique.searchDemandes")} />
         </SectionCard>
       )}
     </>

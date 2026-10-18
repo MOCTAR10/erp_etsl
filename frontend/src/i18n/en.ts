@@ -466,6 +466,9 @@ export const en = {
     },
   },
   logistique: {
+    searchEquipements: "Search equipment (code, label, plate)…",
+    searchLocations: "Search rentals (code, references)…",
+    searchDemandes: "Search requests (code, label)…",
     act: { emettre: "Issue PO / GR", soumettre: "Submit", traiter: "Mark as handled", compteurDepart: "Meter reading at start:", compteurFin: "Meter reading at return:" },
     col: { code: "Code", equipement: "Equipment", partenaire: "Partner", periodicite: "Billing period", consommation: "Usage", montant: "Estimated amount", statut: "Status", besoin: "Need", departement: "Department", affaire: "Project" },
     title: "Logistics — Fleet & GLOBAL RENTAL (M4)",
@@ -866,6 +869,9 @@ export const en = {
     },
   },
   maintenance: {
+    searchOt: "Search work orders (code, asset)…",
+    searchActifs: "Search assets (code, designation, serial no.)…",
+    searchInspections: "Search inspections (code, body)…",
     act: { planifier: "Schedule", terminer: "Complete", annuler: "Cancel", confirmAnnuler: "Cancel this work order?", archiver: "Archive", confirmArchiver: "Archive this work order? It will become read-only." },
     form: { title: "New work order", actif: "Equipment", priorite: "Priority", datePlanifiee: "Planned date", description: "Work description" },
     col: { code: "Code", designation: "Designation", category: "Category", site: "Site", status: "Status", type: "Type", date: "Date", ot: "Generated WO" },

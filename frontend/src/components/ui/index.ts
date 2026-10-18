@@ -20,3 +20,4 @@ export { QuickForm } from "./QuickForm";
 export type { QuickField } from "./QuickForm";
 export { PAGE_SIZES, Pagination } from "./Pagination";
 export { SearchField } from "./SearchField";
+export { PagedDataTable } from "./PagedDataTable";

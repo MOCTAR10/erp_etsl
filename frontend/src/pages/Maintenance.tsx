@@ -1,11 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ClipboardCheck, Coins, Hammer, Inbox, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
 import { formatDate } from "../lib/format";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   Actif,
   Inspection,
@@ -87,15 +89,18 @@ export function MaintenancePage() {
 
   const stats = useQuery({ queryKey: ["maintenance-stats"], queryFn: api.maintenanceStats });
 
-  const actifs = useQuery({
-    queryKey: ["maintenance-actifs"],
-    queryFn: () => api.actifs(`?page_size=50`),
-    select: (page: Paginated<Actif>) => page.results,
+  // Tableau des actifs paginé ; liste complète (toutes les pages) pour le formulaire et le décompte des arrêts.
+  const actifs = usePagedList<Actif>("maintenance-actifs", (q) => api.actifs(q));
+  const actifsTous = useQuery({
+    queryKey: ["maintenance-actifs-choix"],
+    queryFn: () => api.listAll<Actif>("/api/maintenance/actifs/"),
   });
 
+  const [otSearch, setOtSearch] = useState("");
   const ordres = useQuery({
-    queryKey: ["maintenance-ordres"],
-    queryFn: () => api.ordresTravail(`?page_size=100`),
+    queryKey: ["maintenance-ordres", otSearch],
+    queryFn: () => api.ordresTravail(pagedQuery(1, 500, otSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<OrdreTravail>) => {
       const groups: OtGroups = { demande: [], planifie: [], en_cours: [], termine: [], cloture: [], archive: [], annule: [] };
       for (const ot of page.results) {
@@ -105,11 +110,7 @@ export function MaintenancePage() {
     },
   });
 
-  const inspections = useQuery({
-    queryKey: ["maintenance-inspections"],
-    queryFn: () => api.inspections(`?page_size=50`),
-    select: (page: Paginated<Inspection>) => page.results,
-  });
+  const inspections = usePagedList<Inspection>("maintenance-inspections", (q) => api.inspections(q));
 
   if (stats.isLoading || ordres.isLoading || !stats.data)
     return <BoardSkeleton cols={6} rows={3} />;
@@ -119,19 +120,21 @@ export function MaintenancePage() {
         message={t("common.error")}
         onRetry={() => {
           void stats.refetch();
-          void actifs.refetch();
+          void actifs.query.refetch();
+          void actifsTous.refetch();
           void ordres.refetch();
-          void inspections.refetch();
+          void inspections.query.refetch();
         }}
         retryLabel={t("common.retry")}
       />
     );
 
   const s = stats.data;
-  const actifsAll = actifs.data ?? [];
+  const actifsAll = actifs.rows;
+  const actifsChoix = actifsTous.data ?? [];
   const groups = ordres.data;
-  const inspectionsAll = inspections.data ?? [];
-  const arrete = actifsAll.filter((a) => a.en_arret).length;
+  const inspectionsAll = inspections.rows;
+  const arrete = actifsChoix.filter((a) => a.en_arret).length;
   const ouvertNonClos = Object.entries(groups)
     .filter(([k]) => !["cloture", "archive", "annule"].includes(k))
     .reduce((sum, [, arr]) => sum + arr.length, 0);
@@ -148,7 +151,7 @@ export function MaintenancePage() {
             label: t("maintenance.form.actif"),
             type: "select",
             required: true,
-            options: actifsAll.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
+            options: actifsChoix.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
           },
           {
             name: "type_ot",
@@ -175,8 +178,10 @@ export function MaintenancePage() {
         <Kpi label={t("maintenance.otOuverts")} value={s.ot_ouverts} hint={`${t("maintenance.enCours")} · ${s.ot_en_cours} · ${t("maintenance.critiques")} · ${s.ot_critiques}`} icon={Wrench} tone="brand" delay={0} />
         <Kpi label={t("maintenance.actifsArret")} value={arrete || s.actifs_arret} hint={`${t("maintenance.operationnels")} · ${s.actifs_operationnels}`} icon={Hammer} tone="warn" delay={0.05} />
         <Kpi label={t("maintenance.inspectionsPrevues")} value={s.inspections_prevues} hint={`${t("maintenance.heuresTotal")} · ${s.heures_total}`} icon={ClipboardCheck} tone="accent" delay={0.1} />
-        <Kpi label={t("maintenance.coutTotal")} value={`${s.cout_total > 0 ? s.cout_total.toLocaleString("fr-FR") : "0"} F`} hint={`${t("maintenance.actifs")} · ${actifsAll.length}`} icon={Coins} tone="brand" delay={0.15} />
+        <Kpi label={t("maintenance.coutTotal")} value={`${s.cout_total > 0 ? s.cout_total.toLocaleString("fr-FR") : "0"} F`} hint={`${t("maintenance.actifs")} · ${actifs.count}`} icon={Coins} tone="brand" delay={0.15} />
       </div>
+
+      <SearchField value={otSearch} onChange={setOtSearch} placeholder={t("maintenance.searchOt")} />
 
       <div style={{ overflowX: "auto" }}>
         <Board>
@@ -188,6 +193,7 @@ export function MaintenancePage() {
               tone={OT_BADGE[st]}
               delay={ci * 0.05}
               minWidth={260}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <EmptyState icon={Inbox} label={t("common.empty")} />
@@ -205,8 +211,9 @@ export function MaintenancePage() {
         </p>
       ) : null}
 
-      {actifsAll.length > 0 && (
-        <SectionCard title={`${t("maintenance.actifs")} · ${actifsAll.length}`}>
+      {(actifs.count > 0 || actifs.search) && (
+        <SectionCard title={`${t("maintenance.actifs")} · ${actifs.count}`}>
+          <SearchField value={actifs.search} onChange={actifs.setSearch} placeholder={t("maintenance.searchActifs")} />
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -239,6 +246,7 @@ export function MaintenancePage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={actifs.page} pageSize={actifs.pageSize} count={actifs.count} onPageChange={actifs.setPage} onPageSizeChange={actifs.setPageSize} />
         </SectionCard>
       )}
 
@@ -246,8 +254,9 @@ export function MaintenancePage() {
       <PiecesRechangeSection />
       <ParametresMaintenanceSection />
 
-      {inspectionsAll.length > 0 && (
-        <SectionCard title={`${t("maintenance.inspections")} · ${inspectionsAll.length}`}>
+      {(inspections.count > 0 || inspections.search) && (
+        <SectionCard title={`${t("maintenance.inspections")} · ${inspections.count}`}>
+          <SearchField value={inspections.search} onChange={inspections.setSearch} placeholder={t("maintenance.searchInspections")} />
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -282,6 +291,7 @@ export function MaintenancePage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={inspections.page} pageSize={inspections.pageSize} count={inspections.count} onPageChange={inspections.setPage} onPageSizeChange={inspections.setPageSize} />
         </SectionCard>
       )}
     </>
