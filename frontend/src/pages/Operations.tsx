@@ -69,11 +69,26 @@ function Charge({ stats }: { stats: ChargeStats }) {
       delay={delay}
     />
   );
+  const alertes = stats.alertes ?? [];
   return (
-    <div className="kpi-grid">
-      {scope("atelier", 0, Factory)}
-      {scope("chantier", 0.05, Construction)}
-    </div>
+    <>
+      <div className="kpi-grid">
+        {scope("atelier", 0, Factory)}
+        {scope("chantier", 0.05, Construction)}
+      </div>
+      {alertes.length > 0 && (
+        <SectionCard title={`${t("operations.surcharge")} · ${alertes.length}`}>
+          <ul data-testid="alertes-surcharge">
+            {alertes.map((a) => (
+              <li key={`${a.scope}-${a.week}`}>
+                <Badge tone="warn">{t(`operations.${a.scope}`)}</Badge> {t("operations.semaine")} {formatDate(a.week)} :{" "}
+                {formatNumber(a.planned_hours)} h / {formatNumber(a.capacity)} h (+{formatNumber(a.overload_pct)} %)
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
+    </>
   );
 }
 
