@@ -951,6 +951,8 @@ export const en = {
     pendingNote: "Equipment down: corrective WO / maintenance decision required (MANUAL §5.9).",
   },
   rhPaie: {
+    searchEmployes: "Search employees (ID, name, role)…",
+    searchBulletins: "Search payslips (ID, name)…",
     act: { approuver: "Approve" },
     col: { matricule: "Employee ID", nom: "Name", fonction: "Position · department", categorie: "Category", statut: "Status" },
     title: "HR & Payroll — Staff, leave, training & pay slips (M9)",

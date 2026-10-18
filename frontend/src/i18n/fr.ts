@@ -951,6 +951,8 @@ export const fr = {
     pendingNote: "Équipements en arrêt : OT correctif / décision de maintenance requise (MANUEL §5.9).",
   },
   rhPaie: {
+    searchEmployes: "Rechercher un salarié (matricule, nom, fonction)…",
+    searchBulletins: "Rechercher un bulletin (matricule, nom)…",
     act: { approuver: "Approuver" },
     col: { matricule: "Matricule", nom: "Nom", fonction: "Fonction · département", categorie: "Catégorie", statut: "Statut" },
     title: "RH & Paie — Personnel, congés, formations & bulletins (M9)",

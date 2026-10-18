@@ -3,9 +3,10 @@ import { Banknote, CalendarClock, FileText, Inbox, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, Pagination, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
+import { usePagedList } from "../lib/usePagedList";
 import type {
   BulletinPaie,
   DemandeConge,
@@ -157,15 +158,11 @@ export function RhPaiePage() {
 
   const stats = useQuery({ queryKey: ["rhpaie-stats"], queryFn: api.rhPaieStats });
 
-  const employes = useQuery({
-    queryKey: ["rhpaie-employes"],
-    queryFn: () => api.employes(`?page_size=50`),
-    select: (page: Paginated<Employe>) => page.results,
-  });
+  const employes = usePagedList<Employe>("rhpaie-employes", (q) => api.employes(q), { pageSize: 20 });
 
   const conges = useQuery({
     queryKey: ["rhpaie-conges"],
-    queryFn: () => api.congesRh(`?page_size=100`),
+    queryFn: () => api.congesRh(`?page_size=500`),
     select: (page: Paginated<DemandeConge>) => {
       const groups: CongeGroups = { demande: [], approuve: [], valide: [], refuse: [], annule: [] };
       for (const c of page.results) {
@@ -175,11 +172,7 @@ export function RhPaiePage() {
     },
   });
 
-  const bulletins = useQuery({
-    queryKey: ["rhpaie-bulletins"],
-    queryFn: () => api.bulletinsPaie(`?page_size=50`),
-    select: (page: Paginated<BulletinPaie>) => page.results,
-  });
+  const bulletins = usePagedList<BulletinPaie>("rhpaie-bulletins", (q) => api.bulletinsPaie(q), { pageSize: 20 });
 
   const masse = useQuery({
     queryKey: ["rhpaie-masse"],
@@ -194,9 +187,9 @@ export function RhPaiePage() {
         message={t("common.error")}
         onRetry={() => {
           void stats.refetch();
-          void employes.refetch();
+          void employes.query.refetch();
           void conges.refetch();
-          void bulletins.refetch();
+          void bulletins.query.refetch();
           void masse.refetch();
         }}
         retryLabel={t("common.retry")}
@@ -204,9 +197,9 @@ export function RhPaiePage() {
     );
 
   const s = stats.data;
-  const employesAll = employes.data ?? [];
+  const employesAll = employes.rows;
   const groups = conges.data;
-  const bulletinsAll = bulletins.data ?? [];
+  const bulletinsAll = bulletins.rows;
   const m = masse.data;
   const enAttente = groups["demande"].length + groups["approuve"].length;
 
@@ -231,6 +224,7 @@ export function RhPaiePage() {
               tone={CONGE_BADGE[st]}
               delay={ci * 0.05}
               minWidth={240}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <EmptyState icon={Inbox} label={t("common.empty")} />
@@ -246,20 +240,44 @@ export function RhPaiePage() {
         {t("rhPaie.pendingNote")}
       </p>
 
-      {employesAll.length > 0 && (
-        <SectionCard title={`${t("rhPaie.employes")} · ${employesAll.length}`}>
-          <DataTable rows={employesAll} columns={employeColumns} caption={t("rhPaie.employes")} />
+      {(employes.count > 0 || employes.search) && (
+        <SectionCard title={`${t("rhPaie.employes")} · ${employes.count}`}>
+          <SearchField value={employes.search} onChange={employes.setSearch} placeholder={t("rhPaie.searchEmployes")} />
+          {employesAll.length === 0 ? (
+            <EmptyState icon={Inbox} label={t("common.empty")} />
+          ) : (
+            <DataTable rows={employesAll} columns={employeColumns} caption={t("rhPaie.employes")} />
+          )}
+          <Pagination
+            page={employes.page}
+            pageSize={employes.pageSize}
+            count={employes.count}
+            onPageChange={employes.setPage}
+            onPageSizeChange={employes.setPageSize}
+          />
         </SectionCard>
       )}
 
-      {bulletinsAll.length > 0 ? (
+      {bulletins.count > 0 || bulletins.search ? (
         <>
           <h3 className="section-heading">
             {t("rhPaie.bulletins")}
           </h3>
-          <div className="card-list">
-            {bulletinsAll.map((b) => <BulletinCard key={b.id} b={b} />)}
-          </div>
+          <SearchField value={bulletins.search} onChange={bulletins.setSearch} placeholder={t("rhPaie.searchBulletins")} />
+          {bulletinsAll.length === 0 ? (
+            <EmptyState icon={Inbox} label={t("common.empty")} />
+          ) : (
+            <div className="card-list">
+              {bulletinsAll.map((b) => <BulletinCard key={b.id} b={b} />)}
+            </div>
+          )}
+          <Pagination
+            page={bulletins.page}
+            pageSize={bulletins.pageSize}
+            count={bulletins.count}
+            onPageChange={bulletins.setPage}
+            onPageSizeChange={bulletins.setPageSize}
+          />
         </>
       ) : null}
       <DeclarationsSection />
