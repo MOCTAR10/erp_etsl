@@ -50,3 +50,32 @@ models:
       - name: actif_id
         tests:
           - not_null
+  - name: dm_pointages_m9
+    description: "Pointages M9 (Couche D) : heures productives, heures sup. par semaine ISO, nuit et astreinte par employé et par mois ; même règle que rh_paie.services.heures_supplementaires."
+    columns:
+      - name: employe_id
+        tests:
+          - not_null
+      - name: periode
+        tests:
+          - not_null
+  - name: dm_couts_m10
+    description: "Coûts et produits M10 (Couche D) par mois et compte analytique ; même règle que controle_gestion.services.compute_marges (coût GR 618 isolé)."
+    columns:
+      - name: periode
+        tests:
+          - not_null
+  - name: dm_compteurs_parc
+    description: "Compteurs du parc (M8, Couche D) : une ligne par plan préventif en vigueur, échéance compteur ou calendaire (règle PlanPreventif.motif_echeance)."
+    columns:
+      - name: plan_id
+        tests:
+          - not_null
+          - unique
+  - name: dm_lectures_gr
+    description: "Relevés de compteur des prestations GLOBAL RENTAL (Couche D) : première, dernière lecture et consommation par prestation."
+    columns:
+      - name: location_id
+        tests:
+          - not_null
+          - unique
