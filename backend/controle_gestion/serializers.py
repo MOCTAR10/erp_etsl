@@ -166,6 +166,15 @@ class ClotureGestionSerializer(serializers.ModelSerializer):
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     jours_ecoulement = serializers.IntegerField(read_only=True)
     conforme_j4 = serializers.BooleanField(read_only=True)
+    echeance_j4 = serializers.DateField(read_only=True)
+    echeance_j6 = serializers.DateField(read_only=True)
+    reporting_statut = serializers.CharField(read_only=True)
+    reporting_provisoire = serializers.SerializerMethodField()
+
+    def get_reporting_provisoire(self, obj):
+        from .services import CODES_REPORTING, parametres_gestion_provisoires
+
+        return parametres_gestion_provisoires(CODES_REPORTING)
 
     class Meta:
         model = ClotureGestion
@@ -179,11 +188,17 @@ class ClotureGestionSerializer(serializers.ModelSerializer):
             "statut_label",
             "jours_ecoulement",
             "conforme_j4",
+            "echeance_j4",
+            "echeance_j6",
+            "date_publication",
+            "publie_par",
+            "reporting_statut",
+            "reporting_provisoire",
             "created_by",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_by", "code", "statut"]
+        read_only_fields = ["created_by", "code", "statut", "date_publication", "publie_par"]
 
 
 class AnalyseEcartSerializer(serializers.ModelSerializer):

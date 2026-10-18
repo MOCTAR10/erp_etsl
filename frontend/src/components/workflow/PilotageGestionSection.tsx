@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { DoctrineResult, Paginated, ParametreGestion, SousActiviteResult } from "../../types";
+import type { AtterrissageResult, DoctrineResult, NiveauxMarge, Paginated, ParametreGestion, SousActiviteResult } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
 const montant = (v: string | null) => (v === null ? "••••••" : formatNumber(Number(v)));
@@ -35,6 +35,19 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
   const doctrine = useQuery({
     queryKey: ["cg-doctrine", fiscalYear],
     queryFn: () => api.get<DoctrineResult>(`/api/controle-gestion/doctrine/?fiscal_year=${fiscalYear}`),
+    enabled,
+    retry: 0,
+  });
+
+  const niveaux = useQuery({
+    queryKey: ["cg-niveaux-marge", fiscalYear],
+    queryFn: () => api.get<NiveauxMarge>(`/api/controle-gestion/niveaux-marge/?fiscal_year=${fiscalYear}`),
+    enabled,
+    retry: 0,
+  });
+  const atterrissage = useQuery({
+    queryKey: ["cg-atterrissage", fiscalYear],
+    queryFn: () => api.get<AtterrissageResult>(`/api/controle-gestion/atterrissage/?fiscal_year=${fiscalYear}`),
     enabled,
     retry: 0,
   });
@@ -72,6 +85,62 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
           </p>
         )}
         {error && <p className="action-error" role="alert">{error}</p>}
+
+        <h4 className="section-heading">{t("pilotageGestion.niveaux")}</h4>
+        {niveaux.data && (
+          <table className="table" data-testid="niveaux-marge">
+            <tbody>
+              {(
+                [
+                  ["marge_brute", "taux_brute"],
+                  ["marge_operationnelle", "taux_operationnelle"],
+                  ["marge_nette", "taux_nette"],
+                ] as const
+              ).map(([m, tx]) => (
+                <tr key={m}>
+                  <td>{t(`pilotageGestion.${m}`)}</td>
+                  <td className="num">{montant(niveaux.data[m])}</td>
+                  <td className="num">{niveaux.data[tx] === null ? "—" : `${niveaux.data[tx]} %`}</td>
+                </tr>
+              ))}
+              <tr>
+                <td>{t("pilotageGestion.coutGr")}</td>
+                <td className="num">{montant(niveaux.data.cout_gr)}</td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        )}
+        <p className="muted">{t("pilotageGestion.niveauxHint")}</p>
+
+        <h4 className="section-heading">{t("pilotageGestion.atterrissage")}</h4>
+        {atterrissage.data && atterrissage.data.rows.length > 0 && (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{t("pilotageGestion.budget")}</th>
+                <th className="num">{t("pilotageGestion.realise")}</th>
+                <th className="num">{t("pilotageGestion.resteAVenir")}</th>
+                <th className="num">{t("pilotageGestion.atterrissageCol")}</th>
+                <th className="num">{t("pilotageGestion.ecartObjectif")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {atterrissage.data.rows.map((r) => (
+                <tr key={r.budget}>
+                  <td>{r.code} — {r.label}</td>
+                  <td className="num">{montant(r.realise)}</td>
+                  <td className="num">{montant(r.reste_a_venir)}</td>
+                  <td className="num">{montant(r.atterrissage)}</td>
+                  <td className="num">{montant(r.ecart_objectif)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {atterrissage.data && atterrissage.data.marge_a_terminaison !== null && (
+          <p data-testid="marge-terminaison">{t("pilotageGestion.margeTerminaison")} : <strong>{montant(atterrissage.data.marge_a_terminaison)}</strong></p>
+        )}
 
         <h4 className="section-heading">{t("pilotageGestion.sousActivite")}</h4>
         {sousActivite.data && sousActivite.data.rows.length === 0 && <p className="muted">{t("pilotageGestion.aucun")}</p>}

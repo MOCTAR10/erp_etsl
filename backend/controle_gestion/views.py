@@ -24,13 +24,16 @@ from .serializers import (
     ClotureGestionSerializer,
     ParametreGestionSerializer,
 )
+from users.models import User
 from users.permissions import can_read_module
 from .services import (
     CanApproveBudget,
     CanManageGestion,
     PARAMETRES_DEFAUT,
     compute_clotures_stats,
+    compute_atterrissage,
     compute_doctrine,
+    compute_niveaux_marge,
     compute_sous_activite,
     get_param_gestion,
     compute_marges,
@@ -221,7 +224,7 @@ class ClotureGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     serializer_class = ClotureGestionSerializer
 
     def get_permissions(self):
-        if getattr(self, "action", None) == "realiser":
+        if getattr(self, "action", None) in ("realiser", "publier"):
             return [CanApproveBudget()]
         return [CanManageGestion()]
 
@@ -254,6 +257,32 @@ class ClotureGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         cloture.date_cloture = valeur or (cloture.period.end_date + timedelta(days=2))
         cloture.statut = ClotureGestion.Statut.REALISEE
         cloture.save(update_fields=["date_cloture", "statut", "updated_at"])
+        return Response(self.get_serializer(cloture).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def publier(self, request, pk=None):
+        """Publie le reporting du mois à la Direction (attestation côté serveur) ; exige la clôture réalisée."""
+        from workflow.notifications import notify
+
+        cloture = ClotureGestion.objects.select_for_update(of=("self",)).select_related("period").get(
+            pk=self.get_object().pk
+        )
+        if cloture.statut != ClotureGestion.Statut.REALISEE:
+            raise DRFValidationError("La clôture de gestion doit être réalisée avant la publication.")
+        if cloture.date_publication:
+            raise DRFValidationError("Reporting déjà publié.")
+        cloture.date_publication = timezone.localdate()
+        cloture.publie_par = request.user
+        cloture.save(update_fields=["date_publication", "publie_par", "updated_at"])
+        for user in User.objects.filter(
+            role__in=(User.Role.PDG, User.Role.DGA, User.Role.DIRECTION), is_active=True
+        ):
+            notify(
+                user, f"Reporting de gestion publié : {cloture.period}",
+                f"Le reporting de {cloture.period} est publié (statut : {cloture.reporting_statut}).",
+                kind="info",
+            )
         return Response(self.get_serializer(cloture).data)
 
     @action(detail=False, methods=["get"])
@@ -435,3 +464,33 @@ class ParametreGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         p.confirme_le = timezone.now()
         p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
         return Response(self.get_serializer(p).data)
+
+
+class NiveauxMargeView(viewsets.ViewSet):
+    """Marges brute / opérationnelle / nette (coût GR isolé en 618)."""
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    @extend_schema(
+        parameters=[OpenApiParameter("fiscal_year", type=int, required=True)], responses={200: OpenApiTypes.OBJECT}
+    )
+    def list(self, request):
+        result = compute_niveaux_marge(_fiscal_year_requis(request))
+        if not can_see_amount(request.user):
+            result = {k: (None if k.startswith(("produits", "charges", "marge", "cout")) else v) for k, v in result.items()}
+        return Response(result)
+
+
+class AtterrissageView(viewsets.ViewSet):
+    """Atterrissage de fin d'exercice par budget et marge à terminaison."""
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    @extend_schema(
+        parameters=[OpenApiParameter("fiscal_year", type=int, required=True)], responses={200: OpenApiTypes.OBJECT}
+    )
+    def list(self, request):
+        result = compute_atterrissage(_fiscal_year_requis(request))
+        if not can_see_amount(request.user):
+            return Response({"rows": [], "marge_a_terminaison": None, "totaux": None})
+        return Response(result)

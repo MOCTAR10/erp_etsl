@@ -8,7 +8,9 @@ from .views import (
     BudgetViewSet,
     ClotureGestionViewSet,
     ConsommationsStockView,
+    AtterrissageView,
     DoctrineView,
+    NiveauxMargeView,
     MargesView,
     ParametreGestionViewSet,
     SousActiviteView,
@@ -22,6 +24,8 @@ router.register("clotures", ClotureGestionViewSet, basename="cg-clotures")
 router.register("marges", MargesView, basename="cg-marges")
 router.register("consommations-stock", ConsommationsStockView, basename="cg-consommations-stock")
 router.register("sous-activite", SousActiviteView, basename="cg-sous-activite")
+router.register("niveaux-marge", NiveauxMargeView, basename="cg-niveaux-marge")
+router.register("atterrissage", AtterrissageView, basename="cg-atterrissage")
 router.register("doctrine", DoctrineView, basename="cg-doctrine")
 router.register("parametres", ParametreGestionViewSet, basename="cg-parametres")
 router.register("analyses-ecart", AnalyseEcartViewSet, basename="cg-analyses-ecart")

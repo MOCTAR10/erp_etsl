@@ -23,4 +23,14 @@ test.describe("M11 Contrôle de gestion : paramètres de pilotage", () => {
     await ligne.getByRole("button", { name: "Confirmer" }).click();
     await expect(ligne.getByText("Confirmé")).toBeVisible();
   });
+
+  test("les marges brute, opérationnelle et nette et l'atterrissage sont affichés", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.finance);
+    await page.goto("/controle-gestion");
+    const niveaux = page.getByTestId("niveaux-marge");
+    await expect(niveaux).toContainText("Marge brute");
+    await expect(niveaux).toContainText("Marge opérationnelle");
+    await expect(niveaux).toContainText("Marge nette");
+    await expect(page.getByTestId("pilotage-gestion")).toContainText("Atterrissage de fin d'exercice");
+  });
 });

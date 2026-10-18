@@ -271,6 +271,12 @@ class ClotureGestion(models.Model):
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.EN_ATTENTE, verbose_name="Statut"
     )
+    date_publication = models.DateField(null=True, blank=True, verbose_name="Date de publication à la Direction")
+    publie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+", verbose_name="Publié par",
+    )
+    alerte_j6_le = models.DateField(null=True, blank=True, verbose_name="Relance J+6 envoyée le")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -307,7 +313,31 @@ class ClotureGestion(models.Model):
         """Conformité < J+4 : clôture réalisée au plus 4 jours après la période."""
         if self.statut != self.Statut.REALISEE or self.jours_ecoulement is None:
             return False
-        return self.jours_ecoulement <= 4
+        from .services import get_param_gestion
+
+        return self.jours_ecoulement <= int(get_param_gestion("REPORTING_JOUR_J4"))
+
+    @property
+    def echeance_j4(self):
+        from .services import get_param_gestion
+
+        return self.period.end_date + timedelta(days=int(get_param_gestion("REPORTING_JOUR_J4")))
+
+    @property
+    def echeance_j6(self):
+        from .services import get_param_gestion
+
+        return self.period.end_date + timedelta(days=int(get_param_gestion("REPORTING_JOUR_J6")))
+
+    @property
+    def reporting_statut(self):
+        """a_temps (≤ J+4) · j6 (≤ J+6) · hors_delai · en_attente (publication pas encore due ou en cours)."""
+        ref = self.date_publication or timezone.localdate()
+        if ref <= self.echeance_j4:
+            return "a_temps" if self.date_publication else "en_attente"
+        if ref <= self.echeance_j6:
+            return "j6" if self.date_publication else "en_attente"
+        return "hors_delai"
 
 
 class AnalyseEcart(models.Model):
