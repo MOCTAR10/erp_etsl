@@ -13,7 +13,7 @@ test.describe("M11 Contrôle de gestion : paramètres de pilotage", () => {
 
     const ligne = section.getByRole("row", { name: /Sous-activité maximale du centre 90/ });
     // Valeur différente de l'actuelle : une valeur inchangée resterait « confirmée » d'une exécution à l'autre.
-    const actuelle = /(^|\s)5(\.00)? %/.test(await ligne.innerText()) ? "6" : "5";
+    const actuelle = /(?<![\d.])5(\.00)? %/.test(await ligne.innerText()) ? "6" : "5";
     await ligne.getByRole("button", { name: "Modifier" }).click();
     await ligne.getByRole("spinbutton").fill(actuelle);
     await ligne.getByRole("button", { name: "Valider" }).click();
