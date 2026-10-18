@@ -494,6 +494,9 @@ export const en = {
     prelevement: "Readings",
   },
   stocks: {
+    searchLots: "Search lots (code, lot no., item)…",
+    searchMouvements: "Search movements (code, reference, item)…",
+    searchInventaires: "Search inventories (code, warehouse)…",
     form: { confirmCloture: "Close the inventory? Differences will be posted as stock movements (not editable).", title: "New stock movement", source: "Source warehouse", destination: "Destination warehouse", reference: "Document reference (delivery note, WO…)" },
     col: { article: "Article", depot: "Warehouse", method: "Valuation", qty: "Quantity", unitCost: "Unit cost", value: "Value", code: "Code", type: "Type", flow: "Flow", date: "Date", certNo: "Certificate no.", lot: "Lot", organisme: "Body", status: "Status" },
     title: "Stocks & Materials traceability (M5)",

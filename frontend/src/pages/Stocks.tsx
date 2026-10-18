@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ArrowLeftRight, Boxes, Package, Warehouse } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type {
   CertificatMatiere,
   Depot,
@@ -77,9 +79,11 @@ function QuantCard({ quant, index }: { quant: StockQuant; index: number }) {
 export function StocksPage() {
   const { t, i18n } = useTranslation();
 
+  const [lotSearch, setLotSearch] = useState("");
   const lots = useQuery({
-    queryKey: ["lots"],
-    queryFn: () => api.lotsStocks(`?page_size=200`),
+    queryKey: ["lots", lotSearch],
+    queryFn: () => api.lotsStocks(pagedQuery(1, 500, lotSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<LotMatiere>) => {
       const groups: Groups = { disponible: [], partiel: [], epuise: [], bloque: [] };
       for (const lot of page.results) {
@@ -91,44 +95,30 @@ export function StocksPage() {
 
   const articles = useQuery({
     queryKey: ["articles-stock"],
-    queryFn: () => api.get<Paginated<{ id: string; code: string; label: string }>>("/api/referentiels/articles/?page_size=500"),
-    select: (page) => page.results,
+    queryFn: () => api.listAll<{ id: string; code: string; label: string }>("/api/referentiels/articles/"),
   });
 
   const depots = useQuery({
     queryKey: ["depots"],
-    queryFn: () => api.depots(`?active=1&page_size=100`),
-    select: (page: Paginated<Depot>) => page.results,
+    queryFn: () => api.listAll<Depot>("/api/stocks/depots/?active=1"),
   });
 
   const quants = useQuery({
     queryKey: ["quants"],
-    queryFn: () => api.quantsStock(`?positive=1&page_size=200`),
+    queryFn: () => api.quantsStock(`?positive=1&page_size=500`),
     select: (page: Paginated<StockQuant>) => page.results,
   });
 
-  const mouvements = useQuery({
-    queryKey: ["mouvements-stock"],
-    queryFn: () => api.mouvementsStock(`?page_size=12`),
-    select: (page: Paginated<MouvementStock>) => page.results,
-  });
+  const mouvements = usePagedList<MouvementStock>("mouvements-stock", (q) => api.mouvementsStock(q), { pageSize: 20 });
 
   const valorisation = useQuery({
     queryKey: ["valorisation"],
     queryFn: () => api.valorisation(),
   });
 
-  const certificats = useQuery({
-    queryKey: ["certificats"],
-    queryFn: () => api.certificats(`?page_size=30`),
-    select: (page: Paginated<CertificatMatiere>) => page.results,
-  });
+  const certificats = usePagedList<CertificatMatiere>("certificats", (q) => api.certificats(q), { pageSize: 20 });
 
-  const inventaires = useQuery({
-    queryKey: ["inventaires"],
-    queryFn: () => api.inventaires(`?page_size=20`),
-    select: (page: Paginated<Inventaire>) => page.results,
-  });
+  const inventaires = usePagedList<Inventaire>("inventaires", (q) => api.inventaires(q), { pageSize: 20 });
 
   const valoMensuelles = useQuery({
     queryKey: ["valorisations-mensuelles"],
@@ -151,10 +141,10 @@ export function StocksPage() {
           void lots.refetch();
           void quants.refetch();
           void depots.refetch();
-          void mouvements.refetch();
+          void mouvements.query.refetch();
           void valorisation.refetch();
-          void certificats.refetch();
-          void inventaires.refetch();
+          void certificats.query.refetch();
+          void inventaires.query.refetch();
         }}
         retryLabel={t("common.retry")}
       />
@@ -234,25 +224,28 @@ export function StocksPage() {
         <Kpi
           label={t("stocks.totalLots")}
           value={Object.values(groups).reduce((s, arr) => s + arr.length, 0)}
-          hint={`${t("stocks.perf")} · ${certificats.data?.length ?? "—"}`}
+          hint={`${t("stocks.perf")} · ${certificats.count}`}
           icon={Package}
           tone="brand"
           delay={0.1}
         />
         <Kpi
           label={t("stocks.totalMvt")}
-          value={mouvements.data?.length ?? "—"}
-          hint={`${t("stocks.inventaires")} · ${inventaires.data?.length ?? "—"}`}
+          value={mouvements.count}
+          hint={`${t("stocks.inventaires")} · ${inventaires.count}`}
           icon={ArrowLeftRight}
           tone="warn"
           delay={0.15}
         />
       </div>
 
+      <SearchField value={lotSearch} onChange={setLotSearch} placeholder={t("stocks.searchLots")} />
+
       <div style={{ overflowX: "auto" }}>
         <Board>
           {BOARD_ORDER.map((st, ci) => (
             <BoardColumn
+              limit={20}
               key={st}
               title={t(`stocks.lot_status.${st}`)}
               count={groups[st].length}
@@ -312,8 +305,9 @@ export function StocksPage() {
         </SectionCard>
       )}
 
-      {(mouvements.data ?? []).length > 0 && (
+      {(mouvements.count > 0 || mouvements.search) && (
         <SectionCard title={t("stocks.mouvements")}>
+          <SearchField value={mouvements.search} onChange={mouvements.setSearch} placeholder={t("stocks.searchMouvements")} />
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -327,7 +321,7 @@ export function StocksPage() {
                 </tr>
               </thead>
               <tbody>
-                {(mouvements.data ?? []).map((mvt) => (
+                {mouvements.rows.map((mvt) => (
                   <tr key={mvt.id}>
                     <td>{mvt.code}</td>
                     <td>{t(`stocks.type_labels.${mvt.type_mouvement}`)}</td>
@@ -343,10 +337,17 @@ export function StocksPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={mouvements.page}
+            pageSize={mouvements.pageSize}
+            count={mouvements.count}
+            onPageChange={mouvements.setPage}
+            onPageSizeChange={mouvements.setPageSize}
+          />
         </SectionCard>
       )}
 
-      {(certificats.data ?? []).length > 0 && (
+      {certificats.count > 0 && (
         <SectionCard title={t("stocks.certificats")}>
           <div className="table-wrap">
             <table className="table">
@@ -361,7 +362,7 @@ export function StocksPage() {
                 </tr>
               </thead>
               <tbody>
-                {(certificats.data ?? []).map((cert) => (
+                {certificats.rows.map((cert) => (
                   <tr key={cert.id}>
                     <td>{cert.code}</td>
                     <td>{cert.type === "mtc" ? t("stocks.mtc") : t("stocks.coc")}</td>
@@ -378,11 +379,19 @@ export function StocksPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={certificats.page}
+            pageSize={certificats.pageSize}
+            count={certificats.count}
+            onPageChange={certificats.setPage}
+            onPageSizeChange={certificats.setPageSize}
+          />
         </SectionCard>
       )}
 
-      {(inventaires.data ?? []).length > 0 && (
+      {(inventaires.count > 0 || inventaires.search) && (
         <SectionCard title={t("stocks.inventaires")}>
+          <SearchField value={inventaires.search} onChange={inventaires.setSearch} placeholder={t("stocks.searchInventaires")} />
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -395,7 +404,7 @@ export function StocksPage() {
                 </tr>
               </thead>
               <tbody>
-                {(inventaires.data ?? []).map((inv) => (
+                {inventaires.rows.map((inv) => (
                   <tr key={inv.id}>
                     <td>{inv.code}</td>
                     <td>{inv.depot_label}</td>
@@ -414,6 +423,13 @@ export function StocksPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={inventaires.page}
+            pageSize={inventaires.pageSize}
+            count={inventaires.count}
+            onPageChange={inventaires.setPage}
+            onPageSizeChange={inventaires.setPageSize}
+          />
         </SectionCard>
       )}
 

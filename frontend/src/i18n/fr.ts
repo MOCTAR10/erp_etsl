@@ -494,6 +494,9 @@ export const fr = {
     prelevement: "Relevés",
   },
   stocks: {
+    searchLots: "Rechercher un lot (code, n° lot, article)…",
+    searchMouvements: "Rechercher un mouvement (code, référence, article)…",
+    searchInventaires: "Rechercher un inventaire (code, dépôt)…",
     form: { confirmCloture: "Clôturer l'inventaire ? Les écarts seront passés en mouvements de stock (non modifiables).", title: "Nouveau mouvement de stock", source: "Dépôt source", destination: "Dépôt destination", reference: "Référence document (BL, OF…)" },
     col: { article: "Article", depot: "Dépôt", method: "Valorisation", qty: "Quantité", unitCost: "Coût unitaire", value: "Valeur", code: "Code", type: "Type", flow: "Flux", date: "Date", certNo: "N° certificat", lot: "Lot", organisme: "Organisme", status: "Statut" },
     title: "Stocks & Traçabilité matière (M5)",
