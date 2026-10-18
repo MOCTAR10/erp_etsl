@@ -100,7 +100,7 @@ export const en = {
     hint: "Transfer file for the month's validated payslips, once per payslip. Standard CFONB 160 layout: to be validated by ETSL's bank. Bank details restricted to the payroll circle.",
     generer: "Generate the transfer order", periode: "Period (1st of month)", compte: "Issuer account", execution: "Execution date",
     telecharger: "Download the file", compteTitle: "Issuer account", raison: "Company name (24 chars)", emetteur: "Issuer no. (6)",
-    banque: "Bank code", guichet: "Branch code", numCompte: "Account no.", cle: "RIB key", ribTitle: "Employee bank details",
+    banque: "Bank (5 ch.)", guichet: "Branch (5 ch.)", numCompte: "Account no.", cle: "RIB key", ribTitle: "Employee bank details",
     employe: "Employee", domiciliation: "Bank name", pdf: "PDF", archiver: "Archive (10-year DMS)", archive: "Archived",
   },
   baremes: {

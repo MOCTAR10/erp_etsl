@@ -100,7 +100,7 @@ export const fr = {
     hint: "Fichier de virements des bulletins validés du mois, une seule fois par bulletin. Gabarit CFONB 160 standard : à faire valider par la banque d'ETSL. RIB réservés au cercle paie.",
     generer: "Générer l'ordre de virement", periode: "Période (1er du mois)", compte: "Compte émetteur", execution: "Date d'exécution",
     telecharger: "Télécharger le fichier", compteTitle: "Compte émetteur", raison: "Raison sociale (24 car.)", emetteur: "N° d'émetteur (6)",
-    banque: "Code banque", guichet: "Code guichet", numCompte: "N° de compte", cle: "Clé RIB", ribTitle: "Coordonnées bancaires d'un salarié",
+    banque: "Banque (5 ch.)", guichet: "Guichet (5 ch.)", numCompte: "N° de compte", cle: "Clé RIB", ribTitle: "Coordonnées bancaires d'un salarié",
     employe: "Salarié", domiciliation: "Domiciliation", pdf: "PDF", archiver: "Archiver (GED 10 ans)", archive: "Archivé",
   },
   baremes: {

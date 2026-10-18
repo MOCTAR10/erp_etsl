@@ -62,8 +62,8 @@ test.describe("M9 : bulletin PDF et virement des salaires", () => {
     const form = page.locator("form", { has: page.getByPlaceholder("Raison sociale (24 car.)") });
     await form.getByPlaceholder("Raison sociale (24 car.)").fill("ETSL E2E");
     await form.getByPlaceholder("N° d'émetteur (6)").fill("123456");
-    await form.getByPlaceholder("Code banque").fill("30001");
-    await form.getByPlaceholder("Code guichet").fill("00123");
+    await form.getByPlaceholder("Banque (5 ch.)").fill("30001");
+    await form.getByPlaceholder("Guichet (5 ch.)").fill("00123");
     await form.getByPlaceholder("N° de compte").fill(num);
     await form.getByPlaceholder("Clé RIB").fill("45");
     await form.getByRole("button", { name: "Enregistrer" }).click();
