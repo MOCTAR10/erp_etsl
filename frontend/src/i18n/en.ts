@@ -455,7 +455,7 @@ export const en = {
     },
   },
   logistique: {
-    act: { soumettre: "Submit", traiter: "Mark as handled", compteurDepart: "Meter reading at start:", compteurFin: "Meter reading at return:" },
+    act: { emettre: "Issue PO / GR", soumettre: "Submit", traiter: "Mark as handled", compteurDepart: "Meter reading at start:", compteurFin: "Meter reading at return:" },
     col: { code: "Code", equipement: "Equipment", partenaire: "Partner", periodicite: "Billing period", consommation: "Usage", montant: "Estimated amount", statut: "Status", besoin: "Need", departement: "Department", affaire: "Project" },
     title: "Logistics — Fleet & GLOBAL RENTAL (M4)",
     parc: "ETSL fleet",
@@ -1124,6 +1124,18 @@ export const en = {
       cloture: "Closed",
     },
     pendingNote: "SYSCOHADA-revised accounting: entries validated by the kernel (immutable, reversals). Retention rules proc. 4.3–4.8, inter-company refactoring to account 618 (RF-ERP-90…94).",
+  },
+  grAffaires: {
+    title: "GLOBAL RENTAL cost by project (meters to M11)", periode: "Month",
+    hint: "GR meter readings valued per the rate grid and split by project. The cost stays in account 618, isolated from margins: the margin after GR cost is indicative.",
+    warnProvisoire: "Monthly valuation is provisional (days per month to be confirmed by ETSL).",
+    aucun: "No GR service in the period.", affaire: "Project", consommation: "Usage", coutGr: "GR cost", penalites: "Penalties", margeApresGr: "Margin after GR cost", total: "GR total",
+  },
+  paramLogistique: {
+    title: "Meter and GR valuation settings (M4)",
+    hint: "Rolling window, projection horizon and days per month: ETSL data editable here, no developer needed.",
+    warnProvisoire: "{{count}} provisional logistics setting(s) to be confirmed by ETSL.",
+    confirmConfirmer: "Confirm this value (validated by ETSL)?",
   },
   pilotageGestion: {
     niveaux: "Gross, operating and net margins", marge_brute: "Gross margin", marge_operationnelle: "Operating margin", marge_nette: "Net margin",

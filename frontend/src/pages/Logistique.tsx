@@ -3,6 +3,7 @@ import { ClipboardList, MapPin, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { GrAffairesSection, ParametresLogistiqueSection } from "../components/workflow/GrAffairesSection";
 import { formatDate, formatNumber } from "../lib/format";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
@@ -91,6 +92,9 @@ function locationColumns(t: T): Column<LocationGR>[] {
           <Badge tone="brand">{l.statut_label}</Badge> {l.imputation_618 && <Badge tone="warn">618</Badge>}
           <ActionBar
             actions={[
+              ...(l.statut === "brouillon" && !l.emis_le
+                ? [{ label: t("logistique.act.emettre"), path: `/api/logistique/locations/${l.id}/emettre/`, tone: "ghost" as const }]
+                : []),
               ...(l.statut === "brouillon"
                 ? [{ label: t("actions.demarrer"), path: `/api/logistique/locations/${l.id}/demarrer/`, prompt: { name: "lecture_initiale", label: t("logistique.act.compteurDepart") } }]
                 : []),
@@ -246,6 +250,8 @@ export function LogistiquePage() {
           <DataTable rows={locations.data ?? []} columns={locationColumns(t)} caption={t("logistique.locationsActives")} />
         </SectionCard>
       )}
+      <GrAffairesSection />
+      <ParametresLogistiqueSection />
       {(demandes.data ?? []).length > 0 && (
         <SectionCard title={`${t("logistique.demandes")} · ${(demandes.data ?? []).length}`}>
           <DataTable rows={demandes.data ?? []} columns={demandeColumns(t)} caption={t("logistique.demandes")} />
