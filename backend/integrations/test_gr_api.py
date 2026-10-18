@@ -98,6 +98,19 @@ class CompteursEntrantsTests(GrBase):
         lec = LectureCompteur.objects.get()
         self.assertEqual((lec.source, lec.valeur, lec.location), ("gr", Decimal("130"), loc))
 
+    def test_releve_gr_met_a_jour_le_compteur_du_parc(self):
+        loc = make_location()
+        self.assertEqual(self.post(loc, 130).status_code, 201)
+        loc.equipement.refresh_from_db()
+        self.assertEqual(loc.equipement.compteur_value, Decimal("130"))
+
+    def test_releve_gr_ne_baisse_jamais_le_compteur_du_parc(self):
+        loc = make_location()
+        EquipementParc.objects.filter(pk=loc.equipement_id).update(compteur_value=500)
+        self.assertEqual(self.post(loc, 130).status_code, 201)
+        loc.equipement.refresh_from_db()
+        self.assertEqual(loc.equipement.compteur_value, Decimal("500"))
+
     def test_compteur_en_baisse_refuse(self):
         loc = make_location()
         self.post(loc, 130)

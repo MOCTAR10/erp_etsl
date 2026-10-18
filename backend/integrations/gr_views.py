@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from logistique.models import EquipementParc, LectureCompteur, LocationGR
+from logistique.services import reporter_compteur
 from users.permissions import IsAdminOrStaff
 
 from .auth import ApiKeyAuthentication, HasApiScope
@@ -118,6 +119,8 @@ class GrCompteursView(GrAPIView):
                 location=loc, date=d["date"], valeur=d["valeur"], type_lecture=d["type_lecture"],
                 source=LectureCompteur.Source.GR,
             )
+            # Compteur du parc mis à jour (jamais à la baisse) et seuils préventifs M8 évalués (CDC M4 §12.7 / §12.11).
+            reporter_compteur(loc.equipement, lecture.valeur)
         return Response(
             {"id": str(lecture.pk), "code": lecture.code, "location": loc.code, "valeur": str(lecture.valeur)},
             status=status.HTTP_201_CREATED,
