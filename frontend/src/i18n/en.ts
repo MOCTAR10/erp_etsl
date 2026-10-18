@@ -1094,6 +1094,9 @@ export const en = {
     pendingNote: "Payroll restricted to the HR circle (RF-33): salaries and pay slips hidden outside HR/Finance/Management (RF-59).",
   },
   comptabilite: {
+    searchEngagements: "Search commitments (code, subject)…",
+    searchReleves: "Search statements (code, account)…",
+    searchPaiements: "Search payments (code, reference)…",
     act: { soumettre: "Submit", approuver: "Approve", annuler: "Cancel", confirmAnnuler: "Cancel this document?", confirmComptabiliser: "Post this payment? The generated entry can no longer be edited (reversal only)." },
     form: { title: "New payment", engagement: "Approved commitment", reference: "Reference (cheque, transfer no.…)" },
     col: { code: "Code", date: "Date", bank: "Bank account", period: "Period", debit: "Debit", credit: "Credit", status: "Status", direction: "Direction", mode: "Mode", party: "Counterparty", amount: "Amount", entry: "Entry" },

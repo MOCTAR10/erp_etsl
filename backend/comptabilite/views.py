@@ -103,6 +103,7 @@ class CompteBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 class ReleveBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     queryset = ReleveBancaire.objects.prefetch_related("lignes").all()
     serializer_class = ReleveBancaireSerializer
+    search_fields = ("code", "compte_bancaire__code", "compte_bancaire__label")
     permission_classes = [CanManageCompta]
 
     def get_queryset(self):

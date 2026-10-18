@@ -1094,6 +1094,9 @@ export const fr = {
     pendingNote: "Paie restreinte au cercle RH (RF-33) : salaires et bulletins masqués hors RH/Finance/Direction (RF-59).",
   },
   comptabilite: {
+    searchEngagements: "Rechercher un engagement (code, objet)…",
+    searchReleves: "Rechercher un relevé (code, compte)…",
+    searchPaiements: "Rechercher un paiement (code, référence)…",
     act: { soumettre: "Soumettre", approuver: "Approuver", annuler: "Annuler", confirmAnnuler: "Annuler cette pièce ?", confirmComptabiliser: "Comptabiliser ce paiement ? L'écriture générée ne se modifie plus (extourne uniquement)." },
     form: { title: "Nouveau paiement", engagement: "Engagement approuvé", reference: "Référence (n° chèque, virement…)" },
     col: { code: "Code", date: "Date", bank: "Compte bancaire", period: "Période", debit: "Débit", credit: "Crédit", status: "Statut", direction: "Sens", mode: "Mode", party: "Tiers", amount: "Montant", entry: "Écriture" },
