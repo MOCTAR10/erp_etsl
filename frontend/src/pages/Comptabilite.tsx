@@ -1,14 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { BadgePercent, ClipboardList, CreditCard, Inbox, Landmark } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { ClotureSection } from "../components/workflow/ClotureSection";
 import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
 import { LettrageSection } from "../components/workflow/LettrageSection";
 import { formatDate, formatNumber } from "../lib/format";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   CompteBancaire,
   ControleInterne,
@@ -126,21 +128,19 @@ function ControleCard({ c }: { c: ControleInterne }) {
 export function ComptabilitePage() {
   const { t, i18n } = useTranslation();
 
-  const banques = useQuery({
-    queryKey: ["compta-banques"],
-    queryFn: () => api.comptesBancaires("?page_size=50"),
-    select: (page: Paginated<CompteBancaire>) => page.results,
-  });
+  const banques = useQuery({ queryKey: ["compta-banques"], queryFn: () => api.listAll<CompteBancaire>("/api/comptabilite/comptes-bancaires/") });
 
-  const paiements = useQuery({
-    queryKey: ["compta-paiements"],
-    queryFn: () => api.paiements("?page_size=50"),
-    select: (page: Paginated<Paiement>) => page.results,
-  });
+  // Paiements : tableau paginé avec recherche ; liste complète pour le décompte des validés.
+  const paiements = usePagedList<Paiement>("compta-paiements", (q) => api.paiements(q));
+  const paiementsTous = useQuery({ queryKey: ["compta-paiements-tous"], queryFn: () => api.listAll<Paiement>("/api/comptabilite/paiements/") });
 
+  // Engagements : liste complète pour le choix du formulaire (approuvés), Kanban filtré par la recherche.
+  const engagementsTous = useQuery({ queryKey: ["compta-engagements-tous"], queryFn: () => api.listAll<Engagement>("/api/comptabilite/engagements/") });
+  const [engSearch, setEngSearch] = useState("");
   const engagements = useQuery({
-    queryKey: ["compta-engagements"],
-    queryFn: () => api.engagements("?page_size=100"),
+    queryKey: ["compta-engagements", engSearch],
+    queryFn: () => api.engagements(pagedQuery(1, 500, engSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<Engagement>) => {
       const groups: EngagementGroups = { brouillon: [], soumis: [], approuve: [], annule: [] };
       for (const e of page.results) {
@@ -150,50 +150,40 @@ export function ComptabilitePage() {
     },
   });
 
-  const tva = useQuery({
-    queryKey: ["compta-tva"],
-    queryFn: () => api.declarationsTva("?page_size=50"),
-    select: (page: Paginated<DeclarationTva>) => page.results,
-  });
+  const tva = useQuery({ queryKey: ["compta-tva"], queryFn: () => api.listAll<DeclarationTva>("/api/comptabilite/declarations-tva/") });
 
-  const controles = useQuery({
-    queryKey: ["compta-controles"],
-    queryFn: () => api.controlesCompta("?page_size=50"),
-    select: (page: Paginated<ControleInterne>) => page.results,
-  });
+  const controles = useQuery({ queryKey: ["compta-controles"], queryFn: () => api.listAll<ControleInterne>("/api/comptabilite/controles/") });
 
-  const releves = useQuery({
-    queryKey: ["compta-releves"],
-    queryFn: () => api.relevesBancaires("?page_size=50"),
-    select: (page: Paginated<ReleveBancaire>) => page.results,
-  });
+  const releves = usePagedList<ReleveBancaire>("compta-releves", (q) => api.relevesBancaires(q));
 
-  if (paiements.isLoading || engagements.isLoading || !paiements.data || !engagements.data)
+  if (paiementsTous.isLoading || engagements.isLoading || !paiementsTous.data || !engagements.data)
     return <BoardSkeleton cols={4} rows={3} />;
 
-  if (paiements.isError || engagements.isError || !tva.data || !controles.data)
+  if (paiementsTous.isError || engagements.isError || !tva.data || !controles.data)
     return (
       <ErrorState
         message={t("common.error")}
         onRetry={() => {
           void banques.refetch();
-          void paiements.refetch();
+          void paiements.query.refetch();
+          void paiementsTous.refetch();
+          void engagementsTous.refetch();
           void engagements.refetch();
           void tva.refetch();
           void controles.refetch();
-          void releves.refetch();
+          void releves.query.refetch();
         }}
         retryLabel={t("common.retry")}
       />
     );
 
-  const pay = paiements.data;
+  const pay = paiements.rows;
   const groups = engagements.data;
   const tvaAll = tva.data;
   const controlesAll = controles.data;
-  const relevesAll = releves.data ?? [];
+  const relevesAll = releves.rows;
   const banquesAll = banques.data ?? [];
-  const valides = pay.filter((p) => p.statut === "valide");
+  const valides = (paiementsTous.data ?? []).filter((p) => p.statut === "valide");
   const tvaDue = tvaAll.reduce(
     (acc, d) => acc + (d.has_amount_access && d.net_a_payer !== null ? Number(d.net_a_payer) : 0),
     0,
@@ -235,7 +225,7 @@ export function ComptabilitePage() {
             name: "engagement",
             label: t("comptabilite.form.engagement"),
             type: "select",
-            options: groups.approuve.map((e) => ({ value: e.id, label: `${e.code} · ${e.objet}` })),
+            options: (engagementsTous.data ?? []).filter((e) => e.statut === "approuve").map((e) => ({ value: e.id, label: `${e.code} · ${e.objet}` })),
           },
           { name: "reference", label: t("comptabilite.form.reference") },
         ]}
@@ -248,6 +238,8 @@ export function ComptabilitePage() {
         <Kpi label={t("comptabilite.tva")} value={`${formatNumber(tvaDue)} F`} hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
       </div>
 
+      <SearchField value={engSearch} onChange={setEngSearch} placeholder={t("comptabilite.searchEngagements")} />
+
       <div style={{ overflowX: "auto" }}>
         <Board>
           {ENG_ORDER.map((st, ci) => (
@@ -258,6 +250,7 @@ export function ComptabilitePage() {
               tone={ENG_BADGE[st]}
               delay={ci * 0.05}
               minWidth={260}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <EmptyState icon={Inbox} label={t("common.empty")} />
@@ -284,8 +277,9 @@ export function ComptabilitePage() {
         </>
       ) : null}
 
-      {relevesAll.length > 0 && (
-        <SectionCard title={`${t("comptabilite.releves")} · ${relevesAll.length}`}>
+      {(releves.count > 0 || releves.search) && (
+        <SectionCard title={`${t("comptabilite.releves")} · ${releves.count}`}>
+          <SearchField value={releves.search} onChange={releves.setSearch} placeholder={t("comptabilite.searchReleves")} />
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -316,11 +310,13 @@ export function ComptabilitePage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={releves.page} pageSize={releves.pageSize} count={releves.count} onPageChange={releves.setPage} onPageSizeChange={releves.setPageSize} />
         </SectionCard>
       )}
 
-      {pay.length > 0 && (
-        <SectionCard title={`${t("comptabilite.paiements")} · ${pay.length}`}>
+      {(paiements.count > 0 || paiements.search) && (
+        <SectionCard title={`${t("comptabilite.paiements")} · ${paiements.count}`}>
+          <SearchField value={paiements.search} onChange={paiements.setSearch} placeholder={t("comptabilite.searchPaiements")} />
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -368,6 +364,7 @@ export function ComptabilitePage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={paiements.page} pageSize={paiements.pageSize} count={paiements.count} onPageChange={paiements.setPage} onPageSizeChange={paiements.setPageSize} />
         </SectionCard>
       )}
 

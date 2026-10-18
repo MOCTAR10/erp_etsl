@@ -1,6 +1,8 @@
 import { motion } from "motion/react";
 import type { LucideIcon } from "lucide-react";
+import { Children, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { motionTokens } from "../../theme/tokens";
 import { itemRefresh } from "../../lib/motion";
@@ -23,6 +25,7 @@ export function BoardColumn({
   children,
   delay = 0,
   minWidth,
+  limit,
 }: {
   title: ReactNode;
   count?: number;
@@ -31,7 +34,14 @@ export function BoardColumn({
   children: ReactNode;
   delay?: number;
   minWidth?: number;
+  /** Nombre de cartes affichées avant « Voir plus » (toutes si absent). */
+  limit?: number;
 }) {
+  const { t } = useTranslation();
+  const [shown, setShown] = useState(limit);
+  const cards = Children.toArray(children);
+  const visible = shown === undefined ? cards : cards.slice(0, shown);
+  const hidden = cards.length - visible.length;
   return (
     <motion.section
       layout
@@ -48,7 +58,12 @@ export function BoardColumn({
         </span>
         {typeof count === "number" ? <Badge tone={tone}>{count}</Badge> : null}
       </div>
-      {children}
+      {visible}
+      {hidden > 0 ? (
+        <button type="button" className="btn" onClick={() => setShown((shown ?? 0) + (limit ?? 0))}>
+          {t("common.showMore", { count: hidden })}
+        </button>
+      ) : null}
     </motion.section>
   );
 }

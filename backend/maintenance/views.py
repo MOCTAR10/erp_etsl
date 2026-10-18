@@ -54,6 +54,7 @@ def _choix(raw, choices, field):
 class ActifViewSet(viewsets.ModelViewSet):
     queryset = Actif.objects.select_related("equipement_gr").all()
     serializer_class = ActifSerializer
+    search_fields = ("code", "designation", "numero_serie",)
     permission_classes = [CanManageMaintenance]
 
     def get_queryset(self):
@@ -101,6 +102,7 @@ class ActifViewSet(viewsets.ModelViewSet):
 class PlanPreventifViewSet(viewsets.ModelViewSet):
     queryset = PlanPreventif.objects.select_related("actif", "actif__equipement_gr").all()
     serializer_class = PlanPreventifSerializer
+    search_fields = ("code", "libelle",)
     permission_classes = [CanManageMaintenance]
 
     def perform_create(self, serializer):
@@ -124,6 +126,7 @@ class PlanPreventifViewSet(viewsets.ModelViewSet):
 class OrdreTravailViewSet(viewsets.ModelViewSet):
     queryset = OrdreTravail.objects.select_related("actif", "demandeur", "technicien").all()
     serializer_class = OrdreTravailSerializer
+    search_fields = ("code", "actif__code", "actif__designation",)
     permission_classes = [CanManageMaintenance]
 
     def perform_create(self, serializer):
@@ -337,6 +340,7 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
 class InspectionViewSet(viewsets.ModelViewSet):
     queryset = Inspection.objects.select_related("actif", "intervenant", "ot_genere").all()
     serializer_class = InspectionSerializer
+    search_fields = ("code", "organisme",)
     permission_classes = [CanManageMaintenance]
 
     def get_queryset(self):

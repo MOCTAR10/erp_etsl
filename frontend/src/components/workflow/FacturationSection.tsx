@@ -5,8 +5,9 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
+import { usePagedList } from "../../lib/usePagedList";
 import type { AFacturer, FactureClient, ModeleFacture, Paginated } from "../../types";
-import { Badge, SectionCard } from "../ui";
+import { Badge, Pagination, SearchField, SectionCard } from "../ui";
 
 const CHAMPS: (keyof ModeleFacture)[] = ["entete", "mentions_legales", "conditions_paiement", "coordonnees_bancaires", "pied_page"];
 
@@ -20,11 +21,9 @@ export function FacturationSection() {
   const [error, setError] = useState<string | null>(null);
   const [edition, setEdition] = useState<Partial<ModeleFacture> | null>(null);
 
-  const factures = useQuery({
-    queryKey: ["factures-clients"],
-    queryFn: () => api.get<Paginated<FactureClient>>("/api/comptabilite/factures-clients/?page_size=30").then((p) => p.results),
-    retry: 0,
-  });
+  const factures = usePagedList<FactureClient>("factures-clients", (q) =>
+    api.get<Paginated<FactureClient>>(`/api/comptabilite/factures-clients/${q}`),
+  );
   const aFacturer = useQuery({
     queryKey: ["factures-a-facturer"],
     queryFn: () => api.get<AFacturer>("/api/comptabilite/factures-clients/a-facturer/"),
@@ -59,8 +58,8 @@ export function FacturationSection() {
     onError: (e) => setError(describeError(e)),
   });
 
-  if (factures.isError) return null; // pas de droit de lecture : la section n'apparaît pas
-  const rows = factures.data ?? [];
+  if (factures.query.isError) return null; // pas de droit de lecture : la section n'apparaît pas
+  const rows = factures.rows;
   const m = modele.data;
   const jalons = aFacturer.data?.jalons ?? [];
   const situations = aFacturer.data?.situations ?? [];
@@ -107,7 +106,8 @@ export function FacturationSection() {
         </>
       )}
 
-      <h4 className="section-heading">{t("facturation.factures", { count: rows.length })}</h4>
+      <h4 className="section-heading">{t("facturation.factures", { count: factures.count })}</h4>
+      <SearchField value={factures.search} onChange={factures.setSearch} placeholder={t("facturation.search")} />
       {rows.length === 0 ? (
         <p className="muted">{t("facturation.aucune")}</p>
       ) : (
@@ -160,6 +160,7 @@ export function FacturationSection() {
           </tbody>
         </table>
       )}
+      <Pagination page={factures.page} pageSize={factures.pageSize} count={factures.count} onPageChange={factures.setPage} onPageSizeChange={factures.setPageSize} />
 
       {m && (
         <>

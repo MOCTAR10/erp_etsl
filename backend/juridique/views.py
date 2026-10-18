@@ -57,6 +57,7 @@ class CourrierViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = Courrier.objects.select_related("tiers", "document").all()
     serializer_class = CourrierSerializer
+    search_fields = ("code", "objet", "reference",)
     permission_classes = [CanManageJuridique]
 
     def get_queryset(self):
@@ -105,6 +106,7 @@ class ConventionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = Convention.objects.select_related("partenaire", "affaire", "document").all()
     serializer_class = ConventionSerializer
+    search_fields = ("code", "titre",)
 
     def get_permissions(self):
         if self.action in ("signer", "resilier", "cloturer"):
@@ -157,6 +159,7 @@ class ContentieuxViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = Contentieux.objects.select_related("document").all()
     serializer_class = ContentieuxSerializer
+    search_fields = ("code", "objet", "partie_adverse",)
 
     def get_permissions(self):
         if self.action in ("instruire", "cloturer"):
@@ -202,6 +205,7 @@ class CautionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = Caution.objects.select_related("emetteur", "convention", "document").all()
     serializer_class = CautionSerializer
+    search_fields = ("code", "beneficiaire", "objet",)
 
     def get_permissions(self):
         if self.action in ("lever", "appeler", "valider_dg"):
@@ -249,6 +253,7 @@ class AssuranceViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = Assurance.objects.select_related("assureur", "document").all()
     serializer_class = AssuranceSerializer
+    search_fields = ("code", "numero_police",)
 
     def get_permissions(self):
         # NB : self.action = nom de la MÉTHODE (declarer_sinistre), pas l'url_path (bug corrigé : la permission
@@ -310,6 +315,7 @@ class ReunionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         "animateur", "compte_rendu"
     ).all()
     serializer_class = ReunionSerializer
+    search_fields = ("code", "objet",)
     permission_classes = [CanManageJuridique]
 
     def get_queryset(self):
@@ -363,6 +369,7 @@ class DossierGlobalRentalViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = DossierGlobalRental.objects.select_related("partenaire_gr", "affaire").all()
     serializer_class = DossierGlobalRentalSerializer
+    search_fields = ("code", "reference_contrat", "objet",)
     permission_classes = [CanManageJuridique]
 
     def get_queryset(self):

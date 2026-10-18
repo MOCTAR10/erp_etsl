@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { ClotureMensuelle, ControlesCloture, Paginated, PeriodeRef } from "../../types";
+import type { ClotureMensuelle, ControlesCloture, PeriodeRef } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
 const MONTANTS = ["produits", "charges", "resultat", "tresorerie", "creances_clients", "dettes_fournisseurs", "tva_nette"] as const;
@@ -22,12 +22,12 @@ export function ClotureSection() {
 
   const periodes = useQuery({
     queryKey: ["cloture-periodes"],
-    queryFn: () => api.get<Paginated<PeriodeRef>>("/api/accounting/periods/?page_size=60").then((p) => p.results),
+    queryFn: () => api.listAll<PeriodeRef>("/api/accounting/periods/"),
     retry: 0,
   });
   const clotures = useQuery({
     queryKey: ["clotures-mensuelles"],
-    queryFn: () => api.get<Paginated<ClotureMensuelle>>("/api/comptabilite/clotures-mensuelles/?page_size=24").then((p) => p.results),
+    queryFn: () => api.listAll<ClotureMensuelle>("/api/comptabilite/clotures-mensuelles/"),
     retry: 0,
   });
   const controles = useQuery({

@@ -62,6 +62,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         "affaire", "ordre", "demandeur", "validateur"
     ).all()
     serializer_class = PermisTravailSerializer
+    search_fields = ("code", "emplacement",)
     permission_classes = [CanValidateHse]
 
     def get_permissions(self):
@@ -218,6 +219,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
 class EvaluationRisqueViewSet(viewsets.ModelViewSet):
     queryset = EvaluationRisque.objects.select_related("responsable", "affaire").all()
     serializer_class = EvaluationRisqueSerializer
+    search_fields = ("code", "lieux", "activite",)
     permission_classes = [CanManageHse]
 
     def get_queryset(self):
@@ -235,6 +237,7 @@ class EvaluationRisqueViewSet(viewsets.ModelViewSet):
 class EquipementAtexViewSet(viewsets.ModelViewSet):
     queryset = EquipementAtex.objects.all()
     serializer_class = EquipementAtexSerializer
+    search_fields = ("code", "designation",)
     permission_classes = [CanManageHse]
 
     def get_queryset(self):
@@ -275,6 +278,7 @@ class IncidentViewSet(viewsets.ModelViewSet):
         "declared_by", "enqueteur"
     ).prefetch_related("actions").all()
     serializer_class = IncidentSerializer
+    search_fields = ("code", "lieu",)
     permission_classes = [CanManageHse]
 
     def perform_create(self, serializer):
@@ -436,6 +440,7 @@ class IncidentViewSet(viewsets.ModelViewSet):
 class ActionHseViewSet(viewsets.ModelViewSet):
     queryset = ActionHse.objects.select_related("incident", "risque", "responsable").all()
     serializer_class = ActionHseSerializer
+    search_fields = ("code",)
     permission_classes = [CanManageHse]
 
     def get_queryset(self):
@@ -465,6 +470,7 @@ class ActionHseViewSet(viewsets.ModelViewSet):
 class FormationSecuriteViewSet(viewsets.ModelViewSet):
     queryset = FormationSecurite.objects.all()
     serializer_class = FormationSecuriteSerializer
+    search_fields = ("code", "theme",)
     permission_classes = [CanManageHse]
 
     def get_queryset(self):
@@ -482,6 +488,7 @@ class FormationSecuriteViewSet(viewsets.ModelViewSet):
 class EpiViewSet(viewsets.ModelViewSet):
     queryset = Epi.objects.select_related("beneficiaire").all()
     serializer_class = EpiSerializer
+    search_fields = ("code", "designation",)
     permission_classes = [CanManageHse]
 
     def get_queryset(self):
@@ -503,6 +510,7 @@ class EpiViewSet(viewsets.ModelViewSet):
 class BordereauDechetViewSet(viewsets.ModelViewSet):
     queryset = BordereauDechet.objects.select_related("transporteur").all()
     serializer_class = BordereauDechetSerializer
+    search_fields = ("code", "numero_bsd",)
     permission_classes = [CanManageHse]
 
     def get_queryset(self):
@@ -531,6 +539,7 @@ class ExigenceHabilitationViewSet(viewsets.ModelViewSet):
 class AuditHseViewSet(viewsets.ModelViewSet):
     queryset = AuditHse.objects.all()
     serializer_class = AuditHseSerializer
+    search_fields = ("code", "zone",)
     permission_classes = [CanManageHse]
 
     def get_queryset(self):
@@ -588,6 +597,7 @@ class ConstatAuditViewSet(viewsets.ModelViewSet):
 class DuerViewSet(viewsets.ModelViewSet):
     queryset = Duer.objects.all()
     serializer_class = DuerSerializer
+    search_fields = ("code", "perimetre",)
     permission_classes = [CanValidateHse]
 
     @action(detail=True, methods=["post"], url_path="approuver")
@@ -618,6 +628,7 @@ class DuerViewSet(viewsets.ModelViewSet):
 class PlanUrgenceViewSet(viewsets.ModelViewSet):
     queryset = PlanUrgence.objects.all()
     serializer_class = PlanUrgenceSerializer
+    search_fields = ("code", "intitule",)
     permission_classes = [CanManageHse]
 
     def list(self, request, *args, **kwargs):

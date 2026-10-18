@@ -96,12 +96,14 @@ class TauxTvaViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 class CompteBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     queryset = CompteBancaire.objects.select_related("compte_comptable", "devise").all()
     serializer_class = CompteBancaireSerializer
+    search_fields = ("code", "label", "banque",)
     permission_classes = [CanManageCompta]
 
 
 class ReleveBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     queryset = ReleveBancaire.objects.prefetch_related("lignes").all()
     serializer_class = ReleveBancaireSerializer
+    search_fields = ("code", "compte_bancaire__code", "compte_bancaire__label")
     permission_classes = [CanManageCompta]
 
     def get_queryset(self):
@@ -264,6 +266,7 @@ class EngagementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelV
 
     queryset = Engagement.objects.select_related("compte_depense", "fournisseur", "demande_par").all()
     serializer_class = EngagementSerializer
+    search_fields = ("code", "objet",)
     locked_statuses = (Engagement.Statut.SOUMIS, Engagement.Statut.APPROUVE, Engagement.Statut.ANNULE)
     locked_message = "Engagement soumis, approuvé ou annulé : non modifiable (proc. 4.3)."
 
@@ -324,6 +327,7 @@ class PaiementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelVie
 
     queryset = Paiement.objects.select_related("compte_bancaire", "engagement", "tiers", "facture", "move").all()
     serializer_class = PaiementSerializer
+    search_fields = ("code", "reference",)
     locked_statuses = (Paiement.Statut.VALIDE, Paiement.Statut.ANNULE)
     locked_message = "Paiement validé ou annulé : non modifiable (écriture comptable liée)."
 
@@ -375,6 +379,7 @@ class PaiementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelVie
 class DeclarationTvaViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelViewSet):
     queryset = DeclarationTva.objects.select_related("taux_tva").all()
     serializer_class = DeclarationTvaSerializer
+    search_fields = ("code",)
     permission_classes = [CanManageCompta]
     locked_statuses = (DeclarationTva.Statut.DEPOSEE,)
     locked_message = "Déclaration déposée : non modifiable ni supprimable."
@@ -521,7 +526,7 @@ class LettrageViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
 class ModeleFactureViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     """Modèle de facture client : un seul enregistrement, modifiable par ETSL, provisoire jusqu'à confirmation."""
 
-    queryset = ModeleFacture.objects.all()
+    queryset = ModeleFacture.objects.order_by("pk")
     serializer_class = ModeleFactureSerializer
     http_method_names = ["get", "patch", "post", "head", "options"]
 
@@ -553,6 +558,7 @@ class FactureClientViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
 
     queryset = FactureClient.objects.select_related("client", "move", "taux_tva").prefetch_related("lignes").all()
     serializer_class = FactureClientSerializer
+    search_fields = ("code", "objet",)
 
     def get_permissions(self):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):

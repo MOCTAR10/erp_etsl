@@ -51,6 +51,7 @@ class _CommonViewSet(viewsets.ModelViewSet):
 
 class GammeViewSet(_CommonViewSet):
     serializer_class = GammeOperatoireSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = GammeOperatoire.objects.all()
@@ -73,6 +74,7 @@ class GammeOperationViewSet(_CommonViewSet):
 
 class OrdreFabricationViewSet(_CommonViewSet):
     serializer_class = OrdreFabricationSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = OrdreFabrication.objects.select_related(
@@ -160,6 +162,7 @@ class DossierOperationnelViewSet(viewsets.ReadOnlyModelViewSet):
 
 class PointageChantierViewSet(_CommonViewSet):
     serializer_class = PointageChantierSerializer
+    search_fields = ("code", "worker_name",)
 
     def get_queryset(self):
         qs = PointageChantier.objects.select_related("ordre", "worker").all()
@@ -218,6 +221,7 @@ class PointageChantierViewSet(_CommonViewSet):
 
 class SituationTravauxViewSet(_CommonViewSet):
     serializer_class = SituationTravauxSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = SituationTravaux.objects.select_related("affaire", "created_by", "validated_by").all()

@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Clock3, Construction, Factory, HardHat } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, SearchField, SectionCard } from "../components/ui";
 import type {
   ChargeStats,
   OfStatus,
@@ -95,9 +97,11 @@ function Charge({ stats }: { stats: ChargeStats }) {
 export function OperationsPage() {
   const { t } = useTranslation();
 
+  const [ofSearch, setOfSearch] = useState("");
   const byStatus = useQuery({
-    queryKey: ["ordres"],
-    queryFn: () => api.ordres(`?page_size=100`),
+    queryKey: ["ordres", ofSearch],
+    queryFn: () => api.ordres(pagedQuery(1, 500, ofSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<OrdreFabrication>) => {
       const groups: Groups = {
         prevu: [],
@@ -119,22 +123,24 @@ export function OperationsPage() {
     queryFn: () => api.charge(),
   });
 
-  const situations = useQuery({
-    queryKey: ["situations"],
-    queryFn: () => api.situations(`?page_size=100`),
-    select: (page: Paginated<SituationTravaux>) => page.results,
+  const situations = usePagedList<SituationTravaux>("situations", (q) => api.situations(q));
+  // Heures déclarées : somme sur toutes les situations, pas seulement la page affichée.
+  const situationsToutes = useQuery({
+    queryKey: ["situations-toutes"],
+    queryFn: () => api.listAll<SituationTravaux>("/api/operations/situations/"),
   });
 
-  if (byStatus.isLoading || charge.isLoading || situations.isLoading)
+  if (byStatus.isLoading || charge.isLoading || situations.query.isLoading)
     return <BoardSkeleton cols={5} rows={3} />;
-  if (byStatus.isError || charge.isError || situations.isError || !byStatus.data)
+  if (byStatus.isError || charge.isError || situations.query.isError || !byStatus.data)
     return (
       <ErrorState
         message={t("common.error")}
         onRetry={() => {
           void byStatus.refetch();
           void charge.refetch();
-          void situations.refetch();
+          void situations.query.refetch();
+          void situationsToutes.refetch();
         }}
         retryLabel={t("common.retry")}
       />
@@ -142,7 +148,7 @@ export function OperationsPage() {
 
   const groups = byStatus.data;
   const active = groups.en_cours.length + groups.lance.length + groups.prevu.length;
-  const reported = situations.data?.reduce((a, s) => a + Number(s.ordered_hours), 0) ?? 0;
+  const reported = situationsToutes.data?.reduce((a, s) => a + Number(s.ordered_hours), 0) ?? 0;
 
   return (
     <>
@@ -154,6 +160,8 @@ export function OperationsPage() {
       </div>
       {charge.data ? <Charge stats={charge.data} /> : null}
 
+      <SearchField value={ofSearch} onChange={setOfSearch} placeholder={t("operations.searchOf")} />
+
       <div style={{ overflowX: "auto" }}>
         <Board>
           {BOARD_ORDER.map((st, ci) => (
@@ -164,6 +172,7 @@ export function OperationsPage() {
               tone={STATUS_BADGE[st]}
               delay={ci * 0.05}
               minWidth={260}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
@@ -177,10 +186,11 @@ export function OperationsPage() {
         </Board>
       </div>
 
-      {(situations.data ?? []).length > 0 && (
-        <SectionCard title={`${t("operations.situations")} · ${(situations.data ?? []).length}`}>
-          <DataTable
-            rows={situations.data ?? []}
+      {(situations.count > 0 || situations.search) && (
+        <SectionCard title={`${t("operations.situations")} · ${situations.count}`}>
+          <PagedDataTable
+            list={situations}
+            searchPlaceholder={t("operations.searchSituations")}
             caption={t("operations.situations")}
             columns={[
               { key: "code", header: t("operations.sit.code"), render: (s) => s.code },

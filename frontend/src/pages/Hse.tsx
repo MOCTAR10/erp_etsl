@@ -1,11 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Activity, Flame, Gauge, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, PagedDataTable, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate } from "../lib/format";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   IndicateursHse,
   BordereauDechet,
@@ -212,15 +214,13 @@ export function HsePage() {
     queryFn: () => api.get<IndicateursHse>("/api/hse/incidents/indicateurs/"),
   });
 
-  const permis = useQuery({
-    queryKey: ["hse-permis"],
-    queryFn: () => api.permis(`?page_size=50`),
-    select: (page: Paginated<PermisTravail>) => page.results,
-  });
+  const permis = usePagedList<PermisTravail>("hse-permis", (q) => api.permis(q));
 
+  const [incSearch, setIncSearch] = useState("");
   const incidents = useQuery({
-    queryKey: ["hse-incidents"],
-    queryFn: () => api.incidents(`?page_size=100`),
+    queryKey: ["hse-incidents", incSearch],
+    queryFn: () => api.incidents(pagedQuery(1, 500, incSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<Incident>) => {
       const groups: IncidentGroups = { declare: [], en_enquete: [], plan_action: [], cloture: [] };
       for (const inc of page.results) {
@@ -230,35 +230,15 @@ export function HsePage() {
     },
   });
 
-  const risques = useQuery({
-    queryKey: ["hse-risques"],
-    queryFn: () => api.risquesHse(`?page_size=50`),
-    select: (page: Paginated<EvaluationRisque>) => page.results,
-  });
+  const risques = usePagedList<EvaluationRisque>("hse-risques", (q) => api.risquesHse(q));
 
-  const atex = useQuery({
-    queryKey: ["hse-atex"],
-    queryFn: () => api.equipementsAtex(`?page_size=50`),
-    select: (page: Paginated<EquipementAtex>) => page.results,
-  });
+  const atex = usePagedList<EquipementAtex>("hse-atex", (q) => api.equipementsAtex(q));
 
-  const formations = useQuery({
-    queryKey: ["hse-formations"],
-    queryFn: () => api.formationsHse(`?page_size=50`),
-    select: (page: Paginated<FormationSecurite>) => page.results,
-  });
+  const formations = usePagedList<FormationSecurite>("hse-formations", (q) => api.formationsHse(q));
 
-  const epis = useQuery({
-    queryKey: ["hse-epis"],
-    queryFn: () => api.episHse(`?page_size=50`),
-    select: (page: Paginated<Epi>) => page.results,
-  });
+  const epis = usePagedList<Epi>("hse-epis", (q) => api.episHse(q));
 
-  const bsd = useQuery({
-    queryKey: ["hse-bsd"],
-    queryFn: () => api.bordereauxDechets(`?page_size=30`),
-    select: (page: Paginated<BordereauDechet>) => page.results,
-  });
+  const bsd = usePagedList<BordereauDechet>("hse-bsd", (q) => api.bordereauxDechets(q));
 
   if (stats.isLoading || incidents.isLoading || !stats.data)
     return <BoardSkeleton cols={4} rows={3} />;
@@ -268,30 +248,24 @@ export function HsePage() {
         message={t("common.error")}
         onRetry={() => {
           void stats.refetch();
-          void permis.refetch();
+          void permis.query.refetch();
           void incidents.refetch();
-          void risques.refetch();
-          void atex.refetch();
-          void formations.refetch();
-          void epis.refetch();
-          void bsd.refetch();
+          void risques.query.refetch();
+          void atex.query.refetch();
+          void formations.query.refetch();
+          void epis.query.refetch();
+          void bsd.query.refetch();
         }}
         retryLabel={t("common.retry")}
       />
     );
 
   const s = stats.data;
-  const permisAll = permis.data ?? [];
+  const permisAll = permis.rows;
   const groups = incidents.data;
-  const risquesAll = risques.data ?? [];
-  const atexAll = atex.data ?? [];
-  const formAll = formations.data ?? [];
-  const epiAll = epis.data ?? [];
-  const bsdAll = bsd.data ?? [];
   const ouvertNonClos = Object.entries(groups)
     .filter(([k]) => k !== "cloture")
     .reduce((sum, [, arr]) => sum + arr.length, 0);
-  const aRenouveler = epiAll.filter((e) => e.a_renouveler).length;
 
   return (
     <>
@@ -328,7 +302,7 @@ export function HsePage() {
         <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? "∞"} hint={`${t("hse.incidentsOuverts")} · ${s.incidents_ouverts}`} icon={ShieldAlert} tone="ok" delay={0} />
         <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${t("hse.risquesCritiques")} · ${s.risques_critiques}`} icon={ShieldCheck} tone="brand" delay={0.05} />
         <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${t("hse.actionsOuvertes")} · ${s.actions_ouvertes}`} icon={Flame} tone="warn" delay={0.1} />
-        <Kpi label={t("hse.epiRenouveler")} value={aRenouveler || s.epi_a_renouveler} hint={`${t("hse.formationsPrevues")} · ${s.formations_prevues} · ${t("hse.bsdAttente")} · ${s.bsd_en_attente}`} icon={Activity} tone="warn" delay={0.15} />
+        <Kpi label={t("hse.epiRenouveler")} value={s.epi_a_renouveler} hint={`${t("hse.formationsPrevues")} · ${s.formations_prevues} · ${t("hse.bsdAttente")} · ${s.bsd_en_attente}`} icon={Activity} tone="warn" delay={0.15} />
         <Kpi
           label={t("hse.trir")}
           value={frequence.data?.trir ?? "—"}
@@ -338,6 +312,8 @@ export function HsePage() {
           delay={0.2}
         />
       </div>
+
+      <SearchField value={incSearch} onChange={setIncSearch} placeholder={t("hse.searchIncidents")} />
 
       <div style={{ overflowX: "auto" }}>
         <Board>
@@ -349,6 +325,7 @@ export function HsePage() {
               tone={INC_BADGE[st]}
               delay={ci * 0.05}
               minWidth={260}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <EmptyState icon={Inbox} label={t("common.empty")} />
@@ -366,41 +343,47 @@ export function HsePage() {
         </p>
       ) : null}
 
-      {permisAll.length > 0 ? (
+      {permis.count > 0 || permis.search ? (
         <>
           <h3 className="section-heading">
             {t("hse.permis")}
           </h3>
-          <div className="card-list">
-            {permisAll.map((p) => <PermisCard key={p.id} permis={p} />)}
-          </div>
+          <SearchField value={permis.search} onChange={permis.setSearch} placeholder={t("hse.searchPermis")} />
+          {permisAll.length === 0 ? (
+            <EmptyState icon={Inbox} label={t("common.empty")} />
+          ) : (
+            <div className="card-list">
+              {permisAll.map((p) => <PermisCard key={p.id} permis={p} />)}
+            </div>
+          )}
+          <Pagination page={permis.page} pageSize={permis.pageSize} count={permis.count} onPageChange={permis.setPage} onPageSizeChange={permis.setPageSize} />
         </>
       ) : null}
 
-      {risquesAll.length > 0 && (
-        <SectionCard title={`${t("hse.risques")} · ${risquesAll.length}`}>
-          <DataTable rows={risquesAll} columns={risqueColumns(t)} caption={t("hse.risques")} />
+      {(risques.count > 0 || risques.search) && (
+        <SectionCard title={`${t("hse.risques")} · ${risques.count}`}>
+          <PagedDataTable list={risques} columns={risqueColumns(t)} caption={t("hse.risques")} searchPlaceholder={t("hse.searchRisques")} />
         </SectionCard>
       )}
-      {atexAll.length > 0 && (
-        <SectionCard title={`${t("hse.atex")} · ${atexAll.length}`}>
-          <DataTable rows={atexAll} columns={atexColumns(t)} caption={t("hse.atex")} />
+      {(atex.count > 0 || atex.search) && (
+        <SectionCard title={`${t("hse.atex")} · ${atex.count}`}>
+          <PagedDataTable list={atex} columns={atexColumns(t)} caption={t("hse.atex")} searchPlaceholder={t("hse.searchAtex")} />
         </SectionCard>
       )}
-      {formAll.length > 0 && (
-        <SectionCard title={`${t("hse.formations")} · ${formAll.length}`}>
-          <DataTable rows={formAll} columns={formationColumns(t)} caption={t("hse.formations")} />
+      {(formations.count > 0 || formations.search) && (
+        <SectionCard title={`${t("hse.formations")} · ${formations.count}`}>
+          <PagedDataTable list={formations} columns={formationColumns(t)} caption={t("hse.formations")} searchPlaceholder={t("hse.searchFormations")} />
         </SectionCard>
       )}
-      {epiAll.length > 0 && (
-        <SectionCard title={`${t("hse.epi")} · ${epiAll.length}`}>
-          <DataTable rows={epiAll} columns={epiColumns(t)} caption={t("hse.epi")} />
+      {(epis.count > 0 || epis.search) && (
+        <SectionCard title={`${t("hse.epi")} · ${epis.count}`}>
+          <PagedDataTable list={epis} columns={epiColumns(t)} caption={t("hse.epi")} searchPlaceholder={t("hse.searchEpis")} />
         </SectionCard>
       )}
       <ConformiteHse />
-      {bsdAll.length > 0 && (
-        <SectionCard title={`${t("hse.bsd")} · ${bsdAll.length}`}>
-          <DataTable rows={bsdAll} columns={bsdColumns(t)} caption={t("hse.bsd")} />
+      {(bsd.count > 0 || bsd.search) && (
+        <SectionCard title={`${t("hse.bsd")} · ${bsd.count}`}>
+          <PagedDataTable list={bsd} columns={bsdColumns(t)} caption={t("hse.bsd")} searchPlaceholder={t("hse.searchBsd")} />
         </SectionCard>
       )}
     </>

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { CubeArchive, CubeAxe, CubeLecture, Paginated, ParametreCube } from "../../types";
+import type { CubeArchive, CubeAxe, CubeLecture, ParametreCube } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
 const AXES: CubeAxe[] = ["affaire", "chantier", "site", "activite", "centre", "periode"];
@@ -24,7 +24,7 @@ function ParametresCube() {
   const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
   const params = useQuery({
     queryKey: ["cube-parametres"],
-    queryFn: () => api.get<Paginated<ParametreCube>>("/api/analytics/cubes/parametres/").then((p) => p.results),
+    queryFn: () => api.listAll<ParametreCube>("/api/analytics/cubes/parametres/"),
     retry: 0,
   });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["cube-parametres"] });
@@ -108,7 +108,7 @@ export function CubesSection() {
   });
   const archives = useQuery({
     queryKey: ["cube-archives"],
-    queryFn: () => api.get<Paginated<CubeArchive>>("/api/analytics/cubes/archives/").then((p) => p.results),
+    queryFn: () => api.listAll<CubeArchive>("/api/analytics/cubes/archives/"),
     retry: 0,
   });
   const refresh = () => {

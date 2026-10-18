@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { Employe, Paginated } from "../../types";
+import type { Employe } from "../../types";
 import { SectionCard } from "../ui";
 
 interface Compte {
@@ -36,17 +36,17 @@ export function VirementsSection() {
   const qc = useQueryClient();
   const comptes = useQuery({
     queryKey: ["comptes-emetteurs"],
-    queryFn: () => api.get<Paginated<Compte>>("/api/rh-paie/comptes-emetteurs/").then((p) => p.results),
+    queryFn: () => api.listAll<Compte>("/api/rh-paie/comptes-emetteurs/"),
     retry: 0,
   });
   const ordres = useQuery({
     queryKey: ["ordres-virement"],
-    queryFn: () => api.get<Paginated<Ordre>>("/api/rh-paie/ordres-virement/").then((p) => p.results),
+    queryFn: () => api.listAll<Ordre>("/api/rh-paie/ordres-virement/"),
     retry: 0,
   });
   const employes = useQuery({
     queryKey: ["employes-rib"],
-    queryFn: () => api.get<Paginated<Employe>>("/api/rh-paie/employes/").then((p) => p.results),
+    queryFn: () => api.listAll<Employe>("/api/rh-paie/employes/"),
     retry: 0,
   });
   const [compte, setCompte] = useState(COMPTE_VIDE);

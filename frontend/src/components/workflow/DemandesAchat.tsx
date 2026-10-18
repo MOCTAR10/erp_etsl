@@ -1,10 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate } from "../../lib/format";
+import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard, type Column } from "../ui";
+import { ActionBar, Badge, PagedDataTable, QuickForm, SectionCard, type Column } from "../ui";
 
 interface DemandeAchat {
   id: string;
@@ -29,11 +29,7 @@ const TONE: Record<DemandeAchat["status"], "ok" | "warn" | "err" | "brand"> = {
 /** Demandes d'achat : saisie + circuit soumettre → approuver / rejeter (validation hiérarchique côté API). */
 export function DemandesAchat() {
   const { t } = useTranslation();
-  const list = useQuery({
-    queryKey: ["achats-da"],
-    queryFn: () => api.get<Paginated<DemandeAchat>>("/api/achats/requests/?page_size=50").then((p) => p.results),
-  });
-  const rows = list.data ?? [];
+  const list = usePagedList<DemandeAchat>("achats-da", (q) => api.get<Paginated<DemandeAchat>>(`/api/achats/requests/${q}`));
 
   const columns: Column<DemandeAchat>[] = [
     { key: "code", header: t("purchases.da.code"), render: (d) => d.code },
@@ -78,7 +74,7 @@ export function DemandesAchat() {
   ];
 
   return (
-    <SectionCard title={`${t("purchases.da.title")} · ${rows.length}`}>
+    <SectionCard title={`${t("purchases.da.title")} · ${list.count}`}>
       <QuickForm
         title={t("purchases.da.new")}
         endpoint="/api/achats/requests/"
@@ -101,7 +97,9 @@ export function DemandesAchat() {
         ]}
         transform={(v) => ({ ...v, is_urgent: v.is_urgent === "true" })}
       />
-      {rows.length > 0 && <DataTable rows={rows} columns={columns} caption={t("purchases.da.title")} />}
+      {(list.count > 0 || list.search) && (
+        <PagedDataTable list={list} columns={columns} caption={t("purchases.da.title")} searchPlaceholder={t("purchases.da.search")} />
+      )}
     </SectionCard>
   );
 }

@@ -92,7 +92,7 @@ class JournalViewSet(AdminWriteMixin, viewsets.ModelViewSet):
 
 
 class SequenceViewSet(AdminWriteMixin, viewsets.ModelViewSet):
-    queryset = Sequence.objects.select_related("journal").all()
+    queryset = Sequence.objects.select_related("journal").order_by("pk")
     serializer_class = SequenceSerializer
 
 
@@ -100,6 +100,7 @@ class AccountMoveViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     """Écritures comptables : brouillon → comptabilisée (immuable) → extournée."""
 
     serializer_class = AccountMoveSerializer
+    search_fields = ("number", "reference", "label",)
 
     def get_permissions(self):
         # Grand livre = données financières sensibles (dont journal de paie) :

@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { Paginated } from "../../types";
 import { SectionCard } from "../ui";
 
 interface Declaration {
@@ -38,7 +37,7 @@ export function DeclarationsSection() {
   const qc = useQueryClient();
   const decls = useQuery({
     queryKey: ["declarations"],
-    queryFn: () => api.get<Paginated<Declaration>>("/api/rh-paie/declarations/").then((p) => p.results),
+    queryFn: () => api.listAll<Declaration>("/api/rh-paie/declarations/"),
     retry: 0,
   });
   const annee = new Date().getFullYear();

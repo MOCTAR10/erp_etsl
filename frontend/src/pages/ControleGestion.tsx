@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { CalendarCheck, Coins, Inbox, PieChart, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -7,9 +8,10 @@ import { GrAffairesSection } from "../components/workflow/GrAffairesSection";
 import { MaintenanceCoutsSection } from "../components/workflow/MaintenanceM8Section";
 import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaireSection";
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
+import { pagedQuery } from "../lib/usePagedList";
 import type {
   AnalyseEcart,
   Budget,
@@ -201,9 +203,11 @@ export function ControleGestionPage() {
 
   const yearParam = fy.data ? `?fiscal_year=${fy.data.id}` : "";
 
+  const [budSearch, setBudSearch] = useState("");
   const budgets = useQuery({
-    queryKey: ["cg-budgets", fy.data?.id],
-    queryFn: () => api.cgBudgets("?page_size=100"),
+    queryKey: ["cg-budgets", fy.data?.id, budSearch],
+    queryFn: () => api.cgBudgets(pagedQuery(1, 500, budSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<Budget>) => {
       const groups: BudgetGroups = { brouillon: [], approuve: [], cloture: [] };
       for (const b of page.results) {
@@ -216,8 +220,7 @@ export function ControleGestionPage() {
 
   const revisions = useQuery({
     queryKey: ["cg-revisions"],
-    queryFn: () => api.cgRevisions("?page_size=50"),
-    select: (page: Paginated<BudgetRevision>) => page.results,
+    queryFn: () => api.listAll<BudgetRevision>("/api/controle-gestion/revisions/"),
   });
 
   const clotures = useQuery({
@@ -229,8 +232,7 @@ export function ControleGestionPage() {
 
   const analyses = useQuery({
     queryKey: ["cg-analyses-ecart"],
-    queryFn: () => api.get<Paginated<AnalyseEcart>>("/api/controle-gestion/analyses-ecart/?statut=a_analyser&page_size=50"),
-    select: (page: Paginated<AnalyseEcart>) => page.results,
+    queryFn: () => api.listAll<AnalyseEcart>("/api/controle-gestion/analyses-ecart/?statut=a_analyser"),
   });
 
   const cloturesStats = useQuery({
@@ -282,6 +284,8 @@ export function ControleGestionPage() {
         <Kpi label={t("controleGestion.marge")} value={m && m.totals.marge_hors_gr !== null ? `${formatNumber(m.totals.marge_hors_gr)} F` : "••••••"} hint={`${t("controleGestion.coutGr")} ${m ? formatNumber(m.totals.cout_gr) : "—"} F`} icon={Coins} tone="accent" delay={0.15} />
       </div>
 
+      <SearchField value={budSearch} onChange={setBudSearch} placeholder={t("controleGestion.searchBudgets")} />
+
       <div style={{ overflowX: "auto" }}>
         <Board>
           {BUD_ORDER.map((st, ci) => (
@@ -292,6 +296,7 @@ export function ControleGestionPage() {
               tone={BUD_BADGE[st]}
               delay={ci * 0.05}
               minWidth={280}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <EmptyState icon={Inbox} label={t("common.empty")} />

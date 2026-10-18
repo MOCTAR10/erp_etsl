@@ -77,6 +77,7 @@ class AccountViewSet(AdminWriteMixin, viewsets.ModelViewSet):
     """Plan de comptes SYSCOHADA révisée."""
 
     serializer_class = AccountSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = Account.objects.all()
@@ -96,6 +97,7 @@ class PartnerViewSet(AdminWriteMixin, viewsets.ModelViewSet):
     """Tiers unifié (clients, fournisseurs, intra-groupe GR)."""
 
     serializer_class = PartnerSerializer
+    search_fields = ("code", "name", "tax_id",)
 
     def get_queryset(self):
         qs = Partner.objects.select_related("currency").all()
@@ -110,6 +112,7 @@ class PartnerViewSet(AdminWriteMixin, viewsets.ModelViewSet):
 
 class ArticleViewSet(AdminWriteMixin, viewsets.ModelViewSet):
     serializer_class = ArticleSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = Article.objects.select_related("unit", "account").all()
@@ -127,6 +130,7 @@ class ArticleViewSet(AdminWriteMixin, viewsets.ModelViewSet):
 
 class AnalyticAxisViewSet(AdminWriteMixin, viewsets.ModelViewSet):
     serializer_class = AnalyticAxisSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = AnalyticAxis.objects.all()
@@ -138,6 +142,7 @@ class AnalyticAxisViewSet(AdminWriteMixin, viewsets.ModelViewSet):
 
 class AnalyticAccountViewSet(AdminWriteMixin, viewsets.ModelViewSet):
     serializer_class = AnalyticAccountSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = AnalyticAccount.objects.select_related("axis").all()

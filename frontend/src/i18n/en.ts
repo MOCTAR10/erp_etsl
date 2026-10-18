@@ -122,6 +122,7 @@ export const en = {
     envoyer: "Send to Management", rouvrir: "Reopen", motifPrompt: "Reason for reopening?",
   },
   facturation: {
+    search: "Search invoices (code, subject)…",
     title: "Customer invoicing (M10)",
     hint: "Completed milestones and validated progress statements are invoiced here. An issued invoice is posted (411 · 706 · 443), archived 10 years and sealed: corrections go through a credit note.",
     warnModele: "Provisional invoice template: header and legal notices to be confirmed by ETSL (the PDF carries a warning).",
@@ -204,6 +205,16 @@ export const en = {
   quickForm: { created: "Saved.", save: "Save", close: "Close form" },
   actionBar: { confirmer: "Confirm", annuler: "Cancel" },
   common: {
+    pagination: "Pagination",
+    previous: "Previous page",
+    next: "Next page",
+    pageOf: "Page {{page}} of {{pages}}",
+    pageSize: "Rows per page",
+    results_one: "{{count}} result",
+    results_other: "{{count}} results",
+    searchLabel: "Search",
+    searchPlaceholder: "Search…",
+    showMore: "Show more ({{count}})",
     skipToContent: "Skip to content",
     mainNav: "Main navigation",
     logout: "Sign out",
@@ -334,6 +345,9 @@ export const en = {
     task: "task",
   },
   commercial: {
+    searchOffres: "Search quotes (code, title, client)…",
+    searchAffaires: "Search projects (code, title, client)…",
+    searchContrats: "Search contracts (code, client)…",
     offres: "Quotes (versions)",
     affaires: "Deals",
     contrats: "Contracts (CLM)",
@@ -369,6 +383,8 @@ export const en = {
     masked: "Amount restricted",
   },
   achatsPilotage: {
+    searchReceptions: "Search receipts (code, PO)…",
+    searchLitiges: "Search disputes (code, PO)…",
     receptions: "Receipts and quality control",
     receptionsIntro: "Each receipt (even partial) triggers an incoming quality inspection (M6); it is validated only once the inspection is compliant or accepted with reservations.",
     validerReception: "Validate receipt",
@@ -393,7 +409,9 @@ export const en = {
     },
   },
   purchases: {
+    search: "Search purchase orders (code, supplier)…",
     da: {
+      search: "Search purchase requests (code, subject, department)…",
       title: "Purchase requests", new: "New purchase request", code: "Code", objet: "Subject", demandeur: "Requester",
       echeance: "Needed by", statut: "Status", service: "Department", urgente: "Urgent", oui: "Yes", non: "No",
       notes: "Justification / notes", soumettre: "Submit", motif: "Rejection reason:",
@@ -414,6 +432,8 @@ export const en = {
     previ: "Forecast",
   },
   operations: {
+    searchOf: "Search manufacturing orders (code, label)…",
+    searchSituations: "Search work statements (code, label)…",
     surcharge: "Capacity overload (alerts)",
     semaine: "week of",
     sit: { code: "Code", periode: "Period", heures: "Logged hours", avancement: "Progress", montant: "Amount", statut: "Status" },
@@ -455,6 +475,9 @@ export const en = {
     },
   },
   logistique: {
+    searchEquipements: "Search equipment (code, label, plate)…",
+    searchLocations: "Search rentals (code, references)…",
+    searchDemandes: "Search requests (code, label)…",
     act: { emettre: "Issue PO / GR", soumettre: "Submit", traiter: "Mark as handled", compteurDepart: "Meter reading at start:", compteurFin: "Meter reading at return:" },
     col: { code: "Code", equipement: "Equipment", partenaire: "Partner", periodicite: "Billing period", consommation: "Usage", montant: "Estimated amount", statut: "Status", besoin: "Need", departement: "Department", affaire: "Project" },
     title: "Logistics — Fleet & GLOBAL RENTAL (M4)",
@@ -483,6 +506,9 @@ export const en = {
     prelevement: "Readings",
   },
   stocks: {
+    searchLots: "Search lots (code, lot no., item)…",
+    searchMouvements: "Search movements (code, reference, item)…",
+    searchInventaires: "Search inventories (code, warehouse)…",
     form: { confirmCloture: "Close the inventory? Differences will be posted as stock movements (not editable).", title: "New stock movement", source: "Source warehouse", destination: "Destination warehouse", reference: "Document reference (delivery note, WO…)" },
     col: { article: "Article", depot: "Warehouse", method: "Valuation", qty: "Quantity", unitCost: "Unit cost", value: "Value", code: "Code", type: "Type", flow: "Flow", date: "Date", certNo: "Certificate no.", lot: "Lot", organisme: "Body", status: "Status" },
     title: "Stocks & Materials traceability (M5)",
@@ -554,7 +580,15 @@ export const en = {
     totalMvt: "Moves",
   },
   qualite: {
+    searchNc: "Search non-conformities (code)…",
+    searchQualifs: "Search qualifications (code, welder)…",
+    searchWps: "Search WPS/WPQR (code, reference)…",
+    searchControles: "Search inspections (code, point)…",
+    searchPvs: "Search reports (code, title)…",
     m6: {
+      searchInstruments: "Search instruments (code, designation, serial no.)…",
+      searchJoints: "Search joints (code, mark)…",
+      searchEpreuves: "Search tests (code)…",
       metrologie: "Metrology (calibration)", newInstrument: "New instrument", designation: "Designation", serie: "Serial no.", dernierEtalonnage: "Last calibration", echeance: "Calibration due date",
       utilisable: "In service", usageBloque: "Use blocked", etalonnerConforme: "Calibrated OK (+1 year)", confirmEtalonnage: "Record a passing calibration (due in 1 year)?", horsTolerance: "Out of tolerance", confirmHorsTolerance: "Mark the instrument out of tolerance? Its use will be blocked.",
       joints: "Weld joint register", jointsVide: "No joint recorded (an approved ITP is required before welding).", of: "WO", joint: "Joint", coulee: "Heat number", epreuves: "Hydrostatic / leak tests", epreuvesVide: "No test recorded.", pressionEssai: "Test pressure", releves: "P/T readings",
@@ -675,6 +709,13 @@ export const en = {
     interne: "Internal QA/QC",
   },
   hse: {
+    searchIncidents: "Search incidents (code, place)…",
+    searchPermis: "Search permits (code, location)…",
+    searchRisques: "Search risk assessments (code, place, activity)…",
+    searchAtex: "Search ATEX equipment (code, designation)…",
+    searchFormations: "Search training (code, topic)…",
+    searchEpis: "Search PPE (code, designation)…",
+    searchBsd: "Search waste slips (code, BSD no.)…",
     trir: "TRIR (year)",
     joursPerdus: "lost days",
     visaAttendu: "Awaiting sign-off", niveaux: { superviseur: "supervisor", hse: "HSE", dg: "Managing Director" },
@@ -700,6 +741,9 @@ export const en = {
     epi: "PPE",
     bsd: "Waste transfer notes",
     m7: {
+      searchAudits: "Search audits (code, area)…",
+      searchDuer: "Search risk registers (code, scope)…",
+      searchPlans: "Search emergency plans (code, title)…",
       audits: "Audits & inspections",
       duer: "Risk assessment record (DUER)",
       plans: "Emergency plans & drills",
@@ -852,6 +896,9 @@ export const en = {
     },
   },
   maintenance: {
+    searchOt: "Search work orders (code, asset)…",
+    searchActifs: "Search assets (code, designation, serial no.)…",
+    searchInspections: "Search inspections (code, body)…",
     act: { planifier: "Schedule", terminer: "Complete", annuler: "Cancel", confirmAnnuler: "Cancel this work order?", archiver: "Archive", confirmArchiver: "Archive this work order? It will become read-only." },
     form: { title: "New work order", actif: "Equipment", priorite: "Priority", datePlanifiee: "Planned date", description: "Work description" },
     col: { code: "Code", designation: "Designation", category: "Category", site: "Site", status: "Status", type: "Type", date: "Date", ot: "Generated WO" },
@@ -940,6 +987,8 @@ export const en = {
     pendingNote: "Equipment down: corrective WO / maintenance decision required (MANUAL §5.9).",
   },
   rhPaie: {
+    searchEmployes: "Search employees (ID, name, role)…",
+    searchBulletins: "Search payslips (ID, name)…",
     act: { approuver: "Approve" },
     col: { matricule: "Employee ID", nom: "Name", fonction: "Position · department", categorie: "Category", statut: "Status" },
     title: "HR & Payroll — Staff, leave, training & pay slips (M9)",
@@ -1058,6 +1107,9 @@ export const en = {
     pendingNote: "Payroll restricted to the HR circle (RF-33): salaries and pay slips hidden outside HR/Finance/Management (RF-59).",
   },
   comptabilite: {
+    searchEngagements: "Search commitments (code, subject)…",
+    searchReleves: "Search statements (code, account)…",
+    searchPaiements: "Search payments (code, reference)…",
     act: { soumettre: "Submit", approuver: "Approve", annuler: "Cancel", confirmAnnuler: "Cancel this document?", confirmComptabiliser: "Post this payment? The generated entry can no longer be edited (reversal only)." },
     form: { title: "New payment", engagement: "Approved commitment", reference: "Reference (cheque, transfer no.…)" },
     col: { code: "Code", date: "Date", bank: "Bank account", period: "Period", debit: "Debit", credit: "Credit", status: "Status", direction: "Direction", mode: "Mode", party: "Counterparty", amount: "Amount", entry: "Entry" },
@@ -1217,6 +1269,7 @@ export const en = {
     provisoire: "Provisional", confirme: "Confirmed", confirmer: "Confirm", confirmConfirmer: "Confirm this value (validated by ETSL)?",
   },
   controleGestion: {
+    searchBudgets: "Search budgets (code, label)…",
     reporting_statut: { a_temps: "Published by D+4", j6: "Published by D+6", hors_delai: "Late (> D+6)", en_attente: "To publish" },
     joursProvisoires: "provisional days", publieLe: "Published on {{date}}",
     analysesEcart: "Variances > 10 % to analyse",
@@ -1276,6 +1329,13 @@ export const en = {
     pendingNote: "Margins and variances aggregated from posted entries (accounting kernel); GLOBAL RENTAL cost isolated to account 618 (RF-ERP-A4). Period closings < J+4 (RF-ERP-A3), budgets & revisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    searchConventions: "Search agreements (code, title)…",
+    searchCautions: "Search guarantees (code, beneficiary)…",
+    searchAssurances: "Search insurance (code, policy no.)…",
+    searchContentieux: "Search disputes (code, subject, opposing party)…",
+    searchCourriers: "Search mail (code, subject, reference)…",
+    searchReunions: "Search meetings (code, subject)…",
+    searchGr: "Search Global Rental files (code, contract)…",
     act: { enregistrer: "Register", classer: "File", archiver: "Archive" },
     form: {
       title: "Register a letter", entrant: "Incoming", sortant: "Outgoing", reference: "Reference",

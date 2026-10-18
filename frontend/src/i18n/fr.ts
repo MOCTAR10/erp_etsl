@@ -122,6 +122,7 @@ export const fr = {
     envoyer: "Envoyer à la Direction", rouvrir: "Rouvrir", motifPrompt: "Motif de la réouverture ?",
   },
   facturation: {
+    search: "Rechercher une facture (code, objet)…",
     title: "Facturation client (M10)",
     hint: "Les jalons réalisés et les situations validées sont facturés ici. Une facture émise est comptabilisée (411 · 706 · 443), archivée en GED 10 ans et scellée : toute correction passe par un avoir.",
     warnModele: "Modèle de facture provisoire : en-tête et mentions légales à confirmer par ETSL (le PDF porte un avertissement).",
@@ -204,6 +205,16 @@ export const fr = {
   quickForm: { created: "Enregistré.", save: "Enregistrer", close: "Fermer le formulaire" },
   actionBar: { confirmer: "Confirmer", annuler: "Annuler" },
   common: {
+    pagination: "Pagination",
+    previous: "Page précédente",
+    next: "Page suivante",
+    pageOf: "Page {{page}} / {{pages}}",
+    pageSize: "Lignes par page",
+    results_one: "{{count}} résultat",
+    results_other: "{{count}} résultats",
+    searchLabel: "Rechercher",
+    searchPlaceholder: "Rechercher…",
+    showMore: "Voir plus ({{count}})",
     skipToContent: "Aller au contenu",
     mainNav: "Navigation principale",
     logout: "Déconnexion",
@@ -334,6 +345,9 @@ export const fr = {
     task: "tâche",
   },
   commercial: {
+    searchOffres: "Rechercher une offre (code, titre, client)…",
+    searchAffaires: "Rechercher une affaire (code, titre, client)…",
+    searchContrats: "Rechercher un contrat (code, client)…",
     offres: "Offres (versions)",
     affaires: "Affaires",
     contrats: "Contrats (CLM)",
@@ -369,6 +383,8 @@ export const fr = {
     masked: "Montant restreint",
   },
   achatsPilotage: {
+    searchReceptions: "Rechercher une réception (code, BC)…",
+    searchLitiges: "Rechercher un litige (code, BC)…",
     receptions: "Réceptions et contrôle qualité",
     receptionsIntro: "Chaque réception (même partielle) déclenche un contrôle qualité à réception (M6) ; elle n'est validée qu'avec un contrôle conforme ou accepté sous réserve.",
     validerReception: "Valider la réception",
@@ -393,7 +409,9 @@ export const fr = {
     },
   },
   purchases: {
+    search: "Rechercher un bon de commande (code, fournisseur)…",
     da: {
+      search: "Rechercher une demande d'achat (code, objet, service)…",
       title: "Demandes d'achat", new: "Nouvelle demande d'achat", code: "Code", objet: "Objet", demandeur: "Demandeur",
       echeance: "Échéance souhaitée", statut: "Statut", service: "Service", urgente: "Urgente", oui: "Oui", non: "Non",
       notes: "Justification / notes", soumettre: "Soumettre", motif: "Motif du rejet :",
@@ -414,6 +432,8 @@ export const fr = {
     previ: "Prévisionnel",
   },
   operations: {
+    searchOf: "Rechercher un ordre de fabrication (code, libellé)…",
+    searchSituations: "Rechercher une situation de travaux (code, libellé)…",
     surcharge: "Surcharge de capacité (alertes)",
     semaine: "semaine du",
     sit: { code: "Code", periode: "Période", heures: "Heures pointées", avancement: "Avancement", montant: "Montant", statut: "Statut" },
@@ -455,6 +475,9 @@ export const fr = {
     },
   },
   logistique: {
+    searchEquipements: "Rechercher un équipement (code, libellé, immatriculation)…",
+    searchLocations: "Rechercher une location (code, références)…",
+    searchDemandes: "Rechercher une demande (code, libellé)…",
     act: { emettre: "Émettre BC / GR", soumettre: "Soumettre", traiter: "Marquer traitée", compteurDepart: "Relevé du compteur au départ :", compteurFin: "Relevé du compteur au retour :" },
     col: { code: "Code", equipement: "Équipement", partenaire: "Partenaire", periodicite: "Périodicité", consommation: "Consommation", montant: "Montant estimé", statut: "Statut", besoin: "Besoin", departement: "Département", affaire: "Affaire" },
     title: "Logistique — Parc & GLOBAL RENTAL (M4)",
@@ -483,6 +506,9 @@ export const fr = {
     prelevement: "Relevés",
   },
   stocks: {
+    searchLots: "Rechercher un lot (code, n° lot, article)…",
+    searchMouvements: "Rechercher un mouvement (code, référence, article)…",
+    searchInventaires: "Rechercher un inventaire (code, dépôt)…",
     form: { confirmCloture: "Clôturer l'inventaire ? Les écarts seront passés en mouvements de stock (non modifiables).", title: "Nouveau mouvement de stock", source: "Dépôt source", destination: "Dépôt destination", reference: "Référence document (BL, OF…)" },
     col: { article: "Article", depot: "Dépôt", method: "Valorisation", qty: "Quantité", unitCost: "Coût unitaire", value: "Valeur", code: "Code", type: "Type", flow: "Flux", date: "Date", certNo: "N° certificat", lot: "Lot", organisme: "Organisme", status: "Statut" },
     title: "Stocks & Traçabilité matière (M5)",
@@ -554,7 +580,15 @@ export const fr = {
     totalMvt: "Mouvements",
   },
   qualite: {
+    searchNc: "Rechercher une non-conformité (code)…",
+    searchQualifs: "Rechercher une qualification (code, soudeur)…",
+    searchWps: "Rechercher un WPS/WPQR (code, référence)…",
+    searchControles: "Rechercher un contrôle (code, point)…",
+    searchPvs: "Rechercher un PV (code, intitulé)…",
     m6: {
+      searchInstruments: "Rechercher un instrument (code, désignation, n° de série)…",
+      searchJoints: "Rechercher un joint (code, repère)…",
+      searchEpreuves: "Rechercher une épreuve (code)…",
       metrologie: "Métrologie (étalonnage)", newInstrument: "Nouvel instrument", designation: "Désignation", serie: "N° de série", dernierEtalonnage: "Dernier étalonnage", echeance: "Échéance d'étalonnage",
       utilisable: "Utilisable", usageBloque: "Usage bloqué", etalonnerConforme: "Étalonné conforme (+1 an)", confirmEtalonnage: "Enregistrer un étalonnage conforme (échéance dans 1 an) ?", horsTolerance: "Hors tolérance", confirmHorsTolerance: "Déclarer l'instrument hors tolérance ? Son usage sera bloqué.",
       joints: "Registre des joints soudés", jointsVide: "Aucun joint enregistré (un ITP approuvé est requis avant soudage).", of: "OF", joint: "Joint", coulee: "N° de coulée", epreuves: "Épreuves hydrauliques / étanchéité", epreuvesVide: "Aucune épreuve enregistrée.", pressionEssai: "Pression d'essai", releves: "Relevés P/T",
@@ -675,6 +709,13 @@ export const fr = {
     interne: "Interne QA/QC",
   },
   hse: {
+    searchIncidents: "Rechercher un incident (code, lieu)…",
+    searchPermis: "Rechercher un permis (code, emplacement)…",
+    searchRisques: "Rechercher une évaluation de risque (code, lieu, activité)…",
+    searchAtex: "Rechercher un équipement ATEX (code, désignation)…",
+    searchFormations: "Rechercher une formation (code, thème)…",
+    searchEpis: "Rechercher un EPI (code, désignation)…",
+    searchBsd: "Rechercher un bordereau (code, n° BSD)…",
     trir: "TRIR (année)",
     joursPerdus: "jours perdus",
     visaAttendu: "Visa attendu", niveaux: { superviseur: "superviseur", hse: "HSE", dg: "Direction Générale" },
@@ -700,6 +741,9 @@ export const fr = {
     epi: "EPI",
     bsd: "Bordereaux de déchets",
     m7: {
+      searchAudits: "Rechercher un audit (code, zone)…",
+      searchDuer: "Rechercher un DUER (code, périmètre)…",
+      searchPlans: "Rechercher un plan d'urgence (code, intitulé)…",
       audits: "Audits & inspections",
       duer: "DUER (document unique)",
       plans: "Plans d'urgence & exercices",
@@ -852,6 +896,9 @@ export const fr = {
     },
   },
   maintenance: {
+    searchOt: "Rechercher un ordre de travail (code, actif)…",
+    searchActifs: "Rechercher un actif (code, désignation, n° de série)…",
+    searchInspections: "Rechercher une inspection (code, organisme)…",
     act: { planifier: "Planifier", terminer: "Terminer", annuler: "Annuler", confirmAnnuler: "Annuler cet ordre de travail ?", archiver: "Archiver", confirmArchiver: "Archiver cet OT ? Il deviendra non modifiable." },
     form: { title: "Nouvel ordre de travail", actif: "Équipement", priorite: "Priorité", datePlanifiee: "Date planifiée", description: "Description de l'intervention" },
     col: { code: "Code", designation: "Désignation", category: "Catégorie", site: "Site", status: "Statut", type: "Type", date: "Date", ot: "OT généré" },
@@ -940,6 +987,8 @@ export const fr = {
     pendingNote: "Équipements en arrêt : OT correctif / décision de maintenance requise (MANUEL §5.9).",
   },
   rhPaie: {
+    searchEmployes: "Rechercher un salarié (matricule, nom, fonction)…",
+    searchBulletins: "Rechercher un bulletin (matricule, nom)…",
     act: { approuver: "Approuver" },
     col: { matricule: "Matricule", nom: "Nom", fonction: "Fonction · département", categorie: "Catégorie", statut: "Statut" },
     title: "RH & Paie — Personnel, congés, formations & bulletins (M9)",
@@ -1058,6 +1107,9 @@ export const fr = {
     pendingNote: "Paie restreinte au cercle RH (RF-33) : salaires et bulletins masqués hors RH/Finance/Direction (RF-59).",
   },
   comptabilite: {
+    searchEngagements: "Rechercher un engagement (code, objet)…",
+    searchReleves: "Rechercher un relevé (code, compte)…",
+    searchPaiements: "Rechercher un paiement (code, référence)…",
     act: { soumettre: "Soumettre", approuver: "Approuver", annuler: "Annuler", confirmAnnuler: "Annuler cette pièce ?", confirmComptabiliser: "Comptabiliser ce paiement ? L'écriture générée ne se modifie plus (extourne uniquement)." },
     form: { title: "Nouveau paiement", engagement: "Engagement approuvé", reference: "Référence (n° chèque, virement…)" },
     col: { code: "Code", date: "Date", bank: "Compte bancaire", period: "Période", debit: "Débit", credit: "Crédit", status: "Statut", direction: "Sens", mode: "Mode", party: "Tiers", amount: "Montant", entry: "Écriture" },
@@ -1217,6 +1269,7 @@ export const fr = {
     provisoire: "Provisoire", confirme: "Confirmé", confirmer: "Confirmer", confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
   },
   controleGestion: {
+    searchBudgets: "Rechercher un budget (code, libellé)…",
     reporting_statut: { a_temps: "Publié à J+4", j6: "Publié à J+6", hors_delai: "Hors délai (> J+6)", en_attente: "À publier" },
     joursProvisoires: "jours provisoires", publieLe: "Publié le {{date}}",
     analysesEcart: "Écarts > 10 % à analyser",
@@ -1276,6 +1329,13 @@ export const fr = {
     pendingNote: "Marges et écarts agrégés depuis les écritures comptabilisées (noyau comptable) ; coût GLOBAL RENTAL isolé au compte 618 (RF-ERP-A4). Clôtures de gestion < J+4 (RF-ERP-A3), budgets & révisions R1-R4 (RF-ERP-A1).",
   },
   juridique: {
+    searchConventions: "Rechercher une convention (code, titre)…",
+    searchCautions: "Rechercher une caution (code, bénéficiaire)…",
+    searchAssurances: "Rechercher une assurance (code, n° de police)…",
+    searchContentieux: "Rechercher un contentieux (code, objet, partie adverse)…",
+    searchCourriers: "Rechercher un courrier (code, objet, référence)…",
+    searchReunions: "Rechercher une réunion (code, objet)…",
+    searchGr: "Rechercher un dossier Global Rental (code, contrat)…",
     act: { enregistrer: "Enregistrer", classer: "Classer", archiver: "Archiver" },
     form: {
       title: "Enregistrer un courrier", entrant: "Entrant", sortant: "Sortant", reference: "Référence",

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { Budget, ConsommationsStock, Paginated, PeriodeRef } from "../../types";
+import type { Budget, ConsommationsStock, PeriodeRef } from "../../types";
 import { DataTable, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
@@ -36,17 +36,17 @@ export function SaisieBudgetaireSection({ fiscalYear, budgets }: { fiscalYear: s
 
   const axes = useQuery({
     queryKey: ["cg-axes"],
-    queryFn: () => api.get<Paginated<AxisRef>>("/api/referentiels/analytic-axes/?page_size=100").then((p) => p.results),
+    queryFn: () => api.listAll<AxisRef>("/api/referentiels/analytic-axes/"),
     retry: 0,
   });
   const analytiques = useQuery({
     queryKey: ["cg-analytiques"],
-    queryFn: () => api.get<Paginated<AnalyticRef>>("/api/referentiels/analytic-accounts/?page_size=100").then((p) => p.results),
+    queryFn: () => api.listAll<AnalyticRef>("/api/referentiels/analytic-accounts/"),
     retry: 0,
   });
   const periodes = useQuery({
     queryKey: ["cg-periodes", fiscalYear],
-    queryFn: () => api.get<Paginated<PeriodeRef>>(`/api/accounting/periods/?fiscal_year=${fiscalYear}&page_size=24`).then((p) => p.results),
+    queryFn: () => api.listAll<PeriodeRef>(`/api/accounting/periods/?fiscal_year=${fiscalYear}`),
     retry: 0,
   });
   const stock = useQuery({

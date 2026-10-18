@@ -7,7 +7,6 @@ import { api } from "../api/client";
 import { Badge, PageHeader, SectionCard } from "../components/ui";
 import { offlineQueue, submitOffline, syncNow, useOnline, useQueueItems } from "../lib/offline";
 import { useAuth } from "../store/auth";
-import type { Paginated } from "../types";
 
 type Tab = "pointage" | "gaz" | "reception" | "controle";
 
@@ -20,7 +19,7 @@ interface Ref {
 
 /** Listes de référence : le service worker en garde une copie pour la saisie hors-ligne (URLs fixes). */
 const useRef_ = (key: string, path: string) =>
-  useQuery({ queryKey: ["terrain", key], queryFn: () => api.get<Paginated<Ref>>(path).then((p) => p.results), retry: 0 });
+  useQuery({ queryKey: ["terrain", key], queryFn: () => api.listAll<Ref>(path), retry: 0 });
 
 const today = () => new Date().toISOString().slice(0, 10);
 

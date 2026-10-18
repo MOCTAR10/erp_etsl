@@ -71,6 +71,7 @@ class _CommonViewSet(viewsets.ModelViewSet):
 
 class EquipementParcViewSet(_CommonViewSet):
     serializer_class = EquipementParcSerializer
+    search_fields = ("code", "label", "registration", "site",)
 
     def get_queryset(self):
         qs = EquipementParc.objects.select_related("proprietaire")
@@ -106,6 +107,7 @@ class EquipementParcViewSet(_CommonViewSet):
 
 class DemandeMobilisationViewSet(_CommonViewSet):
     serializer_class = DemandeMobilisationSerializer
+    search_fields = ("code", "label",)
 
     def get_queryset(self):
         qs = DemandeMobilisation.objects.select_related("affaire", "ordre", "created_by")
@@ -178,6 +180,7 @@ class AffectationParcViewSet(_CommonViewSet):
 
 class LocationGRViewSet(_CommonViewSet):
     serializer_class = LocationGRSerializer
+    search_fields = ("code", "reference_bc", "reference_gr",)
 
     def get_queryset(self):
         qs = LocationGR.objects.select_related(
