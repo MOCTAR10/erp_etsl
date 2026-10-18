@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Award, ClipboardCheck, FileCheck2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, QuickForm, SectionCard } from "../components/ui";
+import { pagedQuery, usePagedList } from "../lib/usePagedList";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import type {
   ControleQualite,
@@ -155,33 +157,20 @@ function NcCard({ nc, index }: { nc: NonConformite; index: number }) {
 export function QualitePage() {
   const { t } = useTranslation();
 
-  const qualifs = useQuery({
-    queryKey: ["qualifs"],
-    queryFn: () => api.qualifications(`?page_size=200`),
-    select: (page: Paginated<QualificationSoudeur>) => page.results,
-  });
+  // Indicateurs (KPI) : listes complètes, toutes pages ; tableaux : listes paginées avec recherche.
+  const qualifsTous = useQuery({ queryKey: ["qualifs-tous"], queryFn: () => api.listAll<QualificationSoudeur>("/api/qualite/qualifications/") });
+  const wpsTous = useQuery({ queryKey: ["wps-tous"], queryFn: () => api.listAll<WpsWpqr>("/api/qualite/wps/") });
+  const pvsTous = useQuery({ queryKey: ["pvs-tous"], queryFn: () => api.listAll<PvControle>("/api/qualite/pvs/") });
+  const qualifs = usePagedList<QualificationSoudeur>("qualifs", (q) => api.qualifications(q));
+  const wps = usePagedList<WpsWpqr>("wps", (q) => api.wps(q));
+  const controles = usePagedList<ControleQualite>("controles-qualite", (q) => api.controlesQualite(q));
+  const pvs = usePagedList<PvControle>("pvs-controle", (q) => api.pvsControle(q));
 
-  const wps = useQuery({
-    queryKey: ["wps"],
-    queryFn: () => api.wps(`?page_size=50`),
-    select: (page: Paginated<WpsWpqr>) => page.results,
-  });
-
-  const controles = useQuery({
-    queryKey: ["controles-qualite"],
-    queryFn: () => api.controlesQualite(`?page_size=30`),
-    select: (page: Paginated<ControleQualite>) => page.results,
-  });
-
-  const pvs = useQuery({
-    queryKey: ["pvs-controle"],
-    queryFn: () => api.pvsControle(`?page_size=30`),
-    select: (page: Paginated<PvControle>) => page.results,
-  });
-
+  const [ncSearch, setNcSearch] = useState("");
   const ncs = useQuery({
-    queryKey: ["non-conformites"],
-    queryFn: () => api.nonConformites(`?page_size=100`),
+    queryKey: ["non-conformites", ncSearch],
+    queryFn: () => api.nonConformites(pagedQuery(1, 500, ncSearch)),
+    placeholderData: keepPreviousData,
     select: (page: Paginated<NonConformite>) => {
       const groups: NcGroups = { signalee: [], analysee: [], en_traitement: [], cloturee: [] };
       for (const nc of page.results) {
@@ -193,20 +182,22 @@ export function QualitePage() {
 
   const capa = useQuery({
     queryKey: ["capa"],
-    queryFn: () => api.actionsCorrectives(`?page_size=50`),
-    select: (page: Paginated<import("../types").ActionCorrective>) => page.results,
+    queryFn: () => api.listAll<import("../types").ActionCorrective>("/api/qualite/actions-correctives/"),
   });
 
-  if (qualifs.isLoading || ncs.isLoading) return <BoardSkeleton cols={4} rows={3} />;
-  if (qualifs.isError || ncs.isError || !ncs.data)
+  if (qualifsTous.isLoading || ncs.isLoading) return <BoardSkeleton cols={4} rows={3} />;
+  if (qualifsTous.isError || ncs.isError || !ncs.data)
     return (
       <ErrorState
         message={t("common.error")}
         onRetry={() => {
-          void qualifs.refetch();
-          void wps.refetch();
-          void controles.refetch();
-          void pvs.refetch();
+          void qualifsTous.refetch();
+          void wpsTous.refetch();
+          void pvsTous.refetch();
+          void qualifs.query.refetch();
+          void wps.query.refetch();
+          void controles.query.refetch();
+          void pvs.query.refetch();
           void ncs.refetch();
           void capa.refetch();
         }}
@@ -214,10 +205,9 @@ export function QualitePage() {
       />
     );
 
-  const qualifsAll = qualifs.data ?? [];
-  const wpsAll = wps.data ?? [];
-  const ctrlAll = controles.data ?? [];
-  const pvAll = pvs.data ?? [];
+  const qualifsAll = qualifsTous.data ?? [];
+  const wpsAll = wpsTous.data ?? [];
+  const pvAll = pvsTous.data ?? [];
   const capaAll = capa.data ?? [];
   const groups = ncs.data;
   const openNc = Object.entries(groups)
@@ -281,6 +271,8 @@ export function QualitePage() {
         />
       </div>
 
+      <SearchField value={ncSearch} onChange={setNcSearch} placeholder={t("qualite.searchNc")} />
+
       <div style={{ overflowX: "auto" }}>
         <Board>
           {NC_ORDER.map((st, ci) => (
@@ -291,6 +283,7 @@ export function QualitePage() {
               tone={NC_BADGE[st]}
               delay={ci * 0.05}
               minWidth={260}
+              limit={20}
             >
               {groups[st].length === 0 ? (
                 <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
@@ -304,24 +297,24 @@ export function QualitePage() {
         </Board>
       </div>
 
-      {qualifsAll.length > 0 && (
-        <SectionCard title={`${t("qualite.qualifs")} · ${qualifsAll.length}`}>
-          <DataTable rows={qualifsAll} columns={qualifColumns(t)} caption={t("qualite.qualifs")} />
+      {(qualifs.count > 0 || qualifs.search) && (
+        <SectionCard title={`${t("qualite.qualifs")} · ${qualifs.count}`}>
+          <PagedDataTable list={qualifs} columns={qualifColumns(t)} caption={t("qualite.qualifs")} searchPlaceholder={t("qualite.searchQualifs")} />
         </SectionCard>
       )}
-      {wpsAll.length > 0 && (
-        <SectionCard title={`${t("qualite.wps")} · ${wpsAll.length}`}>
-          <DataTable rows={wpsAll} columns={wpsColumns(t)} caption={t("qualite.wps")} />
+      {(wps.count > 0 || wps.search) && (
+        <SectionCard title={`${t("qualite.wps")} · ${wps.count}`}>
+          <PagedDataTable list={wps} columns={wpsColumns(t)} caption={t("qualite.wps")} searchPlaceholder={t("qualite.searchWps")} />
         </SectionCard>
       )}
-      {ctrlAll.length > 0 && (
-        <SectionCard title={`${t("qualite.controles")} · ${ctrlAll.length}`}>
-          <DataTable rows={ctrlAll} columns={ctrlColumns(t)} caption={t("qualite.controles")} />
+      {(controles.count > 0 || controles.search) && (
+        <SectionCard title={`${t("qualite.controles")} · ${controles.count}`}>
+          <PagedDataTable list={controles} columns={ctrlColumns(t)} caption={t("qualite.controles")} searchPlaceholder={t("qualite.searchControles")} />
         </SectionCard>
       )}
-      {pvAll.length > 0 && (
-        <SectionCard title={`${t("qualite.pvs")} · ${pvAll.length}`}>
-          <DataTable rows={pvAll} columns={pvColumns(t)} caption={t("qualite.pvs")} />
+      {(pvs.count > 0 || pvs.search) && (
+        <SectionCard title={`${t("qualite.pvs")} · ${pvs.count}`}>
+          <PagedDataTable list={pvs} columns={pvColumns(t)} caption={t("qualite.pvs")} searchPlaceholder={t("qualite.searchPvs")} />
         </SectionCard>
       )}
       <ItpSection />

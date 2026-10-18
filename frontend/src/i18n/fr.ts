@@ -425,6 +425,8 @@ export const fr = {
     previ: "Prévisionnel",
   },
   operations: {
+    searchOf: "Rechercher un ordre de fabrication (code, libellé)…",
+    searchSituations: "Rechercher une situation de travaux (code, libellé)…",
     surcharge: "Surcharge de capacité (alertes)",
     semaine: "semaine du",
     sit: { code: "Code", periode: "Période", heures: "Heures pointées", avancement: "Avancement", montant: "Montant", statut: "Statut" },
@@ -571,6 +573,11 @@ export const fr = {
     totalMvt: "Mouvements",
   },
   qualite: {
+    searchNc: "Rechercher une non-conformité (code)…",
+    searchQualifs: "Rechercher une qualification (code, soudeur)…",
+    searchWps: "Rechercher un WPS/WPQR (code, référence)…",
+    searchControles: "Rechercher un contrôle (code, point)…",
+    searchPvs: "Rechercher un PV (code, intitulé)…",
     m6: {
       metrologie: "Métrologie (étalonnage)", newInstrument: "Nouvel instrument", designation: "Désignation", serie: "N° de série", dernierEtalonnage: "Dernier étalonnage", echeance: "Échéance d'étalonnage",
       utilisable: "Utilisable", usageBloque: "Usage bloqué", etalonnerConforme: "Étalonné conforme (+1 an)", confirmEtalonnage: "Enregistrer un étalonnage conforme (échéance dans 1 an) ?", horsTolerance: "Hors tolérance", confirmHorsTolerance: "Déclarer l'instrument hors tolérance ? Son usage sera bloqué.",

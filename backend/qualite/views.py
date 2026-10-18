@@ -76,6 +76,7 @@ class SoudeurViewSet(viewsets.ModelViewSet):
 class QualificationSoudeurViewSet(viewsets.ModelViewSet):
     queryset = QualificationSoudeur.objects.select_related("soudeur").all()
     serializer_class = QualificationSoudeurSerializer
+    search_fields = ("code", "soudeur__nom", "soudeur__matricule")
     permission_classes = [CanManageQualite]
 
     def get_queryset(self):

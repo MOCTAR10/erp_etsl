@@ -425,6 +425,8 @@ export const en = {
     previ: "Forecast",
   },
   operations: {
+    searchOf: "Search manufacturing orders (code, label)…",
+    searchSituations: "Search work statements (code, label)…",
     surcharge: "Capacity overload (alerts)",
     semaine: "week of",
     sit: { code: "Code", periode: "Period", heures: "Logged hours", avancement: "Progress", montant: "Amount", statut: "Status" },
@@ -571,6 +573,11 @@ export const en = {
     totalMvt: "Moves",
   },
   qualite: {
+    searchNc: "Search non-conformities (code)…",
+    searchQualifs: "Search qualifications (code, welder)…",
+    searchWps: "Search WPS/WPQR (code, reference)…",
+    searchControles: "Search inspections (code, point)…",
+    searchPvs: "Search reports (code, title)…",
     m6: {
       metrologie: "Metrology (calibration)", newInstrument: "New instrument", designation: "Designation", serie: "Serial no.", dernierEtalonnage: "Last calibration", echeance: "Calibration due date",
       utilisable: "In service", usageBloque: "Use blocked", etalonnerConforme: "Calibrated OK (+1 year)", confirmEtalonnage: "Record a passing calibration (due in 1 year)?", horsTolerance: "Out of tolerance", confirmHorsTolerance: "Mark the instrument out of tolerance? Its use will be blocked.",
