@@ -43,6 +43,7 @@ from controle_gestion import budget_control
 from comptabilite.services import CanValidateCompta
 
 from .comptabilisation import comptabiliser_facture
+from .stock_link import entrer_en_stock
 from .services import CanApproveDa, CanManageAchats, can_see_amount, can_viser_dg
 
 
@@ -356,9 +357,18 @@ class GoodsReceiptViewSet(_CommonViewSet):
         if ctrl.resultat == ControleQualite.Resultat.NON_CONFORME:
             return Response({"detail": f"Contrôle qualité {ctrl.code} non conforme : ouvrez un litige fournisseur."},
                             status=status.HTTP_400_BAD_REQUEST)
+        try:
+            entrer_en_stock(receipt, request.user, request.data.get("depot"))
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages})
         receipt.status = GoodsReceipt.Status.VALIDE
         receipt.save(update_fields=["status", "updated_at"])
         return Response(self.get_serializer(receipt).data)
+
+    def perform_destroy(self, instance):
+        if instance.status != GoodsReceipt.Status.EN_ATTENTE:
+            raise ValidationError({"detail": "Réception validée : suppression impossible (le stock a été alimenté)."})
+        instance.delete()
 
 
 class LitigeFournisseurViewSet(_CommonViewSet):
@@ -447,6 +457,24 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
     @idempotent
     def create(self, request, *args, **kwargs):  # réception magasin rejouable (hors-ligne)
         return super().create(request, *args, **kwargs)
+
+    @staticmethod
+    def _garde_reception_ouverte(receipt):
+        # Réception validée = stock alimenté : ses lignes ne bougent plus (correction = mouvement de stock inverse).
+        if receipt.status != GoodsReceipt.Status.EN_ATTENTE:
+            raise ValidationError({"detail": "Réception validée : lignes non modifiables."})
+
+    def perform_create(self, serializer):
+        self._garde_reception_ouverte(serializer.validated_data["receipt"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._garde_reception_ouverte(serializer.instance.receipt)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._garde_reception_ouverte(instance.receipt)
+        instance.delete()
 
 
 class PurchaseInvoiceViewSet(_CommonViewSet):
