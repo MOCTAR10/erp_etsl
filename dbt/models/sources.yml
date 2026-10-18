@@ -34,6 +34,7 @@ sources:
       - name: hse_epi
       - name: maintenance_actif
       - name: maintenance_ordretravail
+      - name: maintenance_parametremaintenance
       - name: rh_paie_employe
       - name: rh_paie_contrattravail
       - name: rh_paie_qualification

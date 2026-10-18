@@ -471,3 +471,41 @@ class Inspection(models.Model):
             raise ValidationError(
                 {"prochaine_inspection": "La prochaine inspection doit être postérieure à l'inspection."}
             )
+
+class ParametreMaintenance(models.Model):
+    """Paramètre M8 modifiable par ETSL sans développeur (période d'observation, heures de service par jour).
+
+    Tant que `statut_valeur` = « provisoire », les écrans et états de fiabilité (MTBF / MTTR / disponibilité)
+    avertissent. Le défaut est créé à la volée par `services.get_param_maintenance` (donnée, jamais figée en code).
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
+        verbose_name="Statut de la valeur",
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+", verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre maintenance"
+        verbose_name_plural = "Paramètres maintenance"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME

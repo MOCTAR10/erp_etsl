@@ -13,6 +13,7 @@ from .views import (
     NiveauxMargeView,
     MargesView,
     GrAffairesView,
+    MaintenanceCoutsView,
     ParametreGestionViewSet,
     SousActiviteView,
 )
@@ -25,6 +26,7 @@ router.register("clotures", ClotureGestionViewSet, basename="cg-clotures")
 router.register("marges", MargesView, basename="cg-marges")
 router.register("consommations-stock", ConsommationsStockView, basename="cg-consommations-stock")
 router.register("gr-affaires", GrAffairesView, basename="cg-gr-affaires")
+router.register("maintenance-couts", MaintenanceCoutsView, basename="cg-maintenance-couts")
 router.register("sous-activite", SousActiviteView, basename="cg-sous-activite")
 router.register("niveaux-marge", NiveauxMargeView, basename="cg-niveaux-marge")
 router.register("atterrissage", AtterrissageView, basename="cg-atterrissage")

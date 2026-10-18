@@ -44,3 +44,9 @@ models:
           column_name: ref_code
       - not_null:
           column_name: alert_window
+  - name: dm_maintenance_fiabilite
+    description: "Fiabilité du parc (M8) : MTBF, MTTR et disponibilité par machine ; période d'observation paramétrable, valeurs provisoires signalées."
+    columns:
+      - name: actif_id
+        tests:
+          - not_null
