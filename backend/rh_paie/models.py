@@ -95,6 +95,12 @@ class Employe(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+    # Coordonnées bancaires (RIB 5/5/11/2) pour le virement des salaires — données sensibles : cercle paie seul.
+    rib_banque = models.CharField(max_length=5, blank=True, verbose_name="RIB — code banque")
+    rib_guichet = models.CharField(max_length=5, blank=True, verbose_name="RIB — code guichet")
+    rib_compte = models.CharField(max_length=11, blank=True, verbose_name="RIB — numéro de compte")
+    rib_cle = models.CharField(max_length=2, blank=True, verbose_name="RIB — clé")
+    banque_nom = models.CharField(max_length=24, blank=True, verbose_name="Domiciliation bancaire")
     parts_fiscales = models.DecimalField(
         max_digits=4, decimal_places=2, default=1, verbose_name="Parts fiscales (quotient familial)",
         help_text="Nombre de parts pour le calcul de l'impôt sur le revenu (1 = célibataire sans charge).",
@@ -121,6 +127,10 @@ class Employe(models.Model):
     @property
     def nom_complet(self):
         return f"{self.prenom} {self.nom}".strip()
+
+    @property
+    def rib_complet(self):
+        return bool(self.rib_banque and self.rib_guichet and self.rib_compte and self.rib_cle)
 
     @property
     def contrat_actif(self):
@@ -822,6 +832,15 @@ class BulletinPaie(models.Model):
         help_text="Version, taux et statut de chaque barème utilisé au dernier calcul : permet de rejouer "
         "un bulletin passé et d'afficher l'avertissement « provisoire ».",
     )
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="PDF archivé (GED)",
+        help_text="Bulletin PDF scellé en GED (type « bulletins de paie », conservation ≥ 10 ans).",
+    )
+    ordre_virement = models.ForeignKey(
+        "OrdreVirement", null=True, blank=True, on_delete=models.PROTECT, related_name="bulletins",
+        verbose_name="Ordre de virement",
+    )
     move = models.ForeignKey(
         "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.SET_NULL,
         related_name="bulletins_paie", verbose_name="Écriture comptable",
@@ -898,3 +917,66 @@ class BulletinLigne(models.Model):
 
     def __str__(self):
         return f"{self.bulletin.code} — {self.libelle} ({self.montant})"
+
+class CompteEmetteur(models.Model):
+    """Compte bancaire de l'entreprise qui émet les virements de salaires (CFONB)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    raison_sociale = models.CharField(max_length=24, verbose_name="Raison sociale (24 car. max)")
+    numero_emetteur = models.CharField(max_length=6, verbose_name="N° d'émetteur (6 chiffres, fourni par la banque)")
+    code_banque = models.CharField(max_length=5, verbose_name="Code banque")
+    code_guichet = models.CharField(max_length=5, verbose_name="Code guichet")
+    numero_compte = models.CharField(max_length=11, verbose_name="Numéro de compte")
+    cle_rib = models.CharField(max_length=2, verbose_name="Clé RIB")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+
+    class Meta:
+        ordering = ["raison_sociale"]
+        verbose_name = "Compte émetteur de paie"
+        verbose_name_plural = "Comptes émetteurs de paie"
+
+    def __str__(self):
+        return f"{self.raison_sociale} — {self.code_banque} {self.numero_compte}"
+
+    def clean(self):
+        for champ, n in (("numero_emetteur", 6), ("code_banque", 5), ("code_guichet", 5), ("numero_compte", 11), ("cle_rib", 2)):
+            v = getattr(self, champ)
+            ok = v.isalnum() if champ == "numero_compte" else v.isdigit()
+            if not ok or len(v) > n:
+                raise ValidationError({champ: f"Chiffres uniquement, {n} au plus."})
+
+
+class OrdreVirement(models.Model):
+    """Fichier de virement des salaires d'un mois (CFONB 160) — scellé après génération."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    periode = models.DateField(verbose_name="Période (1er du mois)")
+    compte = models.ForeignKey(CompteEmetteur, on_delete=models.PROTECT, related_name="ordres", verbose_name="Compte émetteur")
+    date_execution = models.DateField(verbose_name="Date d'exécution")
+    nb_virements = models.PositiveIntegerField(default=0)
+    total = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Total (FCFA)")
+    contenu = models.TextField(verbose_name="Fichier CFONB 160")
+    sha256 = models.CharField(max_length=64, verbose_name="Empreinte SHA-256")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Généré par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-periode", "-created_at"]
+        verbose_name = "Ordre de virement"
+        verbose_name_plural = "Ordres de virement"
+
+    def __str__(self):
+        return f"{self.code} — {self.periode:%m/%Y}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Un ordre de virement généré est scellé.")
+        if not self.code:
+            self.code = RhPaieSequence.next_for("VIR", "VIR")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Un ordre de virement généré est scellé.")

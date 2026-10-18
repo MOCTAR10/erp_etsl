@@ -21,6 +21,8 @@ from config.inputs import date_input
 from .models import (
     BaremeImpot,
     BaremeCotisation,
+    CompteEmetteur,
+    OrdreVirement,
     HistoriqueBareme,
     ParametrePaie,
     BulletinPaie,
@@ -36,6 +38,8 @@ from .models import (
 )
 from .serializers import (
     BaremeImpotSerializer,
+    CompteEmetteurSerializer,
+    OrdreVirementSerializer,
     HistoriqueBaremeSerializer,
     ParametrePaieSerializer,
     MonBulletinSerializer,
@@ -56,7 +60,9 @@ from .serializers import (
 from .services import (
     CanManagePaie,
     CanManageRh,
+    archiver_bulletin,
     bareme_fige,
+    generer_virement,
     calculer_bulletin,
     comptabiliser_bulletin,
     confirmer_valeur,
@@ -527,6 +533,20 @@ class BulletinViewSet(viewsets.ModelViewSet):
         bulletin.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(bulletin).data)
 
+    @action(detail=True, methods=["post"], url_path="archiver")
+    def archiver(self, request, pk=None):
+        """Scelle le PDF du bulletin en GED (conservation ≥ 10 ans, accès restreint RH)."""
+        try:
+            archiver_bulletin(self.get_object(), user=request.user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(self.get_object()).data)
+
+    @extend_schema(responses=OpenApiTypes.BINARY)
+    @action(detail=True, methods=["get"], url_path="pdf")
+    def pdf(self, request, pk=None):
+        return _reponse_pdf(self.get_object())
+
     @action(detail=True, methods=["post"], url_path="diffuser")
     def diffuser(self, request, pk=None):
         """Met le bulletin à disposition du salarié (accusé de dépôt horodaté, CL-OM-06)."""
@@ -541,6 +561,9 @@ class BulletinViewSet(viewsets.ModelViewSet):
                 {"detail": f"Déjà mis à disposition le {bulletin.disponible_le:%d/%m/%Y %H:%M}."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not bulletin.document_id:  # la copie du salarié est la copie archivée
+            archiver_bulletin(bulletin, user=request.user)
+            bulletin.refresh_from_db()
         bulletin.disponible_le = timezone.now()
         bulletin.save(update_fields=["disponible_le", "updated_at"])
         return Response(self.get_serializer(bulletin).data)
@@ -589,6 +612,23 @@ class BulletinViewSet(viewsets.ModelViewSet):
                 "net_total": f"{agg['net_total'] or 0:.2f}",
             }
         )
+
+
+def _reponse_pdf(bulletin):
+    """Réponse PDF du bulletin : copie archivée si elle existe, sinon génération à la volée (brouillon)."""
+    from django.http import HttpResponse
+
+    from .services import bulletin_pdf
+
+    if bulletin.document_id and bulletin.document.current_version_id:
+        version = bulletin.document.current_version
+        with version.file.open("rb") as f:
+            contenu = f.read()
+    else:
+        contenu = bulletin_pdf(bulletin)
+    rep = HttpResponse(contenu, content_type="application/pdf")
+    rep["Content-Disposition"] = f'attachment; filename="{bulletin.code}.pdf"'
+    return rep
 
 
 class BaremeVersionneMixin:
@@ -790,3 +830,54 @@ class HistoriqueBaremeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = HistoriqueBaremeSerializer
     permission_classes = [CanManagePaie]
     filterset_fields = ["objet", "code"]
+
+
+class MonBulletinPdfView(APIView):
+    permission_classes = [IsEmployeLie]
+
+    @extend_schema(responses=OpenApiTypes.BINARY)
+    def get(self, request, pk):
+        bulletin = generics.get_object_or_404(
+            BulletinPaie, pk=pk, employe=request.employe, disponible_le__isnull=False
+        )
+        return _reponse_pdf(bulletin)
+
+
+class CompteEmetteurViewSet(viewsets.ModelViewSet):
+    """Comptes bancaires émetteurs des virements de salaires — cercle paie."""
+
+    queryset = CompteEmetteur.objects.all()
+    serializer_class = CompteEmetteurSerializer
+    permission_classes = [CanManagePaie]
+
+
+class OrdreVirementViewSet(viewsets.ReadOnlyModelViewSet):
+    """Ordres de virement CFONB 160 (scellés à la génération)."""
+
+    queryset = OrdreVirement.objects.select_related("compte", "created_by")
+    serializer_class = OrdreVirementSerializer
+    permission_classes = [CanManagePaie]
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OrdreVirementSerializer)
+    @action(detail=False, methods=["post"], url_path="generer")
+    def generer(self, request):
+        """`{"periode": "AAAA-MM-01", "compte": <id>, "date_execution": "AAAA-MM-JJ"}`."""
+        data = request.data
+        periode = serializers.DateField().run_validation(data.get("periode"))
+        date_execution = serializers.DateField().run_validation(data.get("date_execution"))
+        compte = generics.get_object_or_404(CompteEmetteur, pk=data.get("compte"))
+        try:
+            ordre = generer_virement(periode, compte, date_execution, user=request.user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(ordre).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(responses=OpenApiTypes.BINARY)
+    @action(detail=True, methods=["get"], url_path="fichier")
+    def fichier(self, request, pk=None):
+        from django.http import HttpResponse
+
+        ordre = self.get_object()
+        rep = HttpResponse(ordre.contenu, content_type="text/plain; charset=ascii")
+        rep["Content-Disposition"] = f'attachment; filename="{ordre.code}.cfonb"'
+        return rep

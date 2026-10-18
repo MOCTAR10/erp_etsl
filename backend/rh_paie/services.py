@@ -342,3 +342,172 @@ def comptabiliser_bulletin(bulletin, user=None):
     bulletin.move = posted
     bulletin.save(update_fields=["move", "updated_at"])
     return posted
+
+
+# --------------------------------------------------------------------------------------------
+# Bulletin PDF archivé en GED (≥ 10 ans) et virement CFONB des salaires (clôture M9)
+# --------------------------------------------------------------------------------------------
+RETENTION_BULLETIN_ANS = 10
+TYPE_GED_BULLETIN = "bulletins_de_paie"
+
+
+def bulletin_pdf(bulletin):
+    """PDF du bulletin (reportlab) — l'avertissement « taux provisoires » y figure tant qu'un barème l'est."""
+    import io
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    styles = getSampleStyleSheet()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, title=bulletin.code)
+    e = bulletin.employe
+    fm = lambda v: f"{v:,.0f}".replace(",", " ")  # noqa: E731
+    story = [
+        Paragraph(f"Bulletin de paie — {bulletin.periode:%m/%Y}", styles["Title"]),
+        Paragraph(f"{bulletin.code} · {e.nom_complet} · matricule {e.code} · {e.fonction or e.categorie}", styles["Normal"]),
+        Paragraph(f"N° CNSS : {e.numero_securite_sociale or '—'} · CNAMGS : {e.matricule_cnps or '—'} · parts fiscales : {e.parts_fiscales}", styles["Normal"]),
+        Spacer(1, 6 * mm),
+    ]
+    rows = [["Rubrique", "Gains", "Retenues"]]
+    for l in bulletin.lignes.select_related("rubrique").order_by("rubrique__nature", "rubrique__ordre"):
+        gain = l.rubrique.nature == "gain"
+        rows.append([l.libelle, fm(l.montant) if gain else "", "" if gain else fm(l.montant)])
+    rows.append(["Brut", fm(bulletin.brut), ""])
+    rows.append(["Charges patronales (information)", "", fm(bulletin.charges_patronales)])
+    rows.append(["NET À PAYER (FCFA)", fm(bulletin.net), ""])
+    table = Table(rows, colWidths=[110 * mm, 35 * mm, 35 * mm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12308f")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.grey), ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+    ]))
+    story.append(table)
+    avertissement = avertissement_provisoire(bulletin.baremes_provisoires)
+    if avertissement:
+        story += [Spacer(1, 6 * mm), Paragraph(f"<font color='#d4142a'><b>AVERTISSEMENT</b> — {avertissement}</font>", styles["Normal"])]
+    story += [Spacer(1, 6 * mm), Paragraph("Document à conserver sans limitation de durée (archivage ETSL : 10 ans minimum).", styles["Italic"])]
+    doc.build(story)
+    return buf.getvalue()
+
+
+@transaction.atomic
+def archiver_bulletin(bulletin, user=None):
+    """Scelle le PDF du bulletin en GED (type « bulletins de paie », conservation ≥ 10 ans, accès restreint RH)."""
+    import hashlib
+
+    from django.core.files.base import ContentFile
+
+    from documents.models import Document, DocumentType, Version
+
+    from .models import BulletinPaie
+
+    bulletin = BulletinPaie.objects.select_for_update().get(pk=bulletin.pk)
+    if bulletin.statut not in (BulletinPaie.Statut.VALIDE, BulletinPaie.Statut.CLOTURE):
+        raise ValidationError("Seul un bulletin validé ou clôturé peut être archivé.")
+    if bulletin.document_id:
+        raise ValidationError("Bulletin déjà archivé en GED (document scellé).")
+    type_doc, _ = DocumentType.objects.get_or_create(
+        code=TYPE_GED_BULLETIN,
+        defaults={"label": "Bulletins de paie", "retention_years": RETENTION_BULLETIN_ANS, "is_restricted_rh": True},
+    )
+    if (type_doc.retention_years or 0) < RETENTION_BULLETIN_ANS or not type_doc.is_restricted_rh:
+        type_doc.retention_years = max(type_doc.retention_years or 0, RETENTION_BULLETIN_ANS)
+        type_doc.is_restricted_rh = True
+        type_doc.save(update_fields=["retention_years", "is_restricted_rh"])
+    contenu = bulletin_pdf(bulletin)
+    sha = hashlib.sha256(contenu).hexdigest()
+    nom = f"{bulletin.code}_{bulletin.periode:%Y-%m}.pdf"
+    document = Document.objects.create(
+        title=f"Bulletin de paie {bulletin.periode:%m/%Y} — {bulletin.employe.nom_complet}",
+        status=Document.Status.ARCHIVED, archived_at=timezone.now(), type=type_doc,
+        document_date=bulletin.periode, counterparty=bulletin.employe.nom_complet, reference=bulletin.code,
+        keywords=["paie", "bulletin", bulletin.employe.code], sha256=sha, created_by=user,
+    )
+    version = Version.objects.create(
+        document=document, number=1, file=ContentFile(contenu, name=nom), sha256=sha, size=len(contenu),
+        original_filename=nom, created_by=user,
+    )
+    document.current_version = version
+    document.save(update_fields=["current_version"])
+    bulletin.document = document
+    bulletin.save(update_fields=["document", "updated_at"])
+    return bulletin
+
+
+def _num(valeur, n):
+    return str(valeur).zfill(n)[-n:] if str(valeur).isdigit() else str(valeur).ljust(n)[:n]
+
+
+def _centimes(montant):
+    return int((Decimal(montant) * 100).to_integral_value())
+
+
+def cfonb160(compte, date_execution, lignes):
+    """Fichier de virements CFONB 160 : en-tête (03) · un destinataire (06) par salarié · total (08).
+
+    `lignes` = [(référence, nom, domiciliation, banque, guichet, compte, montant, libellé)].
+    GABARIT STANDARD à faire valider par la banque d'ETSL (positions exactes variables selon les banques) — réserve M9.
+    """
+
+    def ligne(champs):
+        buf = [" "] * 160
+        for debut, valeur in champs:  # debut = position 1-indexée
+            for i, c in enumerate(valeur):
+                buf[debut - 1 + i] = c
+        return "".join(buf)
+
+    jour = date_execution.strftime("%d%m") + str(date_execution.year)[-1]
+    sortie = [ligne([
+        (1, "0302"), (13, _num(compte.numero_emetteur, 6)), (25, jour), (30, compte.raison_sociale.upper().ljust(24)[:24]),
+        (87, _num(compte.code_guichet, 5)), (92, _num(compte.numero_compte, 11)), (150, _num(compte.code_banque, 5)),
+    ])]
+    total = 0
+    for ref, nom, domic, banque, guichet, cpt, montant, libelle in lignes:
+        c = _centimes(montant)
+        total += c
+        sortie.append(ligne([
+            (1, "0602"), (13, _num(compte.numero_emetteur, 6)), (25, ref.ljust(12)[:12]), (37, nom.upper().ljust(24)[:24]),
+            (61, domic.upper().ljust(24)[:24]), (87, _num(guichet, 5)), (92, _num(cpt, 11)), (103, str(c).zfill(16)),
+            (119, libelle.upper().ljust(31)[:31]), (150, _num(banque, 5)),
+        ]))
+    sortie.append(ligne([(1, "0802"), (13, _num(compte.numero_emetteur, 6)), (103, str(total).zfill(16))]))
+    return "\n".join(sortie) + "\n", Decimal(total) / 100
+
+
+@transaction.atomic
+def generer_virement(periode, compte, date_execution, user=None):
+    """Ordre de virement des bulletins validés/clôturés du mois, une seule fois par bulletin (pas de doublon)."""
+    import hashlib
+
+    from .models import BulletinPaie, OrdreVirement
+
+    periode = periode.replace(day=1)
+    if not compte.actif:
+        raise ValidationError("Compte émetteur inactif.")
+    bulletins = list(
+        BulletinPaie.objects.select_for_update(of=("self",))
+        .select_related("employe")
+        .filter(periode=periode, statut__in=(BulletinPaie.Statut.VALIDE, BulletinPaie.Statut.CLOTURE),
+                ordre_virement__isnull=True, net__gt=0)
+        .order_by("employe__nom")
+    )
+    if not bulletins:
+        raise ValidationError("Aucun bulletin validé à virer pour cette période (ou déjà viré).")
+    sans_rib = [b.employe.nom_complet for b in bulletins if not b.employe.rib_complet]
+    if sans_rib:
+        raise ValidationError("RIB incomplet pour : " + ", ".join(sans_rib) + ".")
+    contenu, total = cfonb160(compte, date_execution, [
+        (b.code, b.employe.nom_complet, b.employe.banque_nom, b.employe.rib_banque, b.employe.rib_guichet,
+         b.employe.rib_compte, b.net, f"SALAIRE {periode:%m/%Y}")
+        for b in bulletins
+    ])
+    ordre = OrdreVirement.objects.create(
+        periode=periode, compte=compte, date_execution=date_execution, nb_virements=len(bulletins), total=total,
+        contenu=contenu, sha256=hashlib.sha256(contenu.encode("ascii", "replace")).hexdigest(), created_by=user,
+    )
+    BulletinPaie.objects.filter(pk__in=[b.pk for b in bulletins]).update(ordre_virement=ordre)
+    return ordre

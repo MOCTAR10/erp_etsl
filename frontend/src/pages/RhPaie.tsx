@@ -14,6 +14,7 @@ import type {
   StatutConge,
 } from "../types";
 import { BaremesSection } from "../components/workflow/BaremesSection";
+import { VirementsSection } from "../components/workflow/VirementsSection";
 
 type CongeGroups = Record<StatutConge, DemandeConge[]>;
 
@@ -73,6 +74,12 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
         )}
         {b.disponible_le && <span className="badge ok"> {t("baremes.diffuse")}</span>}
         {b.move_number && <span className="badge brand"> {b.move_number}</span>}
+        {b.document && <span className="badge ok"> {t("virements.archive")}</span>}
+        {b.statut !== "annule" && (
+          <button type="button" className="btn" onClick={() => void api.download(`/api/rh-paie/bulletins/${b.id}/pdf/`, `${b.code}.pdf`)}>
+            {t("virements.pdf")}
+          </button>
+        )}
       </span>
       {b.avertissement && (
         <p className="action-error" role="note" data-testid="avertissement-provisoire">
@@ -86,6 +93,9 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
                 { label: t("actions.calculer"), path: `/api/rh-paie/bulletins/${b.id}/calculer/`, tone: "ghost" as const },
                 { label: t("actions.valider"), path: `/api/rh-paie/bulletins/${b.id}/valider/` },
               ]
+            : []),
+          ...((b.statut === "valide" || b.statut === "cloture") && !b.document
+            ? [{ label: t("virements.archiver"), path: `/api/rh-paie/bulletins/${b.id}/archiver/`, tone: "ghost" as const }]
             : []),
           ...((b.statut === "valide" || b.statut === "cloture") && !b.disponible_le
             ? [{ label: t("actions.diffuser"), path: `/api/rh-paie/bulletins/${b.id}/diffuser/`, tone: "ghost" as const }]
@@ -250,6 +260,7 @@ export function RhPaiePage() {
           </div>
         </>
       ) : null}
+      <VirementsSection />
       <BaremesSection />
     </>
   );

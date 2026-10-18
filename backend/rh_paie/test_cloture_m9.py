@@ -249,3 +249,137 @@ class ModificationParEtslTests(M9Base):
         param.refresh_from_db()
         self.assertEqual(param.valeur, Decimal("15"))
         self.assertEqual(HistoriqueBareme.objects.filter(action="modification").count(), 3)
+
+
+class BulletinArchiveTests(M9Base):
+    """PR 2/3 : bulletin PDF scellé en GED (≥ 10 ans) et virement CFONB des salaires."""
+
+    def valide(self, periode=date(2026, 3, 1)):
+        self.bareme()
+        b = calculer_bulletin(self.bulletin(periode))
+        BulletinPaie.objects.filter(pk=b.pk).update(statut="valide")
+        b.refresh_from_db()
+        return b
+
+    def test_archivage_pdf_ged_dix_ans_restreint(self):
+        b = self.valide()
+        _auth(self.client, "finance@etls.local")
+        r = self.client.post(f"{BASE}bulletins/{b.pk}/archiver/")
+        self.assertEqual(r.status_code, 200, r.content)
+        b.refresh_from_db()
+        doc = b.document
+        self.assertGreaterEqual(doc.type.retention_years, 10)
+        self.assertTrue(doc.type.is_restricted_rh)
+        self.assertEqual(doc.status, "archived")
+        with doc.current_version.file.open("rb") as f:
+            contenu = f.read()
+        self.assertTrue(contenu.startswith(b"%PDF"))
+        import hashlib
+
+        self.assertEqual(hashlib.sha256(contenu).hexdigest(), doc.sha256)
+        # scellé : pas de second archivage
+        self.assertEqual(self.client.post(f"{BASE}bulletins/{b.pk}/archiver/").status_code, 400)
+
+    def test_brouillon_non_archivable(self):
+        self.bareme()
+        b = calculer_bulletin(self.bulletin())
+        _auth(self.client, "finance@etls.local")
+        self.assertEqual(self.client.post(f"{BASE}bulletins/{b.pk}/archiver/").status_code, 400)
+
+    def test_diffusion_archive_et_le_salarie_telecharge_son_pdf(self):
+        from .models import Employe
+
+        b = self.valide()
+        Employe.objects.filter(pk=self.employe.pk).update(user=self.ouvrier)
+        _auth(self.client, "admin@etls.local")
+        self.assertEqual(self.client.post(f"{BASE}bulletins/{b.pk}/diffuser/").status_code, 200)
+        b.refresh_from_db()
+        self.assertIsNotNone(b.document_id)
+        _auth(self.client, self.ouvrier.email)
+        r = self.client.get(f"{BASE}mon-espace/bulletins/{b.pk}/pdf/")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.content.startswith(b"%PDF"))
+        # le bulletin d'un autre salarié reste introuvable
+        autre = BulletinPaie.objects.create(employe=self.employe2, periode=date(2026, 3, 1), disponible_le=b.disponible_le)
+        self.assertEqual(self.client.get(f"{BASE}mon-espace/bulletins/{autre.pk}/pdf/").status_code, 404)
+
+    def test_pdf_hors_cercle_paie_refuse(self):
+        b = self.valide()
+        _auth(self.client, "logistique@etls.local")
+        self.assertIn(self.client.get(f"{BASE}bulletins/{b.pk}/pdf/").status_code, (403, 404))
+
+
+class VirementCfonbTests(M9Base):
+    def setUp(self):
+        super().setUp()
+        from .models import CompteEmetteur
+
+        self.compte = CompteEmetteur.objects.create(
+            raison_sociale="ETSL", numero_emetteur="123456", code_banque="30001", code_guichet="00123",
+            numero_compte="12345678901", cle_rib="45",
+        )
+        self.bareme()
+        b = calculer_bulletin(self.bulletin())
+        BulletinPaie.objects.filter(pk=b.pk).update(statut="valide")
+        self.b = BulletinPaie.objects.get(pk=b.pk)
+        self.payload = {"periode": "2026-03-01", "compte": str(self.compte.pk), "date_execution": "2026-03-28"}
+
+    def rib(self):
+        from .models import Employe
+
+        Employe.objects.filter(pk=self.employe.pk).update(
+            rib_banque="30002", rib_guichet="00456", rib_compte="98765432101", rib_cle="12", banque_nom="BGFI")
+
+    def test_rib_incomplet_refuse(self):
+        _auth(self.client, "finance@etls.local")
+        r = self.client.post(f"{BASE}ordres-virement/generer/", self.payload, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("RIB incomplet", str(r.json()))
+
+    def test_fichier_cfonb_160_et_pas_de_doublon(self):
+        self.rib()
+        _auth(self.client, "finance@etls.local")
+        r = self.client.post(f"{BASE}ordres-virement/generer/", self.payload, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        ordre = r.json()
+        self.assertEqual((ordre["nb_virements"], Decimal(ordre["total"])), (1, self.b.net))
+        self.assertEqual(ordre["par_email"], "finance@etls.local")
+        fichier = self.client.get(f"{BASE}ordres-virement/{ordre['id']}/fichier/").content.decode()
+        lignes = fichier.splitlines()
+        self.assertEqual([l[:2] for l in lignes], ["03", "06", "08"])
+        self.assertTrue(all(len(l) == 160 for l in lignes))
+        self.assertEqual(int(lignes[1][102:118]), int(self.b.net * 100))
+        self.assertEqual(int(lignes[2][102:118]), int(self.b.net * 100))
+        self.b.refresh_from_db()
+        self.assertEqual(str(self.b.ordre_virement_id), ordre["id"])
+        # un bulletin déjà viré n'est jamais viré deux fois
+        r = self.client.post(f"{BASE}ordres-virement/generer/", self.payload, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_ordre_scelle(self):
+        self.rib()
+        from .services import generer_virement
+
+        ordre = generer_virement(date(2026, 3, 1), self.compte, date(2026, 3, 28))
+        ordre.nb_virements = 9
+        with self.assertRaises(ValidationError):
+            ordre.save()
+        with self.assertRaises(ValidationError):
+            ordre.delete()
+
+    def test_hors_cercle_paie_aucun_acces(self):
+        _auth(self.client, "logistique@etls.local")
+        self.assertEqual(self.client.post(f"{BASE}ordres-virement/generer/", self.payload, format="json").status_code, 403)
+        self.assertEqual(self.client.get(f"{BASE}comptes-emetteurs/").status_code, 403)
+
+    def test_rib_masque_et_non_modifiable_hors_cercle_paie(self):
+        self.rib()
+        chef = User.objects.create_user(email="chef@etls.local", password="Etls#Demo2026", role=User.Role.CHEF_ATELIER)
+        _auth(self.client, "chef@etls.local")
+        data = self.client.get(f"{BASE}employes/{self.employe.pk}/").json()
+        self.assertNotIn("rib_compte", data)
+        r = self.client.patch(f"{BASE}employes/{self.employe.pk}/", {"rib_compte": "1"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        _auth(self.client, "finance@etls.local")
+        self.assertEqual(self.client.get(f"{BASE}employes/{self.employe.pk}/").json()["rib_compte"], "98765432101")
+        self.assertIsNotNone(chef)
