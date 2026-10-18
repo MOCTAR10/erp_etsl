@@ -1256,6 +1256,7 @@ export const fr = {
     provisoire: "Provisoire", confirme: "Confirmé", confirmer: "Confirmer", confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
   },
   controleGestion: {
+    searchBudgets: "Rechercher un budget (code, libellé)…",
     reporting_statut: { a_temps: "Publié à J+4", j6: "Publié à J+6", hors_delai: "Hors délai (> J+6)", en_attente: "À publier" },
     joursProvisoires: "jours provisoires", publieLe: "Publié le {{date}}",
     analysesEcart: "Écarts > 10 % à analyser",
