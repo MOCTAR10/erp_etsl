@@ -19,6 +19,7 @@ from django.utils import timezone
 from outbox.models import publish
 
 from .models import Depot, Inventaire, InventaireLigne, MouvementStock, PlanInventaireTournant, StockQuant, ValorisationMensuelle
+from .services import COMPTES_STOCK
 
 
 def _fin_de_periode(periode):
@@ -59,10 +60,16 @@ def figer_valorisation_mensuelle(periode, user=None):
             for r in conso
         ]
         total = sum((Decimal(v["valeur"]) for v in ventilation), Decimal("0"))
+        par_compte = {}
+        for q in StockQuant.objects.filter(depot=depot).select_related("article"):
+            compte = COMPTES_STOCK.get(q.article.article_type, COMPTES_STOCK["consommable"])[0]
+            par_compte[compte] = par_compte.get(compte, Decimal("0")) + q.stock_value
         val = ValorisationMensuelle.objects.create(
             periode=periode, depot=depot, quantite=quants["q"] or 0, valeur_stock=quants["v"] or 0,
             consommation=total, ventilation=ventilation, created_by=user,
+            valeur_par_compte={k: f"{v:.2f}" for k, v in par_compte.items()},
         )
+        comptabiliser_variation(val, fin, user)
         publish("stocks.valorisation.figee", {
             "periode": periode, "depot": depot.code, "valeur_stock": str(val.valeur_stock),
             "consommation": str(val.consommation), "ventilation": ventilation,
@@ -114,3 +121,50 @@ def planifier_inventaires_tournants(today=None):
         if inv:
             crees.append(inv)
     return crees
+
+
+def comptabiliser_variation(val, fin, user=None):
+    """Variation de stock du mois (SYSCOHADA, classes 3 / 603) passée au journal STK au figé de la valorisation :
+    écart entre la valeur figée et celle du mois précédent, par compte de stock. Non bloquant : sans journal,
+    période ou compte, le motif est conservé sur la valorisation et le figé reste valable pour M11."""
+    from django.core.exceptions import ValidationError
+
+    from accounting_kernel.models import AccountMove, AccountMoveLine, Journal
+    from accounting_kernel.services import period_for_date, post_move
+    from referentiels.models import Account
+
+    precedente = (
+        ValorisationMensuelle.objects.filter(depot=val.depot, periode__lt=val.periode).exclude(pk=val.pk).order_by("-periode").first()
+    )
+    avant = {k: Decimal(v) for k, v in (precedente.valeur_par_compte if precedente else {}).items()}
+    apres = {k: Decimal(v) for k, v in val.valeur_par_compte.items()}
+    variations = {c: apres.get(c, Decimal("0")) - avant.get(c, Decimal("0")) for c in set(avant) | set(apres)}
+    variations = {c: d for c, d in variations.items() if d}
+    if not variations:
+        val.motif_ecriture = "Aucune variation de stock sur la période."
+        val.save(update_fields=["motif_ecriture"])
+        return None
+    variation_de = {stock: var for stock, var in COMPTES_STOCK.values()}
+    try:
+        with transaction.atomic():  # savepoint : jamais d'écriture brouillon partielle
+            journal = Journal.objects.get(code="STK")
+            move = AccountMove.objects.create(
+                journal=journal, period=period_for_date(fin), date=fin, reference=f"VAL-{val.periode}-{val.depot.code}",
+                label=f"Variation de stock {val.periode} — {val.depot.code}", source="M5", source_ref=str(val.pk),
+                status=AccountMove.Status.DRAFT,
+            )
+            ordre = 1
+            for compte_stock, delta in sorted(variations.items()):
+                stock, variation = Account.objects.get(code=compte_stock), Account.objects.get(code=variation_de[compte_stock])
+                montant = abs(delta)
+                # Hausse du stock : Dr 3x / Cr 603x ; baisse : Dr 603x / Cr 3x.
+                debit, credit = (stock, variation) if delta > 0 else (variation, stock)
+                AccountMoveLine.objects.create(move=move, account=debit, label=move.label, debit=montant, credit=0, order=ordre)
+                AccountMoveLine.objects.create(move=move, account=credit, label=move.label, debit=0, credit=montant, order=ordre + 1)
+                ordre += 2
+            val.move = post_move(move, user=user)
+        val.motif_ecriture = ""
+    except (Journal.DoesNotExist, Account.DoesNotExist, ValidationError) as exc:
+        val.motif_ecriture = f"Écriture non passée : {exc}"[:255]
+    val.save(update_fields=["move", "motif_ecriture"])
+    return val.move

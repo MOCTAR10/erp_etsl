@@ -60,6 +60,17 @@ class Depot(models.Model):
         verbose_name="Responsable magasin",
     )
     description = models.TextField(blank=True, verbose_name="Description")
+    methode_valorisation = models.CharField(
+        max_length=8, blank=True, choices=[("fifo", "FIFO / PEPS"), ("peps", "PEPS"), ("cump", "CUMP"), ("pp", "Prix standard")],
+        verbose_name="Méthode de valorisation du dépôt (vide = celle de l'article)",
+    )
+    is_global_rental = models.BooleanField(
+        default=False, verbose_name="Site GLOBAL RENTAL (consultation seule)",
+        help_text="CDC M5 §7.8 : les sites GR sont consultables en lecture seule, aucun mouvement ETSL.",
+    )
+    roles_autorises = models.JSONField(
+        default=list, blank=True, verbose_name="Fonctions autorisées à mouvementer (vide = toutes les fonctions stock)"
+    )
     is_active = models.BooleanField(default=True, verbose_name="Actif")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -642,6 +653,12 @@ class ValorisationMensuelle(models.Model):
         max_digits=18, decimal_places=2, default=0, verbose_name="Consommations du mois (OF, affaires)"
     )
     ventilation = models.JSONField(default=list, verbose_name="Consommations par compte analytique")
+    valeur_par_compte = models.JSONField(default=dict, verbose_name="Valeur du stock par compte de classe 3")
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture de variation de stock",
+    )
+    motif_ecriture = models.CharField(max_length=255, blank=True, verbose_name="Écriture non passée : motif")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="+", verbose_name="Figée par",

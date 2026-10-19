@@ -111,7 +111,7 @@ class SeedReferentielsTests(APITestCase):
 
         self.assertEqual(Currency.objects.count(), 3)
         self.assertEqual(UnitOfMeasure.objects.count(), 11)
-        self.assertEqual(Account.objects.count(), 37)
+        self.assertEqual(Account.objects.count(), 40)  # + 603100 / 603200 / 603300 (variation de stock)
         self.assertEqual(AnalyticAxis.objects.count(), 4)
 
         xaf = Currency.objects.get(code="XAF")
@@ -125,7 +125,7 @@ class SeedReferentielsTests(APITestCase):
     def test_seed_is_idempotent(self):
         call_command("seed_referentiels")
         call_command("seed_referentiels")
-        self.assertEqual(Account.objects.count(), 37)
+        self.assertEqual(Account.objects.count(), 40)  # + 603100 / 603200 / 603300 (variation de stock)
         self.assertEqual(Currency.objects.count(), 3)
         self.assertEqual(Partner.objects.count(), 1)
 

@@ -1278,7 +1278,17 @@ export const en = {
       nouveau: "New MTC / CoC certificate", emission: "Issue date", validation: "QA/QC validation", aValider: "To validate",
       valider: "Validate", resultat: "Validation result…", joindre: "Attach scan", ged: "Scan archived in the DMS",
     },
-    depot: { nouveau: "New warehouse", label: "Warehouse name", site: "Site / location" },
+    depot: {
+      nouveau: "New warehouse", label: "Warehouse name", site: "Site / location",
+      methode: "Valuation method (empty = item's)", gr: "GLOBAL RENTAL site (read-only)",
+      methodes: { fifo: "FIFO", peps: "FIFO", cump: "Weighted average cost", pp: "Standard price" },
+    },
+    audit: {
+      title: "Retrospective valuation audit", hint: "Replays an item's issues from a warehouse with the applicable method and compares with the recorded cost.",
+      depot: "Warehouse", article: "Item", resultat: "Method applied: {{methode}} · {{n}} cost difference(s).",
+      mouvement: "Issue", enregistre: "Recorded cost", recalcule: "Recomputed cost", ecart: "Difference",
+    },
+    valo: { ecriture: "Stock variation entry (STK)" },
     mvt: { ordre: "Work order (issue to production)", bonSortie: "Issue slip" },
   },
   m8e: {

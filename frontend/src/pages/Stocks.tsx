@@ -7,7 +7,7 @@ import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
-import { AlertesStockSection, CertificatActions, ConfigArticlesSection, ParametresStockSection, TracabiliteSection, lotActions } from "../components/workflow/StocksEcartsSection";
+import { AlertesStockSection, AuditValorisationSection, CertificatActions, ConfigArticlesSection, ParametresStockSection, TracabiliteSection, lotActions } from "../components/workflow/StocksEcartsSection";
 import type {
   CertificatMatiere,
   Depot,
@@ -405,11 +405,21 @@ export function StocksPage() {
       <QuickForm
         title={t("m5e.depot.nouveau")}
         endpoint="/api/stocks/depots/"
+        transform={(v) => ({ ...v, is_global_rental: v.is_global_rental === "true" })}
         fields={[
           { name: "label", label: t("m5e.depot.label"), required: true },
           { name: "site", label: t("m5e.depot.site") },
+          {
+            name: "methode_valorisation", label: t("m5e.depot.methode"), type: "select",
+            options: ["fifo", "cump", "pp"].map((m) => ({ value: m, label: t(`m5e.depot.methodes.${m}`) })),
+          },
+          {
+            name: "is_global_rental", label: t("m5e.depot.gr"), type: "select", required: true, defaultValue: "false",
+            options: [{ value: "false", label: t("m5e.non") }, { value: "true", label: t("m5e.oui") }],
+          },
         ]}
       />
+      <AuditValorisationSection depots={depots.data ?? []} articles={articles.data ?? []} />
       <AlertesStockSection />
       <TracabiliteSection lots={Object.values(groups).flat()} />
       <ConfigArticlesSection articles={articles.data ?? []} />
@@ -523,6 +533,7 @@ export function StocksPage() {
                   <th>{t("stocks.col.depot")}</th>
                   <th className="num">{t("stocks.col.value")}</th>
                   <th className="num">{t("stocks.consoMois")}</th>
+                  <th>{t("m5e.valo.ecriture")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -532,6 +543,7 @@ export function StocksPage() {
                     <td>{v.depot_code}</td>
                     <td className="num">{v.valeur_stock === null ? t("stocks.demi") : `${formatNumber(Number(v.valeur_stock))} FCFA`}</td>
                     <td className="num">{v.consommation === null ? t("stocks.demi") : `${formatNumber(Number(v.consommation))} FCFA`}</td>
+                    <td>{v.move_number ? <Badge tone="ok">{v.move_number}</Badge> : <span className="muted">{v.motif_ecriture || "—"}</span>}</td>
                   </tr>
                 ))}
               </tbody>

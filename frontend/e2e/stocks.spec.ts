@@ -69,3 +69,18 @@ test.describe("M5 Stocks : quarantaine, certificats et traçabilité", () => {
     await expect(trace.getByRole("listitem").first()).toContainText("Réception");
   });
 });
+
+test.describe("M5 Stocks : audit rétrospectif de la valorisation", () => {
+  test("l'audit rejoue les sorties d'un article dans un dépôt et annonce la méthode appliquée", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
+    await page.goto("/stocks");
+    const audit = page.getByTestId("audit-valorisation");
+    const depot = audit.getByLabel("Dépôt");
+    await expect.poll(async () => await depot.locator("option").count()).toBeGreaterThan(1);
+    await depot.selectOption({ index: 1 });
+    const article = audit.getByLabel("Article");
+    const tube = await article.locator("option", { hasText: /^TUBE-01 / }).getAttribute("value");
+    await article.selectOption(tube!);
+    await expect(audit.getByRole("status")).toContainText("Méthode appliquée");
+  });
+});

@@ -1,5 +1,6 @@
 """Vues API M5 — Stocks & Traçabilité matière (RF-ERP-40…43)."""
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
@@ -46,7 +47,9 @@ from .services import (
     alertes_stock,
     apply_move,
     archiver_piece_ged,
+    audit_valorisation,
     can_see_amount,
+    controler_depot,
     bon_de_sortie_pdf,
     get_param_stock,
     cloturer_inventaire,
@@ -229,6 +232,7 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         mouvement = serializer.save(created_by=self.request.user)
         try:
+            controler_depot(mouvement, self.request.user)
             apply_move(mouvement)
         except ValueError as exc:
             from django.db import transaction as t
@@ -302,6 +306,23 @@ class StockQuantViewSet(viewsets.ReadOnlyModelViewSet):
         if params.get("positive") == "1":
             qs = qs.filter(quantity__gt=0)
         return qs
+
+    @action(detail=False, methods=["get"], url_path="audit-valorisation")
+    def audit_valorisation(self, request):
+        """Audit rétrospectif de la valorisation d'un article dans un dépôt (`?depot=&article=[&lot=]`)."""
+        from referentiels.models import Article
+
+        try:
+            depot = Depot.objects.get(pk=request.query_params.get("depot"))
+            article = Article.objects.get(pk=request.query_params.get("article"))
+            lot = LotMatiere.objects.get(pk=request.query_params["lot"]) if request.query_params.get("lot") else None
+        except (Depot.DoesNotExist, Article.DoesNotExist, LotMatiere.DoesNotExist, ValueError, DjangoValidationError):
+            raise ValidationError({"detail": "Paramètres `depot` et `article` (identifiants) requis."})
+        resultat = audit_valorisation(depot, article, lot)
+        if not can_see_amount(request.user):
+            for ligne in resultat["lignes"]:
+                ligne["cout_enregistre"] = ligne["cout_recalcule"] = ligne["ecart"] = None
+        return Response(resultat)
 
     @action(detail=False, methods=["get"], url_path="valorisation")
     def valorisation(self, request):

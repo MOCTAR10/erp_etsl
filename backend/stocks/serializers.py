@@ -30,7 +30,7 @@ class DepotSerializer(serializers.ModelSerializer):
         model = Depot
         fields = [
             "id", "code", "label", "site", "responsable", "responsable_label",
-            "description", "is_active", "created_at", "updated_at",
+            "description", "methode_valorisation", "is_global_rental", "roles_autorises", "is_active", "created_at", "updated_at",
         ]
         read_only_fields = ["code"]
 
@@ -259,6 +259,7 @@ class PlanInventaireTournantSerializer(ModelCleanMixin, serializers.ModelSeriali
 
 class ValorisationMensuelleSerializer(serializers.ModelSerializer):
     depot_code = serializers.CharField(source="depot.code", read_only=True)
+    move_number = serializers.CharField(source="move.number", read_only=True, default=None)
     has_amount_access = serializers.SerializerMethodField()
 
     def get_has_amount_access(self, obj):
@@ -275,7 +276,7 @@ class ValorisationMensuelleSerializer(serializers.ModelSerializer):
         model = ValorisationMensuelle
         fields = [
             "id", "periode", "depot", "depot_code", "quantite", "valeur_stock",
-            "consommation", "ventilation", "has_amount_access", "created_at",
+            "consommation", "ventilation", "has_amount_access", "move_number", "motif_ecriture", "created_at",
         ]
 
 
