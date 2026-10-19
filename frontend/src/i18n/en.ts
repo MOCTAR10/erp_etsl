@@ -1293,6 +1293,16 @@ export const en = {
     provisoire: "Provisional", confirme: "Confirmed", marquer: "Mark as official", retirer: "Remove", confirmer: "Confirm",
     confirmConfirmer: "Confirm this type as an official document (validated by ETSL)?",
   },
+  tarifsGr: {
+    title: "GLOBAL RENTAL rate grid (M4)",
+    hint: "Dated versions, never edited: a rate change is a new version with its effective date. A rental uses the version in force at its start date, most specific first (equipment, then category, then general grid). A version not used yet can be deleted.",
+    nouvelle: "New rate version", aucun: "No GR rate entered.", code: "Code", partenaire: "GR partner", equipement: "Equipment (optional)",
+    categorie: "Category (optional)", cible: "Target", generale: "General grid", periodicite: "Billing unit", tarif: "Unit rate",
+    penalite: "Penalty / day late", dateEffet: "Effective date", version: "Version", supprimer: "Delete",
+    confirmSupprimer: "Delete this rate version? (refused if a rental uses it)",
+    cat: { engin: "Construction machinery", levage: "Lifting equipment", transport: "Transport / vehicle", atelier: "Workshop equipment", materiel: "Miscellaneous equipment" },
+    per: { heure: "Hourly", jour: "Daily", mois: "Monthly", forfait: "Flat fee" },
+  },
   grAffaires: {
     title: "GLOBAL RENTAL cost by project (meters to M11)", periode: "Month",
     hint: "GR meter readings valued per the rate grid and split by project. The cost stays in account 618, isolated from margins: the margin after GR cost is indicative.",

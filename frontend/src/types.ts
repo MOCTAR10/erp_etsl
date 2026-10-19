@@ -275,6 +275,23 @@ export type EquipementStatut =
   | "hors_service"
   | "maintenance";
 
+export interface TarifGR {
+  id: string;
+  code: string;
+  partenaire: string;
+  partenaire_code: string | null;
+  equipement: string | null;
+  equipement_code: string | null;
+  categorie: string;
+  categorie_label: string;
+  periodicite: string;
+  periodicite_label: string;
+  tarif: string | null;
+  penalite_jour: string | null;
+  date_effet: string;
+  version: number;
+}
+
 export interface EquipementParc {
   id: string;
   code: string;
