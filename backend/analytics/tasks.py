@@ -18,7 +18,9 @@ DESTINATAIRES = {
     "caution": (User.Role.SECRETAIRE_GENERAL, User.Role.PDG, User.Role.DGA),
     "assurance": (User.Role.SECRETAIRE_GENERAL, User.Role.PDG, User.Role.DGA),
     "contrat_rh": (User.Role.RH,),
-    "qualification_rh": (User.Role.RH,),
+    "qualification_rh": (User.Role.RH, User.Role.HSE),
+    "aptitude_medicale": (User.Role.RH, User.Role.HSE),
+    "epi": (User.Role.HSE,),
     "document": (User.Role.ADMIN,),
     "inspection_reglementaire": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
 }

@@ -1002,6 +1002,38 @@ export interface FormationSecurite {
   statut: StatutFormation;
   statut_label: string;
   notes: string;
+  validite_mois?: number | null;
+  participants_noms?: string[];
+}
+
+export interface PersonnelHse {
+  id: string;
+  code: string;
+  nom_complet: string;
+}
+
+export interface AptitudeMedicale {
+  id: string;
+  employe: string;
+  employe_nom: string;
+  date_visite: string;
+  date_validite: string | null;
+  resultat: "apte" | "apte_restrictions" | "inapte";
+  resultat_label: string;
+}
+
+export interface ExigenceHabilitationHse {
+  id: string;
+  type_permis: string;
+  mot_cle: string;
+}
+
+export interface PasseportSecurite {
+  employe: string;
+  matricule: string;
+  aptitude: { resultat: string; visite: string; validite: string | null; valide: boolean } | null;
+  qualifications: { intitule: string; type: string; obtention: string | null; validite: string | null; valide: boolean }[];
+  epi: { code: string; type: string; designation: string; dotation: string; renouvellement: string | null; statut: string }[];
 }
 
 export type TypeEpi =

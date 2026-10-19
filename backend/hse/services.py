@@ -226,3 +226,101 @@ def registre_osha(annee):
     synthese["jours_arret"] = sum(r["jours_arret"] for r in rows)
     synthese["cas_enregistrables"] = len(rows)
     return {"annee": annee, "rows": rows, "synthese": synthese}
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M7-B : paramètres, flux formations → qualifications RH, passeport sécurité, fiche de dotation EPI
+# ----------------------------------------------------------------------------------------------------------------
+PARAMETRES_HSE_DEFAUT = {
+    "EPI_ALERTE_JOURS": ("EPI : alerte avant renouvellement", "30", "jours"),
+    "APTITUDE_ALERTE_JOURS": ("Aptitude médicale : alerte avant échéance", "30", "jours"),
+}
+PREFIXE_FORMATION_RH = "Formation HSE — "
+
+
+def get_param_hse(code):
+    from decimal import Decimal
+
+    from .models import ParametreHse
+
+    label, valeur, unite = PARAMETRES_HSE_DEFAUT[code]
+    obj, _ = ParametreHse.objects.get_or_create(code=code, defaults={"label": label, "valeur": Decimal(valeur), "unite": unite})
+    return obj.valeur
+
+
+def _ajouter_mois(jour, mois):
+    import calendar
+
+    annee, m = divmod(jour.month - 1 + mois, 12)
+    annee += jour.year
+    m += 1
+    return jour.replace(year=annee, month=m, day=min(jour.day, calendar.monthrange(annee, m)[1]))
+
+
+def publier_formation_rh(formation):
+    """Flux M7 → M9 : une session réalisée devient une qualification RH (certificat) de chaque participant, avec son
+    échéance de recyclage ; l'exigence d'habilitation par mot-clé la reconnaît. Idempotent."""
+    from rh_paie.models import Qualification
+
+    validite = _ajouter_mois(formation.date_session, formation.validite_mois) if formation.validite_mois else None
+    intitule = f"{PREFIXE_FORMATION_RH}{formation.theme}"[:180]
+    crees = 0
+    for emp in formation.participants.all():
+        _, cree = Qualification.objects.get_or_create(
+            employe=emp, intitule=intitule, date_obtention=formation.date_session,
+            defaults={"type": Qualification.Type.CERTIFICAT, "organisme": formation.organisme or formation.formateur,
+                      "date_validite": validite, "notes": f"Session HSE {formation.code}"},
+        )
+        crees += int(cree)
+    return crees
+
+
+def passeport_securite(employe, jour=None):
+    """Passeport sécurité (CDC M7-05) : formations HSE, habilitations / certificats RH, aptitude médicale, EPI dotés."""
+    from django.db.models import Q
+
+    from .models import Epi
+
+    jour = jour or timezone.localdate()
+    qualifs = employe.qualifications.all().order_by("-date_obtention")
+    aptitude = employe.aptitudes.order_by("-date_visite").first()
+    filtre = Q(employe=employe) | (Q(beneficiaire_id=employe.user_id) if employe.user_id else Q(pk__in=[]))
+    epi = Epi.objects.filter(filtre).order_by("-date_dotation")
+    return {
+        "employe": str(employe), "matricule": employe.code,
+        "formations": [
+            {"code": f.code, "theme": f.theme, "date": f.date_session, "type": f.get_type_session_display()}
+            for f in employe.formations_hse.order_by("-date_session")
+        ],
+        "qualifications": [
+            {"intitule": q.intitule, "type": q.get_type_display(), "obtention": q.date_obtention, "validite": q.date_validite,
+             "valide": q.date_validite is None or q.date_validite >= jour}
+            for q in qualifs
+        ],
+        "aptitude": None if aptitude is None else {
+            "resultat": aptitude.get_resultat_display(), "visite": aptitude.date_visite, "validite": aptitude.date_validite,
+            "restrictions": aptitude.restrictions,
+            "valide": aptitude.resultat != "inapte" and (aptitude.date_validite is None or aptitude.date_validite >= jour),
+        },
+        "epi": [
+            {"code": e.code, "type": e.get_type_epi_display(), "designation": e.designation, "dotation": e.date_dotation,
+             "renouvellement": e.date_renouvellement, "statut": e.get_statut_display()}
+            for e in epi.distinct()
+        ],
+    }
+
+
+def passeport_pdf(employe):
+    p = passeport_securite(employe)
+    blocs = [("Salarié", p["employe"]), ("Matricule", p["matricule"])]
+    if p["aptitude"]:
+        a = p["aptitude"]
+        blocs.append(("Aptitude médicale", f"{a['resultat']} — visite du {a['visite']:%d/%m/%Y}"
+                      + (f", valable jusqu'au {a['validite']:%d/%m/%Y}" if a["validite"] else "")))
+    tableau = [["Formation / habilitation", "Obtention", "Validité"]] + [
+        [q["intitule"], f"{q['obtention']:%d/%m/%Y}" if q["obtention"] else "—",
+         (f"{q['validite']:%d/%m/%Y}" if q["validite"] else "sans échéance") + ("" if q["valide"] else " (expirée)")]
+        for q in p["qualifications"]
+    ] + [[f"EPI : {e['type']} — {e['designation']}", f"{e['dotation']:%d/%m/%Y}",
+          f"{e['renouvellement']:%d/%m/%Y}" if e["renouvellement"] else "—"] for e in p["epi"]]
+    return _pdf(f"Passeport sécurité — {p['employe']}", blocs, tableau if len(tableau) > 1 else None)

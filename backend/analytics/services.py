@@ -451,6 +451,34 @@ def alertes_agregees(user=None):
             "statut": qualif.date_validite < timezone.localdate() and "expiree" or "active",
         })
 
+    # Aptitudes médicales et EPI à renouveler (CDC M7-04 / M7-05) : délais paramétrables par ETSL.
+    if _allowed("hse"):
+        from hse.models import AptitudeMedicale, Epi
+        from hse.services import get_param_hse
+
+        aujourdhui_hse = timezone.localdate()
+        vus = set()
+        horizon_apt = aujourdhui_hse + timezone.timedelta(days=int(get_param_hse("APTITUDE_ALERTE_JOURS")))
+        for apt in AptitudeMedicale.objects.select_related("employe").order_by("employe_id", "-date_visite"):
+            if apt.employe_id in vus:
+                continue
+            vus.add(apt.employe_id)
+            if apt.date_validite and apt.date_validite <= horizon_apt:
+                jours = (apt.date_validite - aujourdhui_hse).days
+                rh_liste.append({
+                    "type": "aptitude_medicale", "code": "aptitude", "libelle": f"Aptitude médicale — {apt.employe}",
+                    "date_echeance": apt.date_validite, "bande": _band(jours), "jours": jours,
+                    "statut": "expiree" if jours < 0 else "active",
+                })
+        horizon_epi = aujourdhui_hse + timezone.timedelta(days=int(get_param_hse("EPI_ALERTE_JOURS")))
+        for epi in Epi.objects.filter(statut=Epi.Statut.EN_USAGE, date_renouvellement__lte=horizon_epi).select_related("employe", "beneficiaire"):
+            jours = (epi.date_renouvellement - aujourdhui_hse).days
+            rh_liste.append({
+                "type": "epi", "code": epi.code, "libelle": f"EPI {epi.get_type_epi_display()} — {epi.employe or epi.beneficiaire or epi.designation}",
+                "date_echeance": epi.date_renouvellement, "bande": _band(jours), "jours": jours,
+                "statut": "expiree" if jours < 0 else "active",
+            })
+
     maintenance_liste = []
     for actif in (
         Actif.objects.filter(statut__in=[Actif.Statut.EN_MAINTENANCE, Actif.Statut.EN_PANNE])
