@@ -1250,6 +1250,23 @@ export const en = {
     warnProvisoire: "{{count}} provisional cube parameter(s) (retention period) to be confirmed by ETSL.",
     confirmConfirmer: "Confirm this value (validated by ETSL)?",
   },
+  m7e: {
+    oui: "Yes", non: "No",
+    zones: { atelier: "Workshop", chantier: "Site", bureau: "Offices", site_client: "Client site", site_gr: "GLOBAL RENTAL site" },
+    inc: {
+      zone: "Area", personnes: "People involved / witnesses", ajouterAction: "Add an action", actionPrompt: "Corrective action to take?",
+      planAction: "Set the action plan", causeProfonde: "Root cause identified?", rex: "Lessons learned?",
+      ncr: "Open an HSE NCR", ncrPrompt: "Deviation found (HSE NCR)?", pdf: "PDF report", archive: "Report archived in the DMS (10 years)",
+    },
+    actions: {
+      title: "Open HSE actions", aucune: "No open HSE action.", solder: "Close", efficace: "Effectiveness verified?",
+    },
+    osha: {
+      title: "Recordable cases log (OSHA / OILGUARD)", annee: "Year", export: "Export (CSV)",
+      synthese: "{{cas}} recordable case(s): {{arret}} days away, {{restriction}} restricted work, {{deces}} fatality · {{jours}} day(s) lost.",
+      classes: { deces: "Fatality", arret: "Days away", restriction: "Restricted work", autre_enregistrable: "Other recordable" },
+    },
+  },
   m5e: {
     oui: "Yes", non: "No",
     alertes: {

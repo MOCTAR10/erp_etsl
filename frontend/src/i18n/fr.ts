@@ -1250,6 +1250,23 @@ export const fr = {
     warnProvisoire: "{{count}} paramètre(s) du cube provisoire(s) (durée de conservation) à faire confirmer par ETSL.",
     confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
   },
+  m7e: {
+    oui: "Oui", non: "Non",
+    zones: { atelier: "Atelier", chantier: "Chantier", bureau: "Bureaux", site_client: "Site client", site_gr: "Site GLOBAL RENTAL" },
+    inc: {
+      zone: "Zone", personnes: "Personnes impliquées / témoins", ajouterAction: "Ajouter une action", actionPrompt: "Action corrective à mener ?",
+      planAction: "Arrêter le plan d'action", causeProfonde: "Cause profonde identifiée ?", rex: "Retour d'expérience (REX) ?",
+      ncr: "Ouvrir une NCR-HSE", ncrPrompt: "Écart constaté (NCR-HSE) ?", pdf: "Rapport PDF", archive: "Rapport archivé en GED (10 ans)",
+    },
+    actions: {
+      title: "Actions HSE ouvertes", aucune: "Aucune action HSE ouverte.", solder: "Solder", efficace: "Efficacité vérifiée ?",
+    },
+    osha: {
+      title: "Registre des cas enregistrables (OSHA / OILGUARD)", annee: "Année", export: "Exporter (CSV)",
+      synthese: "{{cas}} cas enregistrable(s) : {{arret}} avec arrêt, {{restriction}} travail restreint, {{deces}} décès · {{jours}} jour(s) perdu(s).",
+      classes: { deces: "Décès", arret: "Arrêt", restriction: "Travail restreint", autre_enregistrable: "Autre cas enregistrable" },
+    },
+  },
   m5e: {
     oui: "Oui", non: "Non",
     alertes: {

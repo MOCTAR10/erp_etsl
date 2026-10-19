@@ -337,7 +337,88 @@ class IncidentViewSet(viewsets.ModelViewSet):
         incident.save()
         return Response(self.get_serializer(incident).data)
 
+    @action(detail=True, methods=["post"], url_path="plan-action")
+    @transaction.atomic
+    def plan_action(self, request, pk=None):
+        """Enquête → plan d'action (MANUEL §9.6) : cause profonde identifiée et au moins une action décidée."""
+        incident = Incident.objects.select_for_update().get(pk=self.get_object().pk)
+        if not can_validate_hse(request.user):
+            return Response({"detail": "Réservé au HSE et à la hiérarchie."}, status=status.HTTP_403_FORBIDDEN)
+        if incident.statut != Incident.Statut.EN_ENQUETE:
+            return Response({"detail": "Le plan d'action suit l'enquête."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.data.get("cause_profonde"):
+            incident.cause_profonde = str(request.data.get("cause_profonde"))
+        if not incident.cause_profonde.strip():
+            return Response({"cause_profonde": "Cause profonde requise pour arrêter le plan d'action."}, status=status.HTTP_400_BAD_REQUEST)
+        if not incident.actions.exists():
+            return Response({"detail": "Au moins une action corrective ou préventive est requise."}, status=status.HTTP_400_BAD_REQUEST)
+        incident.statut = Incident.Statut.PLAN_ACTION
+        incident.plan_action_le = timezone.now()
+        incident.save()
+        return Response(self.get_serializer(incident).data)
+
+    @action(detail=True, methods=["post"], url_path="ncr-hse")
+    @transaction.atomic
+    def ncr_hse(self, request, pk=None):
+        """NCR-HSE (CDC M7-10) ouverte depuis l'événement : NC du socle qualité, variante HSE (traitement, CAPA, clôture)."""
+        from qualite.models import NonConformite
+
+        incident = self.get_object()
+        if not can_validate_hse(request.user):
+            return Response({"detail": "Réservé au HSE et à la hiérarchie."}, status=status.HTTP_403_FORBIDDEN)
+        description = str(request.data.get("description") or "").strip()
+        if not description:
+            return Response({"description": "Description de l'écart requise."}, status=status.HTTP_400_BAD_REQUEST)
+        gravite = request.data.get("gravite") or ("majeure" if incident.gravite != "mineure" else "mineure")
+        if gravite not in NonConformite.Gravite.values:
+            return Response({"gravite": "Gravité inconnue."}, status=status.HTTP_400_BAD_REQUEST)
+        nc = NonConformite.objects.create(
+            type_ncr="hse", incident_hse=incident, source=NonConformite.Source.INTERNE, gravite=gravite,
+            description=description, decided_by=request.user,
+        )
+        return Response({"id": str(nc.pk), "code": nc.code, "statut": nc.statut}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], url_path="rapport-pdf")
+    def rapport_pdf(self, request, pk=None):
+        """Rapport d'incident / d'accident (PDF), à tout moment du cycle."""
+        from django.http import HttpResponse
+
+        from .services import rapport_incident_pdf
+
+        incident = self.get_object()
+        reponse = HttpResponse(rapport_incident_pdf(incident), content_type="application/pdf")
+        reponse["Content-Disposition"] = f'inline; filename="{incident.code}.pdf"'
+        return reponse
+
+    @action(detail=False, methods=["get"], url_path="registre-osha")
+    def registre_osha(self, request):
+        """Registre des cas enregistrables (OSHA 300) et synthèse annuelle (OSHA 300A) ; `?export=csv`."""
+        from .services import registre_osha
+
+        try:
+            annee = int(request.query_params.get("annee") or timezone.localdate().year)
+        except ValueError:
+            raise serializers.ValidationError({"annee": "Année attendue (AAAA)."})
+        registre = registre_osha(annee)
+        if request.query_params.get("export") == "csv":
+            import csv
+            import io
+
+            from django.http import HttpResponse
+
+            buf = io.StringIO()
+            writer = csv.writer(buf, delimiter=";")
+            writer.writerow(["Cas", "Date", "Lieu", "Zone", "Personnes", "Description", "Classification", "Jours d'arrêt"])
+            for r in registre["rows"]:
+                writer.writerow([r["cas"], r["date"], r["lieu"], r["zone"], r["personnes"], r["description"],
+                                 r["classification"], r["jours_arret"]])
+            reponse = HttpResponse(buf.getvalue().encode("utf-8-sig"), content_type="text/csv; charset=utf-8")
+            reponse["Content-Disposition"] = f'attachment; filename="registre-osha-{annee}.csv"'
+            return reponse
+        return Response(registre)
+
     @action(detail=True, methods=["post"], url_path="cloturer")
+    @transaction.atomic
     def cloturer(self, request, pk=None):
         incident = self.get_object()
         if incident.statut == Incident.Statut.CLOTURE:
@@ -345,6 +426,24 @@ class IncidentViewSet(viewsets.ModelViewSet):
                 {"detail": "Incident déjà clôturé."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not can_validate_hse(request.user):
+            return Response(
+                {"detail": "Clôture réservée au HSE et à la hiérarchie."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        ouvertes = incident.actions.exclude(statut=ActionHse.Statut.CLOTUREE)
+        if ouvertes.exists():
+            return Response(
+                {"detail": f"Actions non soldées : {', '.join(a.code for a in ouvertes)} — clôturez-les d'abord."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        rex = str(request.data.get("retour_experience") or incident.retour_experience or "").strip()
+        if incident.type_incident in (Incident.TypeIncident.QUASI_ACCIDENT, Incident.TypeIncident.SITUATION_DANGEREUSE) and not rex:
+            return Response(
+                {"retour_experience": "Retour d'expérience obligatoire pour clôturer un presque-accident."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        incident.retour_experience = rex
         # La clôture archive l'incident (traçabilité §9.9) : elle engage le HSE, comme l'ouverture d'enquête.
         if not can_validate_hse(request.user):
             return Response(
@@ -372,6 +471,16 @@ class IncidentViewSet(viewsets.ModelViewSet):
         incident.statut = Incident.Statut.CLOTURE
         incident.archive = True
         incident.save()
+        # Conservation 10 ans (CDC M7 §9.5 / §9.6) : rapport PDF scellé en GED, lié à l'incident.
+        from .services import TYPE_GED_RAPPORT_HSE, archiver_ged, rapport_incident_pdf
+
+        incident.document = archiver_ged(
+            rapport_incident_pdf(incident), f"{incident.code}.pdf",
+            f"Rapport d'incident {incident.code} — {incident.get_type_incident_display()}", TYPE_GED_RAPPORT_HSE,
+            "Rapports HSE (incidents, accidents)", incident.code, "hse.incident", incident.pk, request.user,
+            mots=("hse", "incident", incident.code),
+        )
+        incident.save(update_fields=["document"])
         return Response(self.get_serializer(incident).data)
 
     @action(detail=False, methods=["get"], url_path="stats")
@@ -528,6 +637,25 @@ class BordereauDechetViewSet(viewsets.ModelViewSet):
                 BordereauDechet.TypeDechet.PEINTURES,
             ])
         return qs
+
+    def perform_update(self, serializer):
+        """BSD traité / valorisé : bordereau scellé et archivé en GED (conservation 10 ans, CDC M7 §9.5)."""
+        avant = serializer.instance.statut
+        bsd = serializer.save()
+        if bsd.statut == BordereauDechet.Statut.TRAITE and avant != BordereauDechet.Statut.TRAITE and not bsd.document_id:
+            from .services import TYPE_GED_BSD, archiver_ged, bsd_pdf
+
+            bsd.document = archiver_ged(
+                bsd_pdf(bsd), f"{bsd.code}.pdf", f"BSD {bsd.code} — {bsd.get_type_dechet_display()}", TYPE_GED_BSD,
+                "Bordereaux de suivi des déchets", bsd.code, "hse.bordereaudechet", bsd.pk, self.request.user,
+                mots=("hse", "bsd", bsd.code),
+            )
+            bsd.save(update_fields=["document"])
+
+    def perform_destroy(self, instance):
+        if instance.document_id:
+            raise serializers.ValidationError({"detail": "BSD archivé : conservé 10 ans, suppression interdite."})
+        instance.delete()
 
 
 class ExigenceHabilitationViewSet(viewsets.ModelViewSet):

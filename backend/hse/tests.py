@@ -247,7 +247,7 @@ class IncidentTests(M7BaseTest):
 
         res = self.client.post(
             f"/api/hse/incidents/{inc.pk}/cloturer/",
-            {"rapport": "Rapport final", "date_rapport": str(date.today())},
+            {"rapport": "Rapport final", "date_rapport": str(date.today()), "retour_experience": "Balisage renforcé"},
             format="json",
         )
         inc.refresh_from_db()
@@ -258,7 +258,7 @@ class IncidentTests(M7BaseTest):
     def test_enquete_impossible_apres_cloture(self):
         self.auth()
         inc = self._incident()
-        self.client.post(f"/api/hse/incidents/{inc.pk}/cloturer/")
+        self.client.post(f"/api/hse/incidents/{inc.pk}/cloturer/", {"retour_experience": "REX"}, format="json")
         res = self.client.post(f"/api/hse/incidents/{inc.pk}/ouvrir-enquete/")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
