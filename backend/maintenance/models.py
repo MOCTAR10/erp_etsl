@@ -9,6 +9,7 @@ préventif · RF-ERP-72 : inspections périodiques + compteurs GLOBAL RENTAL en
 
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -258,6 +259,15 @@ class OrdreTravail(models.Model):
         related_name="maintenance_ot_archives",
         verbose_name="Archivé par",
     )
+    qualifie_le = models.DateTimeField(null=True, blank=True, verbose_name="Qualifié le")
+    qualifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="maintenance_ot_qualifies",
+        verbose_name="Qualifié par",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -269,6 +279,11 @@ class OrdreTravail(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Traçabilité du workflow (CDC M8 §13.5) : statut lu en base, auteur et commentaire de la transition en cours.
+    _statut_initial = None
+    _acteur = None
+    _commentaire_statut = ""
+
     class Meta:
         ordering = ["-date_demande", "-created_at"]
         verbose_name = "Ordre de travail (OT)"
@@ -278,10 +293,28 @@ class OrdreTravail(models.Model):
     def __str__(self):
         return f"{self.code} — {self.actif.code} ({self.get_statut_display()})"
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        obj = super().from_db(db, field_names, values)
+        obj._statut_initial = obj.__dict__.get("statut")
+        return obj
+
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = MaintenanceSequence.next_for("OT", "OT")
-        return super().save(*args, **kwargs)
+        creation = self._state.adding
+        ancien = None if creation else self._statut_initial
+        result = super().save(*args, **kwargs)
+        # Chaque changement de statut (création comprise) est tracé, quel que soit le chemin (action, seed, plan).
+        if creation or ancien != self.statut:
+            HistoriqueStatutOT.objects.create(
+                ot=self, de=ancien or "", vers=self.statut,
+                par=self._acteur or (self.created_by if creation else None),
+                commentaire=self._commentaire_statut[:255],
+            )
+            self._statut_initial = self.statut
+            self._commentaire_statut = ""
+        return result
 
     @property
     def cout_main_oeuvre(self):
@@ -290,6 +323,35 @@ class OrdreTravail(models.Model):
     @property
     def cout_total(self):
         return self.cout_main_oeuvre + self.cout_pieces
+
+
+class HistoriqueStatutOT(models.Model):
+    """Trace horodatée et inaltérable du cycle d'un OT : création, transitions, qualification (CDC M8 §13.5)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ot = models.ForeignKey(
+        OrdreTravail, on_delete=models.CASCADE, related_name="historique", verbose_name="OT"
+    )
+    de = models.CharField(max_length=10, blank=True, verbose_name="Statut de départ")
+    vers = models.CharField(max_length=10, verbose_name="Statut d'arrivée")
+    par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name="Par",
+    )
+    le = models.DateTimeField(default=timezone.now, verbose_name="Le")
+    commentaire = models.CharField(max_length=255, blank=True, verbose_name="Commentaire")
+
+    class Meta:
+        ordering = ["le"]
+        verbose_name = "Historique de statut d'OT"
+        verbose_name_plural = "Historique des statuts d'OT"
+
+    def __str__(self):
+        return f"{self.ot_id} {self.de or '∅'} → {self.vers}"
 
 
 class PlanPreventif(models.Model):
@@ -385,6 +447,19 @@ class PlanPreventif(models.Model):
             )
         if self.prochaine_date is not None and today >= self.prochaine_date:
             return f"échéance calendaire du {self.prochaine_date:%d/%m/%Y}"
+        return None
+
+    def motif_prealerte(self, today=None, jours=7, pct=10):
+        """Échéance proche (fenêtre paramétrable) ou None ; un plan déjà échu relève de `motif_echeance`."""
+        today = today or timezone.localdate()
+        if self.motif_echeance(today):
+            return None
+        if self.prochain_compteur is not None and self.intervalle_compteur:
+            reste = self.prochain_compteur - self.actif.compteur_lecture
+            if reste <= self.intervalle_compteur * Decimal(pct) / 100:
+                return f"seuil compteur proche (reste {reste} {self.actif.get_compteur_type_display().lower()})"
+        if self.prochaine_date is not None and (self.prochaine_date - today).days <= jours:
+            return f"échéance calendaire le {self.prochaine_date:%d/%m/%Y}"
         return None
 
 

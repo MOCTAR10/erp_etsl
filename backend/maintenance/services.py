@@ -77,7 +77,10 @@ MAINTENANCE_CONFIRM_ROLES = (
 PARAMETRES_DEFAUT = {
     "OBSERVATION_JOURS": ("Fiabilité : période d'observation", Decimal("365"), "jours"),
     "HEURES_PAR_JOUR": ("Fiabilité : heures de service théoriques par jour", Decimal("24"), "heures"),
+    "PREVENTIF_PREALERTE_JOURS": ("Préventif : pré-alerte avant l'échéance calendaire", Decimal("7"), "jours"),
+    "PREVENTIF_PREALERTE_PCT": ("Préventif : pré-alerte avant le seuil compteur (part de l'intervalle)", Decimal("10"), "%"),
 }
+CODES_FIABILITE = ("OBSERVATION_JOURS", "HEURES_PAR_JOUR")
 CENT = Decimal("0.01")
 COMPTE_GR = "618000"
 COMPTE_ENTRETIEN = "624000"
@@ -161,7 +164,7 @@ def fiabilite_actifs(aujourdhui=None):
         })
     return {
         "observation_jours": obs, "heures_par_jour": h_jour,
-        "provisoire": parametres_maintenance_provisoires(), "rows": rows,
+        "provisoire": parametres_maintenance_provisoires(CODES_FIABILITE), "rows": rows,
     }
 
 
@@ -285,3 +288,54 @@ def generer_da_reappro(user):
             estimated_price=art.purchase_price or 0,
         )
     return {"da": da.code, "lignes_ajoutees": len(a_ajouter)}
+
+
+def prealerte_parametres():
+    """(jours, pct) de la pré-alerte préventive, paramètres provisoires tant qu'ETSL ne les confirme pas."""
+    return int(get_param_maintenance("PREVENTIF_PREALERTE_JOURS")), get_param_maintenance("PREVENTIF_PREALERTE_PCT")
+
+
+def calendrier_preventif(periode, aujourdhui=None):
+    """Calendrier mensuel des plans préventifs en vigueur (CDC M8.2 / §13.4).
+
+    Plans calendaires : occurrences projetées à la périodicité depuis la prochaine échéance ; une échéance passée
+    non traitée reste affichée comme échue. Plans au compteur : seuil restant, sans date (non prévisible).
+    """
+    from .models import PlanPreventif
+
+    try:
+        annee, mois = (int(x) for x in periode.split("-"))
+        debut = date(annee, mois, 1)
+    except (ValueError, AttributeError):
+        raise ValueError("Période attendue au format AAAA-MM.")
+    fin = (debut.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    aujourdhui = aujourdhui or timezone.localdate()
+    jours_pa, pct_pa = prealerte_parametres()
+    occurrences, compteurs = [], []
+    for plan in PlanPreventif.objects.filter(en_vigueur=True).select_related("actif", "actif__equipement_gr"):
+        base = {
+            "plan": plan.code, "actif": plan.actif.code, "designation": plan.actif.designation,
+            "libelle": plan.libelle, "composant": plan.composant, "priorite": plan.priorite,
+        }
+        if plan.periodicite_jours:
+            pas = timedelta(days=plan.periodicite_jours)
+            d = plan.prochaine_date
+            if d < debut:
+                if d <= aujourdhui and debut <= aujourdhui <= fin:
+                    occurrences.append({**base, "date": d, "echu": True})
+                d += pas * -(-(debut - d).days // plan.periodicite_jours)
+            while d <= fin:
+                occurrences.append({**base, "date": d, "echu": d <= aujourdhui})
+                d += pas
+        if plan.intervalle_compteur is not None:
+            compteurs.append({
+                **base, "compteur_actuel": plan.actif.compteur_lecture, "prochain_compteur": plan.prochain_compteur,
+                "echeance": plan.motif_echeance(aujourdhui),
+                "prealerte": plan.motif_prealerte(aujourdhui, jours_pa, pct_pa),
+            })
+    occurrences.sort(key=lambda o: (o["date"], o["actif"]))
+    return {
+        "periode": f"{debut:%Y-%m}", "debut": debut, "fin": fin, "occurrences": occurrences, "compteurs": compteurs,
+        "prealerte_jours": jours_pa, "prealerte_pct": pct_pa,
+        "provisoire": parametres_maintenance_provisoires(("PREVENTIF_PREALERTE_JOURS", "PREVENTIF_PREALERTE_PCT")),
+    }

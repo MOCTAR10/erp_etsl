@@ -3,8 +3,8 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
-from .services import can_see_amount
+from .models import Actif, HistoriqueStatutOT, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
+from .services import can_see_amount, prealerte_parametres
 
 
 def _validate_instance(serializer, instance, exclude=()):
@@ -68,6 +68,7 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
     cout_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     has_amount_access = serializers.SerializerMethodField()
     plan_code = serializers.CharField(source="plan.code", read_only=True, default=None)
+    qualifie_par_name = serializers.CharField(source="qualifie_par.get_full_name", read_only=True, default=None)
 
     class Meta:
         model = OrdreTravail
@@ -79,11 +80,11 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
             "tarif_horaire", "cout_pieces", "cout_main_oeuvre", "cout_total",
             "has_amount_access", "decision", "decision_label", "rapport", "statut",
             "statut_label", "plan", "plan_code", "archive_le", "archive_par",
-            "created_by", "created_at", "updated_at",
+            "qualifie_le", "qualifie_par", "qualifie_par_name", "created_by", "created_at", "updated_at",
         ]
         read_only_fields = ["created_by", "demandeur",
             "code", "cout_main_oeuvre", "cout_total", "date_debut", "date_fin",
-            "decision", "rapport", "statut", "plan", "archive_le", "archive_par"]
+            "decision", "rapport", "statut", "plan", "archive_le", "archive_par", "qualifie_le", "qualifie_par"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context.get("request").user)
@@ -119,6 +120,7 @@ class PlanPreventifSerializer(serializers.ModelSerializer):
         source="actif.compteur_lecture", max_digits=14, decimal_places=2, read_only=True
     )
     echeance = serializers.SerializerMethodField()
+    prealerte = serializers.SerializerMethodField()
     ot_ouvert = serializers.SerializerMethodField()
 
     class Meta:
@@ -126,13 +128,19 @@ class PlanPreventifSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "actif", "actif_code", "actif_designation", "libelle", "composant",
             "periodicite_jours", "intervalle_compteur", "derniere_date", "dernier_compteur",
-            "prochaine_date", "prochain_compteur", "compteur_actuel", "echeance", "ot_ouvert",
+            "prochaine_date", "prochain_compteur", "compteur_actuel", "echeance", "prealerte", "ot_ouvert",
             "priorite", "priorite_label", "en_vigueur", "created_by", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "created_by"]
 
     def get_echeance(self, obj):
         return obj.motif_echeance()
+
+    def get_prealerte(self, obj):
+        if not hasattr(self, "_prealerte"):  # paramètres lus une fois par réponse
+            self._prealerte = prealerte_parametres()
+        jours, pct = self._prealerte
+        return obj.motif_prealerte(jours=jours, pct=pct)
 
     def get_ot_ouvert(self, obj):
         ot = obj.ordres.exclude(statut__in=OrdreTravail.STATUTS_CLOS).first()
@@ -166,6 +174,15 @@ class InspectionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
+
+class HistoriqueStatutOTSerializer(serializers.ModelSerializer):
+    par_name = serializers.CharField(source="par.get_full_name", read_only=True, default=None)
+
+    class Meta:
+        model = HistoriqueStatutOT
+        fields = ["id", "de", "vers", "par", "par_name", "le", "commentaire"]
+        read_only_fields = fields
+
 
 class ParametreMaintenanceSerializer(serializers.ModelSerializer):
     est_provisoire = serializers.BooleanField(read_only=True)

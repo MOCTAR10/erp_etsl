@@ -1250,6 +1250,36 @@ export const fr = {
     warnProvisoire: "{{count}} paramètre(s) du cube provisoire(s) (durée de conservation) à faire confirmer par ETSL.",
     confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
   },
+  m8e: {
+    plans: {
+      title: "Plans préventifs et calendrier (M8.2)",
+      hint: "Un plan par machine ou composant : périodicité en jours et / ou intervalle compteur. À l'échéance, un OT préventif est généré automatiquement (chaque jour à 06:00, ou à la demande) ; une pré-alerte signale les échéances proches.",
+      nouveau: "Nouveau plan préventif", actif: "Équipement", libelle: "Intervention", composant: "Composant",
+      periodicite: "Périodicité (jours)", intervalle: "Intervalle compteur (h / km)", derniereDate: "Dernière exécution",
+      priorite: "Priorité de l'OT", declencher: "Déclencher les plans échus", code: "Code", declencheur: "Déclencheur",
+      prochaine: "Prochaine échéance", etat: "État", echu: "Échu", prealerte: "Pré-alerte", aJour: "À jour",
+      tousLes: "tous les {{n}} j", toutesLes: "toutes les {{n}} h/km", aucun: "Aucun plan préventif saisi.",
+      generes: "OT préventifs générés : {{codes}}.", aucunEchu: "Aucun plan échu : aucun OT généré.",
+    },
+    cal: {
+      title: "Calendrier mensuel des échéances préventives", mois: "Mois", date: "Échéance", prevu: "Prévu",
+      aucune: "Aucune échéance calendaire ce mois-ci.", compteurs: "Plans au compteur (sans date) :",
+      warnProvisoire: "Pré-alerte provisoire ({{jours}} jours avant l'échéance, {{pct}} % de l'intervalle compteur) : valeurs à faire confirmer par ETSL dans les paramètres.",
+    },
+    ot: {
+      qualifier: "Qualifier", diagnostic: "Diagnostic (cause) de la demande", details: "Détail et historique",
+      qualifiePar: "Qualifié par {{nom}}", mainOeuvre: "Main-d'œuvre de l'OT", heures: "Heures", tarif: "Tarif horaire (FCFA)",
+      historique: "Historique des statuts",
+    },
+    actif: {
+      nouveau: "Nouvel équipement", serie: "N° de série", compteur: "Type de compteur", valeurCompteur: "Compteur initial",
+      miseEnService: "Mise en service", relever: "Relever le compteur", nouvelleValeur: "Nouvelle valeur du compteur",
+    },
+    insp: {
+      nouvelle: "Nouvelle inspection", date: "Date d'inspection", organisme: "Organisme (si externe)",
+      realiser: "Réaliser", resultat: "Résultat…", creerOt: "Créer l'OT correctif",
+    },
+  },
   m8: {
     fiabilite: {
       title: "Fiabilité du parc : MTBF, MTTR, disponibilité (M8)",
