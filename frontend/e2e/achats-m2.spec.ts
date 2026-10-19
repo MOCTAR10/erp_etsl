@@ -33,7 +33,10 @@ test.describe("Régression : Achats M2 — saisie des consultations et des bons 
     await offre.getByRole("button", { name: "Enregistrer" }).click();
     await expect(offre.getByRole("status")).toHaveText("Enregistré.");
 
-    const ligneOffre = page.getByRole("row").filter({ hasText: /125/ }).filter({ has: page.getByRole("button", { name: "Retenir" }) });
+    // Filtre sur le code de CETTE consultation : les specs parallèles créent aussi des offres à 125 000.
+    const codeConsultation = ((await row().getByRole("cell").first().textContent()) ?? "").trim();
+    const ligneOffre = page.getByRole("row").filter({ hasText: codeConsultation }).filter({ hasText: /125/ })
+      .filter({ has: page.getByRole("button", { name: "Retenir" }) });
     await ligneOffre.first().getByRole("button", { name: "Retenir" }).click();
     await expect(page.getByText("Retenue", { exact: true }).first()).toBeVisible();
     await row().getByRole("button", { name: "Clôturer" }).click();
