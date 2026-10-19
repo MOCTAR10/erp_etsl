@@ -292,6 +292,7 @@ SEED_ORDER = [
     "seed_parcours_demo",
     "seed_parcours_b",
     "seed_parcours_c",
+    "seed_parcours_d",
 ]
 
 
