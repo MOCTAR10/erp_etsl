@@ -20,6 +20,7 @@ DESTINATAIRES = {
     "contrat_rh": (User.Role.RH,),
     "qualification_rh": (User.Role.RH,),
     "document": (User.Role.ADMIN,),
+    "inspection_reglementaire": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
 }
 
 
@@ -28,6 +29,7 @@ def _items(alertes):
     for famille in ("conventions", "cautions", "assurances"):
         yield from alertes["juridique"][famille]
     yield from alertes["rh"]
+    yield from alertes["maintenance"]
 
 
 @shared_task

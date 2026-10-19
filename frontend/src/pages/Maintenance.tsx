@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { ActionBar, type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
-import { OtDetails, PlansPreventifsSection } from "../components/workflow/MaintenancePlansSection";
+import { ExigencesHabilitationSection, OtDetails, PlansPreventifsSection } from "../components/workflow/MaintenancePlansSection";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
@@ -302,6 +302,7 @@ export function MaintenancePage() {
       <PlansPreventifsSection actifs={actifsChoix} />
       <FiabiliteSection />
       <PiecesRechangeSection />
+      <ExigencesHabilitationSection />
       <ParametresMaintenanceSection />
 
       <QuickForm

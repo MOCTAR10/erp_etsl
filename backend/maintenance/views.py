@@ -12,10 +12,20 @@ from rest_framework.response import Response
 from config.inputs import choice_input, date_input, fk_input
 from users.models import User
 
-from .models import Actif, HistoriqueStatutOT, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
+from .models import (
+    Actif,
+    ExigenceHabilitationMaintenance,
+    HistoriqueStatutOT,
+    Inspection,
+    OrdreTravail,
+    ParametreMaintenance,
+    PieceOT,
+    PlanPreventif,
+)
 from .preventif import declencher_plans, rearmer_plan
 from .serializers import (
     ActifSerializer,
+    ExigenceHabilitationMaintenanceSerializer,
     HistoriqueStatutOTSerializer,
     InspectionSerializer,
     OrdreTravailSerializer,
@@ -30,8 +40,10 @@ from .services import (
     sortir_piece,
     CanManageMaintenance,
     IsConfirmateurMaintenance,
+    archiver_ot_ged,
     calendrier_preventif,
     fiabilite_actifs,
+    habilitations_technicien_manquantes,
     get_param_maintenance,
 )
 
@@ -215,6 +227,9 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
             ot.date_planifiee = date_planifiee
         if technicien:
             ot.technicien = technicien
+            manquantes = habilitations_technicien_manquantes(ot)
+            if manquantes:
+                raise ValidationError({"technicien": f"Habilitation manquante : {', '.join(manquantes)}."})
         if request.data.get("priorite"):
             ot.priorite = _choix(request.data.get("priorite"), OrdreTravail.Priorite, "priorite")
         ot.save()
@@ -229,10 +244,15 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
                 {"detail": "L'OT doit être planifié ou demandé pour démarrer."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        technicien = fk_input(request.data.get("technicien"), User.objects.filter(is_active=True), "technicien")
+        if technicien:
+            ot.technicien = technicien
+        # Aucun départ en intervention sans habilitation valide du technicien (amont M9).
+        manquantes = habilitations_technicien_manquantes(ot)
+        if manquantes:
+            raise ValidationError({"technicien": f"Habilitation manquante : {', '.join(manquantes)}."})
         ot.statut = OrdreTravail.Statut.EN_COURS
         ot.date_debut = timezone.now()
-        if request.data.get("technicien"):
-            ot.technicien_id = request.data.get("technicien")
         ot.actif.statut = Actif.Statut.EN_MAINTENANCE
         ot.actif.save(update_fields=["statut", "updated_at"])
         ot.save()
@@ -307,6 +327,7 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         ot.archive_le = timezone.now()
         ot.archive_par = request.user
         ot.save(update_fields=["statut", "archive_le", "archive_par", "updated_at"])
+        archiver_ot_ged(ot, request.user)
         return Response(self.get_serializer(ot).data)
 
     @action(detail=True, methods=["post"], url_path="sortir-piece")
@@ -507,3 +528,11 @@ class PiecesViewSet(viewsets.ViewSet):
                  "a_commander": str(r["a_commander"])} for r in rows
             ]})
         return Response(generer_da_reappro(request.user))
+
+
+class ExigenceHabilitationMaintenanceViewSet(viewsets.ModelViewSet):
+    """Habilitations exigées du technicien par catégorie d'équipement / type d'OT (donnée ETSL)."""
+
+    queryset = ExigenceHabilitationMaintenance.objects.all()
+    serializer_class = ExigenceHabilitationMaintenanceSerializer
+    permission_classes = [CanManageMaintenance]

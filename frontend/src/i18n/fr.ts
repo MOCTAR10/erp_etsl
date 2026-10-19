@@ -1270,10 +1270,22 @@ export const fr = {
       qualifier: "Qualifier", diagnostic: "Diagnostic (cause) de la demande", details: "Détail et historique",
       qualifiePar: "Qualifié par {{nom}}", mainOeuvre: "Main-d'œuvre de l'OT", heures: "Heures", tarif: "Tarif horaire (FCFA)",
       historique: "Historique des statuts",
+      archiveGed: "Rapport archivé en GED (10 ans) : {{titre}}",
     },
     actif: {
       nouveau: "Nouvel équipement", serie: "N° de série", compteur: "Type de compteur", valeurCompteur: "Compteur initial",
       miseEnService: "Mise en service", relever: "Relever le compteur", nouvelleValeur: "Nouvelle valeur du compteur",
+    },
+    fiab: {
+      seuils: "Seuils d'alerte : disponibilité ≥ {{dispo}} %, MTBF ≥ {{mtbf}} h (paramètres ETSL ; notification mensuelle des machines sous le seuil).",
+      etat: "Seuils", sousSeuil: "Sous le seuil", ok: "Conforme",
+    },
+    hab: {
+      title: "Habilitations exigées du technicien (M8 ↔ M9)",
+      hint: "Le technicien d'un OT doit détenir une qualification RH valide dont l'intitulé contient le mot-clé ; contrôle à la planification et au démarrage. Catégorie ou type vide = tous.",
+      nouvelle: "Nouvelle exigence", categorie: "Catégorie d'équipement", type: "Type d'OT", motCle: "Mot-clé de la qualification",
+      aucune: "Aucune exigence : aucun contrôle d'habilitation n'est appliqué.", toutes: "Toutes catégories", tous: "Tous types",
+      supprimer: "Supprimer", confirmSupprimer: "Supprimer cette exigence d'habilitation ?",
     },
     insp: {
       nouvelle: "Nouvelle inspection", date: "Date d'inspection", organisme: "Organisme (si externe)",

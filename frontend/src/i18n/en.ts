@@ -1270,10 +1270,22 @@ export const en = {
       qualifier: "Qualify", diagnostic: "Diagnosis (cause) of the request", details: "Details and history",
       qualifiePar: "Qualified by {{nom}}", mainOeuvre: "Work order labour", heures: "Hours", tarif: "Hourly rate (FCFA)",
       historique: "Status history",
+      archiveGed: "Report archived in the DMS (10 years): {{titre}}",
     },
     actif: {
       nouveau: "New equipment", serie: "Serial number", compteur: "Meter type", valeurCompteur: "Initial meter",
       miseEnService: "Commissioned on", relever: "Read meter", nouvelleValeur: "New meter value",
+    },
+    fiab: {
+      seuils: "Alert thresholds: availability ≥ {{dispo}} %, MTBF ≥ {{mtbf}} h (ETSL settings; monthly notification of machines below threshold).",
+      etat: "Thresholds", sousSeuil: "Below threshold", ok: "OK",
+    },
+    hab: {
+      title: "Technician qualifications required (M8 ↔ M9)",
+      hint: "A work order's technician must hold a valid HR qualification whose title contains the keyword; checked when planning and starting. Empty category or type = all.",
+      nouvelle: "New requirement", categorie: "Equipment category", type: "Work order type", motCle: "Qualification keyword",
+      aucune: "No requirement: no qualification check is applied.", toutes: "All categories", tous: "All types",
+      supprimer: "Delete", confirmSupprimer: "Delete this qualification requirement?",
     },
     insp: {
       nouvelle: "New inspection", date: "Inspection date", organisme: "Body (if external)",

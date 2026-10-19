@@ -3,7 +3,16 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Actif, HistoriqueStatutOT, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
+from .models import (
+    Actif,
+    ExigenceHabilitationMaintenance,
+    HistoriqueStatutOT,
+    Inspection,
+    OrdreTravail,
+    ParametreMaintenance,
+    PieceOT,
+    PlanPreventif,
+)
 from .services import can_see_amount, prealerte_parametres
 
 
@@ -69,6 +78,7 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
     has_amount_access = serializers.SerializerMethodField()
     plan_code = serializers.CharField(source="plan.code", read_only=True, default=None)
     qualifie_par_name = serializers.CharField(source="qualifie_par.get_full_name", read_only=True, default=None)
+    document_titre = serializers.CharField(source="document.title", read_only=True, default=None)
 
     class Meta:
         model = OrdreTravail
@@ -80,11 +90,12 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
             "tarif_horaire", "cout_pieces", "cout_main_oeuvre", "cout_total",
             "has_amount_access", "decision", "decision_label", "rapport", "statut",
             "statut_label", "plan", "plan_code", "archive_le", "archive_par",
-            "qualifie_le", "qualifie_par", "qualifie_par_name", "created_by", "created_at", "updated_at",
+            "qualifie_le", "qualifie_par", "qualifie_par_name", "document", "document_titre",
+            "created_by", "created_at", "updated_at",
         ]
         read_only_fields = ["created_by", "demandeur",
             "code", "cout_main_oeuvre", "cout_total", "date_debut", "date_fin",
-            "decision", "rapport", "statut", "plan", "archive_le", "archive_par", "qualifie_le", "qualifie_par"]
+            "decision", "rapport", "statut", "plan", "archive_le", "archive_par", "qualifie_le", "qualifie_par", "document"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context.get("request").user)
@@ -174,6 +185,21 @@ class InspectionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
+
+class ExigenceHabilitationMaintenanceSerializer(serializers.ModelSerializer):
+    categorie_label = serializers.CharField(source="get_categorie_actif_display", read_only=True)
+    type_label = serializers.CharField(source="get_type_ot_display", read_only=True)
+
+    class Meta:
+        model = ExigenceHabilitationMaintenance
+        fields = ["id", "categorie_actif", "categorie_label", "type_ot", "type_label", "mot_cle", "actif"]
+
+    def validate_mot_cle(self, value):
+        value = value.strip()
+        if len(value) < 2:
+            raise serializers.ValidationError("Mot-clé trop court.")
+        return value
+
 
 class HistoriqueStatutOTSerializer(serializers.ModelSerializer):
     par_name = serializers.CharField(source="par.get_full_name", read_only=True, default=None)
