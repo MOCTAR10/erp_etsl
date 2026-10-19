@@ -2212,6 +2212,7 @@ export interface AlertesAgregees {
   documents: AlerteEcheanceItem[];
   juridique: AlertesResult;
   rh: AlerteEcheanceItem[];
+  qualite?: AlerteEcheanceItem[];
   maintenance: AlerteEcheanceItem[];
   compteurs: Record<BandeEcheance, number>;
   total: number;

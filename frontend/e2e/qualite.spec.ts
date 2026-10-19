@@ -13,3 +13,21 @@ test.describe("M6 Qualité : parcours de clôture", () => {
     await expect(page.getByText(/Épreuves hydrauliques/).first()).toBeVisible();
   });
 });
+
+// Écarts M6-A (2026-10-19) : saisies soudage / ITP, cycle WPS, CAPA, punch list, indicateurs et paramètres qualité.
+test.describe("M6 Qualité : écarts M6-A", () => {
+  test("le QA/QC saisit un soudeur et pilote WPS, punch list, indicateurs et paramètres", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.qaqc, DEMO_PASSWORD);
+    await page.goto("/qualite");
+    const saisies = page.getByTestId("saisies-m6");
+    await saisies.getByRole("button", { name: "Nouveau soudeur" }).click();
+    const form = page.getByRole("form", { name: "Nouveau soudeur" });
+    await form.getByLabel("Nom *").fill(`E2E SOUDEUR ${Date.now()}`);
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+    await expect(page.getByTestId("wps-cycle")).toBeVisible();
+    await expect(page.getByTestId("punch-list")).toBeVisible();
+    await expect(page.getByTestId("indicateurs-qualite").getByText("Taux de conformité")).toBeVisible();
+    await expect(page.getByTestId("parametres-qualite").getByText("CAPA : délai de clôture (jours calendaires)")).toBeVisible();
+  });
+});

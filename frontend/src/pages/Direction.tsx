@@ -130,6 +130,7 @@ function DirectionInner() {
     ...(a.juridique.cautions ?? []),
     ...(a.juridique.assurances ?? []),
     ...a.rh,
+    ...(a.qualite ?? []),
   ]
     .filter((e) => e.jours !== null)
     .sort((x, y) => (x.jours ?? 0) - (y.jours ?? 0))

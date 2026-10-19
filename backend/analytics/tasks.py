@@ -23,6 +23,7 @@ DESTINATAIRES = {
     "epi": (User.Role.HSE,),
     "document": (User.Role.ADMIN,),
     "inspection_reglementaire": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
+    "qualification_soudeur": (User.Role.QAQC, User.Role.DIRECTEUR_OPERATIONS),
 }
 
 
@@ -31,6 +32,7 @@ def _items(alertes):
     for famille in ("conventions", "cautions", "assurances"):
         yield from alertes["juridique"][famille]
     yield from alertes["rh"]
+    yield from alertes.get("qualite", [])
     yield from alertes["maintenance"]
 
 
@@ -38,10 +40,13 @@ def _items(alertes):
 def notifier_echeances():
     """Prévient les responsables des échéances atteignant un palier J-90 / J-30 / J-15 / J-0 aujourd'hui.
 
-    Passe d'abord en « expiré » les permis de travail dont la date de fin est dépassée (CDC M7-11)."""
+    Passe d'abord en « expiré » les permis de travail dont la date de fin est dépassée (CDC M7-11), puis relance les
+    CAPA, points d'ITP et réserves en retard (escalade d'une CAPA à la direction, CDC M6)."""
     from hse.services import expirer_permis
+    from qualite.ecarts import relances_qualite
 
     expirer_permis()
+    relances_qualite()
     debut_jour = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
     envoyees = 0
     for item in _items(alertes_agregees()):

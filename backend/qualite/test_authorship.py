@@ -47,6 +47,8 @@ class WpsValidationTests(APITestCase):
 
     def test_validation_reservee_qaqc_et_tracee_par_le_serveur(self):
         wps = WpsWpqr.objects.get(pk=self.create(self.atelier).data["id"])
+        wps.wpqr = WpsWpqr.objects.create(type="wpqr", statut="valide")  # un WPS se valide sur un WPQR validé
+        wps.save()
         self.client.force_authenticate(self.atelier)
         self.assertEqual(self.client.post(f"/api/qualite/wps/{wps.pk}/valider/").status_code, 403)
         self.client.force_authenticate(self.qaqc)

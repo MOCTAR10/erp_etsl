@@ -172,7 +172,8 @@ def rapport_incident_pdf(incident):
     return _pdf(f"Rapport d'incident {incident.code}", blocs, actions if len(actions) > 1 else None)
 
 
-def archiver_ged(contenu, nom, titre, type_code, type_label, reference, objet_type, objet_id, user=None, mots=()):
+def archiver_ged(contenu, nom, titre, type_code, type_label, reference, objet_type, objet_id, user=None, mots=(),
+                 module="M7", note="Archivage réglementaire HSE", retention=RETENTION_HSE_ANS):
     """PDF scellé SHA-256 en GED (conservation 10 ans) et lié à l'objet HSE pour la recherche juridique."""
     import hashlib
 
@@ -181,9 +182,9 @@ def archiver_ged(contenu, nom, titre, type_code, type_label, reference, objet_ty
     from documents.models import Document, DocumentType, Version
     from juridique.models import LienDocument
 
-    type_doc, _ = DocumentType.objects.get_or_create(code=type_code, defaults={"label": type_label, "retention_years": RETENTION_HSE_ANS})
-    if (type_doc.retention_years or 0) < RETENTION_HSE_ANS:
-        type_doc.retention_years = RETENTION_HSE_ANS
+    type_doc, _ = DocumentType.objects.get_or_create(code=type_code, defaults={"label": type_label, "retention_years": retention})
+    if (type_doc.retention_years or 0) < retention:
+        type_doc.retention_years = retention
         type_doc.save(update_fields=["retention_years"])
     sha = hashlib.sha256(contenu).hexdigest()
     document = Document.objects.create(
@@ -195,7 +196,7 @@ def archiver_ged(contenu, nom, titre, type_code, type_label, reference, objet_ty
     document.current_version = version
     document.save(update_fields=["current_version"])
     LienDocument.objects.create(document=document, objet_type=objet_type, objet_id=str(objet_id),
-                                objet_label=titre[:255], module="M7", note="Archivage réglementaire HSE", created_by=user)
+                                objet_label=titre[:255], module=module, note=note, created_by=user)
     return document
 
 

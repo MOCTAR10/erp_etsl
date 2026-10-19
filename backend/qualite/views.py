@@ -12,7 +12,14 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
+from .ecarts import (
+    PARAMETRES_QUALITE_DEFAUT, archiver_dossier_qualite, dossier_qualite_pdf, get_param_qualite, indicateurs,
+    rapport_indicateurs_pdf,
+)
 from .models import (
+    DiffusionWps,
+    ParametreQualite,
+    PunchItem,
     Etalonnage,
     EpreuvePression,
     ImageControle,
@@ -28,6 +35,9 @@ from .models import (
     WpsWpqr,
 )
 from .serializers import (
+    DiffusionWpsSerializer,
+    ParametreQualiteSerializer,
+    PunchItemSerializer,
     EpreuvePressionSerializer,
     ImageControleSerializer,
     InstrumentMesureSerializer,
@@ -49,6 +59,10 @@ def _as_bool(value):
     if isinstance(value, bool):
         return value
     return str(value or "").strip().lower() in ("true", "1", "yes")
+
+
+def _capa_ouvertes(nc):
+    return list(nc.actions_correctives.exclude(statut=ActionCorrective.Statut.CLOTUREE).values_list("code", flat=True))
 
 
 def _uuid_or_none(value):
@@ -111,21 +125,88 @@ class WpsWpqrViewSet(viewsets.ModelViewSet):
             qs = qs.filter(statut=statut)
         if self.request.query_params.get("valides") == "1":
             qs = qs.filter(statut=WpsWpqr.Statut.VALIDE)
+        if type_wps := self.request.query_params.get("type"):
+            qs = qs.filter(type=type_wps)
+        if ordre := _uuid_or_none(self.request.query_params.get("ordre")):
+            qs = qs.filter(diffusions__ordre_id=ordre)
         return qs
+
+    def _assert_brouillon(self):
+        wps = self.get_object()
+        if wps.statut != WpsWpqr.Statut.BROUILLON:
+            raise DRFValidationError(f"{wps.code} {wps.get_statut_display().lower()} : procédure scellée (réviser = nouveau WPS).")
+        return wps
+
+    def update(self, request, *args, **kwargs):
+        self._assert_brouillon()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._assert_brouillon()
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=["post"], permission_classes=[CanValidatePv])
     def valider(self, request, pk=None):
-        """Validation d'un WPS/WPQR : QA/QC + hiérarchie ; date et validateur posés par le serveur."""
+        """Validation d'un WPS/WPQR : QA/QC + hiérarchie ; date et validateur posés par le serveur.
+        Un WPS exige un WPQR validé (PQR) qui le qualifie."""
         wps = self.get_object()
         if wps.statut != WpsWpqr.Statut.BROUILLON:
             return Response(
                 {"detail": f"WPS {wps.get_statut_display().lower()} : validation impossible."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if wps.type == WpsWpqr.Type.WPS and (wps.wpqr is None or wps.wpqr.statut != WpsWpqr.Statut.VALIDE):
+            return Response({"wpqr": "Un WPS se valide sur un WPQR (PQR) validé : renseignez le WPQR support."},
+                            status=status.HTTP_400_BAD_REQUEST)
         wps.statut = WpsWpqr.Statut.VALIDE
         wps.date_validation = timezone.localdate()
         wps.validated_by = request.user
         wps.save(update_fields=["statut", "date_validation", "validated_by", "updated_at"])
+        return Response(self.get_serializer(wps).data)
+
+    @action(detail=True, methods=["post"], url_path="obsolete", permission_classes=[CanValidatePv])
+    @transaction.atomic
+    def obsolete(self, request, pk=None):
+        """Retire un WPS / WPQR validé (révision, norme changée) : plus utilisable pour un nouveau joint."""
+        wps = WpsWpqr.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if wps.statut != WpsWpqr.Statut.VALIDE:
+            raise DRFValidationError("Seule une procédure validée devient obsolète.")
+        motif = str(request.data.get("motif", "")).strip()
+        if not motif:
+            raise DRFValidationError({"motif": "Motif d'obsolescence obligatoire."})
+        wps.statut = WpsWpqr.Statut.OBSOLETE
+        wps.obsolete_le = timezone.now()
+        wps.obsolete_motif = motif[:250]
+        wps.save(update_fields=["statut", "obsolete_le", "obsolete_motif", "updated_at"])
+        return Response(self.get_serializer(wps).data)
+
+    @action(detail=True, methods=["post"], url_path="diffuser")
+    def diffuser(self, request, pk=None):
+        """Diffuse un WPS validé vers un OF (atelier / chantier M3)."""
+        from operations.models import OrdreFabrication
+
+        wps = self.get_object()
+        if wps.statut != WpsWpqr.Statut.VALIDE or wps.type != WpsWpqr.Type.WPS:
+            raise DRFValidationError("Seul un WPS validé se diffuse vers un OF.")
+        ordre = OrdreFabrication.objects.filter(pk=_uuid_or_none(request.data.get("ordre"))).first()
+        if ordre is None:
+            raise DRFValidationError({"ordre": "OF introuvable."})
+        if ordre.status in (OrdreFabrication.Status.CLOTURE, OrdreFabrication.Status.ANNULE):
+            raise DRFValidationError({"ordre": f"OF {ordre.code} clos : diffusion inutile."})
+        diffusion, _ = DiffusionWps.objects.get_or_create(wps=wps, ordre=ordre, defaults={"diffuse_par": request.user})
+        return Response(DiffusionWpsSerializer(diffusion).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="fichier")
+    def fichier(self, request, pk=None):
+        """Joint la fiche WPS / PQR (PDF ou image) tant que la procédure est en brouillon."""
+        wps = self._assert_brouillon()
+        fichier = request.FILES.get("fichier")
+        if fichier is None:
+            raise DRFValidationError({"fichier": "Fichier attendu (PDF ou image)."})
+        if not fichier.name.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):
+            raise DRFValidationError({"fichier": "Formats acceptés : PDF, JPG, PNG."})
+        wps.fichier = fichier
+        wps.save(update_fields=["fichier", "updated_at"])
         return Response(self.get_serializer(wps).data)
 
 
@@ -217,7 +298,7 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
         nc.decided_by = request.user
         nc.date_decision = timezone.localdate()
         nc.save()
-        if traitement == NonConformite.Traitement.REJET and nc.type_ncr != "soudage":
+        if traitement == NonConformite.Traitement.REJET and nc.type_ncr != "soudage" and not _capa_ouvertes(nc):
             nc.statut = NonConformite.Statut.CLOTUREE
             nc.archive = True
             nc.save()
@@ -229,6 +310,9 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
         # MANUEL 5.8 : une NC se clôture après décision de traitement (pas directement depuis « signalée »).
         if nc.statut != NonConformite.Statut.EN_TRAITEMENT:
             return Response({"detail": f"NC {nc.get_statut_display().lower()} : décidez d'abord du traitement."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if ouvertes := _capa_ouvertes(nc):
+            return Response({"detail": f"CAPA non clôturée(s) : {', '.join(ouvertes)} — clôturez-les avant la NC."},
                             status=status.HTTP_400_BAD_REQUEST)
         if nc.type_ncr == "soudage":
             # NCR-SD : seule une CND de recontrôle validée et conforme clôt la non-conformité.
@@ -334,7 +418,20 @@ class PvControleViewSet(viewsets.ModelViewSet):
         pv.reserve_motif = request.data.get("motif", "")
         pv.validated_by = request.user
         pv.save()
+        if not reserve and pv.ordre_id and pv.dossier_document_id is None:
+            # Réception prononcée : le dossier qualité de l'OF est constitué, scellé et archivé 10 ans (CDC M6.1-14).
+            pv.dossier_document = archiver_dossier_qualite(pv, user=request.user)
+            pv.date_archivage = timezone.localdate()
+            pv.save(update_fields=["dossier_document", "date_archivage", "updated_at"])
         return Response(self.get_serializer(pv).data)
+
+    @action(detail=True, methods=["get"], url_path="dossier")
+    def dossier(self, request, pk=None):
+        """Dossier qualité (PDF) : joints, contrôles, ITP, épreuves, NC / CAPA, punch list."""
+        from hse.views import _pdf_response
+
+        pv = self.get_object()
+        return _pdf_response(dossier_qualite_pdf(pv), f"dossier-qualite-{pv.code}.pdf")
 
 
 class PointInspectionViewSet(viewsets.ModelViewSet):
@@ -348,6 +445,8 @@ class PointInspectionViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         if controle := self.request.query_params.get("controle"):
             qs = qs.filter(controle_id=controle)
+        if self.request.query_params.get("en_retard") == "1":
+            qs = qs.filter(statut=PointInspection.Statut.EN_ATTENTE, date_prevue__lt=timezone.localdate())
         return qs
 
     def get_permissions(self):
@@ -538,3 +637,103 @@ class EpreuvePressionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mix
         ep.conclu_le = timezone.now()
         ep.save()
         return Response(self.get_serializer(ep).data)
+
+
+class PunchItemViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                       viewsets.GenericViewSet):
+    """Punch list de fin de travaux : réserves A (bloquent la libération de l'OF), B, C ; levée tracée."""
+
+    queryset = PunchItem.objects.select_related("ordre").all()
+    serializer_class = PunchItemSerializer
+    search_fields = ("code", "description", "repere")
+    permission_classes = [CanManageQualite]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if ordre := _uuid_or_none(self.request.query_params.get("ordre")):
+            qs = qs.filter(ordre_id=ordre)
+        if self.request.query_params.get("ouvertes") == "1":
+            qs = qs.filter(statut=PunchItem.Statut.OUVERTE)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="lever")
+    @transaction.atomic
+    def lever(self, request, pk=None):
+        item = PunchItem.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if item.statut != PunchItem.Statut.OUVERTE:
+            raise DRFValidationError("Réserve déjà levée.")
+        item.statut = PunchItem.Statut.LEVEE
+        item.leve_par = request.user
+        item.leve_le = timezone.now()
+        item.commentaire = str(request.data.get("commentaire", ""))[:250]
+        item.save()
+        return Response(self.get_serializer(item).data)
+
+
+class ParametreQualiteViewSet(viewsets.ModelViewSet):
+    """Paramètres M6 (délai CAPA, escalade, alerte de péremption) : provisoires jusqu'à confirmation QA/QC."""
+
+    queryset = ParametreQualite.objects.all()
+    serializer_class = ParametreQualiteSerializer
+    permission_classes = [CanValidatePv]
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        for code in PARAMETRES_QUALITE_DEFAUT:
+            get_param_qualite(code)
+        return super().get_queryset()
+
+    def create(self, request, *args, **kwargs):
+        return Response({"detail": "Paramètres prédéfinis : modification seulement."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def perform_update(self, serializer):
+        # Une valeur modifiée redevient provisoire jusqu'à sa confirmation.
+        serializer.save(statut_valeur=ParametreQualite.StatutValeur.PROVISOIRE, confirme_par=None, confirme_le=None)
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        p = self.get_object()
+        p.statut_valeur = ParametreQualite.StatutValeur.CONFIRME
+        p.confirme_par = request.user
+        p.confirme_le = timezone.now()
+        p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(p).data)
+
+
+class IndicateursQualiteViewSet(viewsets.ViewSet):
+    """Indicateurs qualité (CDC M6.1-15) sur un mois (`?annee=&mois=`) ou une année ; `?export=pdf` = rapport."""
+
+    permission_classes = [CanManageQualite]
+
+    def list(self, request):
+        from rest_framework.fields import IntegerField
+
+        params = request.query_params
+        annee = IntegerField(min_value=2000, max_value=2100).run_validation(params.get("annee") or timezone.localdate().year)
+        mois = params.get("mois")
+        mois = IntegerField(min_value=1, max_value=12).run_validation(mois) if mois not in (None, "") else None
+        data = indicateurs(annee, mois)
+        if params.get("export") == "pdf":
+            from hse.views import _pdf_response
+
+            suffixe = f"{annee}-{mois:02d}" if mois else str(annee)
+            return _pdf_response(rapport_indicateurs_pdf(data), f"rapport-qualite-{suffixe}.pdf")
+        return Response(data)
+
+
+class PersonnelQualiteViewSet(viewsets.ViewSet):
+    """Salariés actifs (code, nom) pour rattacher un soudeur à sa fiche M9, sans ouvrir le module RH."""
+
+    permission_classes = [CanManageQualite]
+
+    def list(self, request):
+        from rh_paie.models import Employe
+
+        rows = [
+            {"id": str(e.pk), "code": e.code, "nom_complet": e.nom_complet}
+            for e in Employe.objects.exclude(statut=Employe.Statut.SORTI).order_by("code")
+        ]
+        return Response(rows)

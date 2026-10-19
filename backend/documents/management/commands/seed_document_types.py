@@ -18,7 +18,7 @@ class Command(BaseCommand):
         ("courriers", "Courriers entrants / sortants", None, False, "circuit_reception"),
         ("comptes_rendus_reunion", "Comptes rendus de réunion", None, False, "circuit_reception"),
         ("documents_techniques_plans", "Documents techniques / plans", 5, False, None),
-        ("documents_qualite_iso", "Documents qualité / ISO", 5, False, None),
+        ("documents_qualite_iso", "Documents qualité / ISO", 10, False, None),
         ("documents_juridiques", "Documents juridiques (actes, statuts, PV)", 10, False, None),
         ("documents_bancaires", "Documents bancaires (relevés, traites)", 10, False, None),
         ("documents_douaniers_transport", "Documents douaniers / transport", 10, False, None),
