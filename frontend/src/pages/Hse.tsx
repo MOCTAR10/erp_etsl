@@ -22,6 +22,7 @@ import type {
 } from "../types";
 import { ConformiteHse } from "../components/hse/ConformiteHse";
 import { PermisActions } from "../components/workflow/PermisActions";
+import { ActionsHseSection, RegistreOshaSection } from "../components/hse/HseEcartsSection";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
 
@@ -187,16 +188,39 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
           {inc.actions_count > 0 ? ` · ${t("hse.actions")} ×${inc.actions_count}` : ""}
         </span>
       </div>
+      {inc.zone && <div className="meta muted">{t(`m7e.zones.${inc.zone}`)}</div>}
+      {inc.ncr_hse.length > 0 && <div className="meta">NCR-HSE : {inc.ncr_hse.join(", ")}</div>}
+      {inc.document_titre && <div className="meta muted">{t("m7e.inc.archive")}</div>}
       <ActionBar
         actions={[
           ...(inc.statut === "declare"
             ? [{ label: t("hse.act.enquete"), path: `/api/hse/incidents/${inc.id}/ouvrir-enquete/`, tone: "ghost" as const }]
             : []),
           ...(inc.statut !== "cloture"
-            ? [{ label: t("actions.cloturer"), path: `/api/hse/incidents/${inc.id}/cloturer/`, prompt: { name: "rapport", label: t("hse.act.rapport") } }]
+            ? [{
+                label: t("m7e.inc.ajouterAction"), path: "/api/hse/actions/", tone: "ghost" as const,
+                body: { incident: inc.id, type: "corrective" }, prompt: { name: "description", label: t("m7e.inc.actionPrompt") },
+              }]
+            : []),
+          ...(inc.statut === "en_enquete"
+            ? [{ label: t("m7e.inc.planAction"), path: `/api/hse/incidents/${inc.id}/plan-action/`, prompt: { name: "cause_profonde", label: t("m7e.inc.causeProfonde") } }]
+            : []),
+          ...(inc.statut !== "cloture"
+            ? [{
+                label: t("actions.cloturer"), path: `/api/hse/incidents/${inc.id}/cloturer/`,
+                prompt: ["quasi_accident", "situation_dangereuse"].includes(inc.type_incident)
+                  ? { name: "retour_experience", label: t("m7e.inc.rex") }
+                  : { name: "rapport", label: t("hse.act.rapport") },
+              }]
+            : []),
+          ...(inc.statut !== "declare"
+            ? [{ label: t("m7e.inc.ncr"), path: `/api/hse/incidents/${inc.id}/ncr-hse/`, tone: "ghost" as const, prompt: { name: "description", label: t("m7e.inc.ncrPrompt") } }]
             : []),
         ]}
       />
+      <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`)}>
+        {t("m7e.inc.pdf")}
+      </button>
     </BoardCard>
   );
 }
@@ -294,6 +318,11 @@ export function HsePage() {
           },
           { name: "date_evenement", label: t("hse.form.date"), type: "datetime-local", required: true },
           { name: "lieu", label: t("hse.col.lieux"), required: true },
+          {
+            name: "zone", label: t("m7e.inc.zone"), type: "select",
+            options: ["atelier", "chantier", "bureau", "site_client", "site_gr"].map((v) => ({ value: v, label: t(`m7e.zones.${v}`) })),
+          },
+          { name: "personnes_impliquees", label: t("m7e.inc.personnes") },
           { name: "description", label: t("hse.form.description"), type: "textarea", required: true },
         ]}
       />
@@ -381,6 +410,8 @@ export function HsePage() {
         </SectionCard>
       )}
       <ConformiteHse />
+      <ActionsHseSection />
+      <RegistreOshaSection />
       {(bsd.count > 0 || bsd.search) && (
         <SectionCard title={`${t("hse.bsd")} · ${bsd.count}`}>
           <PagedDataTable list={bsd} columns={bsdColumns(t)} caption={t("hse.bsd")} searchPlaceholder={t("hse.searchBsd")} />

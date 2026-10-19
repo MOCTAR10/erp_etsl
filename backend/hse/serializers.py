@@ -138,6 +138,8 @@ class IncidentSerializer(serializers.ModelSerializer):
     )
     actions_count = serializers.SerializerMethodField()
     consequence_humaine_label = serializers.CharField(source="get_consequence_humaine_display", read_only=True)
+    document_titre = serializers.CharField(source="document.title", read_only=True, default=None)
+    ncr_hse = serializers.SerializerMethodField()
 
     class Meta:
         model = Incident
@@ -145,15 +147,19 @@ class IncidentSerializer(serializers.ModelSerializer):
             "id", "code", "type_incident", "type_label", "gravite", "gravite_label",
             "date_evenement", "lieu", "description", "personnes_impliquees",
             "cause_immediate", "cause_profonde", "consequences", "consequence_humaine",
-            "consequence_humaine_label", "jours_arret", "rapport",
+            "consequence_humaine_label", "jours_arret", "rapport", "zone", "retour_experience",
             "statut", "statut_label", "archive", "declared_by", "declared_by_name",
-            "enqueteur", "enqueteur_name", "date_ouverture_enquete", "date_rapport",
-            "actions_count", "created_at", "updated_at",
+            "enqueteur", "enqueteur_name", "date_ouverture_enquete", "date_rapport", "plan_action_le",
+            "document", "document_titre", "ncr_hse", "actions_count", "created_at", "updated_at",
         ]
-        read_only_fields = ["declared_by", "code", "actions_count", "date_ouverture_enquete", "statut"]
+        read_only_fields = ["declared_by", "code", "actions_count", "date_ouverture_enquete", "statut", "archive",
+                            "plan_action_le", "document"]
 
     def get_actions_count(self, obj):
         return obj.actions.count()
+
+    def get_ncr_hse(self, obj):
+        return [f"{nc.code} ({nc.get_statut_display()})" for nc in obj.ncr_hse.all()]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
@@ -225,10 +231,10 @@ class BordereauDechetSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "type_dechet", "type_label", "quantite", "unite",
             "unite_label", "transporteur", "transporteur_name", "numero_bsd",
-            "date_enlevement", "destination", "statut", "statut_label", "notes",
+            "date_enlevement", "destination", "statut", "statut_label", "notes", "document",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        read_only_fields = ["code", "document"]
 
 
 class ExigenceHabilitationSerializer(serializers.ModelSerializer):

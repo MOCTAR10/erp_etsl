@@ -7,6 +7,7 @@ et enquêtes incidents = HSE + hiérarchie. Lecture : tous les utilisateurs
 authentifiés. Aucun montant financier → pas de masquage.
 """
 
+from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
 from users.models import User
@@ -110,3 +111,118 @@ def habilitations_manquantes(permis, jour=None):
             if not ok:
                 manquantes.append(f"{emp.nom_complet} : {ex.mot_cle}")
     return manquantes
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M7 (2026-10-19) : rapport d'incident PDF, archivage GED 10 ans, registre OSHA
+# ----------------------------------------------------------------------------------------------------------------
+TYPE_GED_RAPPORT_HSE = "rapports-hse"
+TYPE_GED_BSD = "bsd-dechets"
+RETENTION_HSE_ANS = 10
+
+
+def _pdf(titre, blocs, tableau=None):
+    import io
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    styles = getSampleStyleSheet()
+    esc = lambda t: str(t or "—").replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>")  # noqa: E731
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, title=titre)
+    story = [Paragraph(esc(titre), styles["Title"])]
+    for libelle, valeur in blocs:
+        story.append(Paragraph(f"<b>{esc(libelle)}</b> : {esc(valeur)}", styles["Normal"]))
+    if tableau:
+        story.append(Spacer(1, 4 * mm))
+        table = Table(tableau)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12308f")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.grey), ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(table)
+    doc.build(story)
+    return buf.getvalue()
+
+
+def rapport_incident_pdf(incident):
+    """Rapport d'accident / d'incident (CDC M7-01) : faits, causes, conséquences, enquête, REX, plan d'action."""
+    tz = timezone.get_current_timezone()
+    blocs = [
+        ("Type", incident.get_type_incident_display()), ("Gravité", incident.get_gravite_display()),
+        ("Date", f"{incident.date_evenement.astimezone(tz):%d/%m/%Y %H:%M}"), ("Lieu", incident.lieu),
+        ("Zone", incident.get_zone_display() if incident.zone else "—"), ("Description", incident.description),
+        ("Personnes impliquées", incident.personnes_impliquees), ("Cause immédiate", incident.cause_immediate),
+        ("Cause profonde", incident.cause_profonde), ("Conséquences", incident.consequences),
+        ("Conséquence humaine", incident.get_consequence_humaine_display()), ("Jours d'arrêt", incident.jours_arret),
+        ("Déclaré par", incident.declared_by), ("Enquêteur", incident.enqueteur),
+        ("Escalade DG", f"{incident.escalade_dg_le:%d/%m/%Y}" if incident.escalade_dg_le else "—"),
+        ("Rapport d'enquête", incident.rapport), ("Retour d'expérience", incident.retour_experience),
+        ("Statut", incident.get_statut_display()),
+    ]
+    actions = [["Action", "Type", "Responsable", "Échéance", "Statut"]] + [
+        [a.code, a.get_type_display(), str(a.responsable or "—"), f"{a.echeance:%d/%m/%Y}" if a.echeance else "—",
+         a.get_statut_display()]
+        for a in incident.actions.select_related("responsable")
+    ]
+    return _pdf(f"Rapport d'incident {incident.code}", blocs, actions if len(actions) > 1 else None)
+
+
+def archiver_ged(contenu, nom, titre, type_code, type_label, reference, objet_type, objet_id, user=None, mots=()):
+    """PDF scellé SHA-256 en GED (conservation 10 ans) et lié à l'objet HSE pour la recherche juridique."""
+    import hashlib
+
+    from django.core.files.base import ContentFile
+
+    from documents.models import Document, DocumentType, Version
+    from juridique.models import LienDocument
+
+    type_doc, _ = DocumentType.objects.get_or_create(code=type_code, defaults={"label": type_label, "retention_years": RETENTION_HSE_ANS})
+    if (type_doc.retention_years or 0) < RETENTION_HSE_ANS:
+        type_doc.retention_years = RETENTION_HSE_ANS
+        type_doc.save(update_fields=["retention_years"])
+    sha = hashlib.sha256(contenu).hexdigest()
+    document = Document.objects.create(
+        title=titre[:200], status=Document.Status.ARCHIVED, archived_at=timezone.now(), type=type_doc,
+        document_date=timezone.localdate(), reference=reference[:120], keywords=list(mots), sha256=sha, created_by=user,
+    )
+    version = Version.objects.create(document=document, number=1, file=ContentFile(contenu, name=nom), sha256=sha,
+                                     size=len(contenu), original_filename=nom, created_by=user)
+    document.current_version = version
+    document.save(update_fields=["current_version"])
+    LienDocument.objects.create(document=document, objet_type=objet_type, objet_id=str(objet_id),
+                                objet_label=titre[:255], module="M7", note="Archivage réglementaire HSE", created_by=user)
+    return document
+
+
+def bsd_pdf(bsd):
+    blocs = [
+        ("Type de déchet", bsd.get_type_dechet_display()), ("Quantité", f"{bsd.quantite} {getattr(bsd, 'unite', '')}"),
+        ("Transporteur", getattr(bsd, "transporteur", "")), ("N° BSD", getattr(bsd, "numero_bsd", "")),
+        ("Destination", getattr(bsd, "destination", "")), ("Statut", bsd.get_statut_display()),
+    ]
+    return _pdf(f"Bordereau de suivi des déchets {bsd.code}", blocs)
+
+
+def registre_osha(annee):
+    """Registre des cas enregistrables de l'année (modèle OSHA 300 / reporting OILGUARD) + synthèse (OSHA 300A)."""
+    from .models import Incident
+
+    rows = []
+    for inc in Incident.objects.filter(date_evenement__year=annee).order_by("date_evenement"):
+        if not inc.classification_osha:
+            continue
+        rows.append({
+            "cas": inc.code, "date": timezone.localtime(inc.date_evenement).date(), "lieu": inc.lieu,
+            "zone": inc.get_zone_display() if inc.zone else "", "personnes": inc.personnes_impliquees,
+            "description": inc.description, "classification": inc.classification_osha,
+            "jours_arret": inc.jours_arret, "gravite": inc.gravite,
+        })
+    synthese = {c: sum(1 for r in rows if r["classification"] == c) for c in ("deces", "arret", "restriction", "autre_enregistrable")}
+    synthese["jours_arret"] = sum(r["jours_arret"] for r in rows)
+    synthese["cas_enregistrables"] = len(rows)
+    return {"annee": annee, "rows": rows, "synthese": synthese}

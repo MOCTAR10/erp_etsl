@@ -433,8 +433,16 @@ class NonConformite(models.Model):
     archive = models.BooleanField(default=False, verbose_name="Archivée (10 ans Oil & Gas)")
     # NCR-SD : variante soudage du socle NC ; clôturée uniquement par un re-CND conforme.
     type_ncr = models.CharField(
-        max_length=10, choices=[("generique", "Générique"), ("soudage", "Soudage (NCR-SD)")],
+        max_length=10, choices=[("generique", "Générique"), ("soudage", "Soudage (NCR-SD)"), ("hse", "HSE (NCR-HSE)")],
         default="generique", verbose_name="Type de NC",
+    )
+    incident_hse = models.ForeignKey(
+        "hse.Incident", null=True, blank=True, on_delete=models.PROTECT, related_name="ncr_hse",
+        verbose_name="Événement HSE d'origine (NCR-HSE)",
+    )
+    constat_audit_hse = models.ForeignKey(
+        "hse.ConstatAudit", null=True, blank=True, on_delete=models.PROTECT, related_name="ncr_hse",
+        verbose_name="Écart d'audit HSE d'origine (NCR-HSE)",
     )
     joint = models.ForeignKey(
         "JointSoude", null=True, blank=True, on_delete=models.PROTECT,
@@ -458,7 +466,8 @@ class NonConformite(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            self.code = QualiteSequence.next_for("NC", "NC")
+            # NCR-HSE : numérotation propre, même socle (traitement, CAPA, clôture) que les NC qualité.
+            self.code = QualiteSequence.next_for("NCRHSE", "NCR-HSE-") if self.type_ncr == "hse" else QualiteSequence.next_for("NC", "NC")
         result = super().save(*args, **kwargs)
         self._synchroniser_quarantaine()
         return result
@@ -488,6 +497,8 @@ class NonConformite(models.Model):
             raise ValidationError({"description": "La description de la non-conformité est requise."})
         if self.type_ncr == "soudage" and not self.joint_id:
             raise ValidationError({"joint": "Une NCR-SD (soudage) se rattache à un joint soudé."})
+        if self.type_ncr == "hse" and not (self.incident_hse_id or self.constat_audit_hse_id):
+            raise ValidationError({"incident_hse": "Une NCR-HSE se rattache à un événement HSE ou à un écart d'audit HSE."})
 
 
 class ActionCorrective(models.Model):

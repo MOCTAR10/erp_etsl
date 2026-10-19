@@ -929,6 +929,17 @@ export interface Incident {
   date_ouverture_enquete: string | null;
   date_rapport: string | null;
   actions_count: number;
+  zone: string;
+  retour_experience: string;
+  plan_action_le: string | null;
+  document_titre: string | null;
+  ncr_hse: string[];
+}
+
+export interface RegistreOsha {
+  annee: number;
+  synthese: { cas_enregistrables: number; deces: number; arret: number; restriction: number; autre_enregistrable: number; jours_arret: number };
+  rows: { cas: string; date: string; lieu: string; zone: string; classification: string; jours_arret: number; description: string }[];
 }
 
 export type TypeActionHse = "corrective" | "preventive";

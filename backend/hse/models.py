@@ -411,6 +411,13 @@ class Incident(models.Model):
         verbose_name="Conséquence humaine (TRIR / LTIR)",
     )
     jours_arret = models.PositiveIntegerField(default=0, verbose_name="Jours d'arrêt (jours perdus)")
+    zone = models.CharField(
+        max_length=12, blank=True,
+        choices=[("atelier", "Atelier"), ("chantier", "Chantier"), ("bureau", "Bureaux"), ("site_client", "Site client"),
+                 ("site_gr", "Site GLOBAL RENTAL")],
+        verbose_name="Zone (atelier / chantier…)",
+    )
+    retour_experience = models.TextField(blank=True, verbose_name="Retour d'expérience (REX)")
     rapport = models.TextField(blank=True, verbose_name="Rapport d'enquête")
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.DECLARE, verbose_name="Statut"
@@ -438,6 +445,11 @@ class Incident(models.Model):
         help_text="CDC M7 §9.8 : escalade DG obligatoire pour les accidents graves.",
     )
     date_rapport = models.DateField(null=True, blank=True, verbose_name="Date du rapport")
+    plan_action_le = models.DateTimeField(null=True, blank=True, verbose_name="Plan d'action arrêté le")
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Rapport d'incident archivé (GED)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -462,6 +474,13 @@ class Incident(models.Model):
             raise ValidationError(
                 {"jours_arret": "Des jours d'arrêt supposent une conséquence « arrêt de travail » ou « décès »."}
             )
+
+    @property
+    def classification_osha(self):
+        """Colonne du registre OSHA 300 : décès, arrêt, travail restreint, autre cas enregistrable (sinon None)."""
+        return {
+            "deces": "deces", "arret": "arret", "restriction": "restriction", "soins_medicaux": "autre_enregistrable",
+        }.get(self.consequence_humaine)
 
     @property
     def est_grave(self):
@@ -709,6 +728,10 @@ class BordereauDechet(models.Model):
         max_length=12, choices=Statut.choices, default=Statut.EN_ATTENTE, verbose_name="Statut"
     )
     notes = models.TextField(blank=True, verbose_name="Notes")
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="BSD archivé (GED)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

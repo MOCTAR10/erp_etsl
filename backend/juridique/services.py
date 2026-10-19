@@ -232,6 +232,7 @@ OBJETS_LIEABLES = {
     "qualite.pvcontrole": "M6",
     "hse.permistravail": "M7",
     "hse.incident": "M7",
+    "hse.bordereaudechet": "M7",
     "maintenance.ordretravail": "M8",
     "comptabilite.factureclient": "M10",
     "controle_gestion.budget": "M11",

@@ -169,6 +169,7 @@ class NonConformiteSerializer(serializers.ModelSerializer):
     decided_by_name = serializers.CharField(
         source="decided_by.get_full_name", read_only=True, default=None
     )
+    incident_hse_code = serializers.CharField(source="incident_hse.code", read_only=True, default=None)
     actions_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -178,7 +179,7 @@ class NonConformiteSerializer(serializers.ModelSerializer):
             "gravite", "gravite_label", "description", "traitement", "traitement_label",
             "statut", "statut_label", "decided_by", "decided_by_name",
             "date_decision", "archive", "actions_count", "created_at", "updated_at",
-            "type_ncr", "joint", "recontrole",
+            "type_ncr", "joint", "recontrole", "incident_hse", "incident_hse_code", "constat_audit_hse",
         ]
         read_only_fields = ["decided_by", "code", "actions_count", "statut", "recontrole"]
 
