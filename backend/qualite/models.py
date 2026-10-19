@@ -459,8 +459,23 @@ class NonConformite(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = QualiteSequence.next_for("NC", "NC")
-        return super().save(*args, **kwargs)
+        result = super().save(*args, **kwargs)
+        self._synchroniser_quarantaine()
+        return result
 
+
+    def _synchroniser_quarantaine(self):
+        """M5 ↔ M6 (CDC M5 §7.10) : une NC matière ouverte met le lot contrôlé en quarantaine ; sa clôture la lève
+        s'il ne reste aucune autre NC ouverte sur ce lot (le lot reste alors bloqué pour la CAPA en cours)."""
+        lot = self.controle.lot if self.controle_id and self.controle.lot_id else None
+        if lot is None:
+            return
+        ouvertes = NonConformite.objects.filter(controle__lot=lot).exclude(statut=self.Statut.CLOTUREE)
+        if self.statut != self.Statut.CLOTUREE:
+            if lot.statut != lot.Statut.BLOQUE:
+                lot.mettre_en_quarantaine(f"NC {self.code} : {self.description}", user=self.decided_by, nc=self)
+        elif lot.statut == lot.Statut.BLOQUE and lot.nc_blocage_id and not ouvertes.exists():
+            lot.lever_quarantaine()
     def clean(self):
         if not self.description.strip():
             raise ValidationError({"description": "La description de la non-conformité est requise."})

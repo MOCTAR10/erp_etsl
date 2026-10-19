@@ -12,6 +12,7 @@ from .models import (
     Inventaire,
     InventaireLigne,
     LotMatiere,
+    ParametreStock,
     MouvementStock,
     PlanInventaireTournant,
     StockQuant,
@@ -38,15 +39,18 @@ class LotMatiereSerializer(ModelCleanMixin, serializers.ModelSerializer):
     article_code = serializers.CharField(source="article.code", read_only=True, default=None)
     article_label = serializers.CharField(source="article.label", read_only=True, default=None)
     certificats = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    nc_blocage_code = serializers.CharField(source="nc_blocage.code", read_only=True, default=None)
+    bloque_par_name = serializers.CharField(source="bloque_par.get_full_name", read_only=True, default=None)
 
     class Meta:
         model = LotMatiere
         fields = [
-            "id", "code", "article", "article_code", "article_label", "numero_lot",
+            "id", "code", "article", "article_code", "article_label", "numero_lot", "numero_coulee",
             "date_reception", "date_peremption", "quantite_initiale",
-            "quantite_restante", "statut", "certificats", "created_at", "updated_at",
+            "quantite_restante", "statut", "certificats", "motif_blocage", "bloque_par", "bloque_par_name",
+            "bloque_le", "nc_blocage", "nc_blocage_code", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "statut", "quantite_restante"]
+        read_only_fields = ["code", "statut", "quantite_restante", "motif_blocage", "bloque_par", "bloque_le", "nc_blocage"]
 
 
 class CertificatMatiereSerializer(ModelCleanMixin, serializers.ModelSerializer):
@@ -57,16 +61,19 @@ class CertificatMatiereSerializer(ModelCleanMixin, serializers.ModelSerializer):
     fournisseur_label = serializers.CharField(
         source="fournisseur.name", read_only=True, default=None
     )
+    valide_par_name = serializers.CharField(source="valide_par.get_full_name", read_only=True, default=None)
+    document_titre = serializers.CharField(source="document.title", read_only=True, default=None)
 
     class Meta:
         model = CertificatMatiere
         fields = [
             "id", "code", "lot", "lot_code", "article_code", "type",
             "numero_certificat", "fournisseur", "fournisseur_label", "organisme",
-            "date_emission", "date_validation", "conforme", "notes",
-            "created_at", "updated_at",
+            "date_emission", "date_validation", "valide_par", "valide_par_name", "document", "document_titre",
+            "conforme", "notes", "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        # Validation QA/QC attestée côté serveur (action `valider`), pièce jointe par `joindre`.
+        read_only_fields = ["code", "date_validation", "valide_par", "document"]
 
 
 class StockQuantSerializer(serializers.ModelSerializer):
@@ -112,6 +119,7 @@ class MouvementStockSerializer(serializers.ModelSerializer):
     lot_code = serializers.CharField(source="lot.code", read_only=True, default=None)
     ordre_code = serializers.CharField(source="ordre.code", read_only=True, default=None)
     type_label = serializers.CharField(source="get_type_mouvement_display", read_only=True)
+    document_titre = serializers.CharField(source="document.title", read_only=True, default=None)
     montant_total = serializers.DecimalField(
         max_digits=16, decimal_places=2, read_only=True
     )
@@ -123,11 +131,11 @@ class MouvementStockSerializer(serializers.ModelSerializer):
             "id", "code", "type_mouvement", "type_label", "article", "article_code",
             "article_label", "quantite", "prix_unitaire", "devise", "source",
             "source_code", "destination", "destination_code", "lot", "lot_code",
-            "ordre", "ordre_code", "analytic", "document_reference", "date", "executed",
+            "ordre", "ordre_code", "analytic", "document_reference", "document", "document_titre", "date", "executed",
             "montant_total", "has_amount_access", "created_by", "notes",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["created_by", "code", "executed", "montant_total"]
+        read_only_fields = ["created_by", "code", "executed", "montant_total", "document"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context.get("request").user)
@@ -206,7 +214,7 @@ class ArticleStockSerializer(serializers.ModelSerializer):
         model = ArticleStock
         fields = [
             "id", "article", "article_code", "article_label", "methode",
-            "prix_standard", "seuil_minimal", "gestion_lots", "is_active",
+            "prix_standard", "seuil_minimal", "gestion_lots", "certificat_requis", "lot_obligatoire", "is_active",
             "created_at", "updated_at",
         ]
 
@@ -229,7 +237,7 @@ class TraceabiliteEntrySerializer(serializers.Serializer):
     type_label = serializers.CharField()
     article = serializers.CharField()
     quantite = serializers.FloatField()
-    prix_unitaire = serializers.FloatField()
+    prix_unitaire = serializers.FloatField(allow_null=True)
     source = serializers.CharField(allow_null=True)
     destination = serializers.CharField(allow_null=True)
     lot = serializers.CharField(allow_null=True)
@@ -269,3 +277,25 @@ class ValorisationMensuelleSerializer(serializers.ModelSerializer):
             "id", "periode", "depot", "depot_code", "quantite", "valeur_stock",
             "consommation", "ventilation", "has_amount_access", "created_at",
         ]
+
+
+class ParametreStockSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ParametreStock
+        fields = ["id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le"]
+        read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
+
+    def validate_valeur(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("La valeur doit être strictement positive.")
+        return value
+
+    def update(self, instance, validated_data):
+        # Une valeur modifiée redevient provisoire jusqu'à nouvelle confirmation.
+        if "valeur" in validated_data and validated_data["valeur"] != instance.valeur:
+            instance.statut_valeur = ParametreStock.StatutValeur.PROVISOIRE
+            instance.confirme_par = None
+            instance.confirme_le = None
+        return super().update(instance, validated_data)

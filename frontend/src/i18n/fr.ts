@@ -1250,6 +1250,37 @@ export const fr = {
     warnProvisoire: "{{count}} paramètre(s) du cube provisoire(s) (durée de conservation) à faire confirmer par ETSL.",
     confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
   },
+  m5e: {
+    oui: "Oui", non: "Non",
+    alertes: {
+      title: "Alertes stock (M5)", hint: "Seuil minimal, péremption à {{jours}} jours, lots d'un fournisseur non agréé qualité / HSE. Notifiées chaque jour à la logistique et à la direction des opérations.",
+      aucune: "Aucune alerte stock.", stock_mini: "Sous le seuil", peremption: "Péremption", fournisseur_non_agree: "Fournisseur non agréé",
+    },
+    params: {
+      title: "Paramètres stocks (M5)", warn: "{{count}} paramètre(s) stocks provisoire(s) à faire confirmer par ETSL.",
+      provisoire: "Provisoire", confirme: "Confirmé", modifier: "Modifier", valider: "Valider", annuler: "Annuler",
+      confirmer: "Confirmer", confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
+    },
+    config: {
+      title: "Paramétrage des articles (seuils, lots, certificats)", nouveau: "Paramétrer un article", seuil: "Seuil minimal",
+      lotObligatoire: "Lot obligatoire", certificatRequis: "Certificat MTC / CoC exigé", modifierSeuil: "Modifier le seuil",
+      nouveauSeuil: "Nouveau seuil minimal ?", exigerLot: "Exiger le lot", lotFacultatif: "Lot facultatif",
+    },
+    trace: {
+      title: "Traçabilité d'un lot (amont / aval)", lot: "Lot", choisir: "Choisir un lot…", aucun: "Aucun mouvement pour ce lot.",
+    },
+    lot: {
+      nouveau: "Nouveau lot de matière", numero: "N° lot fournisseur", coulee: "Coulée", reception: "Date de réception",
+      peremption: "Date de péremption", quantite: "Quantité initiale", bloquer: "Mettre en quarantaine", motif: "Motif de la quarantaine",
+      lever: "Lever la quarantaine", confirmLever: "Lever la quarantaine de ce lot ?", quarantaine: "Quarantaine",
+    },
+    cert: {
+      nouveau: "Nouveau certificat MTC / CoC", emission: "Date d'émission", validation: "Validation QA/QC", aValider: "À valider",
+      valider: "Valider", resultat: "Résultat de la validation…", joindre: "Joindre le scan", ged: "Scan archivé en GED",
+    },
+    depot: { nouveau: "Nouveau dépôt", label: "Désignation du dépôt", site: "Site / localisation" },
+    mvt: { ordre: "Ordre de fabrication (sortie vers production)", bonSortie: "Bon de sortie" },
+  },
   m8e: {
     plans: {
       title: "Plans préventifs et calendrier (M8.2)",

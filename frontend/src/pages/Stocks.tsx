@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { AlertesStockSection, CertificatActions, ConfigArticlesSection, ParametresStockSection, TracabiliteSection, lotActions } from "../components/workflow/StocksEcartsSection";
 import type {
   CertificatMatiere,
   Depot,
@@ -14,6 +15,7 @@ import type {
   LotMatiere,
   LotStatut,
   MouvementStock,
+  OrdreFabrication,
   Paginated,
   PlanInventaireTournant,
   StockQuant,
@@ -51,8 +53,13 @@ function LotCard({ lot, index }: { lot: LotMatiere; index: number }) {
       </div>
       <div className="meta muted">
         {t("stocks.lot")} {lot.numero_lot} · {formatDate(lot.date_reception)}
+        {lot.numero_coulee ? ` · ${t("m5e.lot.coulee")} ${lot.numero_coulee}` : ""}
         {lot.certificats.length > 0 ? ` · ${t("stocks.mtc")}` : ""}
       </div>
+      {lot.statut === "bloque" && lot.motif_blocage && (
+        <div className="meta" role="note">{t("m5e.lot.quarantaine")} : {lot.motif_blocage}{lot.nc_blocage_code ? ` (${lot.nc_blocage_code})` : ""}</div>
+      )}
+      <ActionBar actions={lotActions(lot, t)} />
     </BoardCard>
   );
 }
@@ -93,6 +100,12 @@ export function StocksPage() {
     },
   });
 
+  const ordres = useQuery({
+    queryKey: ["stocks-ordres"],
+    queryFn: () => api.listAll<OrdreFabrication>("/api/operations/ordres/"),
+    select: (rows: OrdreFabrication[]) => rows.filter((o) => !["cloture", "annule"].includes(o.status)),
+    retry: 0,
+  });
   const articles = useQuery({
     queryKey: ["articles-stock"],
     queryFn: () => api.listAll<{ id: string; code: string; label: string }>("/api/referentiels/articles/"),
@@ -189,6 +202,12 @@ export function StocksPage() {
             label: t("stocks.form.destination"),
             type: "select",
             options: (depots.data ?? []).map((d) => ({ value: d.id, label: `${d.code} · ${d.label}` })),
+          },
+          {
+            name: "ordre",
+            label: t("m5e.mvt.ordre"),
+            type: "select",
+            options: (ordres.data ?? []).map((o) => ({ value: o.id, label: `${o.code} · ${o.label}` })),
           },
           {
             name: "lot",
@@ -316,6 +335,7 @@ export function StocksPage() {
                   <th className="num">{t("stocks.col.qty")}</th>
                   <th>{t("stocks.col.flow")}</th>
                   <th>{t("stocks.col.date")}</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -330,6 +350,14 @@ export function StocksPage() {
                       {mvt.ordre_code ? ` · ${mvt.ordre_code}` : ""}
                     </td>
                     <td>{formatDate(mvt.date, i18n.language)}</td>
+                    <td>
+                      {(mvt.type_mouvement === "consommation" || mvt.type_mouvement === "transfert") && (
+                        <button type="button" className="btn ghost" onClick={() => void api.download(`/api/stocks/mouvements/${mvt.id}/bon-de-sortie/`, `BS-${mvt.code}.pdf`)}>
+                          {t("m5e.mvt.bonSortie")}
+                        </button>
+                      )}
+                      {mvt.document_titre && <span className="muted"> · {mvt.document_titre}</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -345,6 +373,48 @@ export function StocksPage() {
         </SectionCard>
       )}
 
+      <QuickForm
+        title={t("m5e.lot.nouveau")}
+        endpoint="/api/stocks/lots/"
+        fields={[
+          {
+            name: "article", label: t("stocks.col.article"), type: "select", required: true,
+            options: (articles.data ?? []).map((a) => ({ value: a.id, label: `${a.code} · ${a.label}` })),
+          },
+          { name: "numero_lot", label: t("m5e.lot.numero"), required: true },
+          { name: "numero_coulee", label: t("m5e.lot.coulee") },
+          { name: "date_reception", label: t("m5e.lot.reception"), type: "date", required: true },
+          { name: "date_peremption", label: t("m5e.lot.peremption"), type: "date" },
+          { name: "quantite_initiale", label: t("m5e.lot.quantite"), type: "number", required: true, min: 0, step: "0.001" },
+        ]}
+      />
+      <QuickForm
+        title={t("m5e.cert.nouveau")}
+        endpoint="/api/stocks/certificats/"
+        fields={[
+          {
+            name: "lot", label: t("stocks.col.lot"), type: "select", required: true,
+            options: Object.values(groups).flat().map((l) => ({ value: l.id, label: `${l.code} · ${l.numero_lot}` })),
+          },
+          { name: "type", label: t("stocks.col.type"), type: "select", required: true, defaultValue: "mtc", options: [{ value: "mtc", label: t("stocks.mtc") }, { value: "coc", label: t("stocks.coc") }] },
+          { name: "numero_certificat", label: t("stocks.col.certNo"), required: true },
+          { name: "organisme", label: t("stocks.col.organisme") },
+          { name: "date_emission", label: t("m5e.cert.emission"), type: "date" },
+        ]}
+      />
+      <QuickForm
+        title={t("m5e.depot.nouveau")}
+        endpoint="/api/stocks/depots/"
+        fields={[
+          { name: "label", label: t("m5e.depot.label"), required: true },
+          { name: "site", label: t("m5e.depot.site") },
+        ]}
+      />
+      <AlertesStockSection />
+      <TracabiliteSection lots={Object.values(groups).flat()} />
+      <ConfigArticlesSection articles={articles.data ?? []} />
+      <ParametresStockSection />
+
       {certificats.count > 0 && (
         <SectionCard title={t("stocks.certificats")}>
           <div className="table-wrap">
@@ -357,6 +427,8 @@ export function StocksPage() {
                   <th>{t("stocks.col.lot")}</th>
                   <th>{t("stocks.col.organisme")}</th>
                   <th>{t("stocks.col.status")}</th>
+                  <th>{t("m5e.cert.validation")}</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -372,6 +444,13 @@ export function StocksPage() {
                         {cert.conforme ? t("stocks.certConforme") : t("stocks.certNonConforme")}
                       </Badge>
                     </td>
+                    <td>
+                      {cert.date_validation
+                        ? `${formatDate(cert.date_validation)}${cert.valide_par_name ? ` · ${cert.valide_par_name}` : ""}`
+                        : <Badge tone="warn">{t("m5e.cert.aValider")}</Badge>}
+                      {cert.document_titre && <div className="muted">{t("m5e.cert.ged")}</div>}
+                    </td>
+                    <td><CertificatActions cert={cert} /></td>
                   </tr>
                 ))}
               </tbody>
