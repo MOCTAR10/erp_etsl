@@ -1055,3 +1055,139 @@ class ParametreHse(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class ConsommationEnvironnement(models.Model):
+    """Relevé mensuel d'une consommation (ISO 14001, CDC M7-06) ; les émissions se calculent par facteur paramétré."""
+
+    class Ressource(models.TextChoices):
+        ELECTRICITE = "electricite", "Électricité"
+        GAZOLE = "gazole", "Gazole"
+        ESSENCE = "essence", "Essence"
+        GAZ = "gaz", "Gaz (GPL)"
+        EAU = "eau", "Eau"
+
+    UNITES = {"electricite": "kWh", "gazole": "L", "essence": "L", "gaz": "kg", "eau": "m³"}
+    #: Ressource → paramètre HSE portant son facteur d'émission (kg CO2e par unité) ; l'eau n'en a pas.
+    FACTEURS = {"electricite": "FE_ELECTRICITE", "gazole": "FE_GAZOLE", "essence": "FE_ESSENCE", "gaz": "FE_GAZ"}
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ressource = models.CharField(max_length=12, choices=Ressource.choices, verbose_name="Ressource")
+    periode = models.DateField(verbose_name="Mois (1er jour)")
+    site = models.CharField(max_length=120, default="Siège / atelier", verbose_name="Site")
+    quantite = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Quantité")
+    source = models.CharField(max_length=200, blank=True, verbose_name="Source (facture, compteur…)")
+    saisi_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-periode", "ressource"]
+        verbose_name = "Consommation environnementale"
+        verbose_name_plural = "Consommations environnementales"
+        constraints = [models.UniqueConstraint(fields=["ressource", "periode", "site"], name="hse_conso_unique_mois_site")]
+
+    def __str__(self):
+        return f"{self.get_ressource_display()} {self.periode:%m/%Y} : {self.quantite} {self.unite}"
+
+    @property
+    def unite(self):
+        return self.UNITES.get(self.ressource, "")
+
+    def clean(self):
+        if self.quantite is not None and self.quantite < 0:
+            raise ValidationError({"quantite": "La quantité ne peut pas être négative."})
+        if self.periode and self.periode > timezone.localdate():
+            raise ValidationError({"periode": "Le mois relevé ne peut pas être futur."})
+
+    def save(self, *args, **kwargs):
+        if self.periode:
+            self.periode = self.periode.replace(day=1)
+        if not self.code:
+            self.code = HseSequence.next_for("ENV", "ENV")
+        return super().save(*args, **kwargs)
+
+
+class PlanReductionImpact(models.Model):
+    """Plan de réduction d'impact environnemental (ISO 14001, CDC M7-06) : cible mesurée sur les consommations."""
+
+    class Statut(models.TextChoices):
+        EN_COURS = "en_cours", "En cours"
+        ATTEINT = "atteint", "Objectif atteint"
+        ABANDONNE = "abandonne", "Abandonné"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    objectif = models.CharField(max_length=200, verbose_name="Objectif")
+    ressource = models.CharField(
+        max_length=12, blank=True, choices=ConsommationEnvironnement.Ressource.choices,
+        verbose_name="Consommation suivie (vide = objectif qualitatif)",
+    )
+    annee_reference = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Année de référence")
+    annee_cible = models.PositiveSmallIntegerField(verbose_name="Année cible")
+    reduction_cible_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Réduction visée (%)"
+    )
+    actions = models.TextField(blank=True, verbose_name="Actions prévues")
+    responsable = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.EN_COURS, verbose_name="Statut")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["annee_cible", "code"]
+        verbose_name = "Plan de réduction d'impact"
+        verbose_name_plural = "Plans de réduction d'impact"
+
+    def __str__(self):
+        return f"{self.code} — {self.objectif}"
+
+    def clean(self):
+        if self.ressource and (self.annee_reference is None or self.reduction_cible_pct is None):
+            raise ValidationError({"reduction_cible_pct": "Un objectif chiffré exige l'année de référence et la réduction visée."})
+        if self.annee_reference and self.annee_cible and self.annee_cible <= self.annee_reference:
+            raise ValidationError({"annee_cible": "L'année cible doit suivre l'année de référence."})
+        if self.reduction_cible_pct is not None and not (0 < self.reduction_cible_pct <= 100):
+            raise ValidationError({"reduction_cible_pct": "La réduction visée est comprise entre 0 et 100 %."})
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("PRI", "PRI")
+        return super().save(*args, **kwargs)
+
+
+class RevueDirectionHse(models.Model):
+    """Revue de direction HSE annuelle (ISO 45001 / 14001 §9.3) : bilan figé à la création, scellée et archivée en GED."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        VALIDEE = "validee", "Validée (scellée)"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    annee = models.PositiveSmallIntegerField(unique=True, verbose_name="Année revue")
+    date_revue = models.DateField(default=timezone.localdate, verbose_name="Date de la revue")
+    participants = models.TextField(blank=True, verbose_name="Participants")
+    conclusions = models.TextField(blank=True, verbose_name="Conclusions (efficacité du système HSE)")
+    decisions = models.TextField(blank=True, verbose_name="Décisions et objectifs de l'année suivante")
+    bilan = models.JSONField(default=dict, blank=True, verbose_name="Bilan annuel (données d'entrée)")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    validee_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    validee_le = models.DateTimeField(null=True, blank=True)
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Compte rendu archivé (GED)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-annee"]
+        verbose_name = "Revue de direction HSE"
+        verbose_name_plural = "Revues de direction HSE"
+
+    def __str__(self):
+        return f"{self.code} — revue {self.annee}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("RDD", "RDD")
+        return super().save(*args, **kwargs)

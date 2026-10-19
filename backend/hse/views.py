@@ -15,6 +15,9 @@ from rh_paie.models import Employe
 from users.models import User
 
 from .models import (
+    ConsommationEnvironnement,
+    PlanReductionImpact,
+    RevueDirectionHse,
     AptitudeMedicale,
     ParametreHse,
     ActionHse,
@@ -33,6 +36,9 @@ from .models import (
     PlanUrgence,
 )
 from .serializers import (
+    ConsommationEnvironnementSerializer,
+    PlanReductionImpactSerializer,
+    RevueDirectionHseSerializer,
     AptitudeMedicaleSerializer,
     ParametreHseSerializer,
     PersonnelHseSerializer,
@@ -313,7 +319,11 @@ class IncidentViewSet(viewsets.ModelViewSet):
         heures = positive_decimal(heures, "heures") if heures not in (None, "") else None
         if fin < debut:
             raise serializers.ValidationError({"fin": "La fin doit suivre le début."})
-        return Response(indicateurs_frequence(debut, fin, heures))
+        from .services import indicateurs_hse
+
+        donnees = indicateurs_frequence(debut, fin, heures)
+        donnees.update(indicateurs_hse(debut, fin, donnees["heures"]))
+        return Response(donnees)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -929,3 +939,131 @@ class ParametreHseViewSet(viewsets.ModelViewSet):
         p.confirme_le = timezone.now()
         p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
         return Response(self.get_serializer(p).data)
+
+
+def _annee(request):
+    from rest_framework.fields import IntegerField
+
+    brut = request.query_params.get("annee")
+    if brut in (None, ""):
+        return timezone.localdate().year
+    return IntegerField(min_value=2000, max_value=2100).run_validation(brut)
+
+
+def _pdf_response(contenu, nom):
+    from django.http import HttpResponse
+
+    reponse = HttpResponse(contenu, content_type="application/pdf")
+    reponse["Content-Disposition"] = f'inline; filename="{nom}"'
+    return reponse
+
+
+class ConsommationEnvironnementViewSet(viewsets.ModelViewSet):
+    """Consommations mensuelles (énergie, carburants, eau) et émissions calculées — ISO 14001 (CDC M7-06)."""
+
+    queryset = ConsommationEnvironnement.objects.all()
+    serializer_class = ConsommationEnvironnementSerializer
+    permission_classes = [CanManageHse]
+    search_fields = ("code", "site")
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if ressource := self.request.query_params.get("ressource"):
+            qs = qs.filter(ressource=ressource)
+        if self.request.query_params.get("annee"):
+            qs = qs.filter(periode__year=_annee(self.request))
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(saisi_par=self.request.user)
+
+    @action(detail=False, methods=["get"], url_path="rapport")
+    def rapport(self, request):
+        """Rapport environnemental de l'année (`?annee=`) : consommations, émissions, déchets, plans ; `&export=pdf`."""
+        from .services import bilan_annuel, bilan_pdf
+
+        annee = _annee(request)
+        bilan = bilan_annuel(annee)
+        donnees = {k: bilan[k] for k in ("annee", "environnement", "dechets", "plans_reduction")}
+        donnees["incidents_environnement"] = bilan["indicateurs"]["incidents_environnement"]
+        if request.query_params.get("export") == "pdf":
+            return _pdf_response(bilan_pdf(bilan, f"Rapport environnemental {annee}"), f"rapport-environnemental-{annee}.pdf")
+        return Response(donnees)
+
+
+class PlanReductionImpactViewSet(viewsets.ModelViewSet):
+    queryset = PlanReductionImpact.objects.all()
+    serializer_class = PlanReductionImpactSerializer
+    permission_classes = [CanManageHse]
+    search_fields = ("code", "objectif")
+
+
+class RevueDirectionHseViewSet(viewsets.ModelViewSet):
+    """Bilan annuel HSE et revue de direction (CDC §9.8) : validée par la hiérarchie, scellée et archivée 10 ans."""
+
+    queryset = RevueDirectionHse.objects.select_related("validee_par").all()
+    serializer_class = RevueDirectionHseSerializer
+    permission_classes = [CanManageHse]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def perform_create(self, serializer):
+        from .services import bilan_annuel
+
+        serializer.save(bilan=bilan_annuel(serializer.validated_data["annee"]))
+
+    def perform_update(self, serializer):
+        if serializer.instance.statut == RevueDirectionHse.Statut.VALIDEE:
+            raise serializers.ValidationError({"detail": "Revue validée : scellée, non modifiable."})
+        serializer.save()
+
+    @action(detail=False, methods=["get"], url_path="bilan")
+    def bilan(self, request):
+        """Bilan HSE annuel calculé à la volée (`?annee=`), `&export=pdf`."""
+        from .services import bilan_annuel, bilan_pdf
+
+        annee = _annee(request)
+        bilan = bilan_annuel(annee)
+        if request.query_params.get("export") == "pdf":
+            return _pdf_response(bilan_pdf(bilan, f"Bilan HSE annuel {annee}"), f"bilan-hse-{annee}.pdf")
+        return Response(bilan)
+
+    @action(detail=True, methods=["post"], url_path="actualiser")
+    def actualiser(self, request, pk=None):
+        from .services import bilan_annuel
+
+        revue = self.get_object()
+        if revue.statut == RevueDirectionHse.Statut.VALIDEE:
+            return Response({"detail": "Revue validée : bilan figé."}, status=status.HTTP_400_BAD_REQUEST)
+        revue.bilan = bilan_annuel(revue.annee)
+        revue.save(update_fields=["bilan"])
+        return Response(self.get_serializer(revue).data)
+
+    @action(detail=True, methods=["post"], url_path="valider")
+    @transaction.atomic
+    def valider(self, request, pk=None):
+        from .services import TYPE_GED_RAPPORT_HSE, archiver_ged, bilan_pdf
+
+        revue = RevueDirectionHse.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if not can_validate_hse(request.user):
+            return Response({"detail": "Réservé au HSE et à la hiérarchie."}, status=status.HTTP_403_FORBIDDEN)
+        if revue.statut == RevueDirectionHse.Statut.VALIDEE:
+            return Response({"detail": "Revue déjà validée."}, status=status.HTTP_400_BAD_REQUEST)
+        manquants = [c for c in ("participants", "conclusions", "decisions") if not getattr(revue, c).strip()]
+        if manquants:
+            return Response({c: "Obligatoire pour valider la revue." for c in manquants}, status=status.HTTP_400_BAD_REQUEST)
+        revue.statut = RevueDirectionHse.Statut.VALIDEE
+        revue.validee_par, revue.validee_le = request.user, timezone.now()
+        titre = f"Revue de direction HSE {revue.annee}"
+        revue.document = archiver_ged(
+            bilan_pdf(revue.bilan, titre, revue), f"{revue.code}.pdf", titre, TYPE_GED_RAPPORT_HSE, "Rapports HSE",
+            revue.code, "hse.revuedirectionhse", revue.pk, user=request.user, mots=("revue de direction", "bilan HSE"),
+        )
+        revue.save(update_fields=["statut", "validee_par", "validee_le", "document"])
+        return Response(self.get_serializer(revue).data)
+
+    @action(detail=True, methods=["get"], url_path="pdf")
+    def pdf(self, request, pk=None):
+        from .services import bilan_pdf
+
+        revue = self.get_object()
+        return _pdf_response(bilan_pdf(revue.bilan, f"Revue de direction HSE {revue.annee}", revue), f"{revue.code}.pdf")
