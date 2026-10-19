@@ -407,6 +407,10 @@ export interface LotMatiere {
   quantite_restante: string;
   statut: LotStatut;
   certificats: string[];
+  numero_coulee: string;
+  motif_blocage: string;
+  bloque_par_name: string | null;
+  nc_blocage_code: string | null;
 }
 
 export interface CertificatMatiere {
@@ -420,7 +424,46 @@ export interface CertificatMatiere {
   organisme: string;
   date_emission: string | null;
   date_validation: string | null;
+  valide_par_name: string | null;
+  document: string | null;
+  document_titre: string | null;
   conforme: boolean;
+}
+
+export interface AlertesStock {
+  peremption_jours: number;
+  provisoire: boolean;
+  rows: { type: "stock_mini" | "peremption" | "fournisseur_non_agree"; article: string; libelle: string; lot: string | null; detail: string }[];
+}
+
+export interface ParametreStock {
+  id: string;
+  code: string;
+  label: string;
+  valeur: string;
+  unite: string;
+  est_provisoire: boolean;
+}
+
+export interface ArticleStockConfig {
+  id: string;
+  article: string;
+  article_code: string | null;
+  article_label: string | null;
+  seuil_minimal: string;
+  lot_obligatoire: boolean;
+  certificat_requis: boolean;
+}
+
+export interface TraceabiliteEntry {
+  code: string;
+  date: string;
+  type_label: string;
+  quantite: number;
+  source: string | null;
+  destination: string | null;
+  ordre: string | null;
+  reference: string;
 }
 
 export interface StockQuant {
@@ -457,6 +500,8 @@ export interface MouvementStock {
   ordre: string | null;
   ordre_code: string | null;
   document_reference: string;
+  document: string | null;
+  document_titre: string | null;
   date: string;
   executed: boolean;
   montant_total: string | null;

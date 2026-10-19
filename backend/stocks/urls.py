@@ -8,6 +8,7 @@ from .views import (
     InventaireViewSet,
     LotMatiereViewSet,
     MouvementStockViewSet,
+    ParametreStockViewSet,
     PlanInventaireTournantViewSet,
     StockQuantViewSet,
     ValorisationMensuelleViewSet,
@@ -24,5 +25,6 @@ router.register("inventaires", InventaireViewSet, basename="stocks-inventaires")
 router.register("inventaire-lignes", InventaireLigneViewSet, basename="stocks-inventaire-lignes")
 router.register("plans-inventaire", PlanInventaireTournantViewSet, basename="stocks-plans-inventaire")
 router.register("valorisations", ValorisationMensuelleViewSet, basename="stocks-valorisations")
+router.register("parametres", ParametreStockViewSet, basename="stocks-parametres")
 
 urlpatterns = router.urls

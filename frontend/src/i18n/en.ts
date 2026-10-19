@@ -1250,6 +1250,37 @@ export const en = {
     warnProvisoire: "{{count}} provisional cube parameter(s) (retention period) to be confirmed by ETSL.",
     confirmConfirmer: "Confirm this value (validated by ETSL)?",
   },
+  m5e: {
+    oui: "Yes", non: "No",
+    alertes: {
+      title: "Stock alerts (M5)", hint: "Minimum level, expiry within {{jours}} days, lots from a supplier without quality / HSE approval. Notified daily to logistics and operations management.",
+      aucune: "No stock alert.", stock_mini: "Below minimum", peremption: "Expiry", fournisseur_non_agree: "Unapproved supplier",
+    },
+    params: {
+      title: "Stock settings (M5)", warn: "{{count}} provisional stock setting(s) to be confirmed by ETSL.",
+      provisoire: "Provisional", confirme: "Confirmed", modifier: "Edit", valider: "Save", annuler: "Cancel",
+      confirmer: "Confirm", confirmConfirmer: "Confirm this value (validated by ETSL)?",
+    },
+    config: {
+      title: "Item settings (minimums, lots, certificates)", nouveau: "Configure an item", seuil: "Minimum level",
+      lotObligatoire: "Lot required", certificatRequis: "MTC / CoC required", modifierSeuil: "Edit minimum",
+      nouveauSeuil: "New minimum level?", exigerLot: "Require lot", lotFacultatif: "Lot optional",
+    },
+    trace: {
+      title: "Lot traceability (upstream / downstream)", lot: "Lot", choisir: "Choose a lot…", aucun: "No movement for this lot.",
+    },
+    lot: {
+      nouveau: "New material lot", numero: "Supplier lot no.", coulee: "Heat", reception: "Receipt date",
+      peremption: "Expiry date", quantite: "Initial quantity", bloquer: "Quarantine", motif: "Quarantine reason",
+      lever: "Release quarantine", confirmLever: "Release this lot from quarantine?", quarantaine: "Quarantine",
+    },
+    cert: {
+      nouveau: "New MTC / CoC certificate", emission: "Issue date", validation: "QA/QC validation", aValider: "To validate",
+      valider: "Validate", resultat: "Validation result…", joindre: "Attach scan", ged: "Scan archived in the DMS",
+    },
+    depot: { nouveau: "New warehouse", label: "Warehouse name", site: "Site / location" },
+    mvt: { ordre: "Work order (issue to production)", bonSortie: "Issue slip" },
+  },
   m8e: {
     plans: {
       title: "Preventive plans and calendar (M8.2)",

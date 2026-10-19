@@ -124,6 +124,12 @@ export const api = {
     raw<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T,>(path: string, body: unknown) => raw<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   remove: (path: string) => raw<void>(path, { method: "DELETE" }),
+  /** Envoi d'une pièce (multipart, champ `fichier`) : certificat numérisé, BL, bon de sortie signé… */
+  upload: <T,>(path: string, fichier: File, champ = "fichier") => {
+    const body = new FormData();
+    body.append(champ, fichier);
+    return raw<T>(path, { method: "POST", body });
+  },
   /** Toutes les pages d'une liste (listes de choix des formulaires) : suit `next` jusqu'à `maxPages`. */
   listAll: <T,>(path: string, opts?: ListAllOptions) =>
     listAll<T>((p) => raw<import("../types").Paginated<T>>(p), path, opts),

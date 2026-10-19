@@ -13,6 +13,7 @@ import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.utils import timezone
 
 
 class StocksSequence(models.Model):
@@ -108,6 +109,10 @@ class ArticleStock(models.Model):
         default=False, verbose_name="Certificat MTC / CoC exigé",
         help_text="Traçabilité client pétrolier (CDC M5 §7.8) : aucune sortie d'un lot sans certificat validé et conforme.",
     )
+    lot_obligatoire = models.BooleanField(
+        default=False, verbose_name="Lot obligatoire sur tout mouvement",
+        help_text="Traçabilité client pétrolier sur toute la chaîne matière (CDC M5 §7.8 / §7.11).",
+    )
     is_active = models.BooleanField(default=True, verbose_name="Actif")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -139,6 +144,7 @@ class LotMatiere(models.Model):
         verbose_name="Article",
     )
     numero_lot = models.CharField(max_length=80, verbose_name="N° lot fournisseur")
+    numero_coulee = models.CharField(max_length=80, blank=True, verbose_name="N° de coulée")
     date_reception = models.DateField(verbose_name="Date de réception")
     date_peremption = models.DateField(null=True, blank=True, verbose_name="Date de péremption")
     quantite_initiale = models.DecimalField(
@@ -149,6 +155,16 @@ class LotMatiere(models.Model):
     )
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.DISPONIBLE, verbose_name="Statut"
+    )
+    motif_blocage = models.CharField(max_length=255, blank=True, verbose_name="Motif de quarantaine")
+    bloque_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Mis en quarantaine par",
+    )
+    bloque_le = models.DateTimeField(null=True, blank=True, verbose_name="Mis en quarantaine le")
+    nc_blocage = models.ForeignKey(
+        "qualite.NonConformite", null=True, blank=True, on_delete=models.SET_NULL, related_name="lots_bloques",
+        verbose_name="NC à l'origine de la quarantaine",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -175,10 +191,29 @@ class LotMatiere(models.Model):
             self.statut = self.Statut.DISPONIBLE
 
     def refresh_statut(self):
+        if self.statut == self.Statut.BLOQUE:
+            return  # la quarantaine ne se lève que par `lever_quarantaine`
         if float(self.quantite_restante) <= 0:
             self.statut = self.Statut.EPUISE
         elif self.statut == self.Statut.DISPONIBLE and float(self.quantite_restante) < float(self.quantite_initiale):
             self.statut = self.Statut.PARTIEL
+
+    def mettre_en_quarantaine(self, motif, user=None, nc=None):
+        self.statut = self.Statut.BLOQUE
+        self.motif_blocage = motif[:255]
+        self.bloque_par = user
+        self.bloque_le = timezone.now()
+        self.nc_blocage = nc
+        self.save(update_fields=["statut", "motif_blocage", "bloque_par", "bloque_le", "nc_blocage", "updated_at"])
+
+    def lever_quarantaine(self):
+        self.statut = self.Statut.DISPONIBLE
+        self.motif_blocage = ""
+        self.nc_blocage = None
+        self.refresh_statut()
+        if self.statut == self.Statut.DISPONIBLE and float(self.quantite_restante) < float(self.quantite_initiale):
+            self.statut = self.Statut.PARTIEL
+        self.save(update_fields=["statut", "motif_blocage", "nc_blocage", "updated_at"])
 
 
 class CertificatMatiere(models.Model):
@@ -211,6 +246,14 @@ class CertificatMatiere(models.Model):
     organisme = models.CharField(max_length=120, blank=True, verbose_name="Organisme / labo")
     date_emission = models.DateField(null=True, blank=True, verbose_name="Date d'émission")
     date_validation = models.DateField(null=True, blank=True, verbose_name="Date de validation QA-QC")
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Validé par (QA/QC)",
+    )
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Certificat numérisé (GED)",
+    )
     conforme = models.BooleanField(default=True, verbose_name="Conforme")
     notes = models.TextField(blank=True, verbose_name="Notes / observations")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -367,6 +410,10 @@ class MouvementStock(models.Model):
     )
     cout_unitaire = models.DecimalField(
         max_digits=16, decimal_places=4, default=0, editable=False, verbose_name="Coût unitaire appliqué (CUMP)"
+    )
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Pièce jointe (BL, bon de sortie) en GED",
     )
     document_reference = models.CharField(
         max_length=60, blank=True, verbose_name="Réf. document (BC / BL / INV)"
@@ -609,3 +656,37 @@ class ValorisationMensuelle(models.Model):
 
     def __str__(self):
         return f"{self.periode} — {self.depot.code}"
+
+
+class ParametreStock(models.Model):
+    """Paramètres M5 modifiables par ETSL (délais d'alerte) : défauts provisoires tant qu'ETSL ne les confirme pas."""
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut de la valeur"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre stocks"
+        verbose_name_plural = "Paramètres stocks"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
