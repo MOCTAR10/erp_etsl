@@ -56,6 +56,11 @@ class Soudeur(models.Model):
         max_length=120, blank=True, verbose_name="Qualification principale"
     )
     is_active = models.BooleanField(default=True, verbose_name="Actif")
+    # Lien M9 : le soudeur est un salarié (dossier RH, contrats, pointages) ; vide pour un intérimaire.
+    employe = models.ForeignKey(
+        "rh_paie.Employe", null=True, blank=True, on_delete=models.SET_NULL, related_name="soudeurs",
+        verbose_name="Fiche salarié (M9)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -209,6 +214,14 @@ class WpsWpqr(models.Model):
         verbose_name="Validé par QA/QC",
     )
     date_validation = models.DateField(null=True, blank=True, verbose_name="Date de validation")
+    # Un WPS s'appuie sur un WPQR (PQR) qualifié ; la fiche signée est jointe (PDF / scan).
+    wpqr = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="wps_supportes",
+        verbose_name="WPQR support", limit_choices_to={"type": "wpqr"},
+    )
+    fichier = models.FileField(upload_to="qualite/wps/%Y/", blank=True, verbose_name="Fiche WPS / PQR (PDF)")
+    obsolete_le = models.DateTimeField(null=True, blank=True, verbose_name="Rendu obsolète le")
+    obsolete_motif = models.CharField(max_length=250, blank=True, verbose_name="Motif d'obsolescence")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -467,7 +480,12 @@ class NonConformite(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             # NCR-HSE : numérotation propre, même socle (traitement, CAPA, clôture) que les NC qualité.
-            self.code = QualiteSequence.next_for("NCRHSE", "NCR-HSE-") if self.type_ncr == "hse" else QualiteSequence.next_for("NC", "NC")
+            if self.type_ncr == "hse":
+                self.code = QualiteSequence.next_for("NCRHSE", "NCR-HSE-")
+            elif self.type_ncr == "soudage":
+                self.code = QualiteSequence.next_for("NCRSD", "NCR-SD-")
+            else:
+                self.code = QualiteSequence.next_for("NC", "NC")
         result = super().save(*args, **kwargs)
         self._synchroniser_quarantaine()
         return result
@@ -540,6 +558,7 @@ class ActionCorrective(models.Model):
     )
     efficace = models.BooleanField(null=True, blank=True, verbose_name="Efficacité vérifiée")
     closed_at = models.DateTimeField(null=True, blank=True, verbose_name="Clôturée le")
+    escaladee_le = models.DateTimeField(null=True, blank=True, verbose_name="Escaladée à la direction le")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -606,6 +625,10 @@ class PvControle(models.Model):
         default=10, verbose_name="Conservation (années)"
     )
     date_archivage = models.DateField(null=True, blank=True, verbose_name="Date d'archivage")
+    dossier_document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Dossier qualité scellé (GED)",
+    )
     validated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -661,6 +684,7 @@ class PointInspection(models.Model):
     responsable_levee = models.CharField(
         max_length=120, blank=True, verbose_name="Levée par (QA/QC, client, organisme...)"
     )
+    date_prevue = models.DateField(null=True, blank=True, verbose_name="Date prévue")
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.EN_ATTENTE, verbose_name="Statut"
     )
@@ -685,6 +709,10 @@ class PointInspection(models.Model):
     def clean(self):
         if self.controle_id and self.controle.type_controle != ControleQualite.TypeControle.ITP:
             raise ValidationError({"controle": "Des points d'inspection se rattachent à un contrôle de type ITP."})
+
+    @property
+    def en_retard(self):
+        return bool(self.date_prevue and self.statut == self.Statut.EN_ATTENTE and self.date_prevue < timezone.localdate())
 
 
 class InstrumentMesure(models.Model):
@@ -831,3 +859,98 @@ class EpreuvePression(models.Model):
         if not self.code:
             self.code = QualiteSequence.next_for("EPR", "EPR-")
         return super().save(*args, **kwargs)
+
+
+class DiffusionWps(models.Model):
+    """Diffusion d'un WPS validé vers un OF (atelier / chantier M3) : seuls les WPS diffusés s'utilisent sur l'OF."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    wps = models.ForeignKey(WpsWpqr, on_delete=models.PROTECT, related_name="diffusions")
+    ordre = models.ForeignKey("operations.OrdreFabrication", on_delete=models.PROTECT, related_name="wps_diffuses")
+    diffuse_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    diffuse_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-diffuse_le"]
+        verbose_name = "Diffusion de WPS"
+        verbose_name_plural = "Diffusions de WPS"
+        constraints = [models.UniqueConstraint(fields=["wps", "ordre"], name="uniq_diffusion_wps_of")]
+
+
+class PunchItem(models.Model):
+    """Réserve de la punch list (fin de travaux) : catégorie A = bloque la libération de l'OF, B / C = à lever."""
+
+    class Categorie(models.TextChoices):
+        A = "A", "A — bloquante (avant libération)"
+        B = "B", "B — avant réception client"
+        C = "C", "C — mineure"
+
+    class Statut(models.TextChoices):
+        OUVERTE = "ouverte", "Ouverte"
+        LEVEE = "levee", "Levée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ordre = models.ForeignKey(
+        "operations.OrdreFabrication", on_delete=models.PROTECT, related_name="punch_items", verbose_name="OF"
+    )
+    itp = models.ForeignKey(
+        ControleQualite, null=True, blank=True, on_delete=models.PROTECT, related_name="punch_items", verbose_name="ITP"
+    )
+    repere = models.CharField(max_length=80, blank=True, verbose_name="Repère (spool, ligne, joint)")
+    description = models.CharField(max_length=250, verbose_name="Réserve")
+    categorie = models.CharField(max_length=1, choices=Categorie.choices, default=Categorie.B)
+    responsable = models.CharField(max_length=120, blank=True, verbose_name="Responsable de la levée")
+    echeance = models.DateField(null=True, blank=True, verbose_name="Échéance")
+    statut = models.CharField(max_length=8, choices=Statut.choices, default=Statut.OUVERTE)
+    leve_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    leve_le = models.DateTimeField(null=True, blank=True)
+    commentaire = models.CharField(max_length=250, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["statut", "categorie", "echeance"]
+        verbose_name = "Réserve (punch list)"
+        verbose_name_plural = "Punch list"
+
+    def __str__(self):
+        return f"{self.code} — {self.description}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("PCH", "PCH-")
+        return super().save(*args, **kwargs)
+
+    @property
+    def en_retard(self):
+        return bool(self.echeance and self.statut == self.Statut.OUVERTE and self.echeance < timezone.localdate())
+
+
+class ParametreQualite(models.Model):
+    """Paramètres M6 modifiables par ETSL (délai CAPA, escalade, alertes) : provisoires tant qu'ETSL ne les confirme pas."""
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE)
+    confirme_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    confirme_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre qualité"
+        verbose_name_plural = "Paramètres qualité"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME

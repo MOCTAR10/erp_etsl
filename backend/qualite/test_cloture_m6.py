@@ -14,7 +14,7 @@ from operations.models import OrdreFabrication
 from users.models import User
 
 from .models import (
-    ControleQualite, EpreuvePression, InstrumentMesure, JointSoude, NonConformite,
+    ControleQualite, DiffusionWps, EpreuvePression, InstrumentMesure, JointSoude, NonConformite,
     PointInspection, QualificationSoudeur, Soudeur, WpsWpqr,
 )
 
@@ -36,6 +36,7 @@ class M6Base(APITestCase):
             date_validite=aujourdhui + timedelta(days=300),
         )
         self.wps = WpsWpqr.objects.create(reference="WPS-01", statut="valide")
+        DiffusionWps.objects.create(wps=self.wps, ordre=self.of)  # WPS diffusé sur l OF (écarts M6-A)
 
     def itp(self, approuve=False):
         itp = ControleQualite.objects.create(

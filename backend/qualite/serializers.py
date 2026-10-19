@@ -8,7 +8,11 @@ from rest_framework import serializers
 
 from config.serializers import ModelCleanMixin
 
+from .ecarts import get_param_qualite, qualification_couvrante
 from .models import (
+    DiffusionWps,
+    ParametreQualite,
+    PunchItem,
     Etalonnage,
     EpreuvePression,
     ImageControle,
@@ -26,11 +30,14 @@ from .models import (
 
 
 class SoudeurSerializer(serializers.ModelSerializer):
+    employe_code = serializers.CharField(source="employe.code", read_only=True, default=None)
+    employe_nom = serializers.CharField(source="employe.nom_complet", read_only=True, default=None)
+
     class Meta:
         model = Soudeur
         fields = [
             "id", "code", "nom", "prenoms", "matricule", "qualification",
-            "is_active", "display_name", "created_at", "updated_at",
+            "is_active", "display_name", "employe", "employe_code", "employe_nom", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "display_name"]
 
@@ -76,6 +83,8 @@ class WpsWpqrSerializer(serializers.ModelSerializer):
     validated_by_name = serializers.CharField(
         source="validated_by.get_full_name", read_only=True, default=None
     )
+    wpqr_code = serializers.CharField(source="wpqr.code", read_only=True, default=None)
+    ordres_diffusion = serializers.SerializerMethodField()
 
     class Meta:
         model = WpsWpqr
@@ -83,10 +92,20 @@ class WpsWpqrSerializer(serializers.ModelSerializer):
             "id", "code", "type", "type_label", "reference", "norme", "norme_label",
             "procede", "procede_label", "materiau", "position", "epaisseur",
             "gaz_protection", "parametres", "revue", "statut", "statut_label",
-            "validated_by", "validated_by_name", "date_validation",
-            "created_at", "updated_at",
+            "validated_by", "validated_by_name", "date_validation", "wpqr", "wpqr_code", "fichier",
+            "obsolete_le", "obsolete_motif", "ordres_diffusion", "created_at", "updated_at",
         ]
-        read_only_fields = ["statut", "validated_by", "date_validation", "code"]
+        read_only_fields = ["statut", "validated_by", "date_validation", "code", "fichier", "obsolete_le", "obsolete_motif"]
+
+    def get_ordres_diffusion(self, obj):
+        return [d.ordre.code for d in obj.diffusions.select_related("ordre")]
+
+    def validate_wpqr(self, wpqr):
+        if wpqr and wpqr.type != WpsWpqr.Type.WPQR:
+            raise serializers.ValidationError("Le support d'un WPS est un WPQR (PQR).")
+        if wpqr and self.instance and wpqr.pk == self.instance.pk:
+            raise serializers.ValidationError("Un WPS ne peut pas être son propre WPQR.")
+        return wpqr
 
 
 class ControleQualiteSerializer(serializers.ModelSerializer):
@@ -171,6 +190,7 @@ class NonConformiteSerializer(serializers.ModelSerializer):
     )
     incident_hse_code = serializers.CharField(source="incident_hse.code", read_only=True, default=None)
     actions_count = serializers.SerializerMethodField()
+    actions_ouvertes = serializers.SerializerMethodField()
 
     class Meta:
         model = NonConformite
@@ -180,11 +200,15 @@ class NonConformiteSerializer(serializers.ModelSerializer):
             "statut", "statut_label", "decided_by", "decided_by_name",
             "date_decision", "archive", "actions_count", "created_at", "updated_at",
             "type_ncr", "joint", "recontrole", "incident_hse", "incident_hse_code", "constat_audit_hse",
+            "actions_ouvertes",
         ]
-        read_only_fields = ["decided_by", "code", "actions_count", "statut", "recontrole"]
+        read_only_fields = ["decided_by", "code", "actions_count", "statut", "recontrole", "actions_ouvertes"]
 
     def get_actions_count(self, obj):
         return obj.actions_correctives.count()
+
+    def get_actions_ouvertes(self, obj):
+        return sum(1 for a in obj.actions_correctives.all() if a.statut != ActionCorrective.Statut.CLOTUREE)
 
     def validate(self, attrs):
         instance = self.instance or self.Meta.model(**attrs)
@@ -200,7 +224,7 @@ class NonConformiteSerializer(serializers.ModelSerializer):
         return attrs
 
 
-CAPA_DELAI_JOURS = 5
+CAPA_DELAI_JOURS = 5  # défaut provisoire : la valeur en vigueur est le paramètre CAPA_DELAI_JOURS (écran Qualité)
 
 
 class ActionCorrectiveSerializer(serializers.ModelSerializer):
@@ -220,23 +244,29 @@ class ActionCorrectiveSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "non_conformite", "non_conformite_code", "type", "type_label",
             "description", "responsable", "responsable_name", "echeance", "en_retard", "statut",
-            "statut_label", "efficace", "closed_at", "created_at", "updated_at",
+            "statut_label", "efficace", "closed_at", "escaladee_le", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "closed_at", "statut"]
+        read_only_fields = ["code", "closed_at", "statut", "escaladee_le"]
+
+    def validate_non_conformite(self, nc):
+        if nc.statut == NonConformite.Statut.CLOTUREE:
+            raise serializers.ValidationError("NC clôturée : ouvrir une nouvelle NC pour une nouvelle action.")
+        return nc
 
     def validate_echeance(self, value):
-        # CDC M6 §8.8 : clôture des CAPA sous 5 jours.
-        limite = timezone.localdate() + timedelta(days=CAPA_DELAI_JOURS)
+        # CDC M6 §8.8 : clôture des CAPA sous 5 jours (délai paramétrable par ETSL).
+        delai = int(get_param_qualite("CAPA_DELAI_JOURS"))
+        limite = timezone.localdate() + timedelta(days=delai)
         if value and value > limite:
             raise serializers.ValidationError(
-                f"Échéance au plus tard le {limite:%d/%m/%Y} : les CAPA se clôturent sous {CAPA_DELAI_JOURS} jours (CDC M6)."
+                f"Échéance au plus tard le {limite:%d/%m/%Y} : les CAPA se clôturent sous {delai} jours (CDC M6)."
             )
         return value
 
     def create(self, validated_data):
         validated_data.setdefault("echeance", None)
         if not validated_data["echeance"]:
-            validated_data["echeance"] = timezone.localdate() + timedelta(days=CAPA_DELAI_JOURS)
+            validated_data["echeance"] = timezone.localdate() + timedelta(days=int(get_param_qualite("CAPA_DELAI_JOURS")))
         return super().create(validated_data)
 
 
@@ -256,9 +286,9 @@ class PvControleSerializer(serializers.ModelSerializer):
             "id", "code", "affaire", "affaire_code", "ordre", "ordre_code", "intitule",
             "controles", "date_pv", "statut", "statut_label", "resultat", "resultat_label",
             "reserve_motif", "levee_reserve", "retention_years", "date_archivage",
-            "validated_by", "validated_by_name", "notes", "created_at", "updated_at",
+            "validated_by", "validated_by_name", "notes", "dossier_document", "created_at", "updated_at",
         ]
-        read_only_fields = ["validated_by", "levee_reserve", "code", "statut"]
+        read_only_fields = ["validated_by", "levee_reserve", "code", "statut", "dossier_document", "date_archivage"]
 
 
 class PointInspectionSerializer(ModelCleanMixin, serializers.ModelSerializer):
@@ -270,10 +300,12 @@ class PointInspectionSerializer(ModelCleanMixin, serializers.ModelSerializer):
         model = PointInspection
         fields = [
             "id", "controle", "ordre", "description", "type_point", "type_label",
-            "responsable_levee", "statut", "statut_label", "leve_par", "leve_par_name",
+            "responsable_levee", "date_prevue", "en_retard", "statut", "statut_label", "leve_par", "leve_par_name",
             "leve_le", "commentaire",
         ]
-        read_only_fields = ["statut", "leve_par", "leve_le"]
+        read_only_fields = ["statut", "leve_par", "leve_le", "en_retard"]
+
+    en_retard = serializers.BooleanField(read_only=True)
 
     def validate(self, attrs):
         controle = attrs.get("controle") or (self.instance.controle if self.instance else None)
@@ -329,6 +361,19 @@ class JointSoudeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"ordre": "Aucun ITP approuvé pour cet OF : soudage interdit."})
         if not any(q.est_valide for q in attrs["soudeur"].qualifications.all()):
             raise serializers.ValidationError({"soudeur": "Soudeur sans qualification valide (ISO 9606-1 / ASME IX)."})
+        # Le joint se soude selon un WPS validé, diffusé sur l'OF, que la qualification du soudeur couvre.
+        wps = attrs.get("wps")
+        if wps is None:
+            raise serializers.ValidationError({"wps": "WPS obligatoire : un joint se soude selon une procédure qualifiée."})
+        if wps.statut != WpsWpqr.Statut.VALIDE or wps.type != WpsWpqr.Type.WPS:
+            raise serializers.ValidationError({"wps": f"WPS {wps.code} non validé ou obsolète : soudage interdit."})
+        if not DiffusionWps.objects.filter(wps=wps, ordre=attrs["ordre"]).exists():
+            raise serializers.ValidationError({"wps": f"WPS {wps.code} non diffusé sur l'OF {attrs['ordre'].code}."})
+        if qualification_couvrante(attrs["soudeur"], wps) is None:
+            raise serializers.ValidationError({"soudeur": (
+                f"Qualification du soudeur hors domaine du WPS {wps.code} "
+                f"(procédé {wps.get_procede_display()}, position {wps.position or '—'})."
+            )})
         return attrs
 
 
@@ -361,3 +406,51 @@ class EpreuvePressionSerializer(serializers.ModelSerializer):
         if instrument and not instrument.utilisable:
             raise serializers.ValidationError("Instrument hors échéance d'étalonnage ou bloqué.")
         return instrument
+
+
+class DiffusionWpsSerializer(serializers.ModelSerializer):
+    wps_code = serializers.CharField(source="wps.code", read_only=True)
+    ordre_code = serializers.CharField(source="ordre.code", read_only=True)
+
+    class Meta:
+        model = DiffusionWps
+        fields = ["id", "wps", "wps_code", "ordre", "ordre_code", "diffuse_par", "diffuse_le"]
+        read_only_fields = fields
+
+
+class PunchItemSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    ordre_code = serializers.CharField(source="ordre.code", read_only=True)
+    categorie_label = serializers.CharField(source="get_categorie_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    en_retard = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PunchItem
+        fields = [
+            "id", "code", "ordre", "ordre_code", "itp", "repere", "description", "categorie", "categorie_label",
+            "responsable", "echeance", "en_retard", "statut", "statut_label", "leve_par", "leve_le", "commentaire",
+            "created_at",
+        ]
+        read_only_fields = ["code", "statut", "leve_par", "leve_le", "commentaire", "en_retard"]
+
+    def validate(self, attrs):
+        itp = attrs.get("itp")
+        if itp and itp.type_controle != ControleQualite.TypeControle.ITP:
+            raise serializers.ValidationError({"itp": "Une réserve se rattache à un ITP."})
+        if itp and itp.ordre_id and itp.ordre_id != attrs["ordre"].pk:
+            raise serializers.ValidationError({"itp": "ITP d'un autre OF."})
+        return super().validate(attrs)
+
+
+class ParametreQualiteSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ParametreQualite
+        fields = ["id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le"]
+        read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
+
+    def validate_valeur(self, valeur):
+        if valeur < 0:
+            raise serializers.ValidationError("Valeur positive attendue.")
+        return valeur

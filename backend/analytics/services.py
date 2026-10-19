@@ -479,6 +479,12 @@ def alertes_agregees(user=None):
                 "statut": "expiree" if jours < 0 else "active",
             })
 
+    qualite_liste = []
+    if _allowed("qualite"):
+        from qualite.ecarts import alertes_qualifications_soudeurs
+
+        qualite_liste = alertes_qualifications_soudeurs(_band)
+
     maintenance_liste = []
     for actif in (
         Actif.objects.filter(statut__in=[Actif.Statut.EN_MAINTENANCE, Actif.Statut.EN_PANNE])
@@ -523,12 +529,14 @@ def alertes_agregees(user=None):
     _add(document_liste)
     _add(juridique["conventions"] + juridique["cautions"] + juridique["assurances"])
     _add(rh_liste)
+    _add(qualite_liste)
     _add([i for i in maintenance_liste if i["type"] == "inspection_reglementaire"])
 
     return {
         "documents": document_liste,
         "juridique": juridique,
         "rh": rh_liste,
+        "qualite": qualite_liste,
         "maintenance": maintenance_liste,
         "compteurs": compteurs,
         "total": sum(compteurs.values()),

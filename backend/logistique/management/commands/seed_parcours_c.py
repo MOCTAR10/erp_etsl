@@ -127,10 +127,18 @@ class Command(ParcoursA):
         bloque = self._instrument("Jauge de soudure (demo)", "JAU-DEMO-003", 60)
         if bloque.statut == "actif":
             self.call(qa, "post", f"/api/qualite/instruments/{bloque.pk}/etalonner/", {"conforme": False, "certificat": "CERT-DEMO-NC"})
-        wps = WpsWpqr.objects.filter(statut="valide").first()
+        wps = WpsWpqr.objects.filter(statut="valide", type="wps").first()
         if wps is None:
-            wps = WpsWpqr.objects.first()
+            wps = WpsWpqr.objects.filter(type="wps").first()
+            # Un WPS se valide sur un WPQR (PQR) validé.
+            wpqr = self.call(qa, "post", "/api/qualite/wps/", {
+                "type": "wpqr", "reference": f"PQR-{wps.reference or wps.code}", "norme": wps.norme, "procede": wps.procede,
+                "materiau": wps.materiau, "position": wps.position, "epaisseur": wps.epaisseur,
+            })
+            self.call(qa, "post", f"/api/qualite/wps/{wpqr['id']}/valider/")
+            self.call(qa, "patch", f"/api/qualite/wps/{wps.pk}/", {"wpqr": wpqr["id"]})
             self.call(qa, "post", f"/api/qualite/wps/{wps.pk}/valider/")
+        self.call(qa, "post", f"/api/qualite/wps/{wps.pk}/diffuser/", {"ordre": str(of.pk)})
         # ITP : 3 points (arret / observation / arret) -> approbation -> levée dans l'ordre.
         itp = self.call(qa, "post", "/api/qualite/controles/", {
             "type_controle": "itp", "affaire": str(of.affaire_id), "ordre": str(of.pk), "point_controle": f"ITP spools {of.code} (demo)",
@@ -141,6 +149,15 @@ class Command(ParcoursA):
         self.call(qa, "post", f"/api/qualite/controles/{itp['id']}/approuver/")
         # Joints soudés (registre en inscription seule) : exigent l'ITP approuvé et un soudeur qualifié.
         soudeur = Soudeur.objects.get(code="SOU00001")
+        from qualite.ecarts import qualification_couvrante
+
+        if qualification_couvrante(soudeur, wps) is None:
+            # Le soudeur se qualifie dans le domaine du WPS (procédé / position) avant de souder.
+            self.call(qa, "post", "/api/qualite/qualifications/", {
+                "soudeur": str(soudeur.pk), "norme": wps.norme, "procede": wps.procede, "position": wps.position or "6G",
+                "date_qualification": str(self.today - timedelta(days=30)),
+                "date_validite": str(self.today + timedelta(days=700)), "certificat": "QUAL-DEMO-WPS",
+            })
         for n in (1, 2):
             self.call(qa, "post", "/api/qualite/joints/", {
                 "ordre": str(of.pk), "repere": f"J-{n:03d}", "soudeur": str(soudeur.pk), "wps": str(wps.pk),
@@ -166,6 +183,11 @@ class Command(ParcoursA):
         # Libération : l'OF est terminé puis libéré, seulement si tous les contrôles sont validés conformes.
         self.call("atelier@etls.local", "post", f"/api/operations/ordres/{of.pk}/terminer/")
         self.call("atelier@etls.local", "post", f"/api/operations/ordres/{of.pk}/liberer/")
+        # Réception interne : PV prononcé sans réserve -> dossier qualité de l OF scellé en GED (10 ans).
+        pv = self.call(qa, "post", "/api/qualite/pvs/", {
+            "affaire": str(of.affaire_id), "ordre": str(of.pk), "intitule": f"Reception interne spools {of.code} (demo)",
+        })
+        self.call(qa, "post", f"/api/qualite/pvs/{pv['id']}/levee-reserve/", {"reserve": False})
 
     # -- M7 : exigences d'habilitation, DUER, audit, plan d'urgence ------------------------------------------
     def parcours_hse(self):

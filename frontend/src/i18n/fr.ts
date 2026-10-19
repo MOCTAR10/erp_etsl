@@ -1255,6 +1255,50 @@ export const fr = {
     warnProvisoire: "{{count}} paramètre(s) du cube provisoire(s) (durée de conservation) à faire confirmer par ETSL.",
     confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",
   },
+  m6e: {
+    saisies: {
+      title: "Saisies soudage et inspection", soudeur: "Nouveau soudeur", qualif: "Nouvelle qualification", wps: "Nouveau WPS / WPQR",
+      joint: "Nouveau joint soudé", itp: "Nouvel ITP", point: "Nouveau point d'ITP", epreuve: "Nouvelle épreuve",
+    },
+    f: {
+      nom: "Nom", prenoms: "Prénoms", matricule: "Matricule", employe: "Fiche salarié (M9)", position: "Position(s)",
+      materiaux: "Groupe de matériaux", dateQualif: "Date de qualification", certificat: "N° de certificat", epaisseur: "Épaisseur / diamètre",
+      gaz: "Gaz de protection", wpqr: "WPQR support", consommable: "Consommable (lot)", perimetreItp: "Périmètre (spool, ligne, ouvrage)",
+      ordre: "N° d'ordre", point: "Point d'inspection", leveePar: "Levée par", datePrevue: "Date prévue",
+      pression: "Pression d'essai (bar)", duree: "Durée de maintien (min)", chute: "Chute admissible (bar)",
+    },
+    procedes: { smaw: "SMAW (électrode enrobée)", gtaw: "GTAW (TIG)", gmaw: "GMAW (MIG/MAG)", fcaw: "FCAW (fil fourré)" },
+    typesPoint: { arret: "Point d'arrêt", observation: "Point d'observation" },
+    typesEpreuve: { hydraulique: "Épreuve hydraulique", etancheite: "Test d'étanchéité" },
+    image: { title: "Image / film CND", choisir: "Contrôle CND…", fichier: "Fichier CND", ok: "Image archivée (SHA-256)." },
+    wps: {
+      title: "Cycle des procédures de soudage", diffusion: "Diffusé sur", fiche: "fiche jointe", joindre: "Joindre la fiche",
+      diffuser: "Diffuser vers un OF", choisirOf: "OF destinataire", obsolete: "Rendre obsolète", motif: "Motif d'obsolescence ?",
+    },
+    capa: {
+      title: "Actions correctives (CAPA) ouvertes", nouvelle: "Nouvelle CAPA", action: "Action", echeance: "Échéance",
+      retard: "En retard", escaladee: "Escaladée", efficace: "Clôturer (efficace)", inefficace: "Clôturer (non efficace)",
+      types: { corrective: "Corrective", preventive: "Préventive" },
+    },
+    punch: {
+      title: "Punch list", nouvelle: "Nouvelle réserve", repere: "Repère (spool, ligne)", reserve: "Réserve", categorie: "Catégorie",
+      responsable: "Responsable", lever: "Lever", commentaire: "Commentaire de levée", levee: "Levée",
+      cat: { A: "A — bloque la libération", B: "B — avant réception", C: "C — mineure" },
+    },
+    ind: {
+      title: "Indicateurs qualité", periode: "Mois", rapport: "Rapport mensuel (PDF)", conformite: "Taux de conformité",
+      controles: "Contrôles", tauxNc: "Taux de NC", rebut: "Taux de rebut", densite: "Densité de défauts (/100 joints)",
+      joints: "Joints", delaiReserves: "Délai de levée des réserves", capaDelais: "CAPA dans les délais",
+    },
+    params: {
+      title: "Paramètres qualité",
+      bandeau: "{{count}} paramètre(s) provisoire(s) à faire confirmer par ETSL (délai CAPA, escalade, alerte de péremption).",
+    },
+    pv: {
+      receptionner: "Réceptionner", confirmReception: "Prononcer la réception ? Le dossier qualité de l'OF sera scellé en GED (10 ans).",
+      reserve: "Sous réserve", motif: "Motif de la réserve ?", dossier: "Dossier qualité (PDF)",
+    },
+  },
   m7e: {
     oui: "Oui", non: "Non",
     zones: { atelier: "Atelier", chantier: "Chantier", bureau: "Bureaux", site_client: "Site client", site_gr: "Site GLOBAL RENTAL" },

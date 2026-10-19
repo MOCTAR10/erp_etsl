@@ -18,6 +18,7 @@ import type {
   WpsWpqr,
 } from "../types";
 import { ClotureM6Section } from "../components/qualite/ClotureM6Section";
+import { EcartsM6Section } from "../components/qualite/EcartsM6Section";
 import { ItpSection } from "../components/workflow/ItpSection";
 
 type NcGroups = Record<StatutNC, NonConformite[]>;
@@ -108,6 +109,25 @@ function pvColumns(t: T): Column<PvControle>[] {
         <Badge tone={p.statut === "receptionne" ? "ok" : p.statut === "reserve" ? "warn" : p.statut === "rejete" ? "err" : "brand"}>
           {t(`qualite.pv_statut.${p.statut}`)}
         </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (p) => (
+        <>
+          {(p.statut === "en_cours" || p.statut === "reserve") && (
+            <ActionBar
+              actions={[
+                { label: t("m6e.pv.receptionner"), path: `/api/qualite/pvs/${p.id}/levee-reserve/`, body: { reserve: false }, confirm: t("m6e.pv.confirmReception") },
+                { label: t("m6e.pv.reserve"), path: `/api/qualite/pvs/${p.id}/levee-reserve/`, body: { reserve: true }, tone: "ghost", prompt: { name: "motif", label: t("m6e.pv.motif") } },
+              ]}
+            />
+          )}
+          <button type="button" className="btn ghost" onClick={() => void api.download(`/api/qualite/pvs/${p.id}/dossier/`, `dossier-qualite-${p.code}.pdf`)}>
+            {t("m6e.pv.dossier")}
+          </button>
+        </>
       ),
     },
   ];
@@ -319,6 +339,7 @@ export function QualitePage() {
       )}
       <ItpSection />
       <ClotureM6Section />
+      <EcartsM6Section />
     </>
   );
 }

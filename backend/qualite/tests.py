@@ -145,6 +145,8 @@ class WpsTests(M6BaseTest):
         # Audit lot 7 : le statut client est ignoré ; la validation passe par l'action `valider` (QA/QC).
         wps = WpsWpqr.objects.get(pk=resp.data["id"])
         self.assertEqual(wps.statut, WpsWpqr.Statut.BROUILLON)
+        wps.wpqr = WpsWpqr.objects.create(type=WpsWpqr.Type.WPQR, statut=WpsWpqr.Statut.VALIDE)
+        wps.save()
         resp = self.client.post(f"/api/qualite/wps/{wps.pk}/valider/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
         wps.refresh_from_db()

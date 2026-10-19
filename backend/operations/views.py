@@ -428,4 +428,9 @@ def controle_liberation(of):
         return f"OF {of.code} : contrôle non conforme — reprise et re-contrôle requis avant libération."
     if NonConformite.objects.filter(controle__ordre=of).exclude(statut=NonConformite.Statut.CLOTUREE).exists():
         return f"OF {of.code} : NC ouverte(s) sur l'OF — traitement et clôture requis avant libération."
+    from qualite.models import PunchItem
+
+    bloquantes = PunchItem.objects.filter(ordre=of, categorie=PunchItem.Categorie.A, statut=PunchItem.Statut.OUVERTE).count()
+    if bloquantes:
+        return f"OF {of.code} : {bloquantes} réserve(s) A de la punch list ouverte(s) — levée requise avant libération."
     return None

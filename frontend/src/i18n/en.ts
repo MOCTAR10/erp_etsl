@@ -1255,6 +1255,50 @@ export const en = {
     warnProvisoire: "{{count}} provisional cube parameter(s) (retention period) to be confirmed by ETSL.",
     confirmConfirmer: "Confirm this value (validated by ETSL)?",
   },
+  m6e: {
+    saisies: {
+      title: "Welding and inspection entries", soudeur: "New welder", qualif: "New qualification", wps: "New WPS / WPQR",
+      joint: "New weld joint", itp: "New ITP", point: "New ITP point", epreuve: "New pressure test",
+    },
+    f: {
+      nom: "Last name", prenoms: "First names", matricule: "Staff number", employe: "Employee record (M9)", position: "Position(s)",
+      materiaux: "Material group", dateQualif: "Qualification date", certificat: "Certificate no.", epaisseur: "Thickness / diameter",
+      gaz: "Shielding gas", wpqr: "Supporting WPQR", consommable: "Consumable (batch)", perimetreItp: "Scope (spool, line, structure)",
+      ordre: "Sequence no.", point: "Inspection point", leveePar: "Released by", datePrevue: "Planned date",
+      pression: "Test pressure (bar)", duree: "Holding time (min)", chute: "Allowed drop (bar)",
+    },
+    procedes: { smaw: "SMAW (stick)", gtaw: "GTAW (TIG)", gmaw: "GMAW (MIG/MAG)", fcaw: "FCAW (flux-cored)" },
+    typesPoint: { arret: "Hold point", observation: "Witness point" },
+    typesEpreuve: { hydraulique: "Hydrostatic test", etancheite: "Leak test" },
+    image: { title: "NDT image / film", choisir: "NDT inspection…", fichier: "NDT file", ok: "Image archived (SHA-256)." },
+    wps: {
+      title: "Welding procedure lifecycle", diffusion: "Issued to", fiche: "sheet attached", joindre: "Attach sheet",
+      diffuser: "Issue to a work order", choisirOf: "Target work order", obsolete: "Make obsolete", motif: "Reason for obsolescence?",
+    },
+    capa: {
+      title: "Open corrective actions (CAPA)", nouvelle: "New CAPA", action: "Action", echeance: "Due date",
+      retard: "Overdue", escaladee: "Escalated", efficace: "Close (effective)", inefficace: "Close (not effective)",
+      types: { corrective: "Corrective", preventive: "Preventive" },
+    },
+    punch: {
+      title: "Punch list", nouvelle: "New punch item", repere: "Tag (spool, line)", reserve: "Item", categorie: "Category",
+      responsable: "Owner", lever: "Clear", commentaire: "Clearance comment", levee: "Cleared",
+      cat: { A: "A — blocks release", B: "B — before handover", C: "C — minor" },
+    },
+    ind: {
+      title: "Quality indicators", periode: "Month", rapport: "Monthly report (PDF)", conformite: "Conformity rate",
+      controles: "Inspections", tauxNc: "NC rate", rebut: "Scrap rate", densite: "Defect density (/100 joints)",
+      joints: "Joints", delaiReserves: "Reserve clearance time", capaDelais: "CAPA on time",
+    },
+    params: {
+      title: "Quality settings",
+      bandeau: "{{count}} provisional setting(s) awaiting ETSL confirmation (CAPA deadline, escalation, expiry alert).",
+    },
+    pv: {
+      receptionner: "Accept", confirmReception: "Accept the work? The work order quality dossier will be sealed in the DMS (10 years).",
+      reserve: "With reservations", motif: "Reason for the reservation?", dossier: "Quality dossier (PDF)",
+    },
+  },
   m7e: {
     oui: "Yes", non: "No",
     zones: { atelier: "Workshop", chantier: "Site", bureau: "Offices", site_client: "Client site", site_gr: "GLOBAL RENTAL site" },
