@@ -71,3 +71,22 @@ test.describe("M7 HSE : cycle d'un presque-accident", () => {
     await expect(carte()).toContainText("Rapport archivé en GED");
   });
 });
+
+// Écarts M7-C (2026-10-19) : ISO 14001 (consommations → émissions), indicateurs, bilan annuel / revue de direction.
+test.describe("M7 HSE : environnement et revue de direction", () => {
+  test("un relevé de consommation saisi à l'écran alimente le rapport environnemental", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
+    await page.goto("/hse");
+    await expect(page.getByTestId("indicateurs-hse")).toContainText("Taux de formation");
+    await expect(page.getByTestId("revues-direction")).toBeVisible();
+    const env = page.getByTestId("environnement-hse");
+    await env.getByRole("button", { name: /Relevé de consommation/ }).click();
+    const form = page.getByRole("form", { name: /Relevé de consommation/ });
+    await form.getByLabel("Mois").fill(new Date().toISOString().slice(0, 10));
+    await form.getByLabel("Quantité").fill("100");
+    await form.getByLabel("Site", { exact: true }).fill(`Base e2e ${Date.now()}`);
+    await form.locator("button[type=submit]").click();
+    await expect(env.getByRole("row", { name: /Gazole/ })).toBeVisible();
+    await expect(env).toContainText("t CO2e");
+  });
+});

@@ -6,6 +6,9 @@ from rest_framework import serializers
 from rh_paie.models import Employe
 
 from .models import (
+    ConsommationEnvironnement,
+    PlanReductionImpact,
+    RevueDirectionHse,
     AptitudeMedicale,
     ParametreHse,
     ActionHse,
@@ -418,3 +421,50 @@ class PersonnelHseSerializer(serializers.ModelSerializer):
 
     def get_nom_complet(self, obj):
         return str(obj)
+
+
+class ConsommationEnvironnementSerializer(serializers.ModelSerializer):
+    ressource_label = serializers.CharField(source="get_ressource_display", read_only=True)
+    unite = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = ConsommationEnvironnement
+        fields = ["id", "code", "ressource", "ressource_label", "periode", "site", "quantite", "unite", "source",
+                  "saisi_par", "created_at"]
+        read_only_fields = ["code", "saisi_par"]
+
+    def validate_periode(self, value):
+        return value.replace(day=1)  # relevé mensuel : le doublon (ressource, mois, site) est refusé en 400
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs)
+
+
+class PlanReductionImpactSerializer(serializers.ModelSerializer):
+    ressource_label = serializers.CharField(source="get_ressource_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    avancement = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PlanReductionImpact
+        fields = ["id", "code", "objectif", "ressource", "ressource_label", "annee_reference", "annee_cible",
+                  "reduction_cible_pct", "actions", "responsable", "statut", "statut_label", "avancement", "created_at"]
+        read_only_fields = ["code"]
+
+    def get_avancement(self, obj):
+        from .services import avancement_plan
+
+        return avancement_plan(obj)
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs)
+
+
+class RevueDirectionHseSerializer(serializers.ModelSerializer):
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+
+    class Meta:
+        model = RevueDirectionHse
+        fields = ["id", "code", "annee", "date_revue", "participants", "conclusions", "decisions", "bilan", "statut",
+                  "statut_label", "validee_par", "validee_le", "document", "created_at"]
+        read_only_fields = ["code", "bilan", "statut", "validee_par", "validee_le", "document"]

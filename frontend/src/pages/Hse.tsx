@@ -30,6 +30,7 @@ import {
   ParametresHseSection,
   PersonnelHseSection,
 } from "../components/hse/HsePersonnelSection";
+import { EnvironnementSection, IndicateursHseSection, RevueDirectionSection } from "../components/hse/HseEnvironnementSection";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
 
@@ -423,6 +424,9 @@ export function HsePage() {
       <FormationsNominativesSection />
       <AptitudesSection />
       <ExigencesPermisSection />
+      <IndicateursHseSection />
+      <EnvironnementSection />
+      <RevueDirectionSection />
       <ParametresHseSection />
       {(bsd.count > 0 || bsd.search) && (
         <SectionCard title={`${t("hse.bsd")} · ${bsd.count}`}>

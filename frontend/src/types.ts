@@ -1028,6 +1028,56 @@ export interface ExigenceHabilitationHse {
   mot_cle: string;
 }
 
+export interface IndicateursHse {
+  salaries_actifs: number;
+  salaries_formes: number;
+  taux_formation: string | null;
+  habilitations_suivies: number;
+  habilitations_a_jour: number;
+  taux_recyclage: string | null;
+  audits_realises: number;
+  conformite_iso: string | null;
+  incidents_environnement: number;
+  taux_incidents_environnement: string | null;
+}
+
+export interface RapportEnvironnemental {
+  annee: number;
+  environnement: {
+    lignes: { ressource: string; libelle: string; unite: string; quantite: string; facteur: string | null; emissions_kg_co2e: string | null }[];
+    emissions_kg_co2e: string;
+    emissions_t_co2e: string;
+  };
+  incidents_environnement: number;
+}
+
+export interface PlanReductionImpact {
+  id: string;
+  code: string;
+  objectif: string;
+  ressource: string;
+  ressource_label: string;
+  annee_reference: number | null;
+  annee_cible: number;
+  reduction_cible_pct: string | null;
+  statut: string;
+  statut_label: string;
+  avancement: { realise_pct: string | null; atteint: boolean; derniere_annee: number | null } | null;
+}
+
+export interface RevueDirectionHse {
+  id: string;
+  code: string;
+  annee: number;
+  date_revue: string;
+  participants: string;
+  conclusions: string;
+  decisions: string;
+  statut: "brouillon" | "validee";
+  statut_label: string;
+  document: string | null;
+}
+
 export interface PasseportSecurite {
   employe: string;
   matricule: string;

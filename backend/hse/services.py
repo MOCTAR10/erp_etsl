@@ -234,6 +234,11 @@ def registre_osha(annee):
 PARAMETRES_HSE_DEFAUT = {
     "EPI_ALERTE_JOURS": ("EPI : alerte avant renouvellement", "30", "jours"),
     "APTITUDE_ALERTE_JOURS": ("Aptitude médicale : alerte avant échéance", "30", "jours"),
+    # Facteurs d'émission (kg CO2e par unité) : valeurs usuelles provisoires, à confirmer par ETSL (réseau SEEG, carburants).
+    "FE_ELECTRICITE": ("Facteur d'émission électricité", "0.40", "kg CO2e/kWh"),
+    "FE_GAZOLE": ("Facteur d'émission gazole", "2.68", "kg CO2e/L"),
+    "FE_ESSENCE": ("Facteur d'émission essence", "2.28", "kg CO2e/L"),
+    "FE_GAZ": ("Facteur d'émission gaz (GPL)", "2.94", "kg CO2e/kg"),
 }
 PREFIXE_FORMATION_RH = "Formation HSE — "
 
@@ -324,3 +329,173 @@ def passeport_pdf(employe):
     ] + [[f"EPI : {e['type']} — {e['designation']}", f"{e['dotation']:%d/%m/%Y}",
           f"{e['renouvellement']:%d/%m/%Y}" if e["renouvellement"] else "—"] for e in p["epi"]]
     return _pdf(f"Passeport sécurité — {p['employe']}", blocs, tableau if len(tableau) > 1 else None)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M7-C : environnement ISO 14001, indicateurs formation / recyclage / ISO, bilan annuel, revue de direction
+# ----------------------------------------------------------------------------------------------------------------
+TYPES_INCIDENT_ENVIRONNEMENT = ("pollution", "deversement")
+
+
+def _dec(valeur):
+    from decimal import Decimal
+
+    return str(Decimal(valeur).quantize(Decimal("0.01")))
+
+
+def consommations_annee(annee):
+    """Totaux de l'année par ressource (quantité + émissions kg CO2e au facteur paramétré)."""
+    from decimal import Decimal
+
+    from django.db.models import Sum
+
+    from .models import ConsommationEnvironnement as C
+
+    totaux = dict(
+        C.objects.filter(periode__year=annee).values_list("ressource").annotate(total=Sum("quantite")).values_list("ressource", "total")
+    )
+    lignes, emissions = [], Decimal("0")
+    for code, libelle in C.Ressource.choices:
+        quantite = totaux.get(code) or Decimal("0")
+        facteur = get_param_hse(C.FACTEURS[code]) if code in C.FACTEURS else None
+        em = quantite * facteur if facteur is not None else None
+        emissions += em or 0
+        lignes.append({"ressource": code, "libelle": libelle, "unite": C.UNITES[code], "quantite": _dec(quantite),
+                       "facteur": None if facteur is None else str(facteur),
+                       "emissions_kg_co2e": None if em is None else _dec(em)})
+    return {"lignes": lignes, "emissions_kg_co2e": _dec(emissions), "emissions_t_co2e": _dec(emissions / 1000)}
+
+
+def avancement_plan(plan):
+    """Réduction réalisée (%) : consommation de la dernière année relevée (≤ année cible) vs l'année de référence."""
+    from django.db.models import Sum
+
+    from .models import ConsommationEnvironnement as C
+
+    if not plan.ressource or not plan.annee_reference:
+        return None
+    par_an = dict(
+        C.objects.filter(ressource=plan.ressource, periode__year__gte=plan.annee_reference, periode__year__lte=plan.annee_cible)
+        .values_list("periode__year").annotate(t=Sum("quantite")).values_list("periode__year", "t")
+    )
+    reference = par_an.get(plan.annee_reference)
+    suivies = [a for a in par_an if a > plan.annee_reference]
+    if not reference or not suivies:
+        return {"reference": _dec(reference or 0), "derniere_annee": None, "realise_pct": None, "atteint": False}
+    derniere = max(suivies)
+    realise = (reference - par_an[derniere]) * 100 / reference
+    return {"reference": _dec(reference), "derniere_annee": derniere, "derniere_valeur": _dec(par_an[derniere]),
+            "realise_pct": _dec(realise), "atteint": realise >= plan.reduction_cible_pct}
+
+
+def indicateurs_hse(debut, fin, heures):
+    """Indicateurs M7-07 au-delà des taux de fréquence : formation, recyclage, conformité ISO, incidents environnement.
+
+    - taux de formation = salariés actifs ayant suivi au moins une session HSE réalisée sur la période / salariés actifs ;
+    - taux de recyclage = habilitations issues des formations HSE (avec échéance) encore valides à la fin de période ;
+    - conformité ISO = score moyen des audits HSE réalisés sur la période (0-100) ;
+    - taux d'incidents environnementaux = pollutions + déversements × 200 000 / heures.
+    """
+    from decimal import Decimal
+
+    from django.db.models import Avg
+
+    from rh_paie.models import Employe, Qualification
+
+    from .indicateurs import BASE_OSHA, _taux
+    from .models import AuditHse, FormationSecurite, Incident
+
+    actifs = Employe.objects.filter(statut=Employe.Statut.ACTIF)
+    nb_actifs = actifs.count()
+    formes = actifs.filter(
+        formations_hse__statut=FormationSecurite.Statut.REALISEE,
+        formations_hse__date_session__gte=debut, formations_hse__date_session__lte=fin,
+    ).distinct().count()
+    # Dernière occurrence de chaque habilitation HSE par salarié : valide à `fin` ou à recycler.
+    dernieres = {}
+    for q in Qualification.objects.filter(intitule__startswith=PREFIXE_FORMATION_RH, date_validite__isnull=False,
+                                          employe__in=actifs).order_by("date_obtention"):
+        dernieres[(q.employe_id, q.intitule)] = q
+    a_jour = sum(1 for q in dernieres.values() if q.date_validite >= fin)
+    audits = AuditHse.objects.filter(date_realisation__gte=debut, date_realisation__lte=fin, score__isnull=False)
+    score = audits.aggregate(m=Avg("score"))["m"]
+    nb_env = Incident.objects.filter(
+        type_incident__in=TYPES_INCIDENT_ENVIRONNEMENT, date_evenement__date__gte=debut, date_evenement__date__lte=fin
+    ).count()
+    pct = lambda n, d: None if not d else _dec(Decimal(n) * 100 / d)  # noqa: E731
+    return {
+        "salaries_actifs": nb_actifs, "salaries_formes": formes, "taux_formation": pct(formes, nb_actifs),
+        "habilitations_suivies": len(dernieres), "habilitations_a_jour": a_jour, "taux_recyclage": pct(a_jour, len(dernieres)),
+        "audits_realises": audits.count(), "conformite_iso": None if score is None else _dec(score),
+        "incidents_environnement": nb_env, "taux_incidents_environnement": _taux(nb_env, BASE_OSHA, Decimal(heures)),
+    }
+
+
+def bilan_annuel(annee):
+    """Bilan HSE annuel (CDC §9.8) : données d'entrée de la revue de direction."""
+    from datetime import date
+
+    from django.db.models import Count, Sum
+
+    from .indicateurs import indicateurs_frequence
+    from .models import ActionHse, AuditHse, BordereauDechet, FormationSecurite, Incident, PermisTravail, PlanReductionImpact
+
+    debut, fin = date(annee, 1, 1), date(annee, 12, 31)
+    freq = indicateurs_frequence(debut, fin)
+    incidents = Incident.objects.filter(date_evenement__year=annee)
+    par_type = {Incident.TypeIncident(t).label: n for t, n in incidents.values_list("type_incident").annotate(n=Count("id"))}
+    dechets = [
+        {"type": BordereauDechet.TypeDechet(t).label, "unite": u, "quantite": _dec(q)}
+        for t, u, q in BordereauDechet.objects.filter(created_at__year=annee).values_list("type_dechet", "unite")
+        .annotate(q=Sum("quantite")).values_list("type_dechet", "unite", "q")
+    ]
+    plans = [
+        {"code": p.code, "objectif": p.objectif, "statut": p.get_statut_display(), "annee_cible": p.annee_cible,
+         "cible_pct": None if p.reduction_cible_pct is None else str(p.reduction_cible_pct), "avancement": avancement_plan(p)}
+        for p in PlanReductionImpact.objects.all()
+    ]
+    return {
+        "annee": annee,
+        "frequence": {k: (str(v) if k in ("debut", "fin") else v) for k, v in freq.items()},
+        "indicateurs": indicateurs_hse(debut, fin, freq["heures"]),
+        "incidents": {"total": incidents.count(), "par_type": par_type,
+                      "clotures": incidents.filter(statut=Incident.Statut.CLOTURE).count()},
+        "registre_osha": registre_osha(annee)["synthese"],
+        "permis": PermisTravail.objects.filter(date_debut__year=annee).count(),
+        "formations": FormationSecurite.objects.filter(date_session__year=annee, statut=FormationSecurite.Statut.REALISEE).count(),
+        "audits": AuditHse.objects.filter(date_realisation__year=annee).count(),
+        "actions_ouvertes": ActionHse.objects.exclude(statut=ActionHse.Statut.CLOTUREE).count(),
+        "environnement": consommations_annee(annee),
+        "dechets": dechets,
+        "plans_reduction": plans,
+    }
+
+
+def bilan_pdf(bilan, titre, revue=None):
+    f, i = bilan["frequence"], bilan["indicateurs"]
+    nd = lambda v, s="": "—" if v is None else f"{v}{s}"  # noqa: E731
+    blocs = [
+        ("Heures travaillées", f["heures"]), ("TRIR / LTIR / LTIFR", f"{nd(f['trir'])} / {nd(f['ltir'])} / {nd(f['ltifr'])}"),
+        ("Cas enregistrables / avec arrêt", f"{f['enregistrables']} / {f['avec_arret']} ({f['jours_perdus']} jours perdus)"),
+        ("Incidents (clôturés)", f"{bilan['incidents']['total']} ({bilan['incidents']['clotures']})"),
+        ("Par type", ", ".join(f"{k} : {v}" for k, v in bilan["incidents"]["par_type"].items()) or "—"),
+        ("Taux de formation", nd(i["taux_formation"], " %")), ("Taux de recyclage à jour", nd(i["taux_recyclage"], " %")),
+        ("Conformité ISO (score moyen des audits)", nd(i["conformite_iso"], " %")),
+        ("Incidents environnementaux", f"{i['incidents_environnement']} (taux {nd(i['taux_incidents_environnement'])})"),
+        ("Permis / formations / audits", f"{bilan['permis']} / {bilan['formations']} / {bilan['audits']}"),
+        ("Actions HSE ouvertes", bilan["actions_ouvertes"]),
+        ("Émissions", f"{bilan['environnement']['emissions_t_co2e']} t CO2e"),
+        ("Déchets", ", ".join(f"{d['type']} : {d['quantite']} {d['unite']}" for d in bilan["dechets"]) or "—"),
+        ("Plans de réduction", "; ".join(
+            f"{p['code']} {p['objectif']} ({p['statut']}"
+            + (f", réalisé {p['avancement']['realise_pct']} % / {p['cible_pct']} %" if p["avancement"] and p["avancement"]["realise_pct"] else "")
+            + ")" for p in bilan["plans_reduction"]) or "—"),
+    ]
+    if revue is not None:
+        blocs += [("Date de la revue", f"{revue.date_revue:%d/%m/%Y}"), ("Participants", revue.participants),
+                  ("Conclusions", revue.conclusions), ("Décisions", revue.decisions),
+                  ("Validée par", revue.validee_par), ("Validée le", f"{revue.validee_le:%d/%m/%Y}" if revue.validee_le else "—")]
+    tableau = [["Ressource", "Quantité", "Unité", "kg CO2e"]] + [
+        [lg["libelle"], lg["quantite"], lg["unite"], lg["emissions_kg_co2e"] or "—"] for lg in bilan["environnement"]["lignes"]
+    ]
+    return _pdf(titre, blocs, tableau)
