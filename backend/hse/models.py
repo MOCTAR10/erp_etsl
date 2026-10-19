@@ -69,6 +69,7 @@ class PermisTravail(models.Model):
         CLOTURE = "cloture", "Clôturé"
         REFUSE = "refuse", "Refusé"
         ANNULE = "annule", "Annulé"
+        EXPIRE = "expire", "Expiré"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
@@ -150,9 +151,13 @@ class PermisTravail(models.Model):
         "rh_paie.Employe", blank=True, related_name="permis_hse", verbose_name="Intervenants",
     )
     notes = models.TextField(blank=True, verbose_name="Notes")
+    photo = models.FileField(upload_to="hse/permis/photos/", blank=True, verbose_name="Photo de la zone")
+    plan = models.FileField(upload_to="hse/permis/plans/", blank=True, verbose_name="Plan / croquis")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    #: Statuts où le permis est figé (pièces jointes, intervenants).
+    STATUTS_FIGES = ("cloture", "refuse", "annule", "expire")
     #: Types de permis exigeant un test d'atmosphère avant démarrage.
     GAZ_TYPES = ("chaud", "confine", "atex", "chimique")
     #: Validité d'un test gaz (heures) - à confirmer avec la procédure HSE d'ETSL.

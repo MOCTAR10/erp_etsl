@@ -36,7 +36,12 @@ def _items(alertes):
 
 @shared_task
 def notifier_echeances():
-    """Prévient les responsables des échéances atteignant un palier J-90 / J-30 / J-15 / J-0 aujourd'hui."""
+    """Prévient les responsables des échéances atteignant un palier J-90 / J-30 / J-15 / J-0 aujourd'hui.
+
+    Passe d'abord en « expiré » les permis de travail dont la date de fin est dépassée (CDC M7-11)."""
+    from hse.services import expirer_permis
+
+    expirer_permis()
     debut_jour = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
     envoyees = 0
     for item in _items(alertes_agregees()):

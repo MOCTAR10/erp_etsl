@@ -86,14 +86,59 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         # Le visa d'un niveau se contrôle dans l'action (signataires par niveau) : un chef d'atelier (superviseur)
         # doit pouvoir y accéder, alors que les autres écritures restent au cercle de validation HSE.
-        if self.action == "valider":
+        # Demande, intervenants et pièces jointes : tout rôle d'écriture HSE (chef d'atelier demandeur, CDC M7-11) ;
+        # la séparation des tâches reste garantie au visa (le demandeur ne signe aucun niveau).
+        if self.action in ("valider", "create", "ajouter_intervenant", "joindre_photo", "joindre_plan"):
             return [CanManageHse()]
         return super().get_permissions()
 
     def perform_create(self, serializer):
         # Le demandeur est toujours l'auteur de la demande : sinon la séparation des tâches (le demandeur ne valide
         # pas son propre permis) se contourne en créant le permis « au nom » d'un collègue.
-        serializer.save(demandeur=self.request.user)
+        from .services import notifier_niveau_suivant
+
+        notifier_niveau_suivant(serializer.save(demandeur=self.request.user))
+
+    def _modifiable(self, permis):
+        if permis.statut in PermisTravail.STATUTS_FIGES:
+            raise serializers.ValidationError({"detail": f"Permis {permis.get_statut_display().lower()} : figé."})
+
+    @action(detail=True, methods=["post"], url_path="ajouter-intervenant")
+    def ajouter_intervenant(self, request, pk=None):
+        permis = self.get_object()
+        self._modifiable(permis)
+        employe = fk_input(request.data.get("employe"), Employe.objects.all(), "employe")
+        if employe is None:
+            raise serializers.ValidationError({"employe": "Salarié requis."})
+        permis.intervenants.add(employe)
+        return Response(self.get_serializer(permis).data)
+
+    @action(detail=True, methods=["post"], url_path="joindre-photo")
+    def joindre_photo(self, request, pk=None):
+        return self._joindre(request, "photo")
+
+    @action(detail=True, methods=["post"], url_path="joindre-plan")
+    def joindre_plan(self, request, pk=None):
+        return self._joindre(request, "plan")
+
+    def _joindre(self, request, piece):
+        """Photo de la zone ou plan / croquis du permis (CDC M7-11) : images ou PDF, 10 Mo au plus."""
+        import os
+
+        from .services import PIECE_TAILLE_MAX, PIECES_PERMIS
+
+        permis = self.get_object()
+        self._modifiable(permis)
+        fichier = request.FILES.get("fichier")
+        if fichier is None:
+            raise serializers.ValidationError({"fichier": "Fichier requis."})
+        if os.path.splitext(fichier.name)[1].lower() not in PIECES_PERMIS[piece]:
+            raise serializers.ValidationError({"fichier": f"Formats acceptés : {', '.join(PIECES_PERMIS[piece])}."})
+        if fichier.size > PIECE_TAILLE_MAX:
+            raise serializers.ValidationError({"fichier": "Fichier trop volumineux (10 Mo au plus)."})
+        getattr(permis, piece).save(fichier.name, fichier, save=False)
+        permis.save(update_fields=[piece, "updated_at"])
+        return Response(self.get_serializer(permis).data)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -150,6 +195,10 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
             permis.validateur = request.user
             permis.date_validation = maintenant
         permis.save()
+        if permis.statut == PermisTravail.Statut.DEMANDE:
+            from .services import notifier_niveau_suivant
+
+            notifier_niveau_suivant(permis)
         return Response(self.get_serializer(permis).data)
 
     @action(detail=True, methods=["post"], url_path="demarrer")
@@ -223,7 +272,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="cloturer")
     def cloturer(self, request, pk=None):
         permis = self.get_object()
-        if permis.statut not in (PermisTravail.Statut.ACTIF, PermisTravail.Statut.VALIDE):
+        if permis.statut not in (PermisTravail.Statut.ACTIF, PermisTravail.Statut.VALIDE, PermisTravail.Statut.EXPIRE):
             return Response(
                 {"detail": "Le permis n'est pas clôturable."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -285,9 +334,14 @@ def escalader_si_grave(incident):
         f"{timezone.localtime(incident.date_evenement):%d/%m/%Y %H:%M} à {incident.lieu} : {incident.description[:300]}. "
         "Investigation immédiate requise (CDC M7 §9.8)."
     )
+    direction = list(User.objects.filter(is_active=True, role__in=[User.Role.PDG, User.Role.DGA]))
+    from workflow.sms import envoyer_sms, sms_actif
+
+    if sms_actif():
+        transaction.on_commit(lambda: [envoyer_sms(u, f"{sujet} : {message}") for u in direction])
     Notification.objects.bulk_create([
         Notification(user=u, subject=sujet, message=message, kind="escalation")
-        for u in User.objects.filter(is_active=True, role__in=[User.Role.PDG, User.Role.DGA])
+        for u in direction
     ])
 
 

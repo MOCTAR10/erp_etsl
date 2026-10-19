@@ -81,7 +81,11 @@ export const fr = {
     conforme: "Conforme",
     nonConforme: "Non conforme",
     reserve: "Accepté sous réserve",
-    tabs: { pointage: "Pointage", gaz: "Test gaz", reception: "Réception", controle: "Contrôle / CND" },
+    tabs: { pointage: "Pointage", gaz: "Test gaz", reception: "Réception", controle: "Contrôle / CND", anomalie: "Anomalie HSE" },
+    anomalie: {
+      lieu: "Lieu", zone: "Zone", gravite: "Gravité", description: "Anomalie constatée",
+      gravites: { mineure: "Mineure", majeure: "Majeure", critique: "Critique" },
+    },
     fields: {
       ordre: "Ordre de fabrication", operateur: "Opérateur", date: "Date", heures: "Heures",
       permis: "Permis de travail", resultat: "Résultat", mesures: "Mesures (LIE, O2, H2S…)",
@@ -861,6 +865,7 @@ export const fr = {
       cloture: "Clôturé",
       refuse: "Refusé",
       annule: "Annulé",
+      expire: "Expiré",
     },
     criticite: {
       faible: "Risque faible",
@@ -1300,6 +1305,15 @@ export const fr = {
       annee: "Année revue", date: "Date de la revue", participants: "Participants", conclusions: "Conclusions", decisions: "Décisions et objectifs",
       aucune: "Aucune revue de direction enregistrée.", archivee: "· archivée en GED", completer: "Compléter",
       actualiser: "Actualiser le bilan", valider: "Valider et sceller", confirmValider: "Valider la revue ? Elle sera scellée et archivée en GED (10 ans).",
+    },
+    permisEcran: {
+      demander: "Demander un permis", type: "Type de permis", emplacement: "Emplacement / zone", description: "Nature des travaux",
+      mesures: "Mesures de prévention", debut: "Début", fin: "Fin", intervenant: "Ajouter un intervenant", salarie: "Salarié",
+      photo: "Joindre une photo", plan: "Joindre un plan", voirPhoto: "Photo", voirPlan: "Plan", intervenants: "Intervenants",
+    },
+    couts: {
+      title: "Coûts HSE par centre analytique (M7 → M11)", hint: "Charges comptabilisées imputées aux centres HSE (EPI, formations, médecine, déchets, environnement, sécurité) : sans ressaisie.",
+      annee: "Année", centre: "Centre", total: "Total", aucun: "Aucune charge imputée aux centres HSE cette année.",
     },
     params: { title: "Paramètres HSE (délais d'alerte, facteurs d'émission)" },
     actions: {

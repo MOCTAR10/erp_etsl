@@ -123,6 +123,11 @@ class Command(BaseCommand):
             )
             counters["axes"] += created
 
+        # Centres de coût HSE (imputation analytique des charges HSE, lue par M11).
+        from hse.services import centres_hse
+
+        centres_hse()
+
         xaf = Currency.objects.filter(code="XAF").first()
         _, created = Partner.objects.update_or_create(
             code="GR-0001",

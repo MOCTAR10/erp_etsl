@@ -839,7 +839,7 @@ export type TypePermis =
   | "electrique"
   | "fouille"
   | "chimique";
-export type StatutPermis = "demande" | "valide" | "actif" | "cloture" | "refuse" | "annule";
+export type StatutPermis = "demande" | "valide" | "actif" | "cloture" | "refuse" | "annule" | "expire";
 
 export interface PermisTravail {
   id: string;
@@ -870,6 +870,16 @@ export interface PermisTravail {
   test_gaz_resultat?: "" | "conforme" | "non_conforme";
   test_gaz_valeur?: string;
   test_gaz_valide?: boolean;
+  intervenants_noms?: string[];
+  photo?: string | null;
+  plan?: string | null;
+}
+
+export interface CoutsHseResult {
+  annee: number;
+  has_amount_access: boolean;
+  total: string | null;
+  rows: { centre: string; libelle: string; mois: (string | null)[]; total: string | null }[];
 }
 
 export type CriticiteRisque = "faible" | "moyenne" | "elevee" | "critique";

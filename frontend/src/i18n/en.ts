@@ -81,7 +81,11 @@ export const en = {
     conforme: "Conforming",
     nonConforme: "Non-conforming",
     reserve: "Accepted with reservation",
-    tabs: { pointage: "Timesheet", gaz: "Gas test", reception: "Goods receipt", controle: "Inspection / NDT" },
+    tabs: { pointage: "Timesheet", gaz: "Gas test", reception: "Goods receipt", controle: "Inspection / NDT", anomalie: "HSE hazard" },
+    anomalie: {
+      lieu: "Location", zone: "Area", gravite: "Severity", description: "Hazard observed",
+      gravites: { mineure: "Minor", majeure: "Major", critique: "Critical" },
+    },
     fields: {
       ordre: "Work order", operateur: "Operator", date: "Date", heures: "Hours",
       permis: "Work permit", resultat: "Result", mesures: "Readings (LEL, O2, H2S…)",
@@ -861,6 +865,7 @@ export const en = {
       cloture: "Closed",
       refuse: "Refused",
       annule: "Cancelled",
+      expire: "Expired",
     },
     criticite: {
       faible: "Low risk",
@@ -1300,6 +1305,15 @@ export const en = {
       annee: "Review year", date: "Review date", participants: "Participants", conclusions: "Conclusions", decisions: "Decisions and objectives",
       aucune: "No management review recorded.", archivee: "· archived in the DMS", completer: "Complete",
       actualiser: "Refresh report", valider: "Approve and seal", confirmValider: "Approve the review? It will be sealed and archived in the DMS (10 years).",
+    },
+    permisEcran: {
+      demander: "Request a permit", type: "Permit type", emplacement: "Location / area", description: "Scope of work",
+      mesures: "Preventive measures", debut: "Start", fin: "End", intervenant: "Add a worker", salarie: "Employee",
+      photo: "Attach a photo", plan: "Attach a plan", voirPhoto: "Photo", voirPlan: "Plan", intervenants: "Workers",
+    },
+    couts: {
+      title: "HSE costs by cost centre (M7 → M11)", hint: "Posted expenses charged to the HSE cost centres (PPE, training, occupational health, waste, environment, safety): no re-entry.",
+      annee: "Year", centre: "Centre", total: "Total", aucun: "No expense charged to the HSE centres this year.",
     },
     params: { title: "HSE settings (alert lead times, emission factors)" },
     actions: {

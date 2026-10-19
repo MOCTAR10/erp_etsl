@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { GrAffairesSection } from "../components/workflow/GrAffairesSection";
 import { MaintenanceCoutsSection } from "../components/workflow/MaintenanceM8Section";
+import { CoutsHseSection } from "../components/hse/HsePermisSection";
 import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaireSection";
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
@@ -351,6 +352,7 @@ export function ControleGestionPage() {
       <PilotageGestionSection fiscalYear={fy.data?.id} />
       <GrAffairesSection fiscalYear={fy.data?.id} />
       <MaintenanceCoutsSection />
+      <CoutsHseSection />
 
       {closed.length > 0 && (
         <SectionCard title={`${t("controleGestion.clotures")} · ${closed.length}`}>

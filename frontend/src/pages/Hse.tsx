@@ -22,6 +22,7 @@ import type {
 } from "../types";
 import { ConformiteHse } from "../components/hse/ConformiteHse";
 import { PermisActions } from "../components/workflow/PermisActions";
+import { DemandePermisForm, PermisPieces } from "../components/hse/HsePermisSection";
 import { ActionsHseSection, RegistreOshaSection } from "../components/hse/HseEcartsSection";
 import {
   AptitudesSection,
@@ -76,6 +77,7 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
         )}
       </span>
       <PermisActions permis={permis} />
+      <PermisPieces permis={permis} />
     </div>
   );
 }
@@ -380,6 +382,7 @@ export function HsePage() {
         </p>
       ) : null}
 
+      <DemandePermisForm />
       {permis.count > 0 || permis.search ? (
         <>
           <h3 className="section-heading">
