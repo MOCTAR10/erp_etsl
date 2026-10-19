@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { AlertesStock, ArticleStockConfig, CertificatMatiere, LotMatiere, ParametreStock, TraceabiliteEntry } from "../../types";
+import type { AlertesStock, ArticleStockConfig, AuditValorisation, CertificatMatiere, LotMatiere, ParametreStock, TraceabiliteEntry } from "../../types";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
 const OUI_NON = (t: (k: string) => string) => [
@@ -278,5 +278,71 @@ export function CertificatActions({ cert }: { cert: CertificatMatiere }) {
       )}
       {error && <p className="action-error" role="alert">{error}</p>}
     </>
+  );
+}
+
+/** Audit rétrospectif (CDC M5 §7.5) : rejoue les sorties d'un article dans un dépôt avec la méthode applicable
+ * (FIFO / PEPS, CUMP, prix standard) et compare au coût enregistré. Coûts masqués hors cercle des montants. */
+export function AuditValorisationSection({ depots, articles }: { depots: { id: string; code: string; label: string }[]; articles: { id: string; code: string; label: string }[] }) {
+  const { t } = useTranslation();
+  const [depot, setDepot] = useState("");
+  const [article, setArticle] = useState("");
+  const q = useQuery({
+    queryKey: ["stocks-audit", depot, article],
+    queryFn: () => api.get<AuditValorisation>(`/api/stocks/quants/audit-valorisation/?depot=${depot}&article=${article}`),
+    enabled: Boolean(depot && article),
+    retry: 0,
+  });
+  const montant = (v: string | null) => (v === null ? "••••••" : formatNumber(Number(v)));
+  return (
+    <SectionCard title={t("m5e.audit.title")}>
+      <div data-testid="audit-valorisation">
+        <p className="muted">{t("m5e.audit.hint")}</p>
+        <label>
+          {t("m5e.audit.depot")}{" "}
+          <select aria-label={t("m5e.audit.depot")} value={depot} onChange={(e) => setDepot(e.target.value)}>
+            <option value="">—</option>
+            {depots.map((d) => <option key={d.id} value={d.id}>{d.code} · {d.label}</option>)}
+          </select>
+        </label>{" "}
+        <label>
+          {t("m5e.audit.article")}{" "}
+          <select aria-label={t("m5e.audit.article")} value={article} onChange={(e) => setArticle(e.target.value)}>
+            <option value="">—</option>
+            {articles.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.label}</option>)}
+          </select>
+        </label>
+        {q.data && (
+          <>
+            <p role="status">{t("m5e.audit.resultat", { methode: t(`m5e.depot.methodes.${q.data.methode}`), n: q.data.ecarts })}</p>
+            {q.data.lignes.length > 0 && (
+              <table className="table">
+                <caption className="sr-only">{t("m5e.audit.title")}</caption>
+                <thead>
+                  <tr>
+                    <th>{t("m5e.audit.mouvement")}</th>
+                    <th className="num">{t("stocks.col.qty")}</th>
+                    <th className="num">{t("m5e.audit.enregistre")}</th>
+                    <th className="num">{t("m5e.audit.recalcule")}</th>
+                    <th className="num">{t("m5e.audit.ecart")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {q.data.lignes.map((l) => (
+                    <tr key={l.mouvement}>
+                      <td>{l.mouvement} <span className="muted">· {formatDate(l.date)}</span></td>
+                      <td className="num">{formatNumber(Number(l.quantite))}</td>
+                      <td className="num">{montant(l.cout_enregistre)}</td>
+                      <td className="num">{montant(l.cout_recalcule)}</td>
+                      <td className="num">{montant(l.ecart)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+      </div>
+    </SectionCard>
   );
 }

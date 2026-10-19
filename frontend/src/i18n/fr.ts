@@ -1278,7 +1278,17 @@ export const fr = {
       nouveau: "Nouveau certificat MTC / CoC", emission: "Date d'émission", validation: "Validation QA/QC", aValider: "À valider",
       valider: "Valider", resultat: "Résultat de la validation…", joindre: "Joindre le scan", ged: "Scan archivé en GED",
     },
-    depot: { nouveau: "Nouveau dépôt", label: "Désignation du dépôt", site: "Site / localisation" },
+    depot: {
+      nouveau: "Nouveau dépôt", label: "Désignation du dépôt", site: "Site / localisation",
+      methode: "Méthode de valorisation (vide = celle de l'article)", gr: "Site GLOBAL RENTAL (consultation seule)",
+      methodes: { fifo: "FIFO / PEPS", peps: "FIFO / PEPS", cump: "CUMP (coût moyen pondéré)", pp: "Prix standard" },
+    },
+    audit: {
+      title: "Audit rétrospectif de la valorisation", hint: "Rejoue les sorties d'un article dans un dépôt avec la méthode applicable et compare au coût enregistré.",
+      depot: "Dépôt", article: "Article", resultat: "Méthode appliquée : {{methode}} · {{n}} écart(s) de coût.",
+      mouvement: "Sortie", enregistre: "Coût enregistré", recalcule: "Coût recalculé", ecart: "Écart",
+    },
+    valo: { ecriture: "Écriture de variation (STK)" },
     mvt: { ordre: "Ordre de fabrication (sortie vers production)", bonSortie: "Bon de sortie" },
   },
   m8e: {

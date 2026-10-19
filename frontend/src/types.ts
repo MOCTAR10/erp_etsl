@@ -542,6 +542,14 @@ export interface ValorisationMensuelle {
   consommation: string | null;
   ventilation: Array<{ axe: string; libelle: string; valeur: string | null }>;
   has_amount_access: boolean;
+  move_number: string | null;
+  motif_ecriture: string;
+}
+
+export interface AuditValorisation {
+  methode: string;
+  ecarts: number;
+  lignes: { mouvement: string; date: string; quantite: string; cout_enregistre: string | null; cout_recalcule: string | null; ecart: string | null }[];
 }
 
 export interface PlanInventaireTournant {

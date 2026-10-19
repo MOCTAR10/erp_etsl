@@ -118,6 +118,130 @@ def controler_sortie_lot(mouvement):
         )
 
 
+def methode_valorisation(depot, article):
+    """Méthode applicable : celle du dépôt si elle est fixée, sinon celle de l'article, à défaut CUMP. FIFO = PEPS."""
+    methode = depot.methode_valorisation if depot is not None else ""
+    if not methode:
+        cfg = ArticleStock.objects.filter(article=article).only("methode").first()
+        methode = cfg.methode if cfg else "cump"
+    return "fifo" if methode in ("fifo", "peps") else methode
+
+
+def prix_standard(article):
+    cfg = ArticleStock.objects.filter(article=article).only("prix_standard").first()
+    return cfg.prix_standard if cfg and cfg.prix_standard > 0 else None
+
+
+def couches_fifo(depot, article, lot, exclure=None):
+    """Couches FIFO restantes [quantité, coût unitaire] d'un quant (dépôt, article, lot), par rejeu chronologique
+    des mouvements exécutés : chaque entrée ouvre une couche à son coût, chaque sortie consomme les plus anciennes."""
+    from collections import deque
+
+    from django.db.models import Q
+
+    qs = MouvementStock.objects.filter(executed=True, article=article).filter(Q(source=depot) | Q(destination=depot))
+    qs = qs.filter(lot=lot) if lot else qs.filter(lot__isnull=True)
+    if exclure is not None:
+        qs = qs.exclude(pk=exclure.pk)
+    couches = deque()
+    for m in qs.order_by("date", "created_at", "code"):
+        if m.destination_id == depot.pk and m.source_id != depot.pk:
+            couches.append([m.quantite, m.cout_unitaire])
+        elif m.source_id == depot.pk and m.destination_id != depot.pk:
+            _consommer(couches, m.quantite)
+    return couches
+
+
+def _consommer(couches, quantite):
+    """Retire `quantite` des couches les plus anciennes ; renvoie le coût total retiré."""
+    from decimal import Decimal
+
+    reste, cout = Decimal(quantite), Decimal("0")
+    while reste > 0 and couches:
+        q, c = couches[0]
+        pris = min(q, reste)
+        cout += pris * c
+        reste -= pris
+        if pris >= q:
+            couches.popleft()
+        else:
+            couches[0][0] = q - pris
+    return cout
+
+
+def cout_sortie(mouvement, src):
+    """Coût unitaire de sortie selon la méthode du dépôt / de l'article (CDC M5 §7.5) : CUMP (valeur moyenne du
+    quant), FIFO / PEPS (couches les plus anciennes), prix standard."""
+    from decimal import Decimal
+
+    quantite_src = Decimal(src.quantity)
+    methode = methode_valorisation(mouvement.source, mouvement.article)
+    if methode == "pp" and prix_standard(mouvement.article):
+        return prix_standard(mouvement.article)
+    if methode == "fifo" and quantite_src > 0:
+        couches = couches_fifo(mouvement.source, mouvement.article, mouvement.lot, exclure=mouvement)
+        if sum((q for q, _ in couches), Decimal("0")) >= Decimal(mouvement.quantite):
+            return (_consommer(couches, mouvement.quantite) / Decimal(mouvement.quantite)).quantize(Decimal("0.0001"))
+    return src.stock_value / src.quantity if float(src.quantity) > 0 else 0
+
+
+def controler_depot(mouvement, user=None):
+    """Sites GLOBAL RENTAL en lecture seule ; fonctions autorisées par dépôt (CDC M5 §7.3 / §7.5)."""
+    for depot in (mouvement.source, mouvement.destination):
+        if depot is None:
+            continue
+        if depot.is_global_rental:
+            raise ValueError(f"Dépôt {depot.code} : site GLOBAL RENTAL consultable en lecture seule, aucun mouvement ETSL.")
+        if user is not None and depot.roles_autorises and not (user.is_staff or user.role == User.Role.ADMIN
+                                                               or user.role in depot.roles_autorises):
+            raise ValueError(f"Dépôt {depot.code} : votre fonction n'est pas autorisée à y mouvementer du stock.")
+
+
+def audit_valorisation(depot, article, lot=None):
+    """Audit rétrospectif : rejoue les sorties du quant avec la méthode applicable et compare au coût enregistré."""
+    from collections import deque
+    from decimal import Decimal
+
+    from django.db.models import Q
+
+    methode = methode_valorisation(depot, article)
+    qs = MouvementStock.objects.filter(executed=True, article=article).filter(Q(source=depot) | Q(destination=depot))
+    qs = qs.filter(lot=lot) if lot else qs.filter(lot__isnull=True)
+    couches, quantite, valeur, lignes = deque(), Decimal("0"), Decimal("0"), []
+    for m in qs.order_by("date", "created_at", "code"):
+        entree = m.destination_id == depot.pk and m.source_id != depot.pk
+        if entree:
+            couches.append([m.quantite, m.cout_unitaire])
+            quantite += m.quantite
+            valeur += m.quantite * m.cout_unitaire
+            continue
+        if methode == "fifo":
+            attendu = _consommer(couches, m.quantite) / m.quantite
+        elif methode == "pp" and prix_standard(article):
+            attendu = prix_standard(article)
+            _consommer(couches, m.quantite)
+        else:
+            attendu = valeur / quantite if quantite > 0 else Decimal("0")
+            _consommer(couches, m.quantite)
+        quantite -= m.quantite
+        valeur -= m.quantite * attendu
+        lignes.append({
+            "mouvement": m.code, "date": m.date, "quantite": m.quantite, "cout_enregistre": m.cout_unitaire,
+            "cout_recalcule": attendu.quantize(Decimal("0.0001")),
+            "ecart": (m.cout_unitaire - attendu).quantize(Decimal("0.0001")),
+        })
+    return {"methode": methode, "lignes": lignes, "ecarts": sum(1 for row in lignes if abs(row["ecart"]) >= Decimal("0.01"))}
+
+
+COMPTES_STOCK = {
+    # type d'article : (compte de stock classe 3, compte de variation 603)
+    "produit": ("310000", "603100"),
+    "matiere": ("320000", "603200"),
+    "consommable": ("330000", "603300"),
+    "service": ("330000", "603300"),
+}
+
+
 @transaction.atomic
 def apply_move(mouvement):
     """Applique un mouvement aux quants (double-entrée) et aux lots.
@@ -128,6 +252,7 @@ def apply_move(mouvement):
     if mouvement.executed:
         return mouvement
     controler_lot_obligatoire(mouvement.article_id, mouvement.lot_id)
+    controler_depot(mouvement)
     controler_sortie_lot(mouvement)
     prix = mouvement.prix_unitaire
     cout = prix
@@ -138,7 +263,7 @@ def apply_move(mouvement):
                 f"Stock insuffisant au dépôt {mouvement.source.label} : "
                 f"{float(src.quantity)} dispo pour {float(mouvement.quantite)}."
             )
-        unit_cost = src.stock_value / src.quantity if float(src.quantity) > 0 else 0
+        unit_cost = cout_sortie(mouvement, src)
         if mouvement.destination:
             # Transfert : la destination reçoit au COÛT de la source (valeur conservée),
             # jamais au « prix unitaire » saisi (0 par défaut => valeur détruite).
@@ -151,6 +276,8 @@ def apply_move(mouvement):
             src.stock_value = 0
         src.save(update_fields=["quantity", "stock_value", "updated_at"])
     if mouvement.destination:
+        if methode_valorisation(mouvement.destination, mouvement.article) == "pp" and not mouvement.source:
+            prix = prix_standard(mouvement.article) or prix  # entrée au prix standard (écart de prix non stocké)
         dst = _quant(mouvement.destination, mouvement.article, mouvement.lot)
         nouveau_qty = dst.quantity + mouvement.quantite
         if float(dst.quantity) > 0 or float(prix) <= 0:
@@ -220,14 +347,9 @@ def valuation(depot_id=None):
         quants = quants.filter(depot_id=depot_id)
     rows = []
     for quant in quants:
-        config = getattr(quant.article, "stock_config", None)
-        method = "cump"
-        if config and config.methode:
-            method = config.methode
-        value = float(quant.stock_value)
+        method = methode_valorisation(quant.depot, quant.article)
+        value = float(quant.stock_value)  # tenue par apply_move selon la méthode applicable
         qty = float(quant.quantity)
-        if method == "pp" and config:
-            value = qty * float(config.prix_standard)
         rows.append(
             {
                 "depot": quant.depot.code,
