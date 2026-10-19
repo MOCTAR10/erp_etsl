@@ -24,7 +24,7 @@ class ParcoursDemoLotATests(TestCase):
         call_command("seed_all_demo", verbosity=0)
 
     def test_affaires_confirmees_generent_un_of_par_type(self):
-        for titre, scope in (("atelier", "atelier"), ("chantier", "chantier")):
+        for titre, scope in (("spools", "atelier"), ("chantier", "chantier")):
             affaire = Affaire.objects.get(title__startswith="Parcours demo", title__icontains=titre)
             self.assertEqual(affaire.status, Affaire.Status.EN_COURS)  # revue validée + CRRL tenu + démarrage
             self.assertEqual(OrdreFabrication.objects.get(affaire=affaire).scope, scope)
