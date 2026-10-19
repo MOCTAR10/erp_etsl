@@ -8,7 +8,15 @@ from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from rest_framework.permissions import BasePermission
+
+from config.inputs import fk_input
+from rh_paie.models import Employe
+from users.models import User
+
 from .models import (
+    AptitudeMedicale,
+    ParametreHse,
     ActionHse,
     AuditHse,
     BordereauDechet,
@@ -25,6 +33,9 @@ from .models import (
     PlanUrgence,
 )
 from .serializers import (
+    AptitudeMedicaleSerializer,
+    ParametreHseSerializer,
+    PersonnelHseSerializer,
     ActionHseSerializer,
     AuditHseSerializer,
     BordereauDechetSerializer,
@@ -41,6 +52,7 @@ from .serializers import (
     PlanUrgenceSerializer,
 )
 from .services import (
+    publier_formation_rh,
     PERMIS_NIVEAU_LIBELLES,
     CanManageHse,
     CanValidateHse,
@@ -593,6 +605,41 @@ class FormationSecuriteViewSet(viewsets.ModelViewSet):
             qs = qs.filter(statut=FormationSecurite.Statut.PLANIFIEE)
         return qs
 
+    def _apres_enregistrement(self, formation):
+        formation.nb_participants = formation.participants.count() or formation.nb_participants
+        formation.save(update_fields=["nb_participants"])
+        if formation.statut == FormationSecurite.Statut.REALISEE:
+            publier_formation_rh(formation)
+
+    def perform_create(self, serializer):
+        self._apres_enregistrement(serializer.save())
+
+    def perform_update(self, serializer):
+        self._apres_enregistrement(serializer.save())
+
+    @action(detail=True, methods=["post"], url_path="ajouter-participant")
+    @transaction.atomic
+    def ajouter_participant(self, request, pk=None):
+        formation = self.get_object()
+        employe = fk_input(request.data.get("employe"), Employe.objects.all(), "employe")
+        if employe is None:
+            raise serializers.ValidationError({"employe": "Salarié requis."})
+        formation.participants.add(employe)
+        self._apres_enregistrement(formation)
+        return Response(self.get_serializer(formation).data)
+
+    @action(detail=True, methods=["post"], url_path="realiser")
+    @transaction.atomic
+    def realiser(self, request, pk=None):
+        """Session réalisée : chaque participant reçoit sa qualification RH (certificat, échéance de recyclage)."""
+        formation = self.get_object()
+        if not formation.participants.exists():
+            raise serializers.ValidationError({"participants": "Ajouter les participants avant de valider la session."})
+        formation.statut = FormationSecurite.Statut.REALISEE
+        formation.save(update_fields=["statut", "updated_at"])
+        self._apres_enregistrement(formation)
+        return Response(self.get_serializer(formation).data)
+
 
 class EpiViewSet(viewsets.ModelViewSet):
     queryset = Epi.objects.select_related("beneficiaire").all()
@@ -614,6 +661,30 @@ class EpiViewSet(viewsets.ModelViewSet):
                 date_renouvellement__lte=j30,
             )
         return qs
+
+    @action(detail=False, methods=["get"], url_path="fiche-dotation")
+    def fiche_dotation(self, request):
+        """Fiche individuelle de dotation EPI d'un salarié (`?employe=`), PDF avec `&export=pdf`."""
+        from django.http import HttpResponse
+
+        from .services import _pdf
+
+        employe = fk_input(request.query_params.get("employe"), Employe.objects.all(), "employe")
+        if employe is None:
+            raise serializers.ValidationError({"employe": "Salarié requis."})
+        epi = Epi.objects.filter(employe=employe).order_by("-date_dotation")
+        if request.query_params.get("export") != "pdf":
+            return Response(EpiSerializer(epi, many=True, context=self.get_serializer_context()).data)
+        tableau = [["EPI", "Désignation", "Taille", "Dotation", "Renouvellement", "Statut"]] + [
+            [e.get_type_epi_display(), e.designation, e.taille or "—", f"{e.date_dotation:%d/%m/%Y}",
+             f"{e.date_renouvellement:%d/%m/%Y}" if e.date_renouvellement else "—", e.get_statut_display()]
+            for e in epi
+        ]
+        contenu = _pdf(f"Fiche individuelle de dotation EPI — {employe}", [("Matricule", employe.code)],
+                       tableau if len(tableau) > 1 else None)
+        reponse = HttpResponse(contenu, content_type="application/pdf")
+        reponse["Content-Disposition"] = f'inline; filename="dotation-epi-{employe.code}.pdf"'
+        return reponse
 
 
 class BordereauDechetViewSet(viewsets.ModelViewSet):
@@ -778,3 +849,83 @@ class ExerciceUrgenceViewSet(viewsets.ModelViewSet):
         if plan := self.request.query_params.get("plan"):
             qs = qs.filter(plan_id=plan)
         return qs
+
+
+HSE_SANTE_ROLES = (
+    User.Role.ADMIN, User.Role.HSE, User.Role.RH, User.Role.PDG, User.Role.DGA, User.Role.DIRECTION,
+    User.Role.DIRECTEUR_OPERATIONS,
+)
+
+
+class CanAptitude(BasePermission):
+    """Données d'aptitude médicale : HSE, RH et direction seulement (lecture comme écriture)."""
+
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(u and u.is_authenticated and (u.is_staff or u.role in HSE_SANTE_ROLES))
+
+
+class AptitudeMedicaleViewSet(viewsets.ModelViewSet):
+    queryset = AptitudeMedicale.objects.select_related("employe").all()
+    serializer_class = AptitudeMedicaleSerializer
+    permission_classes = [CanAptitude]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if employe := self.request.query_params.get("employe"):
+            qs = qs.filter(employe_id=employe)
+        return qs
+
+
+class PersonnelHseViewSet(viewsets.ReadOnlyModelViewSet):
+    """Annuaire minimal du personnel (identité seulement) pour les saisies HSE : EPI, formations, aptitudes."""
+
+    queryset = Employe.objects.all().order_by("nom", "prenom")
+    serializer_class = PersonnelHseSerializer
+    permission_classes = [CanManageHse]
+    search_fields = ("code", "nom", "prenom")
+
+    @action(detail=True, methods=["get"], url_path="passeport")
+    def passeport(self, request, pk=None):
+        """Passeport sécurité du salarié (formations, habilitations, aptitude, EPI) ; `?export=pdf`."""
+        from django.http import HttpResponse
+
+        from .services import passeport_pdf, passeport_securite
+
+        employe = self.get_object()
+        if request.query_params.get("export") == "pdf":
+            reponse = HttpResponse(passeport_pdf(employe), content_type="application/pdf")
+            reponse["Content-Disposition"] = f'inline; filename="passeport-securite-{employe.code}.pdf"'
+            return reponse
+        donnees = passeport_securite(employe)
+        if not CanAptitude().has_permission(request, self):
+            donnees["aptitude"] = None  # secret médical : seulement HSE, RH, direction
+        return Response(donnees)
+
+
+class ParametreHseViewSet(viewsets.ModelViewSet):
+    queryset = ParametreHse.objects.all()
+    serializer_class = ParametreHseSerializer
+    permission_classes = [CanManageHse]
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        from .services import PARAMETRES_HSE_DEFAUT, get_param_hse
+
+        for code in PARAMETRES_HSE_DEFAUT:
+            get_param_hse(code)
+        return super().get_queryset()
+
+    def create(self, request, *args, **kwargs):
+        return Response({"detail": "Paramètres prédéfinis : modification seulement."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        if not can_validate_hse(request.user):
+            return Response({"detail": "Confirmation réservée au HSE et à la hiérarchie."}, status=status.HTTP_403_FORBIDDEN)
+        p = self.get_object()
+        p.statut_valeur = ParametreHse.StatutValeur.CONFIRME
+        p.confirme_par = request.user
+        p.confirme_le = timezone.now()
+        p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(p).data)

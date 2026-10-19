@@ -1258,6 +1258,27 @@ export const en = {
       planAction: "Set the action plan", causeProfonde: "Root cause identified?", rex: "Lessons learned?",
       ncr: "Open an HSE NCR", ncrPrompt: "Deviation found (HSE NCR)?", pdf: "PDF report", archive: "Report archived in the DMS (10 years)",
     },
+    perso: {
+      title: "Staff: safety passport, PPE, medical fitness (M7)", doterEpi: "Issue PPE", aptitude: "Record medical fitness",
+      salarie: "Employee", typeEpi: "PPE type", designation: "Description", taille: "Size", renouvellement: "Renew on",
+      visite: "Visit date", validite: "Valid until", resultat: "Result", restrictions: "Restrictions", medecin: "Occupational physician",
+      resultats: { apte: "Fit", apte_restrictions: "Fit with restrictions", inapte: "Unfit" },
+      passeportDe: "Employee safety passport", choisir: "Choose an employee…", passeportPdf: "Safety passport (PDF)",
+      dotationPdf: "PPE issue sheet (PDF)", aptitudeEtat: "Fitness: {{resultat}}", aptitudeInconnue: "Medical fitness not recorded",
+      passeport: "Safety passport", sansEcheance: "no expiry", aptitudes: "Medical fitness",
+    },
+    form: {
+      title: "Named HSE training (M7-05)", hint: "A validated session becomes an HR qualification for each attendee, with its refresher due date.",
+      nouvelle: "New session", type: "Type", theme: "Topic", date: "Date", validite: "Validity (months) before refresher", organisme: "Provider",
+      types: { formation: "Classroom training", demonstration: "Practical demonstration", causerie: "Toolbox talk", exercice: "Drill", campagne: "Campaign", recyclage: "Refresher" },
+      recyclage: "refresher at {{n}} months", ajouter: "Add an attendee", participant: "Attendee…", realiser: "Validate completed session",
+    },
+    exig: {
+      title: "Qualifications required per permit type (M7-09)", hint: "Each permit worker must hold a valid HR qualification whose title contains the keyword; checked at start.",
+      nouvelle: "New requirement", typePermis: "Permit type", motCle: "Qualification keyword", aucune: "No requirement: no qualification block.",
+      supprimer: "Delete", confirmSupprimer: "Delete this requirement?",
+    },
+    params: { title: "HSE settings (alert lead times)" },
     actions: {
       title: "Open HSE actions", aucune: "No open HSE action.", solder: "Close", efficace: "Effectiveness verified?",
     },

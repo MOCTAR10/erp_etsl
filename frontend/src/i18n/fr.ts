@@ -1258,6 +1258,27 @@ export const fr = {
       planAction: "Arrêter le plan d'action", causeProfonde: "Cause profonde identifiée ?", rex: "Retour d'expérience (REX) ?",
       ncr: "Ouvrir une NCR-HSE", ncrPrompt: "Écart constaté (NCR-HSE) ?", pdf: "Rapport PDF", archive: "Rapport archivé en GED (10 ans)",
     },
+    perso: {
+      title: "Personnel : passeport sécurité, EPI, aptitudes (M7)", doterEpi: "Doter un EPI", aptitude: "Saisir une aptitude médicale",
+      salarie: "Salarié", typeEpi: "Type d'EPI", designation: "Désignation", taille: "Taille", renouvellement: "À renouveler le",
+      visite: "Date de visite", validite: "Valable jusqu'au", resultat: "Résultat", restrictions: "Restrictions", medecin: "Médecin du travail",
+      resultats: { apte: "Apte", apte_restrictions: "Apte avec restrictions", inapte: "Inapte" },
+      passeportDe: "Passeport sécurité du salarié", choisir: "Choisir un salarié…", passeportPdf: "Passeport sécurité (PDF)",
+      dotationPdf: "Fiche de dotation EPI (PDF)", aptitudeEtat: "Aptitude : {{resultat}}", aptitudeInconnue: "Aptitude médicale non renseignée",
+      passeport: "Passeport sécurité", sansEcheance: "sans échéance", aptitudes: "Aptitudes médicales",
+    },
+    form: {
+      title: "Formations HSE nominatives (M7-05)", hint: "Une session validée devient une qualification RH de chaque participant, avec son échéance de recyclage.",
+      nouvelle: "Nouvelle session", type: "Type", theme: "Thème", date: "Date", validite: "Validité (mois) avant recyclage", organisme: "Organisme",
+      types: { formation: "Formation en salle", demonstration: "Démonstration pratique", causerie: "Causerie sécurité", exercice: "Exercice", campagne: "Campagne", recyclage: "Recyclage" },
+      recyclage: "recyclage à {{n}} mois", ajouter: "Ajouter un participant", participant: "Participant…", realiser: "Valider la session réalisée",
+    },
+    exig: {
+      title: "Habilitations exigées par type de permis (M7-09)", hint: "Chaque intervenant du permis doit détenir une qualification RH valide dont l'intitulé contient le mot-clé ; contrôle au démarrage.",
+      nouvelle: "Nouvelle exigence", typePermis: "Type de permis", motCle: "Mot-clé de la qualification", aucune: "Aucune exigence : aucun blocage par habilitation.",
+      supprimer: "Supprimer", confirmSupprimer: "Supprimer cette exigence ?",
+    },
+    params: { title: "Paramètres HSE (délais d'alerte)" },
     actions: {
       title: "Actions HSE ouvertes", aucune: "Aucune action HSE ouverte.", solder: "Solder", efficace: "Efficacité vérifiée ?",
     },

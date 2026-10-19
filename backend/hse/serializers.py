@@ -3,7 +3,11 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from rh_paie.models import Employe
+
 from .models import (
+    AptitudeMedicale,
+    ParametreHse,
     ActionHse,
     AuditHse,
     BordereauDechet,
@@ -189,14 +193,28 @@ class FormationSecuriteSerializer(serializers.ModelSerializer):
     type_label = serializers.CharField(source="get_type_session_display", read_only=True)
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
 
+    participants = serializers.PrimaryKeyRelatedField(many=True, required=False, queryset=Employe.objects.all())
+    participants_noms = serializers.SerializerMethodField()
+
     class Meta:
         model = FormationSecurite
         fields = [
+            "participants", "participants_noms", "validite_mois",
             "id", "code", "type_session", "type_label", "theme", "formateur",
             "organisme", "date_session", "duree_heures", "nb_participants",
             "evalue", "statut", "statut_label", "notes", "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        read_only_fields = ["code", "nb_participants"]
+
+    def get_participants_noms(self, obj):
+        return [str(e) for e in obj.participants.all()]
+
+    def validate(self, attrs):
+        participants = attrs.pop("participants", None)  # M2M hors du constructeur (piège AGENTS n°2)
+        attrs = _apply_and_validate(self, attrs)
+        if participants is not None:
+            attrs["participants"] = participants
+        return attrs
 
 
 class EpiSerializer(serializers.ModelSerializer):
@@ -207,9 +225,15 @@ class EpiSerializer(serializers.ModelSerializer):
     )
     a_renouveler = serializers.BooleanField(read_only=True)
 
+    employe_nom = serializers.SerializerMethodField()
+
+    def get_employe_nom(self, obj):
+        return str(obj.employe) if obj.employe_id else None
+
     class Meta:
         model = Epi
         fields = [
+            "employe", "employe_nom",
             "id", "code", "type_epi", "type_label", "designation", "taille",
             "beneficiaire", "beneficiaire_name", "date_dotation",
             "date_renouvellement", "a_renouveler", "statut", "statut_label",
@@ -346,3 +370,51 @@ class PlanUrgenceSerializer(serializers.ModelSerializer):
             "dernier_exercice", "prochain_exercice", "en_retard", "created_at", "updated_at",
         ]
         read_only_fields = ["code"]
+
+
+class AptitudeMedicaleSerializer(serializers.ModelSerializer):
+    employe_nom = serializers.SerializerMethodField()
+    resultat_label = serializers.CharField(source="get_resultat_display", read_only=True)
+
+    class Meta:
+        model = AptitudeMedicale
+        fields = ["id", "employe", "employe_nom", "date_visite", "date_validite", "resultat", "resultat_label",
+                  "restrictions", "medecin", "created_at"]
+
+    def get_employe_nom(self, obj):
+        return str(obj.employe)
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs, exclude=())
+
+
+class ParametreHseSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ParametreHse
+        fields = ["id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le"]
+        read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
+
+    def validate_valeur(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("La valeur doit être strictement positive.")
+        return value
+
+    def update(self, instance, validated_data):
+        if "valeur" in validated_data and validated_data["valeur"] != instance.valeur:
+            instance.statut_valeur = ParametreHse.StatutValeur.PROVISOIRE
+            instance.confirme_par = None
+            instance.confirme_le = None
+        return super().update(instance, validated_data)
+
+
+class PersonnelHseSerializer(serializers.ModelSerializer):
+    nom_complet = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Employe
+        fields = ["id", "code", "nom_complet"]
+
+    def get_nom_complet(self, obj):
+        return str(obj)

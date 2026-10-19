@@ -23,6 +23,13 @@ import type {
 import { ConformiteHse } from "../components/hse/ConformiteHse";
 import { PermisActions } from "../components/workflow/PermisActions";
 import { ActionsHseSection, RegistreOshaSection } from "../components/hse/HseEcartsSection";
+import {
+  AptitudesSection,
+  ExigencesPermisSection,
+  FormationsNominativesSection,
+  ParametresHseSection,
+  PersonnelHseSection,
+} from "../components/hse/HsePersonnelSection";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
 
@@ -412,6 +419,11 @@ export function HsePage() {
       <ConformiteHse />
       <ActionsHseSection />
       <RegistreOshaSection />
+      <PersonnelHseSection />
+      <FormationsNominativesSection />
+      <AptitudesSection />
+      <ExigencesPermisSection />
+      <ParametresHseSection />
       {(bsd.count > 0 || bsd.search) && (
         <SectionCard title={`${t("hse.bsd")} · ${bsd.count}`}>
           <PagedDataTable list={bsd} columns={bsdColumns(t)} caption={t("hse.bsd")} searchPlaceholder={t("hse.searchBsd")} />

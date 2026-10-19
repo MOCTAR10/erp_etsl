@@ -588,6 +588,12 @@ class FormationSecurite(models.Model):
         max_digits=5, decimal_places=2, default=1, verbose_name="Durée (h)"
     )
     nb_participants = models.PositiveIntegerField(default=0, verbose_name="Participants")
+    participants = models.ManyToManyField(
+        "rh_paie.Employe", blank=True, related_name="formations_hse", verbose_name="Participants (nominatif)"
+    )
+    validite_mois = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name="Validité (mois) avant recyclage", help_text="Vide = sans échéance."
+    )
     evalue = models.BooleanField(default=False, verbose_name="Évaluation des acquis réalisée")
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.PLANIFIEE, verbose_name="Statut"
@@ -645,6 +651,10 @@ class Epi(models.Model):
         on_delete=models.SET_NULL,
         related_name="hse_epi",
         verbose_name="Bénéficiaire",
+    )
+    employe = models.ForeignKey(
+        "rh_paie.Employe", null=True, blank=True, on_delete=models.PROTECT, related_name="epi_dotes",
+        verbose_name="Salarié doté (fiche individuelle)",
     )
     date_dotation = models.DateField(default=timezone.localdate, verbose_name="Date de dotation")
     date_renouvellement = models.DateField(null=True, blank=True, verbose_name="Renouvellement")
@@ -984,3 +994,64 @@ class ExerciceUrgence(models.Model):
             raise ValidationError({"date_exercice": "Un exercice ne peut pas être daté dans le futur."})
         if self.resultat == self.Resultat.INSUFFISANT and not (self.observations or "").strip():
             raise ValidationError({"observations": "Observations obligatoires pour un exercice insuffisant."})
+
+
+class AptitudeMedicale(models.Model):
+    """Visite médicale d'aptitude (CDC M7-05 « certificats médicaux ») : résultat et validité par salarié."""
+
+    class Resultat(models.TextChoices):
+        APTE = "apte", "Apte"
+        APTE_RESTRICTIONS = "apte_restrictions", "Apte avec restrictions"
+        INAPTE = "inapte", "Inapte"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    employe = models.ForeignKey("rh_paie.Employe", on_delete=models.PROTECT, related_name="aptitudes", verbose_name="Salarié")
+    date_visite = models.DateField(verbose_name="Date de la visite")
+    date_validite = models.DateField(null=True, blank=True, verbose_name="Valable jusqu'au")
+    resultat = models.CharField(max_length=18, choices=Resultat.choices, default=Resultat.APTE, verbose_name="Résultat")
+    restrictions = models.TextField(blank=True, verbose_name="Restrictions / aménagements")
+    medecin = models.CharField(max_length=120, blank=True, verbose_name="Médecin du travail")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_visite"]
+        verbose_name = "Aptitude médicale"
+        verbose_name_plural = "Aptitudes médicales"
+
+    def __str__(self):
+        return f"{self.employe} — {self.get_resultat_display()} ({self.date_visite})"
+
+    def clean(self):
+        if self.date_validite and self.date_validite < self.date_visite:
+            raise ValidationError({"date_validite": "La validité doit suivre la date de visite."})
+        if self.resultat == self.Resultat.APTE_RESTRICTIONS and not self.restrictions.strip():
+            raise ValidationError({"restrictions": "Préciser les restrictions."})
+
+
+class ParametreHse(models.Model):
+    """Paramètres M7 modifiables par ETSL (délais d'alerte) : défauts provisoires tant qu'ETSL ne les confirme pas."""
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE)
+    confirme_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    confirme_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre HSE"
+        verbose_name_plural = "Paramètres HSE"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
