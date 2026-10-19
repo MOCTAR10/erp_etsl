@@ -69,7 +69,12 @@ class QuarantaineTests(_Base):
 
     def test_nc_matiere_met_le_lot_en_quarantaine_jusqu_a_sa_cloture(self):
         lot = self.lot()
-        controle = ControleQualite.objects.create(type_controle="visuel", lot=lot, point_controle="Réception tubes")
+        # NC de fabrication (soudure) citant le lot : la matière n'est pas bloquée.
+        cnd = ControleQualite.objects.create(type_controle="cnd", lot=lot, point_controle="Joint 4")
+        NonConformite.objects.create(controle=cnd, description="Porosité joint 4")
+        lot.refresh_from_db()
+        self.assertNotEqual(lot.statut, "bloque")
+        controle = ControleQualite.objects.create(type_controle="reception", lot=lot, point_controle="Réception tubes")
         nc = NonConformite.objects.create(controle=controle, description="Piqûres de corrosion")
         lot.refresh_from_db()
         self.assertEqual((lot.statut, lot.nc_blocage_id), ("bloque", nc.pk))

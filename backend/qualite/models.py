@@ -465,17 +465,24 @@ class NonConformite(models.Model):
 
 
     def _synchroniser_quarantaine(self):
-        """M5 ↔ M6 (CDC M5 §7.10) : une NC matière ouverte met le lot contrôlé en quarantaine ; sa clôture la lève
-        s'il ne reste aucune autre NC ouverte sur ce lot (le lot reste alors bloqué pour la CAPA en cours)."""
+        """M5 ↔ M6 (CDC M5 §7.10) : une NC **matière** ouverte (contrôle à réception, ou NC d'origine fournisseur) met
+        le lot contrôlé en quarantaine ; sa clôture la lève s'il ne reste aucune autre NC matière ouverte sur ce lot.
+        Une NC de fabrication (soudure, CND sur un joint) qui cite le lot pour la traçabilité ne bloque pas la matière."""
         lot = self.controle.lot if self.controle_id and self.controle.lot_id else None
-        if lot is None:
+        if lot is None or not self.est_nc_matiere():
             return
-        ouvertes = NonConformite.objects.filter(controle__lot=lot).exclude(statut=self.Statut.CLOTUREE)
+        ouvertes = [nc for nc in NonConformite.objects.filter(controle__lot=lot).exclude(statut=self.Statut.CLOTUREE)
+                    .select_related("controle") if nc.est_nc_matiere()]
         if self.statut != self.Statut.CLOTUREE:
             if lot.statut != lot.Statut.BLOQUE:
                 lot.mettre_en_quarantaine(f"NC {self.code} : {self.description}", user=self.decided_by, nc=self)
-        elif lot.statut == lot.Statut.BLOQUE and lot.nc_blocage_id and not ouvertes.exists():
+        elif lot.statut == lot.Statut.BLOQUE and lot.nc_blocage_id and not ouvertes:
             lot.lever_quarantaine()
+
+    def est_nc_matiere(self):
+        return self.source == self.Source.FOURNISSEUR or (
+            self.controle_id is not None and self.controle.type_controle == ControleQualite.TypeControle.RECEPTION
+        )
     def clean(self):
         if not self.description.strip():
             raise ValidationError({"description": "La description de la non-conformité est requise."})
