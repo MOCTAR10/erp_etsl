@@ -6,8 +6,8 @@ from django.core.mail import send_mail
 from .models import Notification
 
 
-def notify(user, subject, message, task=None, kind="info"):
-    """Crée une notification en base (RF-37) et envoie un email (RF-34)."""
+def notify(user, subject, message, task=None, kind="info", sms=False):
+    """Crée une notification en base (RF-37) et envoie un email (RF-34) ; `sms=True` : aussi par SMS si configuré."""
     notification = Notification.objects.create(
         user=user, subject=subject, message=message, task=task, kind=kind
     )
@@ -23,6 +23,12 @@ def notify(user, subject, message, task=None, kind="info"):
         except Exception:
             # L'email ne doit jamais faire échouer le reste du traitement.
             pass
+    if sms:
+        from django.db import transaction
+
+        from .sms import envoyer_sms
+
+        transaction.on_commit(lambda: envoyer_sms(user, f"{subject} : {message}"))
     return notification
 
 

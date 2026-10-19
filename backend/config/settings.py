@@ -266,6 +266,11 @@ WATCHED_FOLDER = env("WATCHED_FOLDER", default="")
 # Permis de travail : niveaux de validation successifs (CDC M7 §9.4 émetteur → superviseur → HSE → DG ; paramétrable,
 # EX-G-02 / CL-OM « règles de validation paramétrées »). Valeurs : superviseur, hse, dg.
 HSE_PERMIS_NIVEAUX = env.list("HSE_PERMIS_NIVEAUX", default=["superviseur", "hse", "dg"])
+# Passerelle SMS (alertes urgentes M7 : permis à valider, accident grave) — vide = désactivée.
+SMS_GATEWAY_URL = env("SMS_GATEWAY_URL", default="")
+SMS_GATEWAY_TOKEN = env("SMS_GATEWAY_TOKEN", default="")
+SMS_SENDER = env("SMS_SENDER", default="ETSL")
+SMS_GATEWAY_TIMEOUT = env.int("SMS_GATEWAY_TIMEOUT", default=5)
 
 # MFA TOTP obligatoire pour les rôles sensibles (lot 15b, CDC §8.2). Imposée par défaut hors DEBUG (production) ;
 # en développement et en e2e, `MFA_ROLES` vide : les comptes de démonstration se connectent sans second facteur.

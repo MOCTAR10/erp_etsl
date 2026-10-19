@@ -499,3 +499,99 @@ def bilan_pdf(bilan, titre, revue=None):
         [lg["libelle"], lg["quantite"], lg["unite"], lg["emissions_kg_co2e"] or "—"] for lg in bilan["environnement"]["lignes"]
     ]
     return _pdf(titre, blocs, tableau)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M7-D : permis (signataire suivant prévenu, expiration), coûts HSE analytiques (M11)
+# ----------------------------------------------------------------------------------------------------------------
+PIECES_PERMIS = {"photo": (".jpg", ".jpeg", ".png", ".webp", ".heic"), "plan": (".pdf", ".jpg", ".jpeg", ".png")}
+PIECE_TAILLE_MAX = 10 * 1024 * 1024
+
+
+def signataires_niveau(niveau):
+    return User.objects.filter(is_active=True, role__in=PERMIS_SIGNATAIRES.get(niveau, ()))
+
+
+def notifier_niveau_suivant(permis):
+    """Alerte (notification, email, SMS si configuré) des signataires du prochain visa : « permis imminent à valider »."""
+    from workflow.notifications import notify
+
+    niveau = permis.prochain_niveau
+    if niveau is None:
+        return 0
+    sujet = f"Permis {permis.code} à valider (visa {PERMIS_NIVEAU_LIBELLES.get(niveau, niveau)})"
+    message = (f"{permis.get_type_permis_display()} — {permis.emplacement}, début le {permis.date_debut:%d/%m/%Y}. "
+               "Merci de viser ou refuser le permis.")
+    n = 0
+    for user in signataires_niveau(niveau).exclude(pk=permis.demandeur_id):
+        notify(user, sujet, message, kind="reminder", sms=True)
+        n += 1
+    return n
+
+
+def expirer_permis(jour=None):
+    """Permis validés ou actifs dont la date de fin est passée → « expiré » ; demandeur et HSE prévenus."""
+    from workflow.notifications import notify
+
+    from .models import PermisTravail
+
+    jour = jour or timezone.localdate()
+    expires = list(PermisTravail.objects.filter(
+        statut__in=(PermisTravail.Statut.VALIDE, PermisTravail.Statut.ACTIF), date_fin__lt=jour,
+    ))
+    hse = list(User.objects.filter(is_active=True, role=User.Role.HSE))
+    for permis in expires:
+        permis.statut = PermisTravail.Statut.EXPIRE
+        permis.notes = (permis.notes + "\n" if permis.notes else "") + f"Expiré le {jour:%d/%m/%Y} (fin prévue le {permis.date_fin:%d/%m/%Y})."
+        permis.save(update_fields=["statut", "notes", "updated_at"])
+        for user in {u.pk: u for u in hse + ([permis.demandeur] if permis.demandeur else [])}.values():
+            notify(user, f"Permis {permis.code} expiré", f"Le permis {permis.code} ({permis.emplacement}) est arrivé à "
+                   "échéance : travaux à arrêter ou nouveau permis à demander.", kind="reminder")
+    return len(expires)
+
+
+#: Centres de coût HSE (axe « Centre de coût ») : imputation analytique des achats et charges HSE (CDC M7 → M11).
+CENTRES_HSE = (
+    ("HSE-EPI", "HSE — EPI et équipements de sécurité"),
+    ("HSE-FORM", "HSE — formations et habilitations"),
+    ("HSE-MED", "HSE — médecine du travail"),
+    ("HSE-DECH", "HSE — déchets et BSD"),
+    ("HSE-ENV", "HSE — environnement (mesures, analyses)"),
+    ("HSE-SEC", "HSE — sécurité chantier et divers"),
+)
+
+
+def centres_hse():
+    """Crée au besoin l'axe « Centre de coût » et les centres HSE ; idempotent."""
+    from referentiels.models import AnalyticAccount, AnalyticAxis
+
+    axe, _ = AnalyticAxis.objects.get_or_create(
+        code="AX-CC", defaults={"label": "Centre de coût", "axis_type": AnalyticAxis.AxisType.CENTRE_COUT}
+    )
+    return [AnalyticAccount.objects.get_or_create(axis=axe, code=code, defaults={"label": label})[0] for code, label in CENTRES_HSE]
+
+
+def couts_hse(annee):
+    """Charges (classe 6, écritures comptabilisées) imputées aux centres HSE : par centre et par mois, sans ressaisie."""
+    from decimal import Decimal
+
+    from django.db.models import Sum
+    from django.db.models.functions import ExtractMonth
+
+    from accounting_kernel.models import AccountMove, AccountMoveLine
+
+    centres = centres_hse()
+    lignes = (
+        AccountMoveLine.objects.filter(
+            move__status__in=(AccountMove.Status.POSTED, AccountMove.Status.REVERSED), move__date__year=annee,
+            account__account_class=6, analytic_account__in=centres,
+        )
+        .annotate(mois=ExtractMonth("move__date"))
+        .values("analytic_account_id", "mois")
+        .annotate(debit=Sum("debit"), credit=Sum("credit"))
+    )
+    par_centre = {c.pk: {"centre": c.code, "libelle": c.label, "analytic": c.pk, "mois": [Decimal("0")] * 12} for c in centres}
+    for lg in lignes:
+        par_centre[lg["analytic_account_id"]]["mois"][lg["mois"] - 1] += (lg["debit"] or 0) - (lg["credit"] or 0)
+    rows = [{**r, "total": sum(r["mois"], Decimal("0"))} for r in par_centre.values()]
+    return {"annee": annee, "rows": rows, "total": sum((r["total"] for r in rows), Decimal("0"))}

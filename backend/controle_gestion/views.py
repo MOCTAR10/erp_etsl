@@ -560,6 +560,35 @@ class MaintenanceCoutsView(viewsets.ViewSet):
         })
 
 
+class CoutsHseView(viewsets.ViewSet):
+    """Coûts HSE par centre analytique et par mois (CDC M7 → M11) : charges comptabilisées imputées aux centres HSE.
+
+    Les achats et charges HSE portent le centre (HSE-EPI, HSE-FORM…) : aucune ressaisie ; montants masqués hors RF-59.
+    """
+
+    permission_classes = [can_read_module("controle_gestion")]
+
+    @extend_schema(parameters=[OpenApiParameter("annee", type=int, required=False)], responses={200: OpenApiTypes.OBJECT})
+    def list(self, request):
+        from django.utils import timezone
+        from rest_framework.fields import IntegerField
+
+        from hse.services import couts_hse
+
+        brut = request.query_params.get("annee")
+        annee = timezone.localdate().year if brut in (None, "") else IntegerField(min_value=2000, max_value=2100).run_validation(brut)
+        result = couts_hse(annee)
+        voir = can_see_amount(request.user)
+
+        def montant(x):
+            return f"{x:.2f}" if voir else None
+
+        return Response({
+            "annee": annee, "has_amount_access": voir, "total": montant(result["total"]),
+            "rows": [{**r, "mois": [montant(m) for m in r["mois"]], "total": montant(r["total"])} for r in result["rows"]],
+        })
+
+
 class GrAffairesView(viewsets.ViewSet):
     """Coût GLOBAL RENTAL ventilé par affaire, publié par M4 (clôture M4, CDC M4 §12.11 → M11) : sans ressaisie.
 

@@ -90,3 +90,28 @@ test.describe("M7 HSE : environnement et revue de direction", () => {
     await expect(env).toContainText("t CO2e");
   });
 });
+
+// Écarts M7-D (2026-10-19) : demande de permis à l'écran, coûts HSE lus par le contrôle de gestion.
+test.describe("M7 HSE : permis demandé à l'écran", () => {
+  test("le chef d'atelier demande un permis, qui apparaît en attente de visa", async ({ page }) => {
+    const emplacement = `Rack e2e ${Date.now()}`;
+    await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
+    await page.goto("/hse");
+    await page.getByRole("button", { name: /Demander un permis/ }).click();
+    const form = page.getByRole("form", { name: /Demander un permis/ });
+    await form.getByLabel("Emplacement / zone").fill(emplacement);
+    await form.getByLabel("Nature des travaux").fill("Pose de chemin de câbles");
+    await form.getByLabel("Début").fill(new Date().toISOString().slice(0, 10));
+    await form.locator("button[type=submit]").click();
+    await page.getByPlaceholder(/permis/i).first().fill(emplacement);
+    const carte = page.locator(".card", { hasText: emplacement });
+    await expect(carte).toContainText("Demandé");
+    await expect(carte.getByRole("button", { name: "Joindre une photo" })).toBeVisible();
+  });
+
+  test("le contrôle de gestion affiche les coûts HSE par centre", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
+    await page.goto("/controle-gestion");
+    await expect(page.getByTestId("couts-hse")).toContainText(/HSE/);
+  });
+});

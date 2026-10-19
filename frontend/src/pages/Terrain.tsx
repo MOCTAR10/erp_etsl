@@ -8,7 +8,7 @@ import { Badge, PageHeader, SectionCard } from "../components/ui";
 import { offlineQueue, submitOffline, syncNow, useOnline, useQueueItems } from "../lib/offline";
 import { useAuth } from "../store/auth";
 
-type Tab = "pointage" | "gaz" | "reception" | "controle";
+type Tab = "pointage" | "gaz" | "reception" | "controle" | "anomalie";
 
 interface Ref {
   id: string | number;
@@ -107,7 +107,7 @@ export function TerrainPage() {
       )}
 
       <div className="terrain-tabs" role="tablist">
-        {(["pointage", "gaz", "reception", "controle"] as Tab[]).map((k) => (
+        {(["pointage", "gaz", "reception", "controle", "anomalie"] as Tab[]).map((k) => (
           <button
             key={k}
             role="tab"
@@ -215,6 +215,29 @@ export function TerrainPage() {
                 { value: "non_conforme", label: t("terrain.nonConforme") },
               ] },
             { name: "date", label: t("terrain.fields.date"), kind: "date", required: true, initial: today() },
+          ]}
+        />
+      )}
+
+      {tab === "anomalie" && (
+        <Form
+          submitLabel={t("terrain.save")}
+          onSubmit={async (f) => {
+            // Signalement d'anomalie HSE (CDC M7-08) : situation dangereuse, déclarée hors ligne si besoin.
+            await enqueue(
+              "/api/hse/incidents/",
+              { type_incident: "situation_dangereuse", gravite: f.gravite, date_evenement: new Date().toISOString(),
+                lieu: f.lieu, zone: f.zone, description: f.description },
+              `${t("terrain.tabs.anomalie")} · ${f.lieu}`,
+            );
+          }}
+          fields={[
+            { name: "lieu", label: t("terrain.anomalie.lieu"), kind: "text", required: true },
+            { name: "zone", label: t("terrain.anomalie.zone"), kind: "select", required: true, initial: "chantier",
+              options: ["atelier", "chantier", "bureau", "site_client", "site_gr"].map((v) => ({ value: v, label: t(`m7e.zones.${v}`) })) },
+            { name: "gravite", label: t("terrain.anomalie.gravite"), kind: "select", required: true, initial: "mineure",
+              options: ["mineure", "majeure", "critique"].map((v) => ({ value: v, label: t(`terrain.anomalie.gravites.${v}`) })) },
+            { name: "description", label: t("terrain.anomalie.description"), kind: "text", required: true },
           ]}
         />
       )}
