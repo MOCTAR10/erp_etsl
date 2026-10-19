@@ -2228,6 +2228,7 @@ export interface FactureClient {
   montant_ht: string | null;
   montant_tva: string | null;
   montant_ttc: string | null;
+  move_number: string | null;
   avertissement_provisoire: boolean;
 }
 

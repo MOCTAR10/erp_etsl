@@ -322,6 +322,7 @@ class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeri
     avenants_total = serializers.IntegerField(source="avenants.count", read_only=True)
 
     client_name = serializers.CharField(source="client.partner.name", read_only=True, default=None)
+    affaire_title = serializers.CharField(source="affaire.title", read_only=True, default=None)
     profile_label = serializers.CharField(source="get_profile_display", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     days_to_expiry = serializers.IntegerField(read_only=True)
@@ -334,6 +335,7 @@ class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeri
             "id",
             "code",
             "affaire",
+            "affaire_title",
             "client",
             "client_name",
             "profile",

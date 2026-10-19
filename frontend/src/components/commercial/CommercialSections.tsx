@@ -35,6 +35,7 @@ interface Contrat {
   code: string;
   profile_label: string;
   client_name: string | null;
+  affaire_title: string | null;
   montant_actuel: string | null;
   end_date: string | null;
   expiry_status: string;
@@ -137,6 +138,7 @@ export function CommercialSections() {
     { key: "code", header: t("commercial.col.code"), render: (c) => c.code },
     { key: "profil", header: t("commercial.col.profil"), render: (c) => c.profile_label },
     { key: "client", header: t("commercial.col.client"), render: (c) => c.client_name ?? "—" },
+    { key: "affaire", header: t("commercial.col.affaire"), render: (c) => c.affaire_title ?? "—" },
     { key: "montant", header: t("commercial.col.montantActuel"), num: true, render: (c) => montant(c.montant_actuel) },
     { key: "fin", header: t("commercial.col.echeance"), render: (c) => (c.end_date ? `${formatDate(c.end_date)} · ${c.expiry_status}` : "—") },
     { key: "avenants", header: t("commercial.col.avenants"), num: true, render: (c) => c.avenants_total },

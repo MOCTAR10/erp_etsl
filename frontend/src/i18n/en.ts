@@ -347,14 +347,14 @@ export const en = {
   commercial: {
     searchOffres: "Search quotes (code, title, client)…",
     searchAffaires: "Search projects (code, title, client)…",
-    searchContrats: "Search contracts (code, client)…",
+    searchContrats: "Search contracts (code, client, project)…",
     offres: "Quotes (versions)",
     affaires: "Deals",
     contrats: "Contracts (CLM)",
     marges: "Margins by axis (planned / actual)",
     axe: { client: "Customer", profil: "Contract profile", affaire: "Deal", responsable: "Deal owner" },
     col: {
-      code: "Code", titre: "Title", client: "Customer", montant: "Amount", statut: "Status", responsable: "Owner",
+      code: "Code", titre: "Title", client: "Customer", affaire: "Project", montant: "Amount", statut: "Status", responsable: "Owner",
       profil: "Profile", montantActuel: "Amount (incl. amendments)", echeance: "Expiry", avenants: "Amendments",
       affaires: "Deals", caPrevu: "Planned revenue", margePrevue: "Planned margin", produits: "Actual revenue",
       charges: "Actual costs", margeReelle: "Actual margin",

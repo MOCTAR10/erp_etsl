@@ -125,7 +125,10 @@ export function FacturationSection() {
           <tbody>
             {rows.map((f) => (
               <tr key={f.id}>
-                <td><strong>{f.code}</strong></td>
+                <td>
+                  <strong>{f.code}</strong>
+                  {f.move_number && <span className="muted"> · {f.move_number}</span>}
+                </td>
                 <td>{f.client_name}</td>
                 <td>{formatDate(f.date)}</td>
                 <td className="num">{f.montant_ttc === null ? "••••••" : `${formatNumber(Number(f.montant_ttc))} F`}</td>
