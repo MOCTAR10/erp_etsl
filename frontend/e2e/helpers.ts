@@ -4,6 +4,7 @@ export const DEMO_PASSWORD = "Etls#Demo2026";
 
 export const DEMO_USERS = {
   admin: "admin@etls.local",
+  direction: "direction@etls.local",
   finance: "finance@etls.local",
   logistique: "logistique@etls.local",
   rh: "rh@etls.local",

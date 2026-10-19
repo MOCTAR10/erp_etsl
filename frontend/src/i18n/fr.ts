@@ -347,14 +347,14 @@ export const fr = {
   commercial: {
     searchOffres: "Rechercher une offre (code, titre, client)…",
     searchAffaires: "Rechercher une affaire (code, titre, client)…",
-    searchContrats: "Rechercher un contrat (code, client)…",
+    searchContrats: "Rechercher un contrat (code, client, affaire)…",
     offres: "Offres (versions)",
     affaires: "Affaires",
     contrats: "Contrats (CLM)",
     marges: "Marges par axe (prévues / réelles)",
     axe: { client: "Client", profil: "Profil contractuel", affaire: "Affaire", responsable: "Responsable d'affaire" },
     col: {
-      code: "Code", titre: "Intitulé", client: "Client", montant: "Montant", statut: "Statut", responsable: "Responsable",
+      code: "Code", titre: "Intitulé", client: "Client", affaire: "Affaire", montant: "Montant", statut: "Statut", responsable: "Responsable",
       profil: "Profil", montantActuel: "Montant (avenants inclus)", echeance: "Échéance", avenants: "Avenants",
       affaires: "Affaires", caPrevu: "CA prévu", margePrevue: "Marge prévue", produits: "Produits réels",
       charges: "Charges réelles", margeReelle: "Marge réelle",

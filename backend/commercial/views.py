@@ -326,7 +326,7 @@ class MilestoneViewSet(_CommonViewSet):
 
 class ContractViewSet(_CommonViewSet):
     serializer_class = ContractSerializer
-    search_fields = ("code", "client__partner__name",)
+    search_fields = ("code", "client__partner__name", "affaire__title",)
 
     def get_queryset(self):
         qs = Contract.objects.select_related("client__partner", "currency", "affaire").all()

@@ -140,7 +140,9 @@ export function LettrageSection() {
               {(lettrages.data ?? []).map((l) => (
                 <tr key={l.id}>
                   <td><strong>{l.code}</strong></td>
-                  <td>{l.automatique ? t("lettrage.auto") : t("lettrage.manuel")} · {l.lignes.length} {t("lettrage.lignes")}</td>
+                  <td>{l.automatique ? t("lettrage.auto") : t("lettrage.manuel")} · {l.lignes.length} {t("lettrage.lignes")}
+                    {l.lignes.some((x) => x.piece) && <span className="muted"> · {l.lignes.map((x) => x.piece).filter(Boolean).join(", ")}</span>}
+                  </td>
                   <td><Badge tone={l.statut === "actif" ? "ok" : "err"}>{t(`lettrage.statut.${l.statut}`)}</Badge></td>
                   <td>
                     {l.statut === "actif" && (
