@@ -291,6 +291,7 @@ SEED_ORDER = [
     # Parcours transverses : rejouent le workflow par l API reelle, donc APRES tous les seeds par module.
     "seed_parcours_demo",
     "seed_parcours_b",
+    "seed_parcours_c",
 ]
 
 
