@@ -1293,6 +1293,16 @@ export const fr = {
     provisoire: "Provisoire", confirme: "Confirmé", marquer: "Marquer officiel", retirer: "Retirer", confirmer: "Confirmer",
     confirmConfirmer: "Confirmer ce type comme document officiel (validé par ETSL) ?",
   },
+  tarifsGr: {
+    title: "Grille tarifaire GLOBAL RENTAL (M4)",
+    hint: "Versions datées, jamais modifiées : un changement de tarif = une nouvelle version avec sa date d'effet. Une location retient la version en vigueur à sa date de début, la plus spécifique d'abord (équipement, puis catégorie, puis grille générale). Une version encore inutilisée peut être supprimée.",
+    nouvelle: "Nouvelle version de tarif", aucun: "Aucun tarif GR saisi.", code: "Code", partenaire: "Partenaire GR", equipement: "Équipement (optionnel)",
+    categorie: "Catégorie (optionnel)", cible: "Cible", generale: "Grille générale", periodicite: "Périodicité", tarif: "Tarif unitaire",
+    penalite: "Pénalité / jour de retard", dateEffet: "Date d'effet", version: "Version", supprimer: "Supprimer",
+    confirmSupprimer: "Supprimer cette version de tarif ? (refusé si une location l'utilise)",
+    cat: { engin: "Engin de chantier", levage: "Matériel de levage", transport: "Transport / véhicule", atelier: "Matériel d'atelier", materiel: "Matériel divers" },
+    per: { heure: "À l'heure", jour: "À la journée", mois: "Au mois", forfait: "Forfait" },
+  },
   grAffaires: {
     title: "Coût GLOBAL RENTAL par affaire (compteurs → M11)", periode: "Mois",
     hint: "Compteurs des prestations GR valorisés selon la grille, ventilés par affaire. Le coût reste au compte 618, isolé des marges : la marge après coût GR est indicative.",

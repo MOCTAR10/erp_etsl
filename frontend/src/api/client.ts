@@ -30,7 +30,7 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
           Authorization: `Bearer ${refreshed.access}`,
         }),
       });
-      if (retry.ok) return (await retry.json()) as T;
+      if (retry.ok) return (retry.status === 204 ? undefined : await retry.json()) as T;
     } catch {
       useAuth.getState().clear();
     }
@@ -123,6 +123,7 @@ export const api = {
   post: <T,>(path: string, body?: unknown) =>
     raw<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T,>(path: string, body: unknown) => raw<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  remove: (path: string) => raw<void>(path, { method: "DELETE" }),
   /** Toutes les pages d'une liste (listes de choix des formulaires) : suit `next` jusqu'à `maxPages`. */
   listAll: <T,>(path: string, opts?: ListAllOptions) =>
     listAll<T>((p) => raw<import("../types").Paginated<T>>(p), path, opts),
