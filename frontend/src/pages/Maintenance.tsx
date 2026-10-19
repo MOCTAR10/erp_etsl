@@ -4,8 +4,9 @@ import { ClipboardCheck, Coins, Hammer, Inbox, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
+import { OtDetails, PlansPreventifsSection } from "../components/workflow/MaintenancePlansSection";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
@@ -43,9 +44,26 @@ function inspectionTone(i: Inspection): "ok" | "warn" | "err" | "brand" {
   return i.resultat === "non_conforme" ? "err" : i.resultat === "sous_reserve" ? "warn" : "ok";
 }
 
+function inspectionActions(i: Inspection, t: (k: string) => string): ActionDef[] {
+  const base = `/api/maintenance/inspections/${i.id}`;
+  if (i.statut === "planifiee")
+    return [{
+      label: t("m8e.insp.realiser"), path: `${base}/realiser/`,
+      prompt: {
+        name: "resultat", label: t("m8e.insp.resultat"),
+        options: ["conforme", "sous_reserve", "non_conforme"].map((v) => ({ value: v, label: t(`maintenance.inspection_resultats.${v}`) })),
+      },
+    }];
+  if (i.statut === "realisee" && !i.ot_genere_code && (i.resultat === "non_conforme" || i.resultat === "sous_reserve"))
+    return [{ label: t("m8e.insp.creerOt"), path: `${base}/creer-ot/`, tone: "ghost" }];
+  return [];
+}
+
 function otActions(ot: OrdreTravail, t: (k: string) => string) {
   const base = `/api/maintenance/ordres/${ot.id}`;
-  const out: { label: string; path: string; tone?: "primary" | "ghost" | "danger"; confirm?: string }[] = [];
+  const out: ActionDef[] = [];
+  if (ot.statut === "demande" && !ot.qualifie_le)
+    out.push({ label: t("m8e.ot.qualifier"), path: `${base}/qualifier/`, tone: "ghost", prompt: { name: "cause", label: t("m8e.ot.diagnostic") } });
   if (ot.statut === "demande") out.push({ label: t("maintenance.act.planifier"), path: `${base}/planifier/`, tone: "ghost" });
   if (ot.statut === "demande" || ot.statut === "planifie") out.push({ label: t("actions.demarrer"), path: `${base}/demarrer/` });
   if (ot.statut === "en_cours") out.push({ label: t("maintenance.act.terminer"), path: `${base}/terminer/` });
@@ -79,6 +97,7 @@ function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
         </span>
       </div>
       <ActionBar actions={otActions(ot, t)} />
+      <OtDetails ot={ot} />
     </BoardCard>
   );
 }
@@ -211,6 +230,25 @@ export function MaintenancePage() {
         </p>
       ) : null}
 
+      <QuickForm
+        title={t("m8e.actif.nouveau")}
+        endpoint="/api/maintenance/actifs/"
+        fields={[
+          { name: "designation", label: t("maintenance.col.designation"), required: true },
+          {
+            name: "categorie", label: t("maintenance.col.category"), type: "select", required: true, defaultValue: "machine",
+            options: ["machine", "engin", "levage", "atelier", "chantier", "outillage"].map((v) => ({ value: v, label: t(`maintenance.categories.${v}`) })),
+          },
+          { name: "numero_serie", label: t("m8e.actif.serie") },
+          { name: "site", label: t("maintenance.col.site") },
+          {
+            name: "compteur_type", label: t("m8e.actif.compteur"), type: "select", required: true, defaultValue: "heures",
+            options: ["heures", "km", "aucun"].map((v) => ({ value: v, label: t(`maintenance.compteur_types.${v}`) })),
+          },
+          { name: "compteur_value", label: t("m8e.actif.valeurCompteur"), type: "number", min: 0, step: "0.01" },
+          { name: "date_mise_en_service", label: t("m8e.actif.miseEnService"), type: "date" },
+        ]}
+      />
       {(actifs.count > 0 || actifs.search) && (
         <SectionCard title={`${t("maintenance.actifs")} · ${actifs.count}`}>
           <SearchField value={actifs.search} onChange={actifs.setSearch} placeholder={t("maintenance.searchActifs")} />
@@ -224,6 +262,7 @@ export function MaintenancePage() {
                   <th>{t("maintenance.col.site")}</th>
                   <th className="num">{t("maintenance.compteur")}</th>
                   <th>{t("maintenance.col.status")}</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -241,6 +280,16 @@ export function MaintenancePage() {
                     <td>
                       <Badge tone={actifTone(a)}>{t(`maintenance.statut_actif.${a.statut}`)}</Badge>
                     </td>
+                    <td>
+                      {!a.is_global_rental && a.compteur_type !== "aucun" && (
+                        <ActionBar
+                          actions={[{
+                            label: t("m8e.actif.relever"), path: `/api/maintenance/actifs/${a.id}/releve-compteur/`, tone: "ghost",
+                            prompt: { name: "valeur", label: t("m8e.actif.nouvelleValeur") },
+                          }]}
+                        />
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -250,10 +299,28 @@ export function MaintenancePage() {
         </SectionCard>
       )}
 
+      <PlansPreventifsSection actifs={actifsChoix} />
       <FiabiliteSection />
       <PiecesRechangeSection />
       <ParametresMaintenanceSection />
 
+      <QuickForm
+        title={t("m8e.insp.nouvelle")}
+        endpoint="/api/maintenance/inspections/"
+        fields={[
+          {
+            name: "actif", label: t("maintenance.form.actif"), type: "select", required: true,
+            options: actifsChoix.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
+          },
+          {
+            name: "type_inspection", label: t("maintenance.col.type"), type: "select", required: true, defaultValue: "visuelle",
+            options: ["visuelle", "fonctionnelle", "securite", "levage", "atex", "metrologie"].map((v) => ({ value: v, label: t(`maintenance.inspection_types.${v}`) })),
+          },
+          { name: "date_inspection", label: t("m8e.insp.date"), type: "date", required: true },
+          { name: "prochaine_inspection", label: t("maintenance.prochaine"), type: "date" },
+          { name: "organisme_libelle", label: t("m8e.insp.organisme") },
+        ]}
+      />
       {(inspections.count > 0 || inspections.search) && (
         <SectionCard title={`${t("maintenance.inspections")} · ${inspections.count}`}>
           <SearchField value={inspections.search} onChange={inspections.setSearch} placeholder={t("maintenance.searchInspections")} />
@@ -268,6 +335,7 @@ export function MaintenancePage() {
                   <th>{t("maintenance.prochaine")}</th>
                   <th>{t("maintenance.col.ot")}</th>
                   <th>{t("maintenance.col.status")}</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -285,6 +353,9 @@ export function MaintenancePage() {
                           ? t(`maintenance.inspection_resultats.${i.resultat}`)
                           : t(`maintenance.inspection_statut.${i.statut}`)}
                       </Badge>
+                    </td>
+                    <td>
+                      <ActionBar actions={inspectionActions(i, t)} />
                     </td>
                   </tr>
                 ))}

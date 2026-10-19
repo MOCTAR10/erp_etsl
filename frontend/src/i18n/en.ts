@@ -1250,6 +1250,36 @@ export const en = {
     warnProvisoire: "{{count}} provisional cube parameter(s) (retention period) to be confirmed by ETSL.",
     confirmConfirmer: "Confirm this value (validated by ETSL)?",
   },
+  m8e: {
+    plans: {
+      title: "Preventive plans and calendar (M8.2)",
+      hint: "One plan per machine or component: interval in days and / or meter interval. When due, a preventive work order is generated automatically (daily at 06:00, or on demand); an early warning flags upcoming due dates.",
+      nouveau: "New preventive plan", actif: "Equipment", libelle: "Task", composant: "Component",
+      periodicite: "Interval (days)", intervalle: "Meter interval (h / km)", derniereDate: "Last done",
+      priorite: "Work order priority", declencher: "Trigger due plans", code: "Code", declencheur: "Trigger",
+      prochaine: "Next due", etat: "Status", echu: "Due", prealerte: "Early warning", aJour: "Up to date",
+      tousLes: "every {{n}} d", toutesLes: "every {{n}} h/km", aucun: "No preventive plan yet.",
+      generes: "Preventive work orders generated: {{codes}}.", aucunEchu: "No plan due: no work order generated.",
+    },
+    cal: {
+      title: "Monthly preventive calendar", mois: "Month", date: "Due date", prevu: "Planned",
+      aucune: "No calendar due date this month.", compteurs: "Meter-based plans (no date):",
+      warnProvisoire: "Provisional early warning ({{jours}} days before due date, {{pct}} % of the meter interval): to be confirmed by ETSL in the settings.",
+    },
+    ot: {
+      qualifier: "Qualify", diagnostic: "Diagnosis (cause) of the request", details: "Details and history",
+      qualifiePar: "Qualified by {{nom}}", mainOeuvre: "Work order labour", heures: "Hours", tarif: "Hourly rate (FCFA)",
+      historique: "Status history",
+    },
+    actif: {
+      nouveau: "New equipment", serie: "Serial number", compteur: "Meter type", valeurCompteur: "Initial meter",
+      miseEnService: "Commissioned on", relever: "Read meter", nouvelleValeur: "New meter value",
+    },
+    insp: {
+      nouvelle: "New inspection", date: "Inspection date", organisme: "Body (if external)",
+      realiser: "Record result", resultat: "Result…", creerOt: "Create corrective work order",
+    },
+  },
   m8: {
     fiabilite: {
       title: "Fleet reliability: MTBF, MTTR, availability (M8)",

@@ -12,10 +12,11 @@ from rest_framework.response import Response
 from config.inputs import choice_input, date_input, fk_input
 from users.models import User
 
-from .models import Actif, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
+from .models import Actif, HistoriqueStatutOT, Inspection, OrdreTravail, ParametreMaintenance, PieceOT, PlanPreventif
 from .preventif import declencher_plans, rearmer_plan
 from .serializers import (
     ActifSerializer,
+    HistoriqueStatutOTSerializer,
     InspectionSerializer,
     OrdreTravailSerializer,
     ParametreMaintenanceSerializer,
@@ -29,6 +30,7 @@ from .services import (
     sortir_piece,
     CanManageMaintenance,
     IsConfirmateurMaintenance,
+    calendrier_preventif,
     fiabilite_actifs,
     get_param_maintenance,
 )
@@ -117,6 +119,14 @@ class PlanPreventifViewSet(viewsets.ModelViewSet):
             qs = qs.filter(en_vigueur=True)
         return qs
 
+    @action(detail=False, methods=["get"], url_path="calendrier")
+    def calendrier(self, request):
+        """Calendrier mensuel des échéances préventives (`?mois=AAAA-MM`, mois courant par défaut)."""
+        try:
+            return Response(calendrier_preventif(request.query_params.get("mois") or f"{timezone.localdate():%Y-%m}"))
+        except ValueError as exc:
+            raise ValidationError({"mois": str(exc)})
+
     @action(detail=False, methods=["post"], url_path="declencher")
     def declencher(self, request):
         """Déclenchement manuel des plans échus (même règle que la tâche quotidienne)."""
@@ -138,7 +148,41 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         instance.delete()
 
     def _locked(self):
-        return OrdreTravail.objects.select_for_update().select_related("actif").get(pk=self.get_object().pk)
+        ot = OrdreTravail.objects.select_for_update().select_related("actif").get(pk=self.get_object().pk)
+        ot._acteur = self.request.user  # auteur de la transition, tracé dans l'historique
+        return ot
+
+    @action(detail=True, methods=["post"], url_path="qualifier")
+    @transaction.atomic
+    def qualifier(self, request, pk=None):
+        """Qualification d'une demande (CDC M8.1 : saisie opérateur → qualification) : diagnostic, type, priorité."""
+        ot = self._locked()
+        if ot.statut != OrdreTravail.Statut.DEMANDE:
+            return Response(
+                {"detail": "Seul un OT demandé peut être qualifié."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        cause = str(request.data.get("cause") or "").strip()
+        if not cause:
+            raise ValidationError({"cause": "Diagnostic de qualification requis."})
+        if request.data.get("type_ot"):
+            ot.type_ot = _choix(request.data.get("type_ot"), OrdreTravail.TypeOT, "type_ot")
+        if request.data.get("priorite"):
+            ot.priorite = _choix(request.data.get("priorite"), OrdreTravail.Priorite, "priorite")
+        ot.cause = cause
+        ot.qualifie_par = request.user
+        ot.qualifie_le = timezone.now()
+        ot.save()
+        HistoriqueStatutOT.objects.create(
+            ot=ot, de=ot.statut, vers=ot.statut, par=request.user, commentaire=f"Qualification : {cause}"[:255]
+        )
+        return Response(self.get_serializer(ot).data)
+
+    @action(detail=True, methods=["get"], url_path="historique")
+    def historique(self, request, pk=None):
+        """Historique horodaté des statuts de l'OT (création, transitions, qualification)."""
+        qs = self.get_object().historique.select_related("par")
+        return Response(HistoriqueStatutOTSerializer(qs, many=True).data)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -396,6 +440,11 @@ class InspectionViewSet(viewsets.ModelViewSet):
         if inspection.ot_genere:
             return Response(
                 {"detail": "Un OT a déjà été généré pour cette inspection."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if inspection.resultat not in (Inspection.Resultat.NON_CONFORME, Inspection.Resultat.SOUS_RESERVE):
+            return Response(
+                {"detail": "Un OT correctif ne se génère que depuis une inspection non conforme ou sous réserve."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         ot = OrdreTravail.objects.create(

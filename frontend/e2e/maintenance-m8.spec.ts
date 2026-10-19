@@ -54,3 +54,68 @@ test.describe("M8 Maintenance : fiabilité, pièces de rechange, coût vers M11"
     await expect(section.getByLabel("Mois")).toBeVisible();
   });
 });
+
+// Écarts M8 (2026-10-19) : plans préventifs et calendrier saisis à l'écran, qualification d'une demande et
+// historique horodaté des statuts de l'OT.
+const isoLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+
+test.describe("M8 Maintenance : plans préventifs, qualification et historique", () => {
+  test("un plan préventif saisi à l'écran apparaît au calendrier du mois, un autre en pré-alerte", async ({ page }) => {
+    const suffixe = Date.now();
+    const jour = 24 * 3600_000;
+    const aujourdhui = isoLocal(new Date());
+    await loginAs(page, DEMO_USERS.admin);
+    await page.goto("/maintenance");
+    const section = page.getByTestId("plans-preventifs");
+
+    const plans = section.getByRole("table", { name: "Plans préventifs et calendrier (M8.2)" });
+    const form = page.getByRole("form", { name: "Nouveau plan préventif" });
+    await section.getByRole("button", { name: "Nouveau plan préventif" }).click();
+    const saisir = async (libelle: string, periodicite: string, derniere: string) => {
+      const equipement = form.getByLabel(/Équipement/);
+      await expect(equipement.locator("option").nth(1)).toBeAttached();
+      await equipement.selectOption({ index: 1 });
+      await form.getByLabel(/Intervention/).fill(libelle);
+      await form.getByLabel(/Périodicité/).fill(periodicite);
+      await form.getByLabel(/Dernière exécution/).fill(derniere);
+      await form.getByRole("button", { name: "Enregistrer" }).click();
+      await expect(form.getByRole("status")).toHaveText("Enregistré.");
+    };
+
+    // Échu aujourd'hui : visible au calendrier du mois courant.
+    const echu = `Graissage e2e ${suffixe}`;
+    await saisir(echu, "10", isoLocal(new Date(Date.now() - 10 * jour)));
+    await expect(plans.getByRole("row", { name: new RegExp(echu) })).toContainText("Échu");
+    const calendrier = section.getByTestId("calendrier-preventif");
+    await expect(calendrier.locator("tr", { hasText: echu }).locator(`time[datetime="${aujourdhui}"]`)).toBeVisible();
+
+    // Échéance dans 3 jours : pré-alerte (fenêtre provisoire de 7 jours).
+    const proche = `Vidange e2e ${suffixe}`;
+    await saisir(proche, "30", isoLocal(new Date(Date.now() - 27 * jour)));
+    await expect(plans.getByRole("row", { name: new RegExp(proche) })).toContainText("Pré-alerte");
+  });
+
+  test("une demande d'OT est qualifiée, puis son historique horodaté s'affiche", async ({ page }) => {
+    const label = `Bruit e2e ${Date.now()}`;
+    await loginAs(page, DEMO_USERS.admin);
+    await page.goto("/maintenance");
+    await page.getByRole("button", { name: "Nouvel ordre de travail" }).click();
+    const form = page.getByRole("form", { name: "Nouvel ordre de travail" });
+    const equipement = form.getByLabel(/Équipement/);
+    await expect(equipement.locator("option").nth(1)).toBeAttached();
+    await equipement.selectOption({ index: 1 });
+    await form.getByLabel(/Description de l'intervention/).fill(label);
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+
+    const card = () => page.locator(".task-card", { hasText: label });
+    page.once("dialog", (d) => void d.accept("Roulement usé"));
+    await card().getByRole("button", { name: "Qualifier" }).click();
+    await expect(card().getByRole("button", { name: "Qualifier" })).toHaveCount(0);
+    await card().getByText("Détail et historique").click();
+    const historique = card().getByRole("list", { name: "Historique des statuts" });
+    await expect(historique).toContainText("Demandé");
+    await expect(historique).toContainText("Qualification : Roulement usé");
+  });
+});
+

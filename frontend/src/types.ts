@@ -1098,9 +1098,47 @@ export interface OrdreTravail {
   rapport: string;
   statut: StatutOT;
   statut_label: string;
+  qualifie_le: string | null;
+  qualifie_par_name: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface HistoriqueStatutOT {
+  id: string;
+  de: StatutOT | "";
+  vers: StatutOT;
+  par_name: string | null;
+  le: string;
+  commentaire: string;
+}
+
+export interface PlanPreventif {
+  id: string;
+  code: string;
+  actif: string;
+  actif_code: string;
+  libelle: string;
+  composant: string;
+  periodicite_jours: number | null;
+  intervalle_compteur: string | null;
+  prochaine_date: string | null;
+  prochain_compteur: string | null;
+  compteur_actuel: string;
+  echeance: string | null;
+  prealerte: string | null;
+  ot_ouvert: string | null;
+  priorite: string;
+}
+
+export interface CalendrierPreventif {
+  periode: string;
+  provisoire: boolean;
+  prealerte_jours: number;
+  prealerte_pct: string;
+  occurrences: { plan: string; actif: string; designation: string; libelle: string; composant: string; date: string; echu: boolean }[];
+  compteurs: { plan: string; actif: string; libelle: string; compteur_actuel: string; prochain_compteur: string }[];
 }
 
 export type TypeInspection =
