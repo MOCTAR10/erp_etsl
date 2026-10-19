@@ -376,7 +376,7 @@ def alertes_agregees(user=None):
 
     from juridique.services import compute_alertes
     from rh_paie.models import ContratTravail, Qualification
-    from maintenance.models import Actif
+    from maintenance.models import Actif, Inspection
     from documents.models import Document
 
     compteurs = _zero()
@@ -466,10 +466,36 @@ def alertes_agregees(user=None):
             "jours": None,
             "statut": actif.statut,
         })
+    # Inspections réglementaires (levage, ATEX, métrologie…) : planifiées, ou prochaine échéance d'une inspection
+    # réalisée sans inspection plus récente du même type sur la même machine (CDC M8 §13.4 « suivi réglementaire »).
+    if _allowed("maintenance"):
+        aujourdhui = timezone.localdate()
+        vues = set()
+        for insp in Inspection.objects.exclude(statut=Inspection.Statut.ANNULEE).select_related("actif").order_by(
+            "actif_id", "type_inspection", "-date_inspection"
+        ):
+            cle = (insp.actif_id, insp.type_inspection)
+            if cle in vues:
+                continue
+            vues.add(cle)
+            echeance = insp.date_inspection if insp.statut == Inspection.Statut.PLANIFIEE else insp.prochaine_inspection
+            if echeance is None or echeance > aujourdhui + timezone.timedelta(days=90):
+                continue
+            jours = (echeance - aujourdhui).days
+            maintenance_liste.append({
+                "type": "inspection_reglementaire",
+                "code": insp.code,
+                "libelle": f"{insp.get_type_inspection_display()} — {insp.actif.designation} ({insp.actif.code})",
+                "date_echeance": echeance,
+                "bande": _band(jours),
+                "jours": jours,
+                "statut": insp.statut,
+            })
 
     _add(document_liste)
     _add(juridique["conventions"] + juridique["cautions"] + juridique["assurances"])
     _add(rh_liste)
+    _add([i for i in maintenance_liste if i["type"] == "inspection_reglementaire"])
 
     return {
         "documents": document_liste,

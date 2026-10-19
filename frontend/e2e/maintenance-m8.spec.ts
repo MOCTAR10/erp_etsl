@@ -119,3 +119,28 @@ test.describe("M8 Maintenance : plans préventifs, qualification et historique",
   });
 });
 
+test.describe("M8 Maintenance : habilitations exigées et seuils de fiabilité", () => {
+  test("une exigence d'habilitation se saisit puis se supprime ; la fiabilité affiche ses seuils", async ({ page }) => {
+    const motCle = `CACES e2e ${Date.now()}`;
+    await loginAs(page, DEMO_USERS.admin);
+    await page.goto("/maintenance");
+    await expect(page.getByTestId("fiabilite-parc")).toContainText("Seuils d'alerte");
+
+    const section = page.getByTestId("exigences-habilitation");
+    await section.getByRole("button", { name: "Nouvelle exigence" }).click();
+    const form = page.getByRole("form", { name: "Nouvelle exigence" });
+    // Périmètre étroit (outillage × inspection) : sans effet sur les OT des autres scénarios joués en parallèle.
+    await form.getByLabel(/Catégorie d'équipement/).selectOption("outillage");
+    await form.getByLabel(/Type d'OT/).selectOption("inspection");
+    await form.getByLabel(/Mot-clé/).fill(motCle);
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+
+    const ligne = section.getByRole("row", { name: new RegExp(motCle) });
+    await expect(ligne).toContainText("Outillage");
+    page.once("dialog", (d) => void d.accept());
+    await ligne.getByRole("button", { name: "Supprimer" }).click();
+    await expect(ligne).toHaveCount(0);
+  });
+});
+

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { Actif, CalendrierPreventif, HistoriqueStatutOT, OrdreTravail, PlanPreventif } from "../../types";
+import type { Actif, CalendrierPreventif, ExigenceHabilitationMaintenance, HistoriqueStatutOT, OrdreTravail, PlanPreventif } from "../../types";
 import { Badge, QuickForm, SectionCard } from "../ui";
 
 const moisCourant = () => new Date().toISOString().slice(0, 7);
@@ -188,6 +188,7 @@ export function OtDetails({ ot }: { ot: OrdreTravail }) {
   return (
     <details className="ot-details" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
       <summary>{t("m8e.ot.details")}</summary>
+      {ot.document_titre && <p className="muted">{t("m8e.ot.archiveGed", { titre: ot.document_titre })}</p>}
       {ot.qualifie_par_name && (
         <p className="muted">{t("m8e.ot.qualifiePar", { nom: ot.qualifie_par_name })} · {ot.cause}</p>
       )}
@@ -226,5 +227,72 @@ export function OtDetails({ ot }: { ot: OrdreTravail }) {
         </ol>
       )}
     </details>
+  );
+}
+
+/** Habilitations exigées du technicien (CDC M8 §13.10, amont M9) : donnée ETSL saisie ici, contrôlée à la
+ * planification et au démarrage de l'OT (qualification RH valide dont l'intitulé contient le mot-clé). */
+export function ExigencesHabilitationSection() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const q = useQuery({
+    queryKey: ["maintenance-exigences"],
+    queryFn: () => api.listAll<ExigenceHabilitationMaintenance>("/api/maintenance/exigences-habilitation/"),
+    retry: 0,
+  });
+  const supprimer = useMutation({
+    mutationFn: (id: string) => api.remove(`/api/maintenance/exigences-habilitation/${id}/`),
+    onSuccess: () => {
+      setError(null);
+      void qc.invalidateQueries({ queryKey: ["maintenance-exigences"] });
+    },
+    onError: (e) => setError(describeError(e)),
+  });
+  if (q.isError) return null;
+  const rows = q.data ?? [];
+  return (
+    <SectionCard title={`${t("m8e.hab.title")} · ${rows.length}`}>
+      <div data-testid="exigences-habilitation">
+        <p className="muted">{t("m8e.hab.hint")}</p>
+        <QuickForm
+          title={t("m8e.hab.nouvelle")}
+          endpoint="/api/maintenance/exigences-habilitation/"
+          fields={[
+            {
+              name: "categorie_actif", label: t("m8e.hab.categorie"), type: "select",
+              options: ["machine", "engin", "levage", "atelier", "chantier", "outillage"].map((v) => ({ value: v, label: t(`maintenance.categories.${v}`) })),
+            },
+            {
+              name: "type_ot", label: t("m8e.hab.type"), type: "select",
+              options: ["correctif", "preventif", "urgence", "inspection"].map((v) => ({ value: v, label: t(`maintenance.ot_types.${v}`) })),
+            },
+            { name: "mot_cle", label: t("m8e.hab.motCle"), required: true },
+          ]}
+        />
+        {error && <p className="action-error" role="alert">{error}</p>}
+        {rows.length === 0 ? (
+          <p className="muted">{t("m8e.hab.aucune")}</p>
+        ) : (
+          <table className="table">
+            <caption className="sr-only">{t("m8e.hab.title")}</caption>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.categorie_label || t("m8e.hab.toutes")}</td>
+                  <td>{r.type_label || t("m8e.hab.tous")}</td>
+                  <td><strong>{r.mot_cle}</strong></td>
+                  <td>
+                    <button type="button" className="btn ghost" onClick={() => window.confirm(t("m8e.hab.confirmSupprimer")) && supprimer.mutate(r.id)}>
+                      {t("m8e.hab.supprimer")}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </SectionCard>
   );
 }

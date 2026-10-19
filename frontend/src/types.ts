@@ -1100,9 +1100,21 @@ export interface OrdreTravail {
   statut_label: string;
   qualifie_le: string | null;
   qualifie_par_name: string | null;
+  document: string | null;
+  document_titre: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ExigenceHabilitationMaintenance {
+  id: string;
+  categorie_actif: string;
+  categorie_label: string;
+  type_ot: string;
+  type_label: string;
+  mot_cle: string;
+  actif: boolean;
 }
 
 export interface HistoriqueStatutOT {
@@ -2447,11 +2459,14 @@ export interface FiabiliteRow {
   mttr_h: string | null;
   mtbf_h: string | null;
   disponibilite_pct: string | null;
+  alertes: string[];
 }
 
 export interface FiabiliteResult {
   observation_jours: number;
   heures_par_jour: string;
+  seuil_disponibilite_pct: string;
+  seuil_mtbf_h: string;
   provisoire: boolean;
   rows: FiabiliteRow[];
 }

@@ -34,6 +34,7 @@ export function FiabiliteSection() {
     <SectionCard title={t("m8.fiabilite.title")}>
       <div data-testid="fiabilite-parc">
         <p className="muted">{t("m8.fiabilite.hint", { jours: q.data.observation_jours })}</p>
+        <p className="muted">{t("m8e.fiab.seuils", { dispo: nombre(q.data.seuil_disponibilite_pct), mtbf: nombre(q.data.seuil_mtbf_h) })}</p>
         {q.data.provisoire && (
           <p className="action-error" role="note" data-testid="alerte-provisoire-maintenance">{t("m8.fiabilite.warnProvisoire")}</p>
         )}
@@ -46,6 +47,7 @@ export function FiabiliteSection() {
                 <th className="num">MTBF (h)</th>
                 <th className="num">MTTR (h)</th>
                 <th className="num">{t("m8.fiabilite.dispo")}</th>
+                <th>{t("m8e.fiab.etat")}</th>
               </tr>
             </thead>
             <tbody>
@@ -56,6 +58,15 @@ export function FiabiliteSection() {
                   <td className="num">{nombre(r.mtbf_h)}</td>
                   <td className="num">{nombre(r.mttr_h)}</td>
                   <td className="num">{r.disponibilite_pct === null ? "—" : `${nombre(r.disponibilite_pct)} %`}</td>
+                  <td>
+                    {r.alertes.length > 0 ? (
+                      <>
+                        <Badge tone="err">{t("m8e.fiab.sousSeuil")}</Badge> <span className="muted">{r.alertes.join(" ; ")}</span>
+                      </>
+                    ) : (
+                      <Badge tone="ok">{t("m8e.fiab.ok")}</Badge>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

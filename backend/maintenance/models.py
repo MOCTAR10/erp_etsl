@@ -259,6 +259,10 @@ class OrdreTravail(models.Model):
         related_name="maintenance_ot_archives",
         verbose_name="Archivé par",
     )
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Rapport archivé en GED",
+    )
     qualifie_le = models.DateTimeField(null=True, blank=True, verbose_name="Qualifié le")
     qualifie_par = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -622,3 +626,29 @@ class PieceOT(models.Model):
     @property
     def cout_total(self):
         return self.quantite * self.cout_unitaire
+
+
+class ExigenceHabilitationMaintenance(models.Model):
+    """Habilitation exigée du technicien d'un OT (CDC M8 §13.10, amont M9) : qualification RH valide dont l'intitulé
+    contient `mot_cle`, par catégorie d'équipement et / ou type d'OT (vide = tous). Donnée ETSL, saisie à l'écran."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    categorie_actif = models.CharField(
+        max_length=10, choices=Actif.Categorie.choices, blank=True, verbose_name="Catégorie d'équipement (vide = toutes)"
+    )
+    type_ot = models.CharField(
+        max_length=11, choices=OrdreTravail.TypeOT.choices, blank=True, verbose_name="Type d'OT (vide = tous)"
+    )
+    mot_cle = models.CharField(max_length=80, verbose_name="Mot-clé de l'intitulé de qualification")
+    actif = models.BooleanField(default=True, verbose_name="Active")
+
+    class Meta:
+        ordering = ["categorie_actif", "type_ot", "mot_cle"]
+        verbose_name = "Exigence d'habilitation (maintenance)"
+        verbose_name_plural = "Exigences d'habilitation (maintenance)"
+        constraints = [
+            models.UniqueConstraint(fields=["categorie_actif", "type_ot", "mot_cle"], name="uniq_exigence_hab_maint")
+        ]
+
+    def __str__(self):
+        return f"{self.get_categorie_actif_display() or 'Tous équipements'} / {self.get_type_ot_display() or 'tous OT'} → {self.mot_cle}"

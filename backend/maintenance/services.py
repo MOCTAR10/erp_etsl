@@ -79,8 +79,13 @@ PARAMETRES_DEFAUT = {
     "HEURES_PAR_JOUR": ("Fiabilité : heures de service théoriques par jour", Decimal("24"), "heures"),
     "PREVENTIF_PREALERTE_JOURS": ("Préventif : pré-alerte avant l'échéance calendaire", Decimal("7"), "jours"),
     "PREVENTIF_PREALERTE_PCT": ("Préventif : pré-alerte avant le seuil compteur (part de l'intervalle)", Decimal("10"), "%"),
+    "SEUIL_DISPONIBILITE_PCT": ("Fiabilité : disponibilité minimale attendue par machine", Decimal("90"), "%"),
+    "SEUIL_MTBF_H": ("Fiabilité : MTBF minimal attendu par machine", Decimal("500"), "heures"),
 }
-CODES_FIABILITE = ("OBSERVATION_JOURS", "HEURES_PAR_JOUR")
+CODES_FIABILITE = ("OBSERVATION_JOURS", "HEURES_PAR_JOUR", "SEUIL_DISPONIBILITE_PCT", "SEUIL_MTBF_H")
+ROLES_ALERTE_MAINTENANCE = (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS)
+TYPE_GED_RAPPORT_OT = "rapports-maintenance"
+RETENTION_RAPPORT_OT_ANS = 10
 CENT = Decimal("0.01")
 COMPTE_GR = "618000"
 COMPTE_ENTRETIEN = "624000"
@@ -129,6 +134,8 @@ def fiabilite_actifs(aujourdhui=None):
     aujourdhui = aujourdhui or timezone.localdate()
     obs = int(get_param_maintenance("OBSERVATION_JOURS"))
     h_jour = get_param_maintenance("HEURES_PAR_JOUR")
+    seuil_dispo = get_param_maintenance("SEUIL_DISPONIBILITE_PCT")
+    seuil_mtbf = get_param_maintenance("SEUIL_MTBF_H")
     fin_fenetre = datetime.combine(aujourdhui, time.max, tzinfo=timezone.get_current_timezone())
     debut_fenetre = fin_fenetre - timedelta(days=obs)
 
@@ -155,15 +162,23 @@ def fiabilite_actifs(aujourdhui=None):
         arret = stats["arret"].quantize(CENT, rounding=ROUND_HALF_UP)
         pannes = stats["pannes"]
         dispo = ((requises - arret) / requises * 100).quantize(CENT, rounding=ROUND_HALF_UP) if requises > 0 else None
+        mtbf = ((requises - arret) / pannes).quantize(CENT, rounding=ROUND_HALF_UP) if pannes else None
+        alertes = []
+        if dispo is not None and dispo < seuil_dispo:
+            alertes.append(f"disponibilité {dispo} % < {seuil_dispo} %")
+        if mtbf is not None and mtbf < seuil_mtbf:
+            alertes.append(f"MTBF {mtbf} h < {seuil_mtbf} h")
         rows.append({
             "actif": actif.code, "designation": actif.designation, "gr": actif.is_global_rental,
             "pannes": pannes, "heures_arret": arret, "heures_requises": requises,
             "mttr_h": (arret / pannes).quantize(CENT, rounding=ROUND_HALF_UP) if pannes else None,
-            "mtbf_h": ((requises - arret) / pannes).quantize(CENT, rounding=ROUND_HALF_UP) if pannes else None,
+            "mtbf_h": mtbf,
             "disponibilite_pct": dispo,
+            "alertes": alertes,
         })
     return {
         "observation_jours": obs, "heures_par_jour": h_jour,
+        "seuil_disponibilite_pct": seuil_dispo, "seuil_mtbf_h": seuil_mtbf,
         "provisoire": parametres_maintenance_provisoires(CODES_FIABILITE), "rows": rows,
     }
 
@@ -339,3 +354,151 @@ def calendrier_preventif(periode, aujourdhui=None):
         "prealerte_jours": jours_pa, "prealerte_pct": pct_pa,
         "provisoire": parametres_maintenance_provisoires(("PREVENTIF_PREALERTE_JOURS", "PREVENTIF_PREALERTE_PCT")),
     }
+
+
+def habilitations_technicien_manquantes(ot, jour=None):
+    """Habilitations exigées pour l'OT (catégorie d'équipement, type) que son technicien n'a pas, qualification RH
+    valide à `jour` (sans date de validité = valable). Liste vide si aucune exigence ne s'applique."""
+    from django.db.models import Q
+
+    from rh_paie.models import Employe
+
+    from .models import ExigenceHabilitationMaintenance
+
+    jour = jour or timezone.localdate()
+    exigences = list(
+        ExigenceHabilitationMaintenance.objects.filter(actif=True)
+        .filter(Q(categorie_actif="") | Q(categorie_actif=ot.actif.categorie))
+        .filter(Q(type_ot="") | Q(type_ot=ot.type_ot))
+    )
+    if not exigences:
+        return []
+    if not ot.technicien_id:
+        return ["technicien non désigné"]
+    employe = Employe.objects.filter(user_id=ot.technicien_id).first()
+    if employe is None:
+        return [f"{ot.technicien} : aucune fiche salarié (qualifications introuvables)"]
+    valides = employe.qualifications.filter(Q(date_validite__isnull=True) | Q(date_validite__gte=jour))
+    return [ex.mot_cle for ex in exigences if not valides.filter(intitule__icontains=ex.mot_cle).exists()]
+
+
+def _notifier_roles(sujet, message):
+    """Notification interne aux rôles maintenance, une seule fois par sujet (le sujet porte l'échéance)."""
+    from workflow.models import Notification
+    from workflow.notifications import notify
+
+    envoyees = 0
+    for user in User.objects.filter(role__in=ROLES_ALERTE_MAINTENANCE, is_active=True):
+        if Notification.objects.filter(user=user, subject=sujet).exists():
+            continue
+        notify(user, sujet[:255], message, kind="reminder")
+        envoyees += 1
+    return envoyees
+
+
+def notifier_maintenance(aujourdhui=None):
+    """Pré-alertes préventives (une fois par échéance) et machines sous les seuils de fiabilité (une fois par mois)."""
+    from .models import PlanPreventif
+
+    aujourdhui = aujourdhui or timezone.localdate()
+    jours, pct = prealerte_parametres()
+    envoyees = 0
+    for plan in PlanPreventif.objects.filter(en_vigueur=True).select_related("actif", "actif__equipement_gr"):
+        motif = plan.motif_prealerte(aujourdhui, jours, pct)
+        if motif:
+            cible = plan.prochaine_date.isoformat() if plan.prochaine_date else str(plan.prochain_compteur)
+            envoyees += _notifier_roles(
+                f"Pré-alerte préventive {plan.code} ({cible}) : {plan.actif.code} — {plan.libelle}",
+                f"Le plan {plan.code} ({plan.actif.designation}) arrive à échéance : {motif}. Préparer l'intervention.",
+            )
+    for row in fiabilite_actifs(aujourdhui)["rows"]:
+        if row["alertes"]:
+            envoyees += _notifier_roles(
+                f"Fiabilité {aujourdhui:%Y-%m} sous le seuil : {row['actif']} — {row['designation']}",
+                f"{row['designation']} ({row['actif']}) : {' ; '.join(row['alertes'])}. Analyser les pannes et le plan préventif.",
+            )
+    return envoyees
+
+
+def rapport_ot_pdf(ot):
+    """Rapport d'intervention PDF (reportlab) : identification, déroulé horodaté, pièces, main-d'œuvre."""
+    import io
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    styles = getSampleStyleSheet()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, title=ot.code)
+    esc = lambda t: str(t or "—").replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>")  # noqa: E731
+    story = [
+        Paragraph(f"Rapport d'intervention {ot.code}", styles["Title"]),
+        Paragraph(f"Équipement : <b>{esc(ot.actif.designation)}</b> ({ot.actif.code}) · {ot.get_type_ot_display()} · "
+                  f"priorité {ot.get_priorite_display().lower()}", styles["Normal"]),
+        Paragraph(f"Technicien : {esc(ot.technicien)} · demandé le {ot.date_demande:%d/%m/%Y}", styles["Normal"]),
+        Spacer(1, 4 * mm),
+        Paragraph(f"<b>Demande</b> : {esc(ot.description)}", styles["Normal"]),
+        Paragraph(f"<b>Diagnostic</b> : {esc(ot.cause)}", styles["Normal"]),
+        Paragraph(f"<b>Rapport</b> : {esc(ot.rapport)}", styles["Normal"]),
+        Spacer(1, 4 * mm),
+    ]
+    rows = [["Date", "Statut", "Par", "Commentaire"]]
+    for h in ot.historique.select_related("par"):
+        rows.append([f"{timezone.localtime(h.le):%d/%m/%Y %H:%M}", f"{h.de or '—'} → {h.vers}", str(h.par or "système"),
+                     (h.commentaire or "")[:60]])
+    pieces = [[p.article.code, f"{p.quantite:g}", p.depot.code] for p in ot.pieces.select_related("article", "depot")]
+    for titre, data, largeurs in (("Historique", rows, [30 * mm, 45 * mm, 45 * mm, 60 * mm]),
+                                  ("Pièces sorties du stock", [["Article", "Quantité", "Dépôt"]] + pieces, [80 * mm, 30 * mm, 70 * mm])):
+        story.append(Paragraph(f"<b>{titre}</b>", styles["Normal"]))
+        table = Table(data, colWidths=largeurs)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12308f")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.grey), ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ]))
+        story += [table, Spacer(1, 4 * mm)]
+    story.append(Paragraph(f"Main-d'œuvre : {ot.heures_mo} h · Archivé le {timezone.localtime(ot.archive_le):%d/%m/%Y %H:%M} "
+                           f"par {esc(ot.archive_par)}", styles["Normal"]))
+    doc.build(story)
+    return buf.getvalue()
+
+
+def archiver_ot_ged(ot, user=None):
+    """Archivage réglementaire via M12 (CDC M8 §13.8) : rapport PDF scellé (SHA-256) en GED, conservation 10 ans,
+    lié à l'OT pour la recherche juridique."""
+    import hashlib
+
+    from django.core.files.base import ContentFile
+
+    from documents.models import Document, DocumentType, Version
+    from juridique.models import LienDocument
+
+    type_doc, _ = DocumentType.objects.get_or_create(
+        code=TYPE_GED_RAPPORT_OT, defaults={"label": "Rapports de maintenance", "retention_years": RETENTION_RAPPORT_OT_ANS}
+    )
+    if (type_doc.retention_years or 0) < RETENTION_RAPPORT_OT_ANS:
+        type_doc.retention_years = RETENTION_RAPPORT_OT_ANS
+        type_doc.save(update_fields=["retention_years"])
+    contenu = rapport_ot_pdf(ot)
+    sha = hashlib.sha256(contenu).hexdigest()
+    nom = f"{ot.code}.pdf"
+    document = Document.objects.create(
+        title=f"Rapport d'intervention {ot.code} — {ot.actif.designation}"[:200], status=Document.Status.ARCHIVED,
+        archived_at=timezone.now(), type=type_doc, document_date=timezone.localdate(ot.archive_le),
+        reference=ot.code, keywords=["maintenance", "OT", ot.code, ot.actif.code], sha256=sha, created_by=user,
+    )
+    version = Version.objects.create(
+        document=document, number=1, file=ContentFile(contenu, name=nom), sha256=sha, size=len(contenu),
+        original_filename=nom, created_by=user,
+    )
+    document.current_version = version
+    document.save(update_fields=["current_version"])
+    LienDocument.objects.create(
+        document=document, objet_type="maintenance.ordretravail", objet_id=str(ot.pk),
+        objet_label=f"{ot.code} — {ot.actif.designation}"[:255], module="M8", note="Rapport archivé", created_by=user,
+    )
+    ot.document = document
+    ot.save(update_fields=["document"])
+    return document
