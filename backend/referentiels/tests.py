@@ -129,6 +129,11 @@ class SeedReferentielsTests(APITestCase):
         self.assertEqual(Currency.objects.count(), 3)
         self.assertEqual(Partner.objects.count(), 1)
 
+    def test_comptes_de_tiers_sont_lettrables(self):
+        call_command("seed_referentiels")
+        lettrables = set(Account.objects.filter(reconcile=True).values_list("code", flat=True))
+        self.assertEqual(lettrables, {"401000", "401100", "411000", "411100"})
+
 
 class ReferentielAPITests(APITestCase):
     def setUp(self):
