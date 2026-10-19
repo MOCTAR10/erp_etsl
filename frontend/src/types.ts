@@ -650,7 +650,11 @@ export type TypeControleQualite =
   | "cnd"
   | "pda"
   | "itp"
-  | "peinture";
+  | "peinture"
+  | "genie_civil"
+  | "electrique"
+  | "essai"
+  | "tth";
 export type ResultatControle = "conforme" | "reserve" | "non_conforme";
 export type StatutControle = "en_attente" | "en_cours" | "valide" | "annule";
 
@@ -685,6 +689,24 @@ export interface ControleQualite {
   /** ITP : points d'arrêt / d'observation (CL-OM-07). */
   points?: PointInspection[];
   points_arret_restants?: number;
+  /** M6-B : mesures structurées (seuils figés à la saisie, conformité calculée). */
+  mesures?: MesureControle[];
+  instrument?: string | null;
+  instrument_code?: string | null;
+}
+
+export interface MesureControle {
+  id: string;
+  controle: string;
+  critere: string;
+  critere_libelle: string;
+  unite: string;
+  valeur: string;
+  mini: string | null;
+  maxi: string | null;
+  conforme: boolean;
+  repere: string;
+  saisi_le: string;
 }
 
 export interface PointInspection {

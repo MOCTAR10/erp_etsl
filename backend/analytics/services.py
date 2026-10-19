@@ -481,9 +481,9 @@ def alertes_agregees(user=None):
 
     qualite_liste = []
     if _allowed("qualite"):
-        from qualite.ecarts import alertes_qualifications_soudeurs
+        from qualite.ecarts import alertes_metrologie, alertes_qualifications_soudeurs
 
-        qualite_liste = alertes_qualifications_soudeurs(_band)
+        qualite_liste = alertes_qualifications_soudeurs(_band) + alertes_metrologie(_band)
 
     maintenance_liste = []
     for actif in (

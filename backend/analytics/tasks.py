@@ -24,6 +24,7 @@ DESTINATAIRES = {
     "document": (User.Role.ADMIN,),
     "inspection_reglementaire": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
     "qualification_soudeur": (User.Role.QAQC, User.Role.DIRECTEUR_OPERATIONS),
+    "etalonnage": (User.Role.QAQC,),
 }
 
 

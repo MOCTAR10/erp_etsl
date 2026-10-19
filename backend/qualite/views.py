@@ -13,10 +13,13 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from .ecarts import (
+    conclure_mesures, criteres_defaut, etiquette_pdf, nc_metrologie,
     PARAMETRES_QUALITE_DEFAUT, archiver_dossier_qualite, dossier_qualite_pdf, get_param_qualite, indicateurs,
     rapport_indicateurs_pdf,
 )
 from .models import (
+    CritereControle,
+    MesureControle,
     DiffusionWps,
     ParametreQualite,
     PunchItem,
@@ -35,6 +38,8 @@ from .models import (
     WpsWpqr,
 )
 from .serializers import (
+    CritereControleSerializer,
+    MesureControleSerializer,
     DiffusionWpsSerializer,
     ParametreQualiteSerializer,
     PunchItemSerializer,
@@ -258,6 +263,51 @@ class ControleQualiteViewSet(viewsets.ModelViewSet):
     @idempotent
     def create(self, request, *args, **kwargs):  # contrôle / CND saisi sur le terrain, rejouable
         return super().create(request, *args, **kwargs)
+
+    TYPES_MESURES = ("peinture", "genie_civil", "electrique", "essai", "tth")
+
+    @action(detail=True, methods=["post"], url_path="mesure")
+    @transaction.atomic
+    def mesure(self, request, pk=None):
+        """Saisit une mesure contre un critère du type de contrôle ; seuils figés, conformité calculée."""
+        controle = ControleQualite.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if controle.type_controle not in self.TYPES_MESURES:
+            raise DRFValidationError("Mesures structurées : contrôles peinture, génie civil, électricité, essai ou TTH.")
+        if controle.statut in (ControleQualite.Statut.VALIDE, ControleQualite.Statut.ANNULE):
+            raise DRFValidationError("Contrôle conclu : mesures scellées.")
+        critere = CritereControle.objects.filter(
+            pk=_uuid_or_none(request.data.get("critere")), type_controle=controle.type_controle, actif=True
+        ).first()
+        if critere is None:
+            raise DRFValidationError({"critere": "Critère inconnu pour ce type de contrôle."})
+        try:
+            valeur = Decimal(str(request.data.get("valeur")).replace(",", "."))
+        except InvalidOperation:
+            raise DRFValidationError({"valeur": "Valeur numérique attendue."})
+        mesure = MesureControle.objects.create(
+            controle=controle, critere=critere, valeur=valeur, mini=critere.mini, maxi=critere.maxi,
+            conforme=critere.accepte(valeur), repere=str(request.data.get("repere", ""))[:80], saisi_par=request.user,
+        )
+        if controle.statut == ControleQualite.Statut.EN_ATTENTE:
+            controle.statut = ControleQualite.Statut.EN_COURS
+            controle.save(update_fields=["statut", "updated_at"])
+        return Response(MesureControleSerializer(mesure).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="conclure")
+    @transaction.atomic
+    def conclure(self, request, pk=None):
+        """Conclusion calculée sur les mesures (non conforme => NC ouverte automatiquement)."""
+        controle = ControleQualite.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if controle.statut in (ControleQualite.Statut.VALIDE, ControleQualite.Statut.ANNULE):
+            raise DRFValidationError("Contrôle déjà conclu.")
+        if not controle.mesures.exists():
+            raise DRFValidationError("Aucune mesure saisie.")
+        manquants = list(CritereControle.objects.filter(type_controle=controle.type_controle, actif=True)
+                         .exclude(mesures__controle=controle).values_list("libelle", flat=True))
+        if manquants and not _as_bool(request.data.get("partiel")):
+            raise DRFValidationError({"detail": f"Critères non mesurés : {', '.join(manquants)} (confirmer un contrôle partiel)."})
+        conclure_mesures(controle, request.user)
+        return Response(self.get_serializer(controle).data)
 
 
 class NonConformiteViewSet(viewsets.ModelViewSet):
@@ -501,6 +551,8 @@ class InstrumentMesureViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if type_equipement := self.request.query_params.get("type"):
+            qs = qs.filter(type_equipement=type_equipement)
         if jours := self.request.query_params.get("a_etalonner"):
             try:
                 limite = timezone.localdate() + timedelta(days=int(jours))
@@ -532,9 +584,20 @@ class InstrumentMesureViewSet(viewsets.ModelViewSet):
         inst.save()
         Etalonnage.objects.create(
             instrument=inst, date=aujourdhui, echeance=echeance, conforme=conforme,
+            type_operation=inst.operation_attendue, organisme=str(request.data.get("organisme", inst.organisme))[:150],
             certificat=str(request.data.get("certificat", ""))[:80], par=request.user,
         )
+        if not conforme:
+            # Hors tolérance : NC métrologique avec la liste des usages à réévaluer (contrôles, joints, épreuves).
+            nc_metrologie(inst, request.user)
         return Response(self.get_serializer(inst).data)
+
+    @action(detail=True, methods=["get"], url_path="etiquette")
+    def etiquette(self, request, pk=None):
+        from hse.views import _pdf_response
+
+        inst = self.get_object()
+        return _pdf_response(etiquette_pdf(inst), f"etiquette-{inst.code}.pdf")
 
 
 class JointSoudeViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
@@ -737,3 +800,31 @@ class PersonnelQualiteViewSet(viewsets.ViewSet):
             for e in Employe.objects.exclude(statut=Employe.Statut.SORTI).order_by("code")
         ]
         return Response(rows)
+
+
+class CritereControleViewSet(viewsets.ModelViewSet):
+    """Critères d'acceptation (seuils) par type de contrôle : modifiables par QA/QC, provisoires jusqu'à confirmation."""
+
+    queryset = CritereControle.objects.all()
+    serializer_class = CritereControleSerializer
+    permission_classes = [CanValidatePv]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        criteres_defaut()
+        qs = super().get_queryset()
+        if type_controle := self.request.query_params.get("type"):
+            qs = qs.filter(type_controle=type_controle)
+        return qs
+
+    def perform_update(self, serializer):
+        serializer.save(statut_valeur=CritereControle.StatutValeur.PROVISOIRE, confirme_par=None, confirme_le=None)
+
+    @action(detail=True, methods=["post"], url_path="confirmer")
+    def confirmer(self, request, pk=None):
+        c = self.get_object()
+        c.statut_valeur = CritereControle.StatutValeur.CONFIRME
+        c.confirme_par = request.user
+        c.confirme_le = timezone.now()
+        c.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(c).data)
