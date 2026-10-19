@@ -108,6 +108,8 @@ class Command(BaseCommand):
                     "label": label,
                     "account_class": account_class,
                     "account_type": account_type,
+                    # Comptes de tiers (fournisseurs 401, clients 411) : lettrables, sinon le lettrage est refuse.
+                    "reconcile": code[:3] in ("401", "411"),
                 },
             )
             counters["comptes"] += created
