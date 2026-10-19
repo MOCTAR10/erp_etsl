@@ -191,7 +191,8 @@ class Command(ParcoursA):
 
     def parcours_achats(self):
         depot = StockQuant.objects.select_related("depot").first().depot
-        article = Article.objects.filter(is_stockable=True).order_by("code").first()
+        # TUBE-01 et non « le premier article stockable » : PR-JOINT-VERIN sert de pièce de rechange au seuil de réappro M8 (E2E).
+        article = Article.objects.get(code="TUBE-01")
         service = Article.objects.filter(is_stockable=False).order_by("code").first() or article
         standard = Partner.objects.get(code="FOU-001")
         gr = Partner.objects.get(code="GR-0001")
