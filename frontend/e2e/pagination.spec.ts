@@ -41,7 +41,7 @@ test.describe("Listes : pagination et recherche (inventaires de /stocks)", () =>
 
   test("au-delà de 20 lignes, la page 2 est accessible", async ({ page }) => {
     await page.goto("/stocks");
-    const section = page.locator(".card", { has: page.locator(".card-title", { hasText: /^Inventaires/ }) });
+    const section = page.locator(".card", { has: page.locator(".card-title", { hasText: /^Inventaires$/ }) });
     await expect(section.locator("tbody tr")).toHaveCount(20);
     const pager = section.getByRole("navigation", { name: "Pagination" });
     await expect(pager.getByText(/^Page 1 \/ \d+$/)).toBeVisible();
@@ -54,7 +54,7 @@ test.describe("Listes : pagination et recherche (inventaires de /stocks)", () =>
 
   test("la recherche filtre la liste côté serveur", async ({ page }) => {
     await page.goto("/stocks");
-    const section = page.locator(".card", { has: page.locator(".card-title", { hasText: /^Inventaires/ }) });
+    const section = page.locator(".card", { has: page.locator(".card-title", { hasText: /^Inventaires$/ }) });
     await expect(section.locator("tbody tr")).toHaveCount(20);
     await section.getByRole("searchbox").fill(dernierCode);
     await expect(section.locator("tbody tr")).toHaveCount(1);
