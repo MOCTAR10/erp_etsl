@@ -10,6 +10,12 @@ interface Instrument {
   id: string;
   code: string;
   designation: string;
+  type_equipement: string;
+  type_label: string;
+  periodicite_mois: number;
+  organisme: string;
+  localisation: string;
+  operation_attendue: "etalonnage" | "verification" | "validation";
   numero_serie: string;
   echeance_etalonnage: string;
   statut: "actif" | "bloque";
@@ -55,7 +61,12 @@ export function ClotureM6Section() {
   const instRows = instruments.rows;
   const jointRows = joints.rows;
   const epRows = epreuves.rows;
-  const nextYear = () => new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10);
+  const echeance = (mois: number) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + (mois || 12));
+    return d.toISOString().slice(0, 10);
+  };
+  const TYPES_EQUIPEMENT = ["instrument", "poste_souder", "four_tth", "manometre", "thermometre", "autre"];
 
   return (
     <>
@@ -65,6 +76,17 @@ export function ClotureM6Section() {
           endpoint="/api/qualite/instruments/"
           fields={[
             { name: "designation", label: t("qualite.m6.designation"), required: true },
+            {
+              name: "type_equipement",
+              label: t("qualite.col.type"),
+              type: "select",
+              required: true,
+              defaultValue: "instrument",
+              options: TYPES_EQUIPEMENT.map((v) => ({ value: v, label: t(`qualite.m6.types.${v}`) })),
+            },
+            { name: "periodicite_mois", label: t("qualite.m6.periodicite"), type: "number", min: 1, defaultValue: "12" },
+            { name: "organisme", label: t("qualite.m6.organisme") },
+            { name: "localisation", label: t("qualite.m6.localisation") },
             { name: "numero_serie", label: t("qualite.m6.serie"), required: true },
             { name: "date_etalonnage", label: t("qualite.m6.dernierEtalonnage"), type: "date", required: true },
             { name: "echeance_etalonnage", label: t("qualite.m6.echeance"), type: "date", required: true },
@@ -78,6 +100,7 @@ export function ClotureM6Section() {
                 <tr>
                   <th>{t("qualite.col.code")}</th>
                   <th>{t("qualite.m6.designation")}</th>
+                  <th>{t("qualite.col.type")}</th>
                   <th>{t("qualite.m6.echeance")}</th>
                   <th>{t("qualite.col.statut")}</th>
                   <th />
@@ -90,6 +113,14 @@ export function ClotureM6Section() {
                     <td>
                       {i.designation} <span className="muted">· {i.numero_serie}</span>
                     </td>
+                    <td>
+                      {i.type_label}
+                      <span className="muted">
+                        {" "}
+                        · {t(`qualite.m6.ops.${i.operation_attendue}`)} / {i.periodicite_mois} {t("qualite.m6.mois")}
+                        {i.organisme ? ` · ${i.organisme}` : ""}
+                      </span>
+                    </td>
                     <td>{formatDate(i.echeance_etalonnage, i18n.language)}</td>
                     <td>
                       <Badge tone={i.utilisable ? "ok" : "err"}>{i.utilisable ? t("qualite.m6.utilisable") : t("qualite.m6.usageBloque")}</Badge>
@@ -100,7 +131,7 @@ export function ClotureM6Section() {
                           {
                             label: t("qualite.m6.etalonnerConforme"),
                             path: `/api/qualite/instruments/${i.id}/etalonner/`,
-                            body: { conforme: true, echeance: nextYear() },
+                            body: { conforme: true, echeance: echeance(i.periodicite_mois) },
                             confirm: t("qualite.m6.confirmEtalonnage"),
                           },
                           {
@@ -111,7 +142,10 @@ export function ClotureM6Section() {
                             confirm: t("qualite.m6.confirmHorsTolerance"),
                           },
                         ]}
-                      />
+                      />{" "}
+                      <button type="button" className="btn ghost" onClick={() => void api.download(`/api/qualite/instruments/${i.id}/etiquette/`, `etiquette-${i.code}.pdf`)}>
+                        {t("qualite.m6.etiquette")}
+                      </button>
                     </td>
                   </tr>
                 ))}

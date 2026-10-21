@@ -250,6 +250,10 @@ class ControleQualite(models.Model):
         ITP = "itp", "ITP (plan d'inspection et d'essais)"
         PEINTURE = "peinture", "Peinture / anticorrosion"
         RECEPTION = "reception", "Contrôle à réception (achats M2)"
+        GENIE_CIVIL = "genie_civil", "Génie civil (béton, armatures)"
+        ELECTRIQUE = "electrique", "Électricité et instrumentation"
+        ESSAI = "essai", "Essai fonctionnel"
+        TTH = "tth", "Traitement thermique (TTH)"
 
     class MethodeCnd(models.TextChoices):
         RT = "RT", "Radiographie (RT)"
@@ -464,6 +468,10 @@ class NonConformite(models.Model):
     recontrole = models.ForeignKey(
         ControleQualite, null=True, blank=True, on_delete=models.PROTECT,
         related_name="ncr_cloturees", verbose_name="Re-CND de clôture",
+    )
+    instrument = models.ForeignKey(
+        "InstrumentMesure", null=True, blank=True, on_delete=models.PROTECT, related_name="non_conformites",
+        verbose_name="Équipement hors tolérance (métrologie)",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -722,9 +730,26 @@ class InstrumentMesure(models.Model):
         ACTIF = "actif", "En service"
         BLOQUE = "bloque", "Bloqué (hors tolérance)"
 
+    class TypeEquipement(models.TextChoices):
+        INSTRUMENT = "instrument", "Instrument de mesure"
+        POSTE_SOUDER = "poste_souder", "Poste à souder"
+        FOUR_TTH = "four_tth", "Four / équipement de traitement thermique"
+        MANOMETRE = "manometre", "Manomètre / enregistreur de pression"
+        THERMOMETRE = "thermometre", "Thermomètre / thermocouple"
+        AUTRE = "autre", "Autre équipement"
+
+    #: Opération de métrologie attendue par type : étalonnage (instrument), vérification (poste), validation (four).
+    OPERATION_PAR_TYPE = {"poste_souder": "verification", "four_tth": "validation"}
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
     designation = models.CharField(max_length=150, verbose_name="Désignation")
+    type_equipement = models.CharField(
+        max_length=14, choices=TypeEquipement.choices, default=TypeEquipement.INSTRUMENT, verbose_name="Type d'équipement"
+    )
+    periodicite_mois = models.PositiveSmallIntegerField(default=12, verbose_name="Périodicité (mois)")
+    organisme = models.CharField(max_length=150, blank=True, verbose_name="Organisme d'étalonnage")
+    localisation = models.CharField(max_length=120, blank=True, verbose_name="Localisation")
     numero_serie = models.CharField(max_length=80, verbose_name="N° de série")
     date_etalonnage = models.DateField(verbose_name="Dernier étalonnage")
     echeance_etalonnage = models.DateField(verbose_name="Échéance d'étalonnage")
@@ -752,6 +777,10 @@ class InstrumentMesure(models.Model):
     def utilisable(self):
         return self.statut == self.Statut.ACTIF and self.echeance_etalonnage >= timezone.localdate()
 
+    @property
+    def operation_attendue(self):
+        return self.OPERATION_PAR_TYPE.get(self.type_equipement, "etalonnage")
+
 
 class Etalonnage(models.Model):
     """Historique des étalonnages d'un instrument (preuve, non modifiable)."""
@@ -761,6 +790,11 @@ class Etalonnage(models.Model):
     date = models.DateField(default=timezone.localdate)
     echeance = models.DateField(null=True, blank=True)
     conforme = models.BooleanField(default=True, verbose_name="Dans la tolérance")
+    type_operation = models.CharField(
+        max_length=12, default="etalonnage", verbose_name="Opération",
+        choices=[("etalonnage", "Étalonnage"), ("verification", "Vérification"), ("validation", "Validation")],
+    )
+    organisme = models.CharField(max_length=150, blank=True, verbose_name="Organisme")
     certificat = models.CharField(max_length=80, blank=True, verbose_name="N° certificat")
     par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
 
@@ -781,6 +815,10 @@ class JointSoude(models.Model):
     wps = models.ForeignKey(WpsWpqr, null=True, blank=True, on_delete=models.PROTECT, related_name="joints")
     numero_coulee = models.CharField(max_length=60, blank=True, verbose_name="N° de coulée (heat number)")
     consommable = models.CharField(max_length=120, blank=True, verbose_name="Consommable (lot de fil / électrode)")
+    poste = models.ForeignKey(
+        InstrumentMesure, null=True, blank=True, on_delete=models.PROTECT, related_name="joints",
+        verbose_name="Poste à souder",
+    )
     date_soudage = models.DateField(default=timezone.localdate)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -954,3 +992,67 @@ class ParametreQualite(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class CritereControle(models.Model):
+    """Critère d'acceptation paramétrable par type de contrôle (peinture, génie civil, électricité, essais) :
+    unité et seuils mini / maxi. Valeurs livrées provisoires, à confirmer par ETSL (fiches de contrôle)."""
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    type_controle = models.CharField(max_length=14, choices=ControleQualite.TypeControle.choices)
+    code = models.CharField(max_length=30, verbose_name="Identifiant")
+    libelle = models.CharField(max_length=150, verbose_name="Critère")
+    unite = models.CharField(max_length=20, blank=True)
+    mini = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Minimum")
+    maxi = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Maximum")
+    norme = models.CharField(max_length=80, blank=True, verbose_name="Norme / méthode")
+    actif = models.BooleanField(default=True)
+    statut_valeur = models.CharField(max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE)
+    confirme_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    confirme_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["type_controle", "code"]
+        verbose_name = "Critère de contrôle"
+        verbose_name_plural = "Critères de contrôle"
+        constraints = [models.UniqueConstraint(fields=["type_controle", "code"], name="uniq_critere_type_code")]
+
+    def __str__(self):
+        return f"{self.get_type_controle_display()} — {self.libelle}"
+
+    def clean(self):
+        if self.mini is None and self.maxi is None:
+            raise ValidationError({"mini": "Renseigner un minimum et/ou un maximum."})
+        if self.mini is not None and self.maxi is not None and self.mini > self.maxi:
+            raise ValidationError({"maxi": "Le maximum doit être supérieur au minimum."})
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+    def accepte(self, valeur):
+        return (self.mini is None or valeur >= self.mini) and (self.maxi is None or valeur <= self.maxi)
+
+
+class MesureControle(models.Model):
+    """Mesure structurée d'un contrôle ; le résultat est calculé contre les seuils figés au moment de la saisie."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    controle = models.ForeignKey(ControleQualite, on_delete=models.CASCADE, related_name="mesures")
+    critere = models.ForeignKey(CritereControle, on_delete=models.PROTECT, related_name="mesures")
+    valeur = models.DecimalField(max_digits=12, decimal_places=3)
+    mini = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    maxi = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    conforme = models.BooleanField()
+    repere = models.CharField(max_length=80, blank=True, verbose_name="Repère / point de mesure")
+    saisi_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    saisi_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["controle", "saisi_le"]
+        verbose_name = "Mesure de contrôle"
+        verbose_name_plural = "Mesures de contrôle"

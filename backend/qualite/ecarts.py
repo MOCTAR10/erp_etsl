@@ -13,6 +13,7 @@ PARAMETRES_QUALITE_DEFAUT = {
     "CAPA_DELAI_JOURS": ("CAPA : délai de clôture (jours calendaires)", "5", "jours"),
     "CAPA_ESCALADE_JOURS": ("CAPA : retard avant escalade à la direction", "2", "jours"),
     "QUALIF_ALERTE_JOURS": ("Qualification soudeur : alerte avant péremption", "90", "jours"),
+    "METRO_ALERTE_JOURS": ("Métrologie : alerte avant échéance d'étalonnage", "30", "jours"),
 }
 #: Destinataires des relances qualité (QA/QC) et de l'escalade d'une CAPA en retard (hiérarchie).
 ROLES_QAQC = (User.Role.QAQC,)
@@ -259,3 +260,129 @@ def rapport_indicateurs_pdf(data):
     ]
     return _pdf(f"Rapport qualité {'mensuel' if data['mois'] else 'annuel'} — {periode}",
                 [("Période", periode), ("Édité le", f"{timezone.localdate():%d/%m/%Y}")], tableau)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M6-B : contrôles mesurés (peinture, génie civil, électricité, essais), métrologie typée
+# ----------------------------------------------------------------------------------------------------------------
+#: Critères livrés par défaut (valeurs usuelles provisoires, à remplacer par les fiches de contrôle ETSL).
+CRITERES_DEFAUT = (
+    ("peinture", "DFT", "Épaisseur de film sec (DFT)", "µm", "200", None, "ISO 19840"),
+    ("peinture", "ADHERENCE", "Adhérence (pull-off)", "MPa", "5", None, "ISO 4624"),
+    ("peinture", "RUGOSITE", "Rugosité de surface (profil)", "µm", "50", "100", "ISO 8503"),
+    ("peinture", "HR", "Humidité relative à l'application", "%", None, "85", "ISO 8502-4"),
+    ("peinture", "ECART_ROSEE", "Écart support / point de rosée", "°C", "3", None, "ISO 8502-4"),
+    ("genie_civil", "FC28", "Résistance à la compression à 28 j", "MPa", "25", None, "EN 12390-3"),
+    ("genie_civil", "SLUMP", "Affaissement (cône d'Abrams)", "mm", "50", "150", "EN 12350-2"),
+    ("genie_civil", "ENROBAGE", "Enrobage des armatures", "mm", "30", None, "Eurocode 2"),
+    ("genie_civil", "PLANEITE", "Planéité (règle de 2 m)", "mm", None, "5", ""),
+    ("electrique", "ISOLEMENT", "Résistance d'isolement", "MΩ", "1", None, "IEC 60364-6"),
+    ("electrique", "CONTINUITE", "Continuité du conducteur de protection", "Ω", None, "1", "IEC 60364-6"),
+    ("electrique", "TERRE", "Résistance de prise de terre", "Ω", None, "10", "IEC 60364-6"),
+    ("electrique", "BOUCLE_4_20", "Erreur de boucle 4-20 mA", "%", None, "0.5", "IEC 61298"),
+    ("essai", "ECART_CONSIGNE", "Écart à la consigne", "%", None, "2", ""),
+    ("essai", "DUREE", "Durée de fonctionnement sans défaut", "min", "60", None, ""),
+    ("tth", "TEMP_PALIER", "Température de palier", "°C", "580", "620", "ASME B31.3"),
+    ("tth", "DUREE_PALIER", "Durée de palier", "min", "60", None, "ASME B31.3"),
+)
+#: Type d'équipement dont l'usage est contrôlé par type de contrôle (blocage d'usage).
+EQUIPEMENT_PAR_CONTROLE = {"tth": "four_tth"}
+
+
+def criteres_defaut():
+    from .models import CritereControle
+
+    for type_controle, code, libelle, unite, mini, maxi, norme in CRITERES_DEFAUT:
+        CritereControle.objects.get_or_create(type_controle=type_controle, code=code, defaults={
+            "libelle": libelle, "unite": unite, "mini": Decimal(mini) if mini else None,
+            "maxi": Decimal(maxi) if maxi else None, "norme": norme,
+        })
+
+
+def conclure_mesures(controle, user):
+    """Résultat calculé : conforme si toutes les mesures le sont ; sinon non conforme et NC ouverte automatiquement."""
+    from .models import ControleQualite, NonConformite
+
+    mesures = list(controle.mesures.select_related("critere"))
+    hors = [m for m in mesures if not m.conforme]
+    controle.resultat = ControleQualite.Resultat.NON_CONFORME if hors else ControleQualite.Resultat.CONFORME
+    controle.statut = ControleQualite.Statut.VALIDE
+    controle.save(update_fields=["resultat", "statut", "updated_at"])
+    nc = None
+    if hors:
+        detail = " ; ".join(f"{m.critere.libelle} = {m.valeur} {m.critere.unite} (hors [{m.mini if m.mini is not None else '—'} ; "
+                            f"{m.maxi if m.maxi is not None else '—'}])" for m in hors)
+        nc = NonConformite.objects.create(
+            controle=controle, source=NonConformite.Source.CONTROLE, gravite=NonConformite.Gravite.MAJEURE,
+            description=f"{controle.get_type_controle_display()} {controle.code} non conforme : {detail}"[:2000],
+            decided_by=user,
+        )
+    return nc
+
+
+def nc_metrologie(instrument, user=None):
+    """Équipement hors tolérance : NC ouverte listant les contrôles et joints réalisés avec lui depuis le dernier
+    étalonnage conforme (analyse d'impact à mener par QA/QC)."""
+    from .models import NonConformite
+
+    depuis = instrument.date_etalonnage
+    controles = list(instrument.controles.filter(date_controle__gte=depuis).values_list("code", flat=True))
+    joints = list(instrument.joints.filter(date_soudage__gte=depuis).values_list("code", flat=True))
+    epreuves = list(instrument.epreuves.filter(created_at__date__gte=depuis).values_list("code", flat=True))
+    impact = ", ".join(controles + joints + epreuves) or "aucun usage enregistré"
+    return NonConformite.objects.create(
+        source=NonConformite.Source.INTERNE, gravite=NonConformite.Gravite.MAJEURE, instrument=instrument,
+        description=(f"{instrument.get_type_equipement_display()} {instrument.code} ({instrument.designation}) hors tolérance. "
+                     f"Usages depuis le {depuis:%d/%m/%Y} à réévaluer : {impact}.")[:2000],
+        decided_by=user,
+    )
+
+
+def alertes_metrologie(band):
+    from .models import InstrumentMesure
+
+    aujourdhui = timezone.localdate()
+    horizon = aujourdhui + timedelta(days=int(get_param_qualite("METRO_ALERTE_JOURS")))
+    items = []
+    for inst in InstrumentMesure.objects.filter(statut=InstrumentMesure.Statut.ACTIF, echeance_etalonnage__lte=horizon):
+        jours = (inst.echeance_etalonnage - aujourdhui).days
+        items.append({
+            "type": "etalonnage", "code": inst.code,
+            "libelle": f"{inst.get_type_equipement_display()} — {inst.designation} ({inst.numero_serie})",
+            "date_echeance": inst.echeance_etalonnage, "bande": band(jours), "jours": jours,
+            "statut": "expiree" if jours < 0 else "active",
+        })
+    return items
+
+
+def etiquette_pdf(instrument):
+    """Étiquette de statut métrologique (vert : utilisable ; rouge : interdit d'usage), format 70 x 40 mm."""
+    import io
+
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    largeur, hauteur = 70 * mm, 40 * mm
+    c = canvas.Canvas(buf, pagesize=(largeur, hauteur))
+    ok = instrument.utilisable
+    c.setFillColor(colors.HexColor("#15803d" if ok else "#b91c1c"))
+    c.rect(0, hauteur - 12 * mm, largeur, 12 * mm, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawCentredString(largeur / 2, hauteur - 8 * mm, "CONFORME - UTILISABLE" if ok else "INTERDIT D'USAGE")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(3 * mm, hauteur - 18 * mm, f"{instrument.code} - {instrument.numero_serie}"[:45])
+    c.setFont("Helvetica", 8)
+    c.drawString(3 * mm, hauteur - 23 * mm, instrument.designation[:48])
+    dernier = instrument.etalonnages.first()
+    operation = dict(instrument.etalonnages.model._meta.get_field("type_operation").choices).get(instrument.operation_attendue)
+    c.drawString(3 * mm, hauteur - 28 * mm, f"{operation} : {instrument.date_etalonnage:%d/%m/%Y}")
+    c.drawString(3 * mm, hauteur - 33 * mm, f"Prochaine échéance : {instrument.echeance_etalonnage:%d/%m/%Y}")
+    if dernier and dernier.certificat:
+        c.drawString(3 * mm, hauteur - 38 * mm, f"Certificat : {dernier.certificat}"[:48])
+    c.showPage()
+    c.save()
+    return buf.getvalue()

@@ -10,6 +10,8 @@ from config.serializers import ModelCleanMixin
 
 from .ecarts import get_param_qualite, qualification_couvrante
 from .models import (
+    CritereControle,
+    MesureControle,
     DiffusionWps,
     ParametreQualite,
     PunchItem,
@@ -130,14 +132,16 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
             "date_controle", "resultat", "resultat_label", "statut", "statut_label",
             "notes", "created_by", "created_by_name", "created_at", "updated_at",
             "points", "points_arret_restants", "methode_cnd", "instrument", "instrument_code",
-            "approuve_par", "approuve_le", "images_count",
+            "approuve_par", "approuve_le", "images_count", "mesures",
         ]
         read_only_fields = [
             "code", "created_by", "points", "points_arret_restants", "approuve_par", "approuve_le", "images_count",
+            "mesures",
         ]
 
     instrument_code = serializers.CharField(source="instrument.code", read_only=True, default=None)
     images_count = serializers.SerializerMethodField()
+    mesures = serializers.SerializerMethodField()
     points = serializers.SerializerMethodField()
     points_arret_restants = serializers.SerializerMethodField()
 
@@ -146,6 +150,9 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
 
     def get_images_count(self, obj):
         return obj.images.count()
+
+    def get_mesures(self, obj):
+        return MesureControleSerializer(obj.mesures.select_related("critere"), many=True).data
 
     def get_points_arret_restants(self, obj):
         return obj.points.filter(type_point="arret").exclude(statut="leve").count()
@@ -166,6 +173,11 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"instrument": "Instrument hors échéance d'étalonnage ou bloqué : utilisation interdite."}
             )
+        type_controle = attrs.get("type_controle") or (self.instance.type_controle if self.instance else None)
+        if type_controle == ControleQualite.TypeControle.TTH:
+            four = instrument or (self.instance.instrument if self.instance else None)
+            if four is None or four.type_equipement != "four_tth":
+                raise serializers.ValidationError({"instrument": "Un traitement thermique se trace avec un four TTH validé."})
         instance = self.instance or self.Meta.model(**attrs)
         if self.instance:
             for key, value in attrs.items():
@@ -195,6 +207,7 @@ class NonConformiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = NonConformite
         fields = [
+            "instrument",
             "id", "code", "controle", "controle_code", "source", "source_label",
             "gravite", "gravite_label", "description", "traitement", "traitement_label",
             "statut", "statut_label", "decided_by", "decided_by_name",
@@ -323,18 +336,21 @@ class PointInspectionSerializer(ModelCleanMixin, serializers.ModelSerializer):
 class EtalonnageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Etalonnage
-        fields = ["id", "date", "echeance", "conforme", "certificat"]
+        fields = ["id", "date", "echeance", "conforme", "type_operation", "organisme", "certificat"]
 
 
 class InstrumentMesureSerializer(ModelCleanMixin, serializers.ModelSerializer):
     utilisable = serializers.BooleanField(read_only=True)
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    type_label = serializers.CharField(source="get_type_equipement_display", read_only=True)
+    operation_attendue = serializers.CharField(read_only=True)
     etalonnages = EtalonnageSerializer(many=True, read_only=True)
 
     class Meta:
         model = InstrumentMesure
         fields = [
-            "id", "code", "designation", "numero_serie", "date_etalonnage", "echeance_etalonnage",
+            "id", "code", "designation", "type_equipement", "type_label", "periodicite_mois", "organisme", "localisation",
+            "numero_serie", "date_etalonnage", "echeance_etalonnage", "operation_attendue",
             "statut", "statut_label", "utilisable", "etalonnages",
         ]
         read_only_fields = ["code", "statut"]
@@ -349,7 +365,7 @@ class JointSoudeSerializer(serializers.ModelSerializer):
         model = JointSoude
         fields = [
             "id", "code", "ordre", "ordre_code", "repere", "soudeur", "soudeur_nom", "wps", "wps_code",
-            "numero_coulee", "consommable", "date_soudage", "created_at",
+            "numero_coulee", "consommable", "poste", "date_soudage", "created_at",
         ]
         read_only_fields = ["code"]
 
@@ -369,6 +385,9 @@ class JointSoudeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"wps": f"WPS {wps.code} non validé ou obsolète : soudage interdit."})
         if not DiffusionWps.objects.filter(wps=wps, ordre=attrs["ordre"]).exists():
             raise serializers.ValidationError({"wps": f"WPS {wps.code} non diffusé sur l'OF {attrs['ordre'].code}."})
+        poste = attrs.get("poste")
+        if poste and (poste.type_equipement != "poste_souder" or not poste.utilisable):
+            raise serializers.ValidationError({"poste": f"Poste {poste.code} non vérifié, bloqué ou pas un poste à souder."})
         if qualification_couvrante(attrs["soudeur"], wps) is None:
             raise serializers.ValidationError({"soudeur": (
                 f"Qualification du soudeur hors domaine du WPS {wps.code} "
@@ -454,3 +473,29 @@ class ParametreQualiteSerializer(serializers.ModelSerializer):
         if valeur < 0:
             raise serializers.ValidationError("Valeur positive attendue.")
         return valeur
+
+
+class CritereControleSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_controle_display", read_only=True)
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = CritereControle
+        fields = [
+            "id", "type_controle", "type_label", "code", "libelle", "unite", "mini", "maxi", "norme", "actif",
+            "statut_valeur", "est_provisoire", "confirme_par", "confirme_le",
+        ]
+        read_only_fields = ["statut_valeur", "confirme_par", "confirme_le"]
+
+    def validate_code(self, code):
+        return code.strip().upper()
+
+
+class MesureControleSerializer(serializers.ModelSerializer):
+    critere_libelle = serializers.CharField(source="critere.libelle", read_only=True)
+    unite = serializers.CharField(source="critere.unite", read_only=True)
+
+    class Meta:
+        model = MesureControle
+        fields = ["id", "controle", "critere", "critere_libelle", "unite", "valeur", "mini", "maxi", "conforme", "repere", "saisi_le"]
+        read_only_fields = ["mini", "maxi", "conforme"]

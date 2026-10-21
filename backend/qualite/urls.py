@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    CritereControleViewSet,
     IndicateursQualiteViewSet,
     ParametreQualiteViewSet,
     PersonnelQualiteViewSet,
@@ -34,6 +35,7 @@ router.register("joints", JointSoudeViewSet, basename="joints")
 router.register("images-controle", ImageControleViewSet, basename="images-controle")
 router.register("epreuves", EpreuvePressionViewSet, basename="epreuves")
 router.register("punch-list", PunchItemViewSet, basename="punch-list")
+router.register("criteres", CritereControleViewSet, basename="criteres-controle")
 router.register("parametres", ParametreQualiteViewSet, basename="parametres-qualite")
 router.register("indicateurs", IndicateursQualiteViewSet, basename="indicateurs-qualite")
 router.register("personnel", PersonnelQualiteViewSet, basename="personnel-qualite")

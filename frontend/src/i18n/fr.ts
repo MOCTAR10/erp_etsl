@@ -648,7 +648,7 @@ export const fr = {
       searchJoints: "Rechercher un joint (code, repère)…",
       searchEpreuves: "Rechercher une épreuve (code)…",
       metrologie: "Métrologie (étalonnage)", newInstrument: "Nouvel instrument", designation: "Désignation", serie: "N° de série", dernierEtalonnage: "Dernier étalonnage", echeance: "Échéance d'étalonnage",
-      utilisable: "Utilisable", usageBloque: "Usage bloqué", etalonnerConforme: "Étalonné conforme (+1 an)", confirmEtalonnage: "Enregistrer un étalonnage conforme (échéance dans 1 an) ?", horsTolerance: "Hors tolérance", confirmHorsTolerance: "Déclarer l'instrument hors tolérance ? Son usage sera bloqué.",
+      utilisable: "Utilisable", usageBloque: "Usage bloqué", etalonnerConforme: "Conforme (périodicité)", confirmEtalonnage: "Enregistrer une opération conforme (prochaine échéance selon la périodicité) ?", periodicite: "Périodicité (mois)", organisme: "Organisme", localisation: "Localisation", mois: "mois", etiquette: "Étiquette", types: { instrument: "Instrument de mesure", poste_souder: "Poste à souder", four_tth: "Four TTH", manometre: "Manomètre / enregistreur", thermometre: "Thermomètre / thermocouple", autre: "Autre équipement" }, ops: { etalonnage: "Étalonnage", verification: "Vérification", validation: "Validation" }, horsTolerance: "Hors tolérance", confirmHorsTolerance: "Déclarer l'instrument hors tolérance ? Son usage sera bloqué.",
       joints: "Registre des joints soudés", jointsVide: "Aucun joint enregistré (un ITP approuvé est requis avant soudage).", of: "OF", joint: "Joint", coulee: "N° de coulée", epreuves: "Épreuves hydrauliques / étanchéité", epreuvesVide: "Aucune épreuve enregistrée.", pressionEssai: "Pression d'essai", releves: "Relevés P/T",
       conclure: "Conclure", confirmConclure: "Conclure l'épreuve ? Les relevés seront scellés.", res: { conforme: "Conforme", non_conforme: "Non conforme" },
     },
@@ -711,6 +711,10 @@ export const fr = {
       pda: "PDA",
       itp: "ITP",
       peinture: "Peinture / anticorrosion",
+      genie_civil: "Génie civil (béton, armatures)",
+      electrique: "Électricité et instrumentation",
+      essai: "Essai fonctionnel",
+      tth: "Traitement thermique (TTH)",
     },
     ctrl_result: {
       conforme: "Conforme",
@@ -1297,6 +1301,20 @@ export const fr = {
     pv: {
       receptionner: "Réceptionner", confirmReception: "Prononcer la réception ? Le dossier qualité de l'OF sera scellé en GED (10 ans).",
       reserve: "Sous réserve", motif: "Motif de la réserve ?", dossier: "Dossier qualité (PDF)",
+    },
+  },
+  m6b: {
+    ctrl: {
+      title: "Contrôles mesurés (peinture, génie civil, électricité, essais, TTH)", nouveau: "Nouveau contrôle mesuré",
+      equipement: "Équipement (four TTH obligatoire pour un TTH)", aide: "Chaque mesure est comparée aux seuils en vigueur (figés à la saisie) ; un contrôle conclu non conforme ouvre une NC.",
+      mesures: "Mesures", critere: "Critère", valeur: "Valeur", repere: "Repère", saisir: "Saisir la mesure",
+      hors_one: "{{count}} mesure hors seuil", hors_other: "{{count}} mesures hors seuil",
+      conclure: "Conclure", confirmConclure: "Conclure le contrôle ? Le résultat est calculé sur les mesures (NC si non conforme).",
+      partiel: "Conclure (partiel)", confirmPartiel: "Conclure alors que des critères ne sont pas mesurés ?",
+    },
+    crit: {
+      title: "Critères d'acceptation (seuils)", critere: "Critère", seuils: "Seuils [mini ; maxi]", norme: "Norme / méthode", mini: "minimum", maxi: "maximum",
+      bandeau: "{{count}} seuil(s) provisoire(s) à faire confirmer par ETSL (fiches de contrôle) ; une modification remet le seuil en provisoire.",
     },
   },
   m7e: {

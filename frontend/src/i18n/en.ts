@@ -648,7 +648,7 @@ export const en = {
       searchJoints: "Search joints (code, mark)…",
       searchEpreuves: "Search tests (code)…",
       metrologie: "Metrology (calibration)", newInstrument: "New instrument", designation: "Designation", serie: "Serial no.", dernierEtalonnage: "Last calibration", echeance: "Calibration due date",
-      utilisable: "In service", usageBloque: "Use blocked", etalonnerConforme: "Calibrated OK (+1 year)", confirmEtalonnage: "Record a passing calibration (due in 1 year)?", horsTolerance: "Out of tolerance", confirmHorsTolerance: "Mark the instrument out of tolerance? Its use will be blocked.",
+      utilisable: "In service", usageBloque: "Use blocked", etalonnerConforme: "Conforming (periodicity)", confirmEtalonnage: "Record a conforming operation (next due date from the periodicity)?", periodicite: "Periodicity (months)", organisme: "Body", localisation: "Location", mois: "months", etiquette: "Label", types: { instrument: "Measuring instrument", poste_souder: "Welding machine", four_tth: "PWHT furnace", manometre: "Pressure gauge / recorder", thermometre: "Thermometer / thermocouple", autre: "Other equipment" }, ops: { etalonnage: "Calibration", verification: "Verification", validation: "Validation" }, horsTolerance: "Out of tolerance", confirmHorsTolerance: "Mark the instrument out of tolerance? Its use will be blocked.",
       joints: "Weld joint register", jointsVide: "No joint recorded (an approved ITP is required before welding).", of: "WO", joint: "Joint", coulee: "Heat number", epreuves: "Hydrostatic / leak tests", epreuvesVide: "No test recorded.", pressionEssai: "Test pressure", releves: "P/T readings",
       conclure: "Conclude", confirmConclure: "Conclude the test? Readings will be sealed.", res: { conforme: "Conforming", non_conforme: "Non-conforming" },
     },
@@ -711,6 +711,10 @@ export const en = {
       pda: "PDA",
       itp: "ITP",
       peinture: "Painting / anticorrosion",
+      genie_civil: "Civil works (concrete, rebar)",
+      electrique: "Electrical & instrumentation",
+      essai: "Functional test",
+      tth: "Post-weld heat treatment (PWHT)",
     },
     ctrl_result: {
       conforme: "Conform",
@@ -1297,6 +1301,20 @@ export const en = {
     pv: {
       receptionner: "Accept", confirmReception: "Accept the work? The work order quality dossier will be sealed in the DMS (10 years).",
       reserve: "With reservations", motif: "Reason for the reservation?", dossier: "Quality dossier (PDF)",
+    },
+  },
+  m6b: {
+    ctrl: {
+      title: "Measured inspections (painting, civil works, electrical, tests, PWHT)", nouveau: "New measured inspection",
+      equipement: "Equipment (PWHT furnace required for PWHT)", aide: "Each measurement is checked against the current thresholds (frozen when entered); a non-conforming conclusion opens an NCR.",
+      mesures: "Measurements", critere: "Criterion", valeur: "Value", repere: "Location", saisir: "Record measurement",
+      hors_one: "{{count}} measurement out of range", hors_other: "{{count}} measurements out of range",
+      conclure: "Conclude", confirmConclure: "Conclude the inspection? The result is computed from the measurements (NCR if non-conforming).",
+      partiel: "Conclude (partial)", confirmPartiel: "Conclude although some criteria are not measured?",
+    },
+    crit: {
+      title: "Acceptance criteria (thresholds)", critere: "Criterion", seuils: "Thresholds [min ; max]", norme: "Standard / method", mini: "minimum", maxi: "maximum",
+      bandeau: "{{count}} provisional threshold(s) to be confirmed by ETSL (inspection sheets); editing a threshold makes it provisional again.",
     },
   },
   m7e: {
