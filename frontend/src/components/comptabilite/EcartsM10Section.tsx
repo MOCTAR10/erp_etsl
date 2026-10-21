@@ -195,7 +195,7 @@ export function EcartsM10Section() {
             </p>
             {etat.data.provisoire && etat.data.avertissement && <p className="muted">{etat.data.avertissement}</p>}
             {etat.data.tableaux.map((tab) => (
-              <div className="table-wrap" key={tab.titre}>
+              <div className="table-wrap" key={tab.titre} tabIndex={0} role="region" aria-label={tab.titre}>
                 <h4>{tab.titre}</h4>
                 <table className="table" data-testid={`etat-${code}`}>
                   <thead>
@@ -247,7 +247,7 @@ export function EcartsM10Section() {
               {treso.data.alertes.length > 0 ? <Badge tone="err">{t("ecarts_m10.treso.alerte", { n: treso.data.alertes.length })}</Badge> : <Badge tone="ok">{t("ecarts_m10.treso.ok")}</Badge>}{" "}
               {treso.data.provisoire && provisoire}
             </p>
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_m10.treso.title")}>
               <table className="table" data-testid="tresorerie-13">
                 <thead>
                   <tr>
