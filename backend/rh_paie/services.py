@@ -330,9 +330,9 @@ def comptabiliser_bulletin(bulletin, user=None):
     except Journal.DoesNotExist:
         raise ValidationError("Journal de paie PAI absent (seed_accounting).")
 
-    brut, net, patronal = bulletin.brut, bulletin.net, bulletin.charges_patronales
-    retenues = brut - net
-    comptes = {code: _compte(code) for code in ("661000", "664000", "421000", "431000")}
+    from .compta_m9b import lignes_ecriture_paie
+
+    lignes = lignes_ecriture_paie(bulletin)  # comptes paramétrés (ou défaut), ventilation par affaire
     jour = date(bulletin.periode.year, bulletin.periode.month,
                 calendar.monthrange(bulletin.periode.year, bulletin.periode.month)[1])
     move = AccountMove.objects.create(
@@ -340,15 +340,11 @@ def comptabiliser_bulletin(bulletin, user=None):
         reference=bulletin.code, label=f"Paie {bulletin.periode:%m/%Y} — {bulletin.employe.nom_complet}",
         source="M9", source_ref=bulletin.code,
     )
-    lignes = [
-        (comptes["661000"], brut, 0), (comptes["664000"], patronal, 0),
-        (comptes["421000"], 0, net), (comptes["431000"], 0, retenues + patronal),
-    ]
-    for ordre, (compte, debit, credit) in enumerate(lignes):
+    for ordre, (compte, debit, credit, analytic, libelle) in enumerate(lignes):
         if debit or credit:
             AccountMoveLine.objects.create(
-                move=move, account=compte, debit=debit, credit=credit, order=ordre,
-                label=f"Paie {bulletin.code}",
+                move=move, account=compte, debit=debit, credit=credit, order=ordre, analytic_account=analytic,
+                label=f"Paie {bulletin.code} — {libelle}"[:200],
             )
     posted = post_move(move, user=user)
     bulletin.move = posted
@@ -529,7 +525,12 @@ def generer_virement(periode, compte, date_execution, user=None):
 # Pointages M3 -> heures supplémentaires, déclarations sans ressaisie, reporting RH (clôture M9)
 # --------------------------------------------------------------------------------------------
 HS_RUBRIQUE = "HS-TEMPS"
-HS_PARAMETRES = ("DUREE_LEGALE_HEBDO", "HS_MAJ_1", "HS_MAJ_2", "HS_SEUIL_2")
+HS_PARAMETRES = ("DUREE_LEGALE_HEBDO", "HS_MAJ_1", "HS_MAJ_2", "HS_SEUIL_2", "MAJ_NUIT", "MAJ_ASTREINTE")
+#: type de pointage, paramètre (% du taux horaire), rubrique, libellé — valorisés seulement si le taux est saisi.
+PRIMES_HORAIRES = (
+    ("nuit", "MAJ_NUIT", "NUIT-TEMPS", "Majoration des heures de nuit"),
+    ("astreinte", "MAJ_ASTREINTE", "ASTR-TEMPS", "Heures d'astreinte"),
+)
 JOURS_OUVRES_AN = Decimal("220")  # base d'absentéisme (jours ouvrés/an) ; à confirmer avec la convention collective
 
 
@@ -606,14 +607,45 @@ def integrer_temps(bulletin):
         )
     else:
         bulletin.lignes.filter(rubrique=rubrique).delete()
+    primes = _primes_horaires(bulletin, res["taux_horaire"])
     SaisieTemps.objects.filter(pk__in=[s.pk for s in res["saisies"]]).update(statut=SaisieTemps.Statut.TRANSFERE_PAIE)
     snaps = [
         s for s in (bulletin.baremes_utilises or [])
         if not (s.get("type") == "parametre" and s.get("code") in HS_PARAMETRES)
     ]
-    bulletin.baremes_utilises = snaps + [_instantane(p, "parametre") for p in res["parametres"]]
+    bulletin.baremes_utilises = snaps + [_instantane(p, "parametre") for p in res["parametres"] + primes]
     bulletin.save(update_fields=["baremes_utilises", "updated_at"])
     return calculer_bulletin(bulletin), res
+
+
+def _primes_horaires(bulletin, taux_horaire):
+    """Heures de nuit et d'astreinte du mois, valorisées au % du taux horaire si le paramètre existe (sinon ignorées)."""
+    from django.db.models import Sum
+
+    from .models import BulletinLigne, RubriquePaie, SaisieTemps
+
+    utilises = []
+    for type_, code, rub, label in PRIMES_HORAIRES:
+        heures = SaisieTemps.objects.filter(
+            employe=bulletin.employe, date__year=bulletin.periode.year, date__month=bulletin.periode.month, type=type_,
+        ).aggregate(t=Sum("heures"))["t"] or Decimal("0")
+        rubrique, _ = RubriquePaie.objects.get_or_create(
+            code=rub, defaults={"label": label, "nature": RubriquePaie.Nature.GAIN, "ordre": 21}
+        )
+        try:
+            taux = parametre(code, bulletin.periode)
+        except ValidationError:
+            taux = None
+        if heures and taux is not None:
+            BulletinLigne.objects.update_or_create(
+                bulletin=bulletin, rubrique=rubrique,
+                defaults={"libelle": f"{label} ({heures} h à {taux.valeur} %)",
+                          "montant": _arrondi(heures * taux_horaire * taux.valeur / 100)},
+            )
+            utilises.append(taux)
+        else:
+            bulletin.lignes.filter(rubrique=rubrique).delete()
+    return utilises
 
 
 def ventilation_bulletin(bulletin):

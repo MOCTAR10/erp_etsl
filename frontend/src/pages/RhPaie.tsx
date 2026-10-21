@@ -16,6 +16,7 @@ import type {
 } from "../types";
 import { BaremesSection } from "../components/workflow/BaremesSection";
 import { EcartsM9aSection } from "../components/rhpaie/EcartsM9aSection";
+import { EcartsM9bSection } from "../components/rhpaie/EcartsM9bSection";
 import { DeclarationsSection } from "../components/workflow/DeclarationsSection";
 import { VirementsSection } from "../components/workflow/VirementsSection";
 
@@ -283,6 +284,7 @@ export function RhPaiePage() {
         </>
       ) : null}
       <EcartsM9aSection />
+      <EcartsM9bSection />
       <DeclarationsSection />
       <VirementsSection />
       <BaremesSection />

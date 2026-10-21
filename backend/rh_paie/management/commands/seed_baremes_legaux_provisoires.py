@@ -68,6 +68,9 @@ PARAMETRES = [
     ("JOURS_PAIE_MOIS", "Diviseur journalier du salaire (retenue d'absence)", "30", "j",
      "Usage (mois de 30 jours) — à confirmer avec la convention collective",
      "Convention collective / pratique ETSL à confirmer (26 jours ouvrables possibles)"),
+    ("PROVISION_CP_TAUX", "Provision mensuelle pour congés payés (% du brut)", "8.333", "%",
+     "30 jours de congé par an : 1/12 du brut annuel (usage)",
+     "Règle d'acquisition des congés (code du travail / convention) à confirmer"),
     ("CNAMGS_PENALITE_DEFAUT", "CNAMGS — majoration pour défaut de déclaration", "25", "%", CNAMGS, CNAMGS_REF),
     ("CNAMGS_PENALITE_RETARD", "CNAMGS — majoration pour paiement tardif", "2", "%", CNAMGS, CNAMGS_REF),
 ]
