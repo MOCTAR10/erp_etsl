@@ -430,6 +430,18 @@ class Paiement(models.Model):
     imputation_618 = models.BooleanField(
         default=False, verbose_name="Refacturation intra-groupe (compte 618)"
     )
+    analytic_account = models.ForeignKey(
+        "referentiels.AnalyticAccount", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Imputation analytique (affaire / chantier / centre)",
+        help_text="À défaut, reprise de l'imputation du bon de commande de la facture fournisseur (M10 → M11).",
+    )
+    retenue_source = models.BooleanField(
+        default=False, verbose_name="Retenue à la source",
+        help_text="Décaissement : retenue au taux paramétré, créditée au 447 et reversée à l'État.",
+    )
+    montant_retenue = models.DecimalField(
+        max_digits=16, decimal_places=2, default=0, verbose_name="Montant retenu à la source"
+    )
     move = models.ForeignKey(
         "accounting_kernel.AccountMove",
         blank=True,
@@ -471,6 +483,10 @@ class Paiement(models.Model):
 class DeclarationTva(models.Model):
     """Déclaration de TVA (RF-ERP-90 : TVA 18 %), assise sur les écritures validées."""
 
+    class SourceCalcul(models.TextChoices):
+        ECRITURES = "ecritures", "Écritures 443 / 445"
+        PAIEMENTS = "paiements", "Paiements validés (encaissements)"
+
     class Statut(models.TextChoices):
         BROUILLON = "brouillon", "Brouillon"
         DEPOSEE = "deposee", "Déposée"
@@ -495,6 +511,17 @@ class DeclarationTva(models.Model):
     )
     net_a_payer = models.DecimalField(
         max_digits=16, decimal_places=2, default=0, verbose_name="TVA nette à payer"
+    )
+    tva_autoliquidee = models.DecimalField(
+        max_digits=16, decimal_places=2, default=0, verbose_name="dont TVA autoliquidée (autofacturation)"
+    )
+    retenues_source = models.DecimalField(
+        max_digits=16, decimal_places=2, default=0, verbose_name="Retenues à la source à reverser (447)"
+    )
+    source_calcul = models.CharField(max_length=10, choices=SourceCalcul.choices, blank=True, verbose_name="Calculée sur")
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Déclaration archivée en GED",
     )
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut"
@@ -863,6 +890,11 @@ class ClotureMensuelle(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
     destinataires = models.JSONField(default=list, blank=True)
+    emails_envoyes = models.PositiveIntegerField(default=0, verbose_name="E-mails envoyés à la Direction")
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Journal de la période archivé en GED",
+    )
     reouvertures = models.JSONField(default=list, blank=True, help_text="Historique {par, le, motif} des réouvertures.")
 
     class Meta:
@@ -872,3 +904,127 @@ class ClotureMensuelle(models.Model):
 
     def __str__(self):
         return f"Clôture {self.period}"
+
+
+class PrevisionTresorerie(models.Model):
+    """Prévision de trésorerie saisie (salaires, impôts, financement, encaissement attendu…) — plan 13 semaines."""
+
+    class Sens(models.TextChoices):
+        ENTREE = "entree", "Encaissement"
+        SORTIE = "sortie", "Décaissement"
+
+    class Categorie(models.TextChoices):
+        CLIENTS = "clients", "Clients"
+        FOURNISSEURS = "fournisseurs", "Fournisseurs"
+        SALAIRES = "salaires", "Salaires et charges sociales"
+        FISCAL = "fiscal", "Impôts et taxes"
+        FINANCEMENT = "financement", "Financement / emprunts"
+        INTRAGROUPE = "intragroupe", "Intra-groupe GLOBAL RENTAL"
+        AUTRE = "autre", "Autre"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    date_prevue = models.DateField(verbose_name="Date prévue")
+    sens = models.CharField(max_length=8, choices=Sens.choices, verbose_name="Sens")
+    categorie = models.CharField(max_length=12, choices=Categorie.choices, default=Categorie.AUTRE, verbose_name="Catégorie")
+    libelle = models.CharField(max_length=200, verbose_name="Libellé")
+    montant = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant")
+    compte_bancaire = models.ForeignKey(
+        CompteBancaire, null=True, blank=True, on_delete=models.SET_NULL, related_name="previsions",
+        verbose_name="Compte bancaire",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date_prevue", "code"]
+        verbose_name = "Prévision de trésorerie"
+        verbose_name_plural = "Prévisions de trésorerie"
+
+    def __str__(self):
+        return f"{self.code} — {self.libelle}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ComptabiliteSequence.next_for("PRV", "PRV")
+        return super().save(*args, **kwargs)
+
+
+class AutoFacture(models.Model):
+    """Autofacturation : ETSL établit la facture pour le compte du fournisseur et autoliquide la TVA (443 / 445)."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        EMISE = "emise", "Émise"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Numéro")
+    fournisseur = models.ForeignKey(
+        "referentiels.Partner", on_delete=models.PROTECT, related_name="autofactures", verbose_name="Fournisseur"
+    )
+    date = models.DateField(default=timezone.localdate, verbose_name="Date")
+    objet = models.CharField(max_length=250, verbose_name="Objet de la prestation")
+    montant_ht = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant HT")
+    taux_tva = models.ForeignKey(TauxTva, on_delete=models.PROTECT, related_name="+", verbose_name="Taux de TVA")
+    montant_tva = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="TVA autoliquidée")
+    compte_charge = models.ForeignKey(
+        "referentiels.Account", on_delete=models.PROTECT, related_name="+", verbose_name="Compte de charge"
+    )
+    analytic = models.ForeignKey(
+        "referentiels.AnalyticAccount", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Imputation analytique",
+    )
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, db_index=True)
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.SET_NULL, related_name="autofactures"
+    )
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    emise_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    emise_le = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Autofacture"
+        verbose_name_plural = "Autofactures"
+
+    def __str__(self):
+        return f"{self.code} — {self.fournisseur_id}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ComptabiliteSequence.next_for("AUT", "AUT")
+        return super().save(*args, **kwargs)
+
+
+class GabaritEtat(models.Model):
+    """Gabarit d'état comptable / fiscal (bilan, résultat, liasse, état 2460) : donnée ETSL modifiable,
+    provisoire jusqu'à confirmation (modèles officiels DGI à fournir)."""
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    parametres = models.JSONField(default=dict, blank=True, verbose_name="Paramètres du gabarit")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut"
+    )
+    confirme_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    confirme_le = models.DateTimeField(null=True, blank=True)
+    modifie_le = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Gabarit d'état"
+        verbose_name_plural = "Gabarits d'états"
+
+    def __str__(self):
+        return f"{self.code} ({self.statut_valeur})"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
