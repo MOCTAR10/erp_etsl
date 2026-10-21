@@ -3,6 +3,9 @@
 À la clôture (retour) d'une location GR, le coût de la prestation (tarif × durée ou compteurs, + pénalités de
 retard) est comptabilisé au journal des achats : Dr 618000 (analytique de l'affaire) / Cr 401100 (fournisseur
 intra-groupe GLOBAL RENTAL). Une seule écriture par location (source « M4 », réf. = code de la location).
+
+Pas de double charge : une location rattachée à un bon de commande GLOBAL RENTAL (M2, `PurchaseOrder.location_gr`)
+est facturée et comptabilisée au 618 par le circuit achats (facture fournisseur) ; elle est exclue d'ici.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -56,6 +59,10 @@ def comptabiliser_location_gr(location, user=None):
         raise ValidationError("La prestation n'est pas imputée au compte 618.")
     if ecriture_location(location):
         raise ValidationError("Location GR déjà comptabilisée.")
+    if bc_lie(location):
+        raise ValidationError(
+            "Location rattachée à un bon de commande GLOBAL RENTAL : la charge 618 passe par sa facture d'achat (M2)."
+        )
     montant = montant_location(location)
     if montant <= 0:
         raise ValidationError("Montant de la prestation nul : rien à comptabiliser (tarif ou compteurs manquants).")
@@ -98,6 +105,13 @@ def locations_a_comptabiliser():
         AccountMove.objects.filter(source=SOURCE_GR).exclude(status=AccountMove.Status.DRAFT).values_list("source_ref", flat=True)
     )
     qs = LocationGR.objects.filter(
-        statut=LocationGR.Statut.TERMINEE, partenaire__is_global_rental=True, imputation_618=True
+        statut=LocationGR.Statut.TERMINEE, partenaire__is_global_rental=True, imputation_618=True,
     ).select_related("partenaire", "equipement", "affaire").prefetch_related("lectures")
-    return [loc for loc in qs if loc.code not in faites]
+    return [loc for loc in qs if loc.code not in faites and not bc_lie(loc)]
+
+
+def bc_lie(location):
+    """BC achats GLOBAL RENTAL (non annulé) rattaché à la location : la charge 618 passe par sa facture (M2)."""
+    from achats.models import PurchaseOrder
+
+    return PurchaseOrder.objects.filter(location_gr=location).exclude(status=PurchaseOrder.Status.ANNULEE).exists()

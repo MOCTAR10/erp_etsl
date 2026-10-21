@@ -258,3 +258,16 @@ class LocationGrTests(EcartsBase):
         self.assertFalse(PrevisionTresorerie.objects.exists())
         self.assertFalse(Paiement.objects.exists())
         self.assertFalse(AutoFacture.objects.exists())
+
+    def test_location_avec_bc_gr_une_seule_charge_618(self):
+        """Location rattachée à un BC GLOBAL RENTAL (M2) : la charge 618 passe par sa facture d'achat, jamais ici."""
+        from achats.ecarts import bc_depuis_location_gr
+
+        loc = self.location()
+        bc_depuis_location_gr(loc, self.admin)
+        self.assertEqual(self.client.get(f"{BASE}locations-gr/").json()["a_comptabiliser"], [])
+        self.assertEqual(self.client.post(f"{BASE}locations-gr/{loc.pk}/comptabiliser/").status_code, 400)
+        from .tasks import comptabiliser_locations_gr
+
+        self.assertEqual(comptabiliser_locations_gr(), [])
+        self.assertFalse(AccountMove.objects.filter(source="M4", source_ref=loc.code).exists())
