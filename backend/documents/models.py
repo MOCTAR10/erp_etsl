@@ -35,6 +35,12 @@ class DocumentType(models.Model):
         verbose_name="Caractère officiel confirmé par",
     )
     officiel_confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+    # Écarts M12 : durée de rétention éditable à l'écran, provisoire tant qu'ETSL ne l'a pas confirmée.
+    retention_confirmee_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Durée de rétention confirmée par",
+    )
+    retention_confirmee_le = models.DateTimeField(null=True, blank=True, verbose_name="Rétention confirmée le")
 
     class Meta:
         ordering = ["label"]
@@ -409,3 +415,46 @@ class Signer(models.Model):
 
     def __str__(self):
         return f"{self.request_id} #{self.order} {self.user_id} [{self.status}]"
+
+
+class DemandePurge(models.Model):
+    """Purge d'un document arrivé au terme de sa durée de rétention (écarts M12, archivage légal).
+
+    Proposée par le Secrétariat Général / l'administrateur, exécutée seulement après validation de la Direction
+    Générale. La trace (titre, empreinte, type, fin de rétention, validateur) survit au document purgé.
+    """
+
+    class Statut(models.TextChoices):
+        PROPOSEE = "proposee", "Proposée"
+        EXECUTEE = "executee", "Validée et exécutée"
+        REJETEE = "rejetee", "Rejetée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(
+        Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="demandes_purge",
+        verbose_name="Document",
+    )
+    document_title = models.CharField(max_length=255, verbose_name="Titre du document")
+    document_sha256 = models.CharField(max_length=64, blank=True, verbose_name="Empreinte du document")
+    type_label = models.CharField(max_length=120, blank=True, verbose_name="Type de document")
+    fin_retention = models.DateField(verbose_name="Fin de rétention")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.PROPOSEE, verbose_name="Statut")
+    motif = models.CharField(max_length=255, blank=True, verbose_name="Motif / commentaire")
+    propose_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Proposée par",
+    )
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Validée / rejetée par",
+    )
+    traite_le = models.DateTimeField(null=True, blank=True, verbose_name="Traitée le")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Demande de purge"
+        verbose_name_plural = "Demandes de purge (fin de rétention)"
+
+    def __str__(self):
+        return f"{self.document_title} [{self.statut}]"

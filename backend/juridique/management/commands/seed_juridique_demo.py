@@ -124,6 +124,8 @@ class Command(BaseCommand):
             ),
         )
 
+        self._seed_ecarts_m12()
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"Juridique M12 prêt : courriers={Courrier.objects.count()}, "
@@ -148,4 +150,28 @@ class Command(BaseCommand):
         LienDocument.objects.get_or_create(
             document=doc, objet_type="commercial.affaire", objet_id=str(affaire.pk),
             defaults={"objet_label": str(affaire)[:255], "module": "M1"},
+        )
+
+    def _seed_ecarts_m12(self):
+        """Ecarts M12 : parametres provisoires, juridiction + cotation, jalon, journal, mandat GR (idempotent)."""
+        from juridique.ecarts import assurer_parametres
+        from juridique.models import ActionContentieux, JalonContentieux
+
+        assurer_parametres()
+        lit = Contentieux.objects.filter(code="LIT00001").first()
+        if lit is not None:
+            if not lit.juridiction:
+                lit.juridiction = "Tribunal de commerce de Libreville"
+                lit.probabilite = "moyenne"
+                lit.save(update_fields=["juridiction", "probabilite", "updated_at"])
+            JalonContentieux.objects.get_or_create(
+                contentieux=lit, libelle="Audience de conciliation",
+                defaults={"date_prevue": _today(60)},
+            )
+            ActionContentieux.objects.get_or_create(
+                contentieux=lit, type="courrier",
+                defaults={"description": "Mise en demeure adressee a la partie adverse (demo)."},
+            )
+        DossierGlobalRental.objects.filter(code="GRD00001", mandat_date_fin__isnull=True).update(
+            mandat_reference="MAND-GR-2026", mandat_date_fin=_today(300)
         )

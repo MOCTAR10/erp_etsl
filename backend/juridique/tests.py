@@ -243,6 +243,9 @@ class CautionTests(BaseJuridiqueTest):
     def test_lever_caution(self):
         caution = self._caution()
         _auth(self.client, "dg@etls.local")  # CDC M12 §14.8 : acte réservé au DG
+        # Écarts M12 : mainlevée bloquée tant que la DG n'a pas validé la caution.
+        self.assertEqual(self.client.post(f"{BASE}cautions/{caution.pk}/lever/").status_code, 400)
+        self.client.post(f"{BASE}cautions/{caution.pk}/valider-dg/")
         resp = self.client.post(f"{BASE}cautions/{caution.pk}/lever/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         caution.refresh_from_db()
@@ -264,6 +267,7 @@ class AssuranceTests(BaseJuridiqueTest):
     def test_renouveler_assurance(self):
         a = self._assurance()
         _auth(self.client, "dg@etls.local")  # CDC M12 §14.8 : acte réservé au DG
+        self.client.post(f"{BASE}assurances/{a.pk}/valider-dg/")  # écarts M12 : validation DG préalable
         resp = self.client.post(
             f"{BASE}assurances/{a.pk}/renouveler/",
             {"date_echeance": str(date.today() + timedelta(days=365))}, format="json",

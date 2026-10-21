@@ -304,6 +304,13 @@ class Contentieux(models.Model):
         max_length=20, choices=Statut.choices, default=Statut.OUVERT, verbose_name="Statut"
     )
     decision = models.TextField(blank=True, verbose_name="Décision / issue")
+    # Écarts M12 : juridiction saisie (liste paramétrable) et cotation du risque (vue Risk).
+    juridiction = models.CharField(max_length=200, blank=True, verbose_name="Juridiction")
+    probabilite = models.CharField(
+        max_length=10, blank=True, default="",
+        choices=[("faible", "Faible"), ("moyenne", "Moyenne"), ("forte", "Forte"), ("certaine", "Certaine")],
+        verbose_name="Probabilité de condamnation / perte",
+    )
     document = models.ForeignKey(
         "documents.Document",
         blank=True,
@@ -704,6 +711,14 @@ class DossierGlobalRental(models.Model):
     references_documents = models.JSONField(
         default=list, blank=True, verbose_name="Références BC / GR / BL / retour GR"
     )
+    # Écarts M12 : mandat intra-groupe et revue périodique (contrôle « à jour »).
+    mandat_reference = models.CharField(max_length=120, blank=True, verbose_name="Référence du mandat")
+    mandat_date_fin = models.DateField(null=True, blank=True, verbose_name="Fin de validité du mandat")
+    date_revue = models.DateField(null=True, blank=True, verbose_name="Dernière revue du dossier")
+    revu_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Revu par",
+    )
     commentaire = models.TextField(blank=True, verbose_name="Commentaire")
     cree_par = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -774,3 +789,138 @@ class LienDocument(models.Model):
 
     def __str__(self):
         return f"{self.document_id} → {self.objet_type}:{self.objet_label}"
+
+
+# --------------------------------------------------------------------------------------------------
+# Écarts M12 (2026-10) : paramètres provisoires, suivi contentieux, pièces de dossier
+# --------------------------------------------------------------------------------------------------
+class ParametreJuridique(models.Model):
+    """Paramètre M12 modifiable à l'écran : valeur provisoire tant qu'ETSL ne l'a pas confirmée."""
+
+    cle = models.SlugField(max_length=60, unique=True, verbose_name="Clé")
+    libelle = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.JSONField(default=dict, blank=True, verbose_name="Valeur")
+    provisoire = models.BooleanField(default=True, verbose_name="Provisoire (à confirmer par ETSL)")
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Modifié par",
+    )
+    modifie_le = models.DateTimeField(null=True, blank=True, verbose_name="Modifié le")
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["cle"]
+        verbose_name = "Paramètre juridique"
+        verbose_name_plural = "Paramètres juridiques"
+
+    def __str__(self):
+        return f"{self.cle}{' (provisoire)' if self.provisoire else ''}"
+
+
+class JalonContentieux(models.Model):
+    """Jalon de l'échéancier d'un contentieux (audience, dépôt de conclusions, délai d'appel…)."""
+
+    class Statut(models.TextChoices):
+        A_VENIR = "a_venir", "À venir"
+        REALISE = "realise", "Réalisé"
+        ANNULE = "annule", "Annulé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contentieux = models.ForeignKey(
+        Contentieux, on_delete=models.CASCADE, related_name="jalons", verbose_name="Contentieux"
+    )
+    libelle = models.CharField(max_length=200, verbose_name="Jalon")
+    date_prevue = models.DateField(verbose_name="Date prévue")
+    date_realisee = models.DateField(null=True, blank=True, verbose_name="Date de réalisation")
+    statut = models.CharField(max_length=8, choices=Statut.choices, default=Statut.A_VENIR, verbose_name="Statut")
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Créé par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date_prevue"]
+        verbose_name = "Jalon de contentieux"
+        verbose_name_plural = "Jalons de contentieux"
+
+    def __str__(self):
+        return f"{self.contentieux.code} — {self.libelle}"
+
+    @property
+    def days_left(self):
+        return (self.date_prevue - timezone.localdate()).days
+
+
+class ActionContentieux(models.Model):
+    """Journal chronologique (inaltérable) des actions menées sur un contentieux."""
+
+    class Type(models.TextChoices):
+        AUDIENCE = "audience", "Audience"
+        CONCLUSIONS = "conclusions", "Conclusions / mémoire"
+        COURRIER = "courrier", "Courrier / mise en demeure"
+        EXPERTISE = "expertise", "Expertise"
+        NEGOCIATION = "negociation", "Négociation"
+        DECISION = "decision", "Décision"
+        PHASE = "phase", "Changement de phase"
+        STATUT = "statut", "Changement de statut"
+        AUTRE = "autre", "Autre"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contentieux = models.ForeignKey(
+        Contentieux, on_delete=models.CASCADE, related_name="actions", verbose_name="Contentieux"
+    )
+    date_action = models.DateField(default=timezone.localdate, verbose_name="Date")
+    type = models.CharField(max_length=12, choices=Type.choices, default=Type.AUTRE, verbose_name="Type")
+    description = models.TextField(verbose_name="Description")
+    auteur = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Auteur",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_action", "-created_at"]
+        verbose_name = "Action de contentieux"
+        verbose_name_plural = "Journal des actions de contentieux"
+
+    def __str__(self):
+        return f"{self.contentieux.code} — {self.get_type_display()}"
+
+
+class PieceDossier(models.Model):
+    """Pièce versée à un dossier (contentieux, convention, dossier GR) : un document GED par pièce requise."""
+
+    class DossierType(models.TextChoices):
+        CONTENTIEUX = "contentieux", "Contentieux"
+        CONVENTION = "convention", "Convention / contrat"
+        GR = "gr", "Dossier GLOBAL RENTAL"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dossier_type = models.CharField(max_length=12, choices=DossierType.choices, verbose_name="Type de dossier")
+    dossier_id = models.CharField(max_length=64, verbose_name="Identifiant du dossier")
+    piece = models.CharField(max_length=60, verbose_name="Pièce")
+    document = models.ForeignKey(
+        "documents.Document", on_delete=models.PROTECT, related_name="pieces_dossier",
+        verbose_name="Document (GED)",
+    )
+    ajoute_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Ajoutée par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["dossier_type", "piece"]
+        verbose_name = "Pièce de dossier"
+        verbose_name_plural = "Pièces de dossier"
+        constraints = [
+            models.UniqueConstraint(fields=["dossier_type", "dossier_id", "piece"], name="piece_dossier_uniq"),
+        ]
+
+    def __str__(self):
+        return f"{self.dossier_type}:{self.dossier_id} — {self.piece}"

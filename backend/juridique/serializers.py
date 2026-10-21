@@ -8,8 +8,12 @@ from .models import (
     Contentieux,
     Convention,
     Courrier,
+    ActionContentieux,
     DossierGlobalRental,
+    JalonContentieux,
     LienDocument,
+    ParametreJuridique,
+    PieceDossier,
     Reunion,
 )
 from .services import can_see_amount
@@ -84,7 +88,13 @@ class ConventionSerializer(AmountMaskMixin, serializers.ModelSerializer):
     expiry_status = serializers.CharField(read_only=True)
     a_renouveler = serializers.BooleanField(read_only=True)
     has_amount_access = serializers.SerializerMethodField()
+    completude = serializers.SerializerMethodField()
     amount_fields = ("montant",)
+
+    def get_completude(self, obj):
+        from .ecarts import completude
+
+        return completude("convention", obj)
 
     class Meta:
         model = Convention
@@ -110,6 +120,7 @@ class ConventionSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "expiry_status",
             "a_renouveler",
             "has_amount_access",
+            "completude",
             "commentaire",
             "created_at",
             "updated_at",
@@ -131,7 +142,21 @@ class ContentieuxSerializer(AmountMaskMixin, serializers.ModelSerializer):
         source="document.title", read_only=True, default=None
     )
     has_amount_access = serializers.SerializerMethodField()
+    completude = serializers.SerializerMethodField()
+    probabilite_label = serializers.CharField(source="get_probabilite_display", read_only=True)
     amount_fields = ("montant_en_jeu",)
+
+    def get_completude(self, obj):
+        from .ecarts import completude
+
+        return completude("contentieux", obj)
+
+    def validate_juridiction(self, value):
+        from .ecarts import parametre
+
+        if value and value not in (parametre("juridictions") or []):
+            raise serializers.ValidationError("Juridiction hors de la liste paramétrée (paramètres M12).")
+        return value
 
     class Meta:
         model = Contentieux
@@ -151,6 +176,10 @@ class ContentieuxSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "statut",
             "statut_label",
             "decision",
+            "juridiction",
+            "probabilite",
+            "probabilite_label",
+            "completude",
             "document",
             "document_title",
             "has_amount_access",
@@ -173,7 +202,11 @@ class CautionSerializer(AmountMaskMixin, serializers.ModelSerializer):
     days_left = serializers.IntegerField(read_only=True)
     expiry_status = serializers.CharField(read_only=True)
     has_amount_access = serializers.SerializerMethodField()
+    en_attente_dg = serializers.SerializerMethodField()
     amount_fields = ("montant",)
+
+    def get_en_attente_dg(self, obj):
+        return obj.valide_dg_le is None
 
     class Meta:
         model = Caution
@@ -201,6 +234,7 @@ class CautionSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "has_amount_access",
             "valide_dg_par",
             "valide_dg_le",
+            "en_attente_dg",
             "created_at",
             "updated_at",
         ]
@@ -217,7 +251,11 @@ class AssuranceSerializer(AmountMaskMixin, serializers.ModelSerializer):
     days_left = serializers.IntegerField(read_only=True)
     expiry_status = serializers.CharField(read_only=True)
     has_amount_access = serializers.SerializerMethodField()
+    en_attente_dg = serializers.SerializerMethodField()
     amount_fields = ("prime_annuelle",)
+
+    def get_en_attente_dg(self, obj):
+        return obj.valide_dg_le is None
 
     class Meta:
         model = Assurance
@@ -244,6 +282,7 @@ class AssuranceSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "has_amount_access",
             "valide_dg_par",
             "valide_dg_le",
+            "en_attente_dg",
             "created_at",
             "updated_at",
         ]
@@ -304,7 +343,13 @@ class DossierGlobalRentalSerializer(AmountMaskMixin, serializers.ModelSerializer
     )
     affaire_code = serializers.CharField(source="affaire.code", read_only=True, default=None)
     has_amount_access = serializers.SerializerMethodField()
+    controle = serializers.SerializerMethodField()
     amount_fields = ("montant_estime",)
+
+    def get_controle(self, obj):
+        from .ecarts import controle_gr
+
+        return controle_gr(obj)
 
     class Meta:
         model = DossierGlobalRental
@@ -326,10 +371,15 @@ class DossierGlobalRentalSerializer(AmountMaskMixin, serializers.ModelSerializer
             "references_documents",
             "commentaire",
             "has_amount_access",
+            "mandat_reference",
+            "mandat_date_fin",
+            "date_revue",
+            "revu_par",
+            "controle",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["code", "statut"]
+        read_only_fields = ["code", "statut", "date_revue", "revu_par"]
 
     def validate(self, attrs):
         partenaire = attrs.get("partenaire_gr")
@@ -366,4 +416,77 @@ class LienDocumentSerializer(serializers.ModelSerializer):
             document=attrs["document"], objet_type=attrs["objet_type"], objet_id=attrs["objet_id"]
         ).exists():
             raise serializers.ValidationError({"detail": "Ce document est déjà lié à cet objet."})
+        return attrs
+
+
+
+# --------------------------------------------------------------------------------------------------
+# Écarts M12
+# --------------------------------------------------------------------------------------------------
+class ParametreJuridiqueSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParametreJuridique
+        fields = ["id", "cle", "libelle", "valeur", "provisoire", "modifie_par", "modifie_le", "confirme_par", "confirme_le"]
+        read_only_fields = fields
+
+
+class JalonContentieuxSerializer(serializers.ModelSerializer):
+    contentieux_code = serializers.CharField(source="contentieux.code", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    days_left = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = JalonContentieux
+        fields = [
+            "id", "contentieux", "contentieux_code", "libelle", "date_prevue", "date_realisee", "statut",
+            "statut_label", "days_left", "cree_par", "created_at",
+        ]
+        read_only_fields = ["date_realisee", "statut", "cree_par", "created_at"]
+
+
+class ActionContentieuxSerializer(serializers.ModelSerializer):
+    contentieux_code = serializers.CharField(source="contentieux.code", read_only=True)
+    type_label = serializers.CharField(source="get_type_display", read_only=True)
+    auteur_name = serializers.CharField(source="auteur.get_full_name", read_only=True, default=None)
+
+    class Meta:
+        model = ActionContentieux
+        fields = [
+            "id", "contentieux", "contentieux_code", "date_action", "type", "type_label", "description", "auteur",
+            "auteur_name", "created_at",
+        ]
+        read_only_fields = ["auteur", "created_at"]
+
+
+class PieceDossierSerializer(serializers.ModelSerializer):
+    document_title = serializers.CharField(source="document.title", read_only=True)
+
+    class Meta:
+        model = PieceDossier
+        fields = ["id", "dossier_type", "dossier_id", "piece", "document", "document_title", "ajoute_par", "created_at"]
+        read_only_fields = ["ajoute_par", "created_at"]
+        validators = []  # doublon normalisé dans validate()
+
+    def validate(self, attrs):
+        from documents.services import visible_documents
+
+        from .ecarts import pieces_requises, resoudre_dossier
+
+        request = self.context["request"]
+        try:
+            dossier = resoudre_dossier(attrs["dossier_type"], attrs["dossier_id"])
+        except ValueError as exc:
+            raise serializers.ValidationError({"dossier_id": str(exc)})
+        attrs["dossier_id"] = str(dossier.pk)
+        requises = pieces_requises(attrs["dossier_type"], dossier)
+        if attrs["piece"] not in requises:
+            raise serializers.ValidationError(
+                {"piece": "Pièce non prévue pour ce dossier (attendues : " + ", ".join(requises) + ")."}
+            )
+        if not visible_documents(request.user).filter(pk=attrs["document"].pk).exists():
+            raise serializers.ValidationError({"document": "Document inaccessible."})
+        if PieceDossier.objects.filter(
+            dossier_type=attrs["dossier_type"], dossier_id=attrs["dossier_id"], piece=attrs["piece"]
+        ).exists():
+            raise serializers.ValidationError({"piece": "Cette pièce est déjà versée au dossier."})
         return attrs
