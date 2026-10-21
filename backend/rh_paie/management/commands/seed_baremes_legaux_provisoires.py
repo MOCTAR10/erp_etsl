@@ -71,6 +71,11 @@ PARAMETRES = [
     ("PROVISION_CP_TAUX", "Provision mensuelle pour congés payés (% du brut)", "8.333", "%",
      "30 jours de congé par an : 1/12 du brut annuel (usage)",
      "Règle d'acquisition des congés (code du travail / convention) à confirmer"),
+    ("JOURS_OUVRES_AN", "Jours ouvrés par an (base de l'absentéisme)", "220", "j",
+     "Usage (52 semaines de 5 jours, moins congés et fériés) — à confirmer",
+     "Convention collective / calendrier ETSL à confirmer"),
+    ("ALERTE_MO_SEUIL", "Tolérance avant alerte de dépassement de main-d'œuvre (% des heures prévues)", "0", "%",
+     "Valeur par défaut ERP (alerte dès le dépassement)", "Seuil de tolérance ETSL à confirmer"),
     ("CNAMGS_PENALITE_DEFAUT", "CNAMGS — majoration pour défaut de déclaration", "25", "%", CNAMGS, CNAMGS_REF),
     ("CNAMGS_PENALITE_RETARD", "CNAMGS — majoration pour paiement tardif", "2", "%", CNAMGS, CNAMGS_REF),
 ]

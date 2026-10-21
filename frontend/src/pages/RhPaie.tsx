@@ -17,6 +17,7 @@ import type {
 import { BaremesSection } from "../components/workflow/BaremesSection";
 import { EcartsM9aSection } from "../components/rhpaie/EcartsM9aSection";
 import { EcartsM9bSection } from "../components/rhpaie/EcartsM9bSection";
+import { EcartsM9cSection } from "../components/rhpaie/EcartsM9cSection";
 import { DeclarationsSection } from "../components/workflow/DeclarationsSection";
 import { VirementsSection } from "../components/workflow/VirementsSection";
 
@@ -79,6 +80,12 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
         {b.disponible_le && <span className="badge ok"> {t("baremes.diffuse")}</span>}
         {b.move_number && <span className="badge brand"> {b.move_number}</span>}
         {b.document && <span className="badge ok"> {t("virements.archive")}</span>}
+        {b.signature_statut && (
+          <span className={`badge ${b.signature_statut === "completed" ? "ok" : b.signature_statut === "refused" ? "err" : "warn"}`}>
+            {" "}
+            {t(`m9c.signature.${b.signature_statut}`)}
+          </span>
+        )}
         {b.statut !== "annule" && (
           <button type="button" className="btn" onClick={() => void api.download(`/api/rh-paie/bulletins/${b.id}/pdf/`, `${b.code}.pdf`)}>
             {t("virements.pdf")}
@@ -102,6 +109,9 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
             : []),
           ...((b.statut === "valide" || b.statut === "cloture") && !b.document
             ? [{ label: t("virements.archiver"), path: `/api/rh-paie/bulletins/${b.id}/archiver/`, tone: "ghost" as const }]
+            : []),
+          ...((b.statut === "valide" || b.statut === "cloture") && (!b.signature_statut || b.signature_statut === "refused")
+            ? [{ label: t("m9c.signature.demander"), path: `/api/rh-paie/bulletins/${b.id}/signer/`, tone: "ghost" as const }]
             : []),
           ...((b.statut === "valide" || b.statut === "cloture") && !b.disponible_le
             ? [{ label: t("actions.diffuser"), path: `/api/rh-paie/bulletins/${b.id}/diffuser/`, tone: "ghost" as const }]
@@ -285,6 +295,7 @@ export function RhPaiePage() {
       ) : null}
       <EcartsM9aSection />
       <EcartsM9bSection />
+      <EcartsM9cSection />
       <DeclarationsSection />
       <VirementsSection />
       <BaremesSection />

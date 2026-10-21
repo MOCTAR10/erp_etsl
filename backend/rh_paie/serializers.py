@@ -14,7 +14,10 @@ from .models import (
     ParametrePaie,
     BulletinLigne,
     BulletinPaie,
+    CatalogueFormation,
     ContratTravail,
+    HabilitationPoste,
+    PlanFormation,
     DemandeRecrutement,
     DemandesConge,
     Employe,
@@ -132,15 +135,16 @@ class QualificationSerializer(serializers.ModelSerializer):
     type_label = serializers.CharField(source="get_type_display", read_only=True)
     expiree = serializers.BooleanField(read_only=True)
     a_renouveler = serializers.BooleanField(read_only=True)
+    source_label = serializers.CharField(source="get_source_display", read_only=True)
 
     class Meta:
         model = Qualification
         fields = [
             "id", "code", "employe", "employe_nom", "type", "type_label",
             "intitule", "organisme", "date_obtention", "date_validite",
-            "expiree", "a_renouveler", "notes",
+            "expiree", "a_renouveler", "notes", "source", "source_label", "formation",
         ]
-        read_only_fields = ["code", "expiree", "a_renouveler"]
+        read_only_fields = ["code", "expiree", "a_renouveler", "source", "formation"]
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
@@ -173,20 +177,53 @@ class FormationSerializer(serializers.ModelSerializer):
     )
     type_label = serializers.CharField(source="get_type_display", read_only=True)
     nb_participants = serializers.SerializerMethodField()
+    theme = serializers.CharField(max_length=180, required=False)
+    catalogue_intitule = serializers.CharField(source="catalogue.intitule", read_only=True, default=None)
+    plan_annee = serializers.IntegerField(source="plan.annee", read_only=True, default=None)
+    roi_pct = serializers.SerializerMethodField()
+    nb_qualifications_delivrees = serializers.SerializerMethodField()
 
     class Meta:
         model = Formation
         fields = [
             "id", "code", "theme", "organisme", "formateur", "date_session",
             "duree_heures", "participants", "participants_detail", "nb_participants",
-            "type", "type_label", "evaluation", "created_at", "updated_at",
+            "type", "type_label", "evaluation", "catalogue", "catalogue_intitule", "plan", "plan_annee",
+            "cout_prevu", "cout_reel", "gain_estime", "note_evaluation", "roi_pct", "nb_qualifications_delivrees",
+            "created_at", "updated_at",
         ]
-        read_only_fields = ["code"]
+        read_only_fields = ["code", "type", "cout_reel", "note_evaluation"]
 
     def get_nb_participants(self, obj):
         return obj.participants.count()
 
+    def get_roi_pct(self, obj):
+        from .formation_m9c import roi_pct
+
+        roi = roi_pct(obj.cout_reel, obj.gain_estime)
+        return None if roi is None else str(roi)
+
+    def get_nb_qualifications_delivrees(self, obj):
+        return obj.qualifications_delivrees.count()
+
     def validate(self, attrs):
+        from .formation_m9c import controler_budget
+
+        catalogue = attrs.get("catalogue", getattr(self.instance, "catalogue", None))
+        if catalogue is not None and self.instance is None:  # valeurs par défaut reprises du catalogue
+            attrs.setdefault("theme", catalogue.intitule)
+            attrs.setdefault("organisme", catalogue.organisme)
+            attrs.setdefault("duree_heures", catalogue.duree_heures)
+            attrs.setdefault("cout_prevu", catalogue.cout_session)
+        if not attrs.get("theme", getattr(self.instance, "theme", "")):
+            raise serializers.ValidationError({"theme": "Thème obligatoire (ou formation du catalogue)."})
+        plan = attrs.get("plan", getattr(self.instance, "plan", None))
+        if plan is not None:
+            cout = attrs.get("cout_prevu", getattr(self.instance, "cout_prevu", 0))
+            try:
+                controler_budget(plan, cout, exclure=getattr(self.instance, "pk", None))
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"plan": exc.messages})
         return _apply_and_validate(self, attrs)
 
 
@@ -280,6 +317,12 @@ class BulletinSerializer(serializers.ModelSerializer):
     has_amount_access = serializers.SerializerMethodField()
     baremes_provisoires = serializers.ListField(child=serializers.CharField(), read_only=True)
     avertissement = serializers.SerializerMethodField()
+    signature_statut = serializers.SerializerMethodField()
+
+    def get_signature_statut(self, obj):
+        from .formation_m9c import statut_signature
+
+        return statut_signature(obj)
 
     def get_avertissement(self, obj):
         from .services import avertissement_provisoire
@@ -291,7 +334,7 @@ class BulletinSerializer(serializers.ModelSerializer):
         fields = [
             "baremes_provisoires", "avertissement", "baremes_utilises", "document", "ordre_virement", "id", "code", "employe", "employe_nom", "matricule", "periode",
             "salaire_base", "brut", "net", "charges_patronales", "total_gains", "total_retenues",
-            "lignes", "statut", "statut_label", "move", "move_number", "has_amount_access",
+            "lignes", "statut", "statut_label", "move", "move_number", "has_amount_access", "signature_statut",
             "created_at", "updated_at",
         ]
         read_only_fields = [
@@ -608,3 +651,45 @@ class ProvisionCongesSerializer(serializers.ModelSerializer):
             "par_email", "created_at",
         ]
         read_only_fields = fields
+
+
+class CatalogueFormationSerializer(serializers.ModelSerializer):
+    qualification_type_label = serializers.CharField(source="get_qualification_type_display", read_only=True)
+
+    class Meta:
+        model = CatalogueFormation
+        fields = [
+            "id", "code", "intitule", "organisme", "duree_heures", "cout_session", "qualification_type",
+            "qualification_type_label", "validite_mois", "actif",
+        ]
+        read_only_fields = ["code"]
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs)
+
+
+class PlanFormationSerializer(serializers.ModelSerializer):
+    synthese = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PlanFormation
+        fields = ["id", "annee", "budget", "objectifs", "synthese", "created_at"]
+
+    def get_synthese(self, obj):
+        from .formation_m9c import synthese_plan
+
+        return synthese_plan(obj)
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs, exclude=())
+
+
+class HabilitationPosteSerializer(serializers.ModelSerializer):
+    poste_label = serializers.CharField(source="get_poste_display", read_only=True)
+
+    class Meta:
+        model = HabilitationPoste
+        fields = ["id", "poste", "poste_label", "mot_cle", "actif"]
+
+    def validate_mot_cle(self, value):
+        return (value or "").strip()

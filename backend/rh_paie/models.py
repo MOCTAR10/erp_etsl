@@ -263,8 +263,28 @@ class Qualification(models.Model):
     date_validite = models.DateField(null=True, blank=True, verbose_name="Date de validité")
     notes = models.TextField(blank=True, verbose_name="Notes")
 
+    class Source(models.TextChoices):
+        RH = "rh", "Saisie RH"
+        M6 = "m6", "Qualification soudeur (M6)"
+        FORMATION = "formation", "Délivrée par une formation"
+
+    source = models.CharField(max_length=10, choices=Source.choices, default=Source.RH, verbose_name="Origine")
+    source_ref = models.CharField(
+        max_length=80, blank=True, verbose_name="Référence d'origine",
+        help_text="Qualification soudeur M6 ou formation + salarié : clé de synchronisation.",
+    )
+    formation = models.ForeignKey(
+        "Formation", null=True, blank=True, on_delete=models.SET_NULL, related_name="qualifications_delivrees",
+        verbose_name="Formation d'origine",
+    )
+
     class Meta:
         ordering = ["-date_validite"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "source_ref"], condition=~models.Q(source_ref=""), name="uniq_qualif_source_ref"
+            )
+        ]
         verbose_name = "Qualification / habilitation"
         verbose_name_plural = "Qualifications & habilitations"
 
@@ -375,6 +395,25 @@ class Formation(models.Model):
         max_length=12, choices=Type.choices, default=Type.PLANIFIE, verbose_name="Statut"
     )
     evaluation = models.CharField(max_length=400, blank=True, verbose_name="Évaluation post-formation")
+    catalogue = models.ForeignKey(
+        "CatalogueFormation", null=True, blank=True, on_delete=models.PROTECT, related_name="sessions",
+        verbose_name="Formation du catalogue",
+    )
+    plan = models.ForeignKey(
+        "PlanFormation", null=True, blank=True, on_delete=models.PROTECT, related_name="formations",
+        verbose_name="Plan de formation",
+    )
+    cout_prevu = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Coût prévu (FCFA)")
+    cout_reel = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Coût réel (FCFA)"
+    )
+    gain_estime = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Gain estimé (FCFA)",
+        help_text="Base du ROI (méthode provisoire) : gains de productivité, non-qualité évitée…",
+    )
+    note_evaluation = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Note d'évaluation (/20)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1360,3 +1399,89 @@ class ProvisionConges(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Une provision passée est scellée (extourne en comptabilité).")
+
+
+# --------------------------------------------------------------------------------------------
+# Écarts M9-C : catalogue et plan de formation, matrice habilitation ↔ poste
+# --------------------------------------------------------------------------------------------
+class CatalogueFormation(models.Model):
+    """Formation du catalogue : durée, coût de session et qualification délivrée à la réalisation."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    intitule = models.CharField(max_length=180, verbose_name="Intitulé")
+    organisme = models.CharField(max_length=120, blank=True, verbose_name="Organisme")
+    duree_heures = models.DecimalField(max_digits=6, decimal_places=2, default=0, verbose_name="Durée (heures)")
+    cout_session = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, verbose_name="Coût d'une session (FCFA)"
+    )
+    qualification_type = models.CharField(
+        max_length=14, choices=Qualification.Type.choices, blank=True, verbose_name="Qualification délivrée",
+        help_text="Vide = sensibilisation sans qualification.",
+    )
+    validite_mois = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="Validité (mois)", help_text="Vide = sans échéance."
+    )
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+
+    class Meta:
+        ordering = ["intitule"]
+        verbose_name = "Formation du catalogue"
+        verbose_name_plural = "Catalogue des formations"
+
+    def __str__(self):
+        return f"{self.code} — {self.intitule}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = RhPaieSequence.next_for("CAT", "CAT")
+        return super().save(*args, **kwargs)
+
+
+class PlanFormation(models.Model):
+    """Plan de formation annuel : budget voté, sessions rattachées (coût engagé, réalisé, ROI)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    annee = models.PositiveSmallIntegerField(unique=True, verbose_name="Année")
+    budget = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Budget (FCFA)")
+    objectifs = models.TextField(blank=True, verbose_name="Objectifs")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-annee"]
+        verbose_name = "Plan de formation"
+        verbose_name_plural = "Plans de formation"
+
+    def __str__(self):
+        return f"Plan de formation {self.annee}"
+
+    def clean(self):
+        if not 2000 <= (self.annee or 0) <= 2100:
+            raise ValidationError({"annee": "Année hors plage (2000-2100)."})
+        if self.budget is not None and self.budget < 0:
+            raise ValidationError({"budget": "Le budget ne peut être négatif."})
+
+
+class HabilitationPoste(models.Model):
+    """Matrice habilitation ↔ poste : un pointage chantier sur un OF dont la gamme comporte ce poste exige une
+    qualification valide dont l'intitulé contient `mot_cle`."""
+
+    POSTES = (
+        ("decoupe", "Découpe"), ("tuyauterie", "Tuyauterie"), ("soudure", "Soudure"),
+        ("chaudronnerie", "Chaudronnerie"), ("structure", "Structures métalliques"), ("montage", "Montage"),
+        ("controle", "Contrôle / essais"),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    poste = models.CharField(max_length=16, choices=POSTES, verbose_name="Poste (gamme M3)")
+    mot_cle = models.CharField(max_length=80, verbose_name="Mot-clé de l'intitulé de qualification")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+
+    class Meta:
+        ordering = ["poste", "mot_cle"]
+        verbose_name = "Habilitation exigée par poste"
+        verbose_name_plural = "Matrice habilitations ↔ postes"
+        constraints = [models.UniqueConstraint(fields=["poste", "mot_cle"], name="uniq_habilitation_poste")]
+
+    def __str__(self):
+        return f"{self.get_poste_display()} ⇒ {self.mot_cle}"
