@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { GrAffairesSection, ParametresLogistiqueSection } from "../components/workflow/GrAffairesSection";
 import { TarifsGrSection } from "../components/workflow/TarifsGrSection";
+import { EcartsM4Section } from "../components/logistique/EcartsM4Section";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, SearchField, SectionCard } from "../components/ui";
@@ -252,6 +253,7 @@ export function LogistiquePage() {
       <GrAffairesSection />
       <TarifsGrSection />
       <ParametresLogistiqueSection />
+      <EcartsM4Section />
       {(demandes.count > 0 || demandes.search) && (
         <SectionCard title={`${t("logistique.demandes")} · ${demandes.count}`}>
           <PagedDataTable list={demandes} columns={demandeColumns(t)} caption={t("logistique.demandes")} searchPlaceholder={t("logistique.searchDemandes")} />
