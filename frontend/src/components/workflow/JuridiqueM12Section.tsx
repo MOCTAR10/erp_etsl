@@ -7,15 +7,18 @@ import { describeError } from "../../lib/offlineQueue";
 import type { DocumentTypeOfficiel, Paginated, RechercheJuridiqueResult } from "../../types";
 import { Badge, SectionCard } from "../ui";
 
-/** Types d'objets métier liables (M1-M11) : identique à la liste blanche du backend. */
+/** Types d'objets métier liables (M1-M12) : identique à la liste blanche du backend. */
 const OBJETS_LIEABLES = [
   "commercial.affaire", "commercial.contract", "commercial.avenant", "commercial.estimate",
   "achats.purchaserequest", "achats.purchaseorder", "achats.litigefournisseur",
   "operations.ordrefabrication", "operations.dossieroperationnel", "logistique.locationgr",
   "stocks.lotmatiere", "qualite.nonconformite", "qualite.pvcontrole", "hse.permistravail", "hse.incident",
   "maintenance.ordretravail", "comptabilite.factureclient", "controle_gestion.budget",
+  "rh_paie.employe", "rh_paie.contrattravail", "rh_paie.sanction",
+  "juridique.convention", "juridique.contentieux", "juridique.caution", "juridique.assurance", "juridique.courrier",
+  "juridique.dossierglobalrental",
 ] as const;
-const MODULES = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M10", "M11"];
+const MODULES = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12"];
 
 /** Recherche juridique interconnectée : documents GED retrouvés par leur texte ou par l'objet métier lié. */
 export function RechercheJuridiqueSection() {

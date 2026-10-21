@@ -106,6 +106,10 @@ class GammeOperation(models.Model):
     planned_hours = models.DecimalField(
         max_digits=14, decimal_places=2, default=0, verbose_name="Heures prévues"
     )
+    machine_hours = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, verbose_name="Heures machine",
+        help_text="Temps machine unitaire (capacité machine du plan de charge).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -177,6 +181,8 @@ class OrdreFabrication(models.Model):
     alerte_mo_le = models.DateTimeField(
         null=True, blank=True, verbose_name="Alerte de dépassement de main-d'œuvre émise le"
     )
+    replanifie_le = models.DateTimeField(null=True, blank=True, verbose_name="Replanifié le")
+    motif_replanification = models.CharField(max_length=255, blank=True, verbose_name="Motif de la dernière replanification")
     responsible = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -241,6 +247,10 @@ class PointageChantier(models.Model):
         NUIT = "nuit", "Heures de nuit"
         ASTREINTE = "astreinte", "Astreinte"
 
+    class NatureMo(models.TextChoices):
+        DIRECTE = "directe", "Main-d'œuvre directe"
+        INDIRECTE = "indirecte", "Main-d'œuvre indirecte"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
     ordre = models.ForeignKey(
@@ -258,6 +268,13 @@ class PointageChantier(models.Model):
         verbose_name="Opérateur",
     )
     worker_name = models.CharField(max_length=150, blank=True, verbose_name="Nom opérateur")
+    employe = models.ForeignKey(
+        "rh_paie.Employe", null=True, blank=True, on_delete=models.PROTECT, related_name="pointages_chantier",
+        verbose_name="Salarié (fiche RH)", help_text="Rattachement opérateur ↔ fiche RH : rend le pointage transférable en paie.",
+    )
+    nature_mo = models.CharField(
+        max_length=10, choices=NatureMo.choices, default=NatureMo.DIRECTE, verbose_name="Nature de la main-d'œuvre"
+    )
     date = models.DateField(verbose_name="Date")
     hours = models.DecimalField(
         max_digits=14, decimal_places=2, default=0, verbose_name="Heures"
@@ -306,7 +323,7 @@ class PointageChantier(models.Model):
     def clean(self):
         if self.hours <= 0:
             raise ValidationError({"hours": "Le nombre d'heures doit être strictement positif."})
-        if not self.worker_name and not self.worker:
+        if not self.worker_name and not self.worker and not self.employe_id:
             raise ValidationError(
                 {"worker": "Le pointage doit être rattaché à un opérateur ou un nom libre."}
             )
@@ -368,6 +385,8 @@ class SituationTravaux(models.Model):
     validated_at = models.DateTimeField(null=True, blank=True, verbose_name="Validé le")
     facture_ref = models.CharField(max_length=60, blank=True, verbose_name="Référence facture (M10)")
     facture_le = models.DateField(null=True, blank=True, verbose_name="Facturée le")
+    recue_le = models.DateTimeField(null=True, blank=True, verbose_name="Reçu client le")
+    recue_signataire = models.CharField(max_length=150, blank=True, verbose_name="Signataire du reçu client")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -566,3 +585,319 @@ class PresenceChantier(models.Model):
     def clean(self):
         if self.statut != self.Statut.PRESENT and not self.motif:
             raise ValidationError({"motif": "Un motif est obligatoire pour une absence ou un retard."})
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M3 (lot 2) : paramètres provisoires, préparation atelier, besoins matière, rapports, transferts,
+# attachements / métrés, fiches de contrôle chantier, escalades de surcharge.
+# ----------------------------------------------------------------------------------------------------------------
+class ParametreOperations(models.Model):
+    """Paramètres M3 modifiables par ETSL : valeurs provisoires tant qu'ETSL ne les confirme pas."""
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=255, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=30, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut de la valeur"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre opérations"
+        verbose_name_plural = "Paramètres opérations"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur == self.StatutValeur.PROVISOIRE
+
+
+class FichePreparation(models.Model):
+    """Fiche de préparation atelier d'un OF (CDC M3-03) : outillage réservé, consignes, besoins matière."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        VALIDEE = "validee", "Validée (prête)"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ordre = models.OneToOneField(OrdreFabrication, on_delete=models.CASCADE, related_name="fiche_preparation", verbose_name="OF")
+    outillage = models.TextField(blank=True, verbose_name="Outillage / équipements réservés")
+    consignes = models.TextField(blank=True, verbose_name="Consignes de préparation")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Validée par",
+    )
+    valide_le = models.DateTimeField(null=True, blank=True, verbose_name="Validée le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créée par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Fiche de préparation"
+        verbose_name_plural = "Fiches de préparation"
+
+    def __str__(self):
+        return f"{self.code} — {self.ordre.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = OperationsSequence.next_for("FPR", "FPR")
+        return super().save(*args, **kwargs)
+
+
+class BesoinMatiere(models.Model):
+    """Besoin matière d'un OF : réservation logique sur le stock disponible, rupture ⇒ alerte + DA (M2)."""
+
+    class Statut(models.TextChoices):
+        A_VERIFIER = "a_verifier", "À vérifier"
+        RESERVE = "reserve", "Réservé"
+        RUPTURE = "rupture", "Rupture"
+        SERVI = "servi", "Servi (sorti du stock)"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ordre = models.ForeignKey(OrdreFabrication, on_delete=models.CASCADE, related_name="besoins_matiere", verbose_name="OF")
+    article = models.ForeignKey("referentiels.Article", on_delete=models.PROTECT, related_name="+", verbose_name="Article")
+    quantite = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Quantité nécessaire")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.A_VERIFIER, verbose_name="Statut")
+    disponible = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Disponible au dernier contrôle"
+    )
+    verifie_le = models.DateTimeField(null=True, blank=True, verbose_name="Contrôlé le")
+    demande_achat = models.ForeignKey(
+        "achats.PurchaseRequest", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="DA de réapprovisionnement",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ordre", "created_at"]
+        verbose_name = "Besoin matière"
+        verbose_name_plural = "Besoins matière"
+        indexes = [models.Index(fields=["article", "statut"])]
+
+    def __str__(self):
+        return f"{self.ordre.code} — {self.article} × {self.quantite}"
+
+
+class RapportExecution(models.Model):
+    """Rapport d'exécution atelier (M3-04) ou rapport d'avancement chantier (M3-06) : quantités réalisées, rebut, %."""
+
+    class Type(models.TextChoices):
+        EXECUTION = "execution", "Rapport d'exécution atelier"
+        AVANCEMENT = "avancement", "Rapport d'avancement chantier"
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        VALIDE = "valide", "Validé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ordre = models.ForeignKey(OrdreFabrication, on_delete=models.CASCADE, related_name="rapports", verbose_name="OF")
+    type = models.CharField(max_length=10, choices=Type.choices, default=Type.EXECUTION, verbose_name="Type")
+    date = models.DateField(verbose_name="Date")
+    quantite_realisee = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Quantité réalisée")
+    quantite_rebut = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Quantité rebutée")
+    avancement = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Avancement déclaré (%)")
+    observations = models.TextField(blank=True, verbose_name="Observations / aléas")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Validé par",
+    )
+    valide_le = models.DateTimeField(null=True, blank=True, verbose_name="Validé le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Établi par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Rapport d'exécution / d'avancement"
+        verbose_name_plural = "Rapports d'exécution / d'avancement"
+        indexes = [models.Index(fields=["ordre", "statut"])]
+
+    def __str__(self):
+        return f"{self.code} — {self.ordre.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = OperationsSequence.next_for("REX", "REX")
+        return super().save(*args, **kwargs)
+
+
+class FicheControleChantier(models.Model):
+    """Fiche d'autocontrôle chantier (M3-06) : points vérifiés, résultat calculé, visa du contrôleur."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ordre = models.ForeignKey(OrdreFabrication, on_delete=models.CASCADE, related_name="fiches_controle", verbose_name="OF")
+    date = models.DateField(verbose_name="Date")
+    objet = models.CharField(max_length=200, verbose_name="Objet du contrôle")
+    points = models.JSONField(default=list, verbose_name="Points contrôlés [{libelle, conforme}]")
+    conforme = models.BooleanField(default=True, verbose_name="Conforme")
+    controle_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Contrôlé par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Fiche de contrôle chantier"
+        verbose_name_plural = "Fiches de contrôle chantier"
+
+    def __str__(self):
+        return f"{self.code} — {self.objet}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = OperationsSequence.next_for("FCC", "FCC")
+        self.conforme = all(bool(p.get("conforme")) for p in (self.points or []))
+        return super().save(*args, **kwargs)
+
+
+class BonTransfert(models.Model):
+    """Bon de livraison / fiche de transfert atelier → chantier (M3-05) : préparé, expédié, réceptionné."""
+
+    class Type(models.TextChoices):
+        BL = "bl", "Bon de livraison"
+        TRANSFERT = "transfert", "Fiche de transfert"
+
+    class Statut(models.TextChoices):
+        PREPARE = "prepare", "Préparé"
+        EXPEDIE = "expedie", "Expédié"
+        RECEPTIONNE = "receptionne", "Réceptionné sur chantier"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    type = models.CharField(max_length=10, choices=Type.choices, default=Type.BL, verbose_name="Type")
+    ordre = models.ForeignKey(OrdreFabrication, on_delete=models.PROTECT, related_name="transferts", verbose_name="OF")
+    origine = models.CharField(max_length=120, default="Atelier ETSL", verbose_name="Origine")
+    destination = models.CharField(max_length=120, verbose_name="Destination (chantier / site)")
+    transporteur = models.CharField(max_length=120, blank=True, verbose_name="Transporteur / véhicule")
+    lignes = models.JSONField(default=list, verbose_name="Lignes [{designation, quantite}]")
+    statut = models.CharField(max_length=12, choices=Statut.choices, default=Statut.PREPARE, verbose_name="Statut")
+    expedie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Expédié par",
+    )
+    expedie_le = models.DateTimeField(null=True, blank=True, verbose_name="Expédié le")
+    receptionne_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Réceptionné par",
+    )
+    receptionne_le = models.DateTimeField(null=True, blank=True, verbose_name="Réceptionné le")
+    reserves = models.CharField(max_length=255, blank=True, verbose_name="Réserves à la réception")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Établi par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Bon de livraison / transfert"
+        verbose_name_plural = "Bons de livraison / transferts"
+
+    def __str__(self):
+        return f"{self.code} — {self.ordre.code} → {self.destination}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = OperationsSequence.next_for(
+                "BL" if self.type == self.Type.BL else "FTR", "BL" if self.type == self.Type.BL else "FTR"
+            )
+        return super().save(*args, **kwargs)
+
+
+class Attachement(models.Model):
+    """Attachement / métré contradictoire (quantité réalisée constatée avec le client) : base de la situation."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        SIGNE = "signe", "Signé contradictoirement"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    ordre = models.ForeignKey(OrdreFabrication, on_delete=models.PROTECT, related_name="attachements", verbose_name="OF")
+    situation = models.ForeignKey(
+        SituationTravaux, null=True, blank=True, on_delete=models.SET_NULL, related_name="attachements",
+        verbose_name="Situation de travaux",
+    )
+    date = models.DateField(verbose_name="Date du constat")
+    designation = models.CharField(max_length=200, verbose_name="Ouvrage / poste")
+    unite = models.CharField(max_length=20, default="u", verbose_name="Unité (ml, m², kg, u…)")
+    quantite = models.DecimalField(max_digits=14, decimal_places=3, verbose_name="Quantité métrée")
+    prix_unitaire = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    signataire_client = models.CharField(max_length=150, blank=True, verbose_name="Signataire client")
+    signe_le = models.DateTimeField(null=True, blank=True, verbose_name="Signé le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Établi par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Attachement / métré"
+        verbose_name_plural = "Attachements / métrés"
+
+    def __str__(self):
+        return f"{self.code} — {self.designation}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = OperationsSequence.next_for("ATT", "ATT")
+        return super().save(*args, **kwargs)
+
+    @property
+    def montant(self):
+        return (self.quantite * self.prix_unitaire).quantize(Decimal("0.01"))
+
+
+class RepartitionAffaireOF(models.Model):
+    """Cas multi-affaires (interprétation provisoire) : un OF commun réparti entre plusieurs affaires (clé en %)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ordre = models.ForeignKey(OrdreFabrication, on_delete=models.CASCADE, related_name="repartitions", verbose_name="OF")
+    affaire = models.ForeignKey("commercial.Affaire", on_delete=models.PROTECT, related_name="+", verbose_name="Affaire")
+    part_pct = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Part (%)")
+
+    class Meta:
+        unique_together = [("ordre", "affaire")]
+        verbose_name = "Répartition multi-affaires"
+        verbose_name_plural = "Répartitions multi-affaires"
+
+    def __str__(self):
+        return f"{self.ordre.code} → {self.affaire} ({self.part_pct} %)"
+
+
+class EscaladeSurcharge(models.Model):
+    """Escalade d'une surcharge de capacité vers la direction (sous-traitance / location GLOBAL RENTAL) — une par semaine."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    scope = models.CharField(max_length=10, choices=OrdreFabrication.Scope.choices, verbose_name="Périmètre")
+    resource = models.CharField(max_length=8, choices=CapaciteAtelier.Resource.choices, verbose_name="Ressource")
+    semaine = models.DateField(verbose_name="Semaine du")
+    surcharge_pct = models.DecimalField(max_digits=8, decimal_places=1, verbose_name="Surcharge (%)")
+    escalade_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Escaladée par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-semaine"]
+        unique_together = [("scope", "resource", "semaine")]
+        verbose_name = "Escalade de surcharge"
+        verbose_name_plural = "Escalades de surcharge"
