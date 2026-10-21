@@ -10,6 +10,12 @@ from config.serializers import ModelCleanMixin
 
 from .ecarts import get_param_qualite, qualification_couvrante
 from .models import (
+    AuditQualite,
+    ConstatAuditQualite,
+    DocumentQualite,
+    ProcessusQualite,
+    ResponsabiliteQualite,
+    RevueDirectionQualite,
     CritereControle,
     MesureControle,
     DiffusionWps,
@@ -499,3 +505,110 @@ class MesureControleSerializer(serializers.ModelSerializer):
         model = MesureControle
         fields = ["id", "controle", "critere", "critere_libelle", "unite", "valeur", "mini", "maxi", "conforme", "repere", "saisi_le"]
         read_only_fields = ["mini", "maxi", "conforme"]
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M6-C : système de management de la qualité (CDC M6.2)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+class ProcessusQualiteSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_processus_display", read_only=True)
+    pilote_nom = serializers.CharField(source="pilote.get_full_name", read_only=True, default=None)
+    cible_atteinte = serializers.BooleanField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = ProcessusQualite
+        fields = [
+            "id", "code", "libelle", "type_processus", "type_label", "pilote", "pilote_nom", "finalite", "indicateur",
+            "unite", "cible", "sens", "valeur", "date_mesure", "cible_atteinte", "actif",
+        ]
+        read_only_fields = ["code", "valeur", "date_mesure"]
+
+
+class ResponsabiliteQualiteSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    titulaire_nom = serializers.CharField(source="titulaire.get_full_name", read_only=True, default=None)
+    suppleant_nom = serializers.CharField(source="suppleant.get_full_name", read_only=True, default=None)
+    processus_code = serializers.CharField(source="processus.code", read_only=True, default=None)
+
+    class Meta:
+        model = ResponsabiliteQualite
+        fields = [
+            "id", "fonction", "titulaire", "titulaire_nom", "suppleant", "suppleant_nom", "rattachement", "missions",
+            "autorites", "processus", "processus_code",
+        ]
+
+
+class DocumentQualiteSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_doc_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    affaire_code = serializers.CharField(source="affaire.code", read_only=True, default=None)
+    processus_code = serializers.CharField(source="processus.code", read_only=True, default=None)
+    approuve_par_nom = serializers.CharField(source="approuve_par.get_full_name", read_only=True, default=None)
+    revue_echue = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentQualite
+        fields = [
+            "id", "reference", "version", "type_doc", "type_label", "titre", "processus", "processus_code", "affaire",
+            "affaire_code", "fichier", "motif_revision", "periodicite_revue_mois", "date_revue", "revue_echue", "statut",
+            "statut_label", "redige_par", "approuve_par", "approuve_par_nom", "approuve_le", "document", "created_at",
+        ]
+        read_only_fields = ["reference", "version", "date_revue", "statut", "redige_par", "approuve_par", "approuve_le", "document"]
+
+    def get_revue_echue(self, obj):
+        return bool(obj.statut == DocumentQualite.Statut.APPROUVE and obj.date_revue and obj.date_revue < timezone.localdate())
+
+
+class ConstatAuditQualiteSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_constat_display", read_only=True)
+    nc_code = serializers.CharField(source="nc.code", read_only=True, default=None)
+    nc_statut = serializers.CharField(source="nc.statut", read_only=True, default=None)
+
+    class Meta:
+        model = ConstatAuditQualite
+        fields = ["id", "audit", "type_constat", "type_label", "exigence", "description", "nc", "nc_code", "nc_statut", "created_at"]
+        read_only_fields = ["nc"]
+
+    def validate_audit(self, audit):
+        if audit.statut == AuditQualite.Statut.CLOTURE:
+            raise serializers.ValidationError("Audit clôturé : constats scellés.")
+        return audit
+
+
+class AuditQualiteSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_audit_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    fournisseur_nom = serializers.CharField(source="fournisseur.name", read_only=True, default=None)
+    agrement_jusqu = serializers.DateField(source="fournisseur.agree_qualite_jusqu", read_only=True, default=None)
+    processus_code = serializers.CharField(source="processus.code", read_only=True, default=None)
+    constats = ConstatAuditQualiteSerializer(many=True, read_only=True)
+    nc_ouvertes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditQualite
+        fields = [
+            "id", "code", "type_audit", "type_label", "referentiel", "perimetre", "processus", "processus_code",
+            "fournisseur", "fournisseur_nom", "agrement_jusqu", "organisme", "auditeur", "date_prevue", "date_realisation",
+            "score", "conclusion", "agrement_accorde", "statut", "statut_label", "constats", "nc_ouvertes", "rapport",
+            "created_at",
+        ]
+        read_only_fields = [
+            "code", "date_realisation", "score", "agrement_accorde", "statut", "rapport",
+        ]
+
+    def get_nc_ouvertes(self, obj):
+        return obj.nc_ouvertes.count()
+
+
+class RevueDirectionQualiteSerializer(serializers.ModelSerializer):
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    validee_par_nom = serializers.CharField(source="validee_par.get_full_name", read_only=True, default=None)
+
+    class Meta:
+        model = RevueDirectionQualite
+        fields = [
+            "id", "code", "annee", "date_revue", "participants", "conclusions", "decisions", "bilan", "statut",
+            "statut_label", "validee_par", "validee_par_nom", "validee_le", "document", "created_at",
+        ]
+        read_only_fields = ["code", "bilan", "statut", "validee_par", "validee_le", "document"]

@@ -14,6 +14,9 @@ PARAMETRES_QUALITE_DEFAUT = {
     "CAPA_ESCALADE_JOURS": ("CAPA : retard avant escalade à la direction", "2", "jours"),
     "QUALIF_ALERTE_JOURS": ("Qualification soudeur : alerte avant péremption", "90", "jours"),
     "METRO_ALERTE_JOURS": ("Métrologie : alerte avant échéance d'étalonnage", "30", "jours"),
+    "AGREMENT_SCORE_MIN": ("Audit fournisseur : score minimal d'agrément", "70", "%"),
+    "AGREMENT_DUREE_MOIS": ("Audit fournisseur : durée de l'agrément qualité", "36", "mois"),
+    "DOC_REVUE_ALERTE_JOURS": ("Document qualité : alerte avant la date de revue", "30", "jours"),
 }
 #: Destinataires des relances qualité (QA/QC) et de l'escalade d'une CAPA en retard (hiérarchie).
 ROLES_QAQC = (User.Role.QAQC,)
