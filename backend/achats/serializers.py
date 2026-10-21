@@ -35,6 +35,7 @@ class PurchaseRequestSerializer(serializers.ModelSerializer):
     requester_name = serializers.SerializerMethodField()
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     lines_count = serializers.IntegerField(source="lines.count", read_only=True)
+    affaire_code = serializers.CharField(source="affaire.code", read_only=True, default=None)
 
     class Meta:
         model = PurchaseRequest
@@ -49,6 +50,8 @@ class PurchaseRequestSerializer(serializers.ModelSerializer):
             "status",
             "status_label",
             "is_urgent",
+            "affaire",
+            "affaire_code",
             "notes",
             "analytic",
             "visa_dg_par",
@@ -182,6 +185,8 @@ class PurchaseOrderSerializer(AmountMaskMixin, ModelCleanMixin, serializers.Mode
     conformity = serializers.JSONField(read_only=True)
     lines_count = serializers.IntegerField(source="lines.count", read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    affaire_code = serializers.CharField(source="affaire.code", read_only=True, default=None)
+    location_gr_code = serializers.CharField(source="location_gr.code", read_only=True, default=None)
 
     class Meta:
         model = PurchaseOrder
@@ -199,6 +204,12 @@ class PurchaseOrderSerializer(AmountMaskMixin, ModelCleanMixin, serializers.Mode
             "status_label",
             "currency",
             "is_global_rental",
+            "affaire",
+            "affaire_code",
+            "location_gr",
+            "location_gr_code",
+            "reference_ds",
+            "document_ged",
             "notes",
             "analytic",
             "visa_dg_par",
@@ -221,6 +232,7 @@ class PurchaseOrderSerializer(AmountMaskMixin, ModelCleanMixin, serializers.Mode
             "visa_dg_le",
             "total",
             "conformity",
+            "document_ged",
             "created_by",
             "created_at",
             "updated_at",
@@ -248,6 +260,7 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
     received_by_name = serializers.SerializerMethodField()
 
     controle_qualite = serializers.SerializerMethodField()
+    controles = serializers.SerializerMethodField()
 
     class Meta:
         model = GoodsReceipt
@@ -263,10 +276,19 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
             "received_by_name",
             "notes",
             "controle_qualite",
+            "controles",
+            "document_ged",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "status", "received_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "status", "received_by", "document_ged", "created_at", "updated_at"]
+
+    def get_controles(self, obj):
+        """Tous les contrôles M6 de la réception (réception + ITP / CND exigés par les règles d'inspection)."""
+        return [
+            {"id": str(c.pk), "code": c.code, "type": c.type_controle, "statut": c.statut, "resultat": c.resultat}
+            for c in obj.controles_qualite.order_by("created_at")
+        ]
 
     def get_controle_qualite(self, obj):
         ctrl = obj.controles_qualite.order_by("-created_at").first()
@@ -284,6 +306,7 @@ class GoodsReceiptLineSerializer(serializers.ModelSerializer):
     order_line_label = serializers.CharField(
         source="purchase_order_line.label", read_only=True
     )
+    lot_code = serializers.CharField(source="lot.code", read_only=True, default=None)
 
     class Meta:
         model = GoodsReceiptLine
@@ -294,8 +317,24 @@ class GoodsReceiptLineSerializer(serializers.ModelSerializer):
             "order_line_label",
             "quantity",
             "comment",
+            "numero_lot",
+            "numero_coulee",
+            "date_peremption",
+            "certificat_type",
+            "numero_certificat",
+            "organisme_certificat",
+            "lot",
+            "lot_code",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "lot"]
+
+    def validate(self, attrs):
+        get = lambda k: attrs.get(k, getattr(self.instance, k, "") if self.instance else "")  # noqa: E731
+        if get("certificat_type") and not (get("numero_certificat") or "").strip():
+            raise serializers.ValidationError({"numero_certificat": "N° de certificat MTC / CoC requis."})
+        if (get("certificat_type") or (get("numero_certificat") or "").strip()) and not (get("numero_lot") or "").strip():
+            raise serializers.ValidationError({"numero_lot": "Un certificat matière se rattache à un lot : n° de lot requis."})
+        return attrs
 
 
 class PurchaseInvoiceSerializer(AmountMaskMixin, serializers.ModelSerializer):
@@ -379,10 +418,11 @@ class LitigeFournisseurSerializer(AmountMaskMixin, ModelCleanMixin, serializers.
         fields = [
             "id", "code", "purchase_order", "order_code", "fournisseur_name", "receipt", "invoice", "type", "type_label",
             "description", "montant_en_jeu", "statut", "statut_label", "nb_relances", "derniere_relance_le",
-            "contentieux", "contentieux_code", "resolution", "resolu_le", "created_by", "created_at", "updated_at",
+            "contentieux", "contentieux_code", "resolution", "resolu_le", "document_ged", "created_by", "created_at",
+            "updated_at",
         ]
         read_only_fields = ["id", "code", "statut", "nb_relances", "derniere_relance_le", "contentieux", "resolution",
-                            "resolu_le", "created_by", "created_at", "updated_at"]
+                            "resolu_le", "document_ged", "created_by", "created_at", "updated_at"]
 
     def validate(self, attrs):
         if self.instance and self.instance.statut == LitigeFournisseur.Statut.RESOLU:

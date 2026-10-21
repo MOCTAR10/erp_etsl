@@ -116,7 +116,7 @@ ROLE_MODULES: dict[str, tuple[str, ...]] = {
         "stocks",
     ),
     _R.QAQC: ("qualite", "operations", "achats"),
-    _R.HSE: ("hse", "operations", "qualite", "maintenance"),
+    _R.HSE: ("hse", "operations", "qualite", "maintenance", "achats"),
     _R.LOGISTIQUE: (
         "achats",
         "logistique",

@@ -167,6 +167,15 @@ class Command(BaseCommand):
             },
         )
 
+        # Écarts M2 : paramètres provisoires et une règle d'inspection à réception provisoire (tube MAT-A106 : ITP + CND UT).
+        from achats.ecarts import assurer_parametres
+        from achats.models import RegleInspectionReception
+
+        assurer_parametres()
+        RegleInspectionReception.objects.get_or_create(
+            article=tube, defaults={"exige_itp": True, "exige_cnd": True, "methode_cnd": "UT"},
+        )
+
         self.stdout.write(self.style.SUCCESS(
             f"Achats M2 prêt : {PurchaseRequest.objects.count()} DA, "
             f"{PurchaseOrder.objects.count()} BC, {GoodsReceipt.objects.count()} BL, "

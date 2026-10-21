@@ -121,6 +121,10 @@ class Budget(models.Model):
         verbose_name="Visa Contrôle de gestion",
     )
     visa_cg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa CG")
+    pv_document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="PV de validation archivé (GED)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -216,6 +220,10 @@ class BudgetRevision(models.Model):
         verbose_name="Visa Contrôle de gestion",
     )
     visa_cg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa CG")
+    pv_document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="PV de validation archivé (GED)",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -414,6 +422,9 @@ class ParametreGestion(models.Model):
     label = models.CharField(max_length=200, verbose_name="Libellé")
     valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
     unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    table = models.CharField(
+        max_length=40, blank=True, db_index=True, verbose_name="Table de paramétrage (RGM_*, KPI_CIBLES)"
+    )
     statut_valeur = models.CharField(
         max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
         verbose_name="Statut de la valeur",
@@ -449,3 +460,227 @@ class AlerteSousActivite(models.Model):
     class Meta:
         ordering = ["-detecte_le"]
         constraints = [models.UniqueConstraint(fields=["budget", "centre"], name="uniq_alerte_sous_activite")]
+
+
+# ==================================================================================================
+# Écarts M11 (2026-10-21) : révision par ligne mensuelle, plan d'action de sous-activité, reporting
+# archivé par horizon, revue de performance P-M11.10, validation de la marge d'affaire, provisions 408.
+# ==================================================================================================
+class BudgetRevisionLigne(models.Model):
+    """Révision d'une ligne mensuelle (R1-R4) : appliquée à la `BudgetLigne` de la période au second visa."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    revision = models.ForeignKey(BudgetRevision, on_delete=models.CASCADE, related_name="lignes", verbose_name="Révision")
+    period = models.ForeignKey("accounting_kernel.Period", on_delete=models.PROTECT, related_name="+", verbose_name="Période")
+    ancien_montant = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Montant avant révision")
+    nouveau_montant = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant révisé")
+
+    class Meta:
+        ordering = ["revision", "period"]
+        verbose_name = "Ligne de révision budgétaire"
+        verbose_name_plural = "Lignes de révision budgétaire"
+        constraints = [models.UniqueConstraint(fields=["revision", "period"], name="uniq_revision_ligne_period")]
+
+    def __str__(self):
+        return f"{self.revision.code} · {self.period} → {self.nouveau_montant}"
+
+
+class PlanActionSousActivite(models.Model):
+    """Plan d'action rattaché à un budget en sous-activité (centre 99) : actions, responsable, échéance, suivi."""
+
+    class Statut(models.TextChoices):
+        OUVERT = "ouvert", "Ouvert"
+        EN_COURS = "en_cours", "En cours"
+        CLOS = "clos", "Clos"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="plans_sous_activite", verbose_name="Budget")
+    alerte = models.ForeignKey(
+        AlerteSousActivite, null=True, blank=True, on_delete=models.SET_NULL, related_name="plans", verbose_name="Alerte"
+    )
+    centre = models.CharField(max_length=2, blank=True, verbose_name="Centre au lancement")
+    taux = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="Taux de sous-activité")
+    actions = models.TextField(verbose_name="Actions prévues")
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Responsable"
+    )
+    echeance = models.DateField(null=True, blank=True, verbose_name="Échéance")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.OUVERT, verbose_name="Statut")
+    suivi = models.TextField(blank=True, verbose_name="Suivi / résultat")
+    clos_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Clos par"
+    )
+    clos_le = models.DateTimeField(null=True, blank=True, verbose_name="Clos le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créé par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["statut", "echeance"]
+        verbose_name = "Plan d'action de sous-activité"
+        verbose_name_plural = "Plans d'action de sous-activité"
+
+    def __str__(self):
+        return f"{self.code} — {self.budget.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ControleGestionSequence.next_for("PAS", "PAS")
+        return super().save(*args, **kwargs)
+
+    @property
+    def en_retard(self):
+        return self.statut != self.Statut.CLOS and self.echeance is not None and timezone.localdate() > self.echeance
+
+
+class ReportingArchive(models.Model):
+    """Reporting de gestion d'un mois, par horizon (12 mois à J+4, 3 mois à J+6) : PDF archivé en GED."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cloture = models.ForeignKey(ClotureGestion, on_delete=models.CASCADE, related_name="reportings", verbose_name="Clôture")
+    type_reporting = models.CharField(
+        max_length=2, choices=[("j4", "Publié à J+4"), ("j6", "Publié à J+6")], verbose_name="Type de reporting"
+    )
+    horizon = models.PositiveSmallIntegerField(verbose_name="Horizon (mois)")
+    echeance = models.DateField(verbose_name="Échéance de publication")
+    archive_le = models.DateField(default=timezone.localdate, verbose_name="Archivé le")
+    a_temps = models.BooleanField(default=False, verbose_name="Publié dans le délai")
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="PDF archivé"
+    )
+    archive_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Archivé par"
+    )
+
+    class Meta:
+        ordering = ["-archive_le"]
+        verbose_name = "Reporting de gestion archivé"
+        verbose_name_plural = "Reportings de gestion archivés"
+        constraints = [models.UniqueConstraint(fields=["cloture", "type_reporting"], name="uniq_reporting_cloture_type")]
+
+
+class RevuePerformance(models.Model):
+    """Revue de performance périodique (procédure P-M11.10) : ordre du jour, KPI figés, décisions, PV archivé."""
+
+    class Statut(models.TextChoices):
+        PLANIFIEE = "planifiee", "Planifiée"
+        TENUE = "tenue", "Tenue (PV archivé)"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    period = models.ForeignKey(
+        "accounting_kernel.Period", on_delete=models.PROTECT, related_name="+", verbose_name="Période revue"
+    )
+    date_revue = models.DateField(verbose_name="Date de la revue")
+    ordre_du_jour = models.TextField(blank=True, verbose_name="Ordre du jour")
+    participants = models.TextField(blank=True, verbose_name="Participants")
+    decisions = models.TextField(blank=True, verbose_name="Décisions et actions")
+    kpis = models.JSONField(default=list, blank=True, verbose_name="KPI figés à la revue")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.PLANIFIEE, verbose_name="Statut")
+    pv_document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="PV archivé"
+    )
+    tenue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="PV établi par"
+    )
+    tenue_le = models.DateTimeField(null=True, blank=True, verbose_name="PV établi le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créée par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_revue"]
+        verbose_name = "Revue de performance (P-M11.10)"
+        verbose_name_plural = "Revues de performance (P-M11.10)"
+
+    def __str__(self):
+        return f"{self.code} — {self.period}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ControleGestionSequence.next_for("RPF", "RPF")
+        return super().save(*args, **kwargs)
+
+
+class ValidationMarge(models.Model):
+    """Validation de la marge prévisionnelle d'une affaire par le contrôle de gestion (CA et marge figés)."""
+
+    class Statut(models.TextChoices):
+        VALIDEE = "validee", "Validée"
+        REJETEE = "rejetee", "Rejetée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    affaire = models.ForeignKey("commercial.Affaire", on_delete=models.CASCADE, related_name="validations_marge")
+    ca = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="CA contractuel figé")
+    marge = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Marge prévue figée")
+    statut = models.CharField(max_length=10, choices=Statut.choices, verbose_name="Décision")
+    commentaire = models.CharField(max_length=250, blank=True, verbose_name="Commentaire")
+    par = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", verbose_name="Décidée par")
+    le = models.DateTimeField(auto_now_add=True, verbose_name="Décidée le")
+
+    class Meta:
+        ordering = ["-le"]
+        verbose_name = "Validation de marge d'affaire"
+        verbose_name_plural = "Validations de marge d'affaire"
+
+
+class ProvisionFnp(models.Model):
+    """Provision des factures non parvenues (compte 408) : réceptions validées non facturées à la date d'arrêté.
+
+    Écriture OD comptabilisée (Dr charge · Cr 408), extournée à l'ouverture de la période suivante.
+    """
+
+    class Statut(models.TextChoices):
+        COMPTABILISEE = "comptabilisee", "Comptabilisée"
+        EXTOURNEE = "extournee", "Extournée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    date_arrete = models.DateField(unique=True, verbose_name="Date d'arrêté")
+    montant = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant provisionné (HT)")
+    detail = models.JSONField(default=list, blank=True, verbose_name="Détail par ligne de commande")
+    statut = models.CharField(max_length=14, choices=Statut.choices, default=Statut.COMPTABILISEE, verbose_name="Statut")
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture de provision",
+    )
+    extourne = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture d'extourne",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Passée par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_arrete"]
+        verbose_name = "Provision factures non parvenues (408)"
+        verbose_name_plural = "Provisions factures non parvenues (408)"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ControleGestionSequence.next_for("FNP", "FNP")
+        return super().save(*args, **kwargs)
+
+
+class AxeAnalytiqueM11(models.Model):
+    """Nature M11 d'un axe analytique (activité / profil contractuel) : le réalisé d'un budget sur cet axe agrège
+    les écritures des affaires de l'activité ou du profil correspondant."""
+
+    class Nature(models.TextChoices):
+        ACTIVITE = "activite", "Activité"
+        PROFIL = "profil", "Profil contractuel"
+
+    axis = models.OneToOneField("referentiels.AnalyticAxis", on_delete=models.CASCADE, related_name="nature_m11")
+    nature = models.CharField(max_length=10, choices=Nature.choices, verbose_name="Nature")
+
+    class Meta:
+        verbose_name = "Axe analytique M11 (activité / profil)"
+        verbose_name_plural = "Axes analytiques M11 (activité / profil)"

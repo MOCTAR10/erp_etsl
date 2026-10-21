@@ -11,7 +11,10 @@ from .views import (
     EstimateLineViewSet,
     EstimateOptionViewSet,
     EstimateViewSet,
+    HabilitationRequiseViewSet,
     MilestoneViewSet,
+    ParametreCommercialViewSet,
+    PilotageM1ViewSet,
     OpportunityViewSet,
     SoumissionEventViewSet,
     TenderReviewViewSet,
@@ -31,6 +34,9 @@ router.register("contracts", ContractViewSet, basename="contract")
 router.register("contract-services", ContractServiceViewSet, basename="contractservice")
 router.register("avenants", AvenantViewSet, basename="avenant")
 router.register("soumissions", SoumissionEventViewSet, basename="soumission")
+router.register("parametres", ParametreCommercialViewSet, basename="parametrecommercial")
+router.register("habilitations-requises", HabilitationRequiseViewSet, basename="habilitationrequise")
+router.register("pilotage", PilotageM1ViewSet, basename="pilotagem1")
 
 urlpatterns = [
     path("", include(router.urls)),
