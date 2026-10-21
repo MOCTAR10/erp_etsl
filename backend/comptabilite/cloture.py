@@ -140,6 +140,15 @@ def cloturer(cm, user):
     cm.controles = liste
     cm.synthese = build_synthese(cm.period)
     cm.save()
+    # Conservation 10 ans : le journal (grand livre) de la période clôturée est scellé en GED.
+    from .fiscal import archiver_journal_periode
+
+    try:
+        with transaction.atomic():
+            cm.document = archiver_journal_periode(cm.period, user)
+            cm.save(update_fields=["document"])
+    except Exception:  # noqa: BLE001 — l'archivage ne bloque jamais la clôture (réessayé à la réouverture)
+        pass
     return cm
 
 
@@ -180,9 +189,23 @@ def envoyer_direction(cm, user=None):
     Notification.objects.bulk_create([
         Notification(user=u, subject=sujet, message=texte, kind="info") for u in destinataires
     ])
+    # Envoi par e-mail (serveur SMTP `EMAIL_*`) en plus de la notification interne.
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    emails = [u.email for u in destinataires if u.email]
+    envoyes = 0
+    if emails:
+        try:
+            envoyes = len(emails) if send_mail(
+                f"[ETSL] {sujet}", texte, settings.DEFAULT_FROM_EMAIL, emails, fail_silently=False
+            ) else 0
+        except Exception:  # noqa: BLE001 — SMTP indisponible : la notification interne reste, compteur à 0
+            envoyes = 0
     cm.envoyee_le, cm.envoyee_par = timezone.now(), user
     cm.destinataires = [u.email for u in destinataires]
-    cm.save(update_fields=["envoyee_le", "envoyee_par", "destinataires"])
+    cm.emails_envoyes = envoyes
+    cm.save(update_fields=["envoyee_le", "envoyee_par", "destinataires", "emails_envoyes"])
     return cm
 
 

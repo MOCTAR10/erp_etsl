@@ -66,6 +66,36 @@ class DocumentTypeViewSet(viewsets.ReadOnlyModelViewSet):
         t.save(update_fields=["officiel", "officiel_confirme_par", "officiel_confirme_le"])
         return Response(self.get_serializer(t).data)
 
+    @action(detail=True, methods=["post"], url_path="definir-retention")
+    def definir_retention(self, request, pk=None):
+        """Durée de rétention (années, vide = conservation sans échéance) ; repasse en provisoire (écarts M12)."""
+        self._direction_only(request)
+        brut = request.data.get("retention_years")
+        if brut in (None, ""):
+            annees = None
+        else:
+            try:
+                annees = int(str(brut).strip())
+            except ValueError:
+                raise DRFValidationError({"retention_years": "Nombre d'années entier attendu."})
+            if not 1 <= annees <= 100:
+                raise DRFValidationError({"retention_years": "Durée attendue entre 1 et 100 ans."})
+        t = self.get_object()
+        t.retention_years = annees
+        t.retention_confirmee_par = None
+        t.retention_confirmee_le = None
+        t.save(update_fields=["retention_years", "retention_confirmee_par", "retention_confirmee_le"])
+        return Response(self.get_serializer(t).data)
+
+    @action(detail=True, methods=["post"], url_path="confirmer-retention")
+    def confirmer_retention(self, request, pk=None):
+        self._direction_only(request)
+        t = self.get_object()
+        t.retention_confirmee_par = request.user
+        t.retention_confirmee_le = timezone.now()
+        t.save(update_fields=["retention_confirmee_par", "retention_confirmee_le"])
+        return Response(self.get_serializer(t).data)
+
     @action(detail=True, methods=["post"], url_path="confirmer-officiel")
     def confirmer_officiel(self, request, pk=None):
         self._direction_only(request)

@@ -68,6 +68,10 @@ class PurchaseRequest(models.Model):
         max_length=14, choices=Status.choices, default=Status.BROUILLON, verbose_name="Statut"
     )
     is_urgent = models.BooleanField(default=False, verbose_name="Urgente")
+    affaire = models.ForeignKey(
+        "commercial.Affaire", null=True, blank=True, on_delete=models.SET_NULL, related_name="demandes_achat",
+        verbose_name="Affaire d'origine (M1)",
+    )
     notes = models.TextField(blank=True, verbose_name="Notes")
     analytic = models.ForeignKey(
         "referentiels.AnalyticAccount",
@@ -275,6 +279,22 @@ class PurchaseOrder(models.Model):
     is_global_rental = models.BooleanField(
         default=False, verbose_name="Intra-groupe GLOBAL RENTAL"
     )
+    affaire = models.ForeignKey(
+        "commercial.Affaire", null=True, blank=True, on_delete=models.SET_NULL, related_name="commandes_achat",
+        verbose_name="Affaire (M1)",
+    )
+    location_gr = models.ForeignKey(
+        "logistique.LocationGR", null=True, blank=True, on_delete=models.PROTECT, related_name="commandes_achat",
+        verbose_name="Location GLOBAL RENTAL (M4)",
+    )
+    reference_ds = models.CharField(
+        max_length=40, blank=True, verbose_name="Référence DS",
+        help_text="Sigle « DS » à confirmer par ETSL (paramètre provisoire DS_OBLIGATOIRE_GR).",
+    )
+    document_ged = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Pièce archivée en GED (conservation)",
+    )
     notes = models.TextField(blank=True, verbose_name="Notes")
     analytic = models.ForeignKey(
         "referentiels.AnalyticAccount",
@@ -361,6 +381,11 @@ class PurchaseOrder(models.Model):
             raise ValidationError(
                 {"supplier": "Le partenaire doit être marqué GLOBAL RENTAL (intra-groupe)."}
             )
+        if self.location_gr_id:
+            if not self.is_global_rental:
+                raise ValidationError({"location_gr": "Un BC lié à une location GR est un BC GLOBAL RENTAL (compte 618)."})
+            if self.supplier_id and self.supplier_id != self.location_gr.partenaire_id:
+                raise ValidationError({"supplier": "Le fournisseur doit être le partenaire GR de la location."})
 
 
 class PurchaseOrderLine(models.Model):
@@ -443,6 +468,10 @@ class GoodsReceipt(models.Model):
         verbose_name="Réceptionné par",
     )
     notes = models.TextField(blank=True, verbose_name="Notes")
+    document_ged = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Pièce archivée en GED (conservation)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -477,6 +506,20 @@ class GoodsReceiptLine(models.Model):
         max_digits=14, decimal_places=2, default=0, verbose_name="Qté reçue"
     )
     comment = models.CharField(max_length=200, blank=True, verbose_name="Commentaire")
+    # Aval M5 : lot et certificat matière saisis à la réception, créés dans M5 à la validation.
+    numero_lot = models.CharField(max_length=80, blank=True, verbose_name="N° lot fournisseur")
+    numero_coulee = models.CharField(max_length=80, blank=True, verbose_name="N° de coulée")
+    date_peremption = models.DateField(null=True, blank=True, verbose_name="Date de péremption")
+    certificat_type = models.CharField(
+        max_length=4, blank=True, choices=[("mtc", "MTC (Mill Test Certificate)"), ("coc", "CoC (Certificate of Conformity)")],
+        verbose_name="Certificat matière",
+    )
+    numero_certificat = models.CharField(max_length=80, blank=True, verbose_name="N° certificat")
+    organisme_certificat = models.CharField(max_length=120, blank=True, verbose_name="Organisme / labo")
+    lot = models.ForeignKey(
+        "stocks.LotMatiere", null=True, blank=True, on_delete=models.SET_NULL, related_name="lignes_reception",
+        verbose_name="Lot créé (M5)",
+    )
 
     class Meta:
         ordering = ["receipt", "id"]
@@ -768,6 +811,10 @@ class LitigeFournisseur(models.Model):
     )
     resolution = models.TextField(blank=True, verbose_name="Résolution")
     resolu_le = models.DateTimeField(null=True, blank=True, verbose_name="Résolu le")
+    document_ged = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Pièce archivée en GED (conservation)",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créé par"
     )
@@ -810,3 +857,189 @@ def _controle_a_reception(sender, instance, created, **kwargs):
         point_controle=f"Réception {instance.code} — BC {instance.purchase_order.code}"[:200],
         statut=ControleQualite.Statut.EN_ATTENTE,
     )
+
+
+class _ParametreBase(models.Model):
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut de la valeur"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        abstract = True
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class ParametreAchats(_ParametreBase):
+    """Paramètres M2 attendus d'ETSL : valeurs provisoires tant qu'ETSL ne les confirme pas (écarts M2)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre achats"
+        verbose_name_plural = "Paramètres achats"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+
+class AgrementFournisseur(models.Model):
+    """Agrément fournisseur qualité (M6) ou HSE (M7) : décision des services QA/QC ou HSE reportée sur la fiche tiers."""
+
+    class Domaine(models.TextChoices):
+        QUALITE = "qualite", "Qualité (M6)"
+        HSE = "hse", "HSE (M7)"
+
+    class Statut(models.TextChoices):
+        DEMANDE = "demande", "Demandé"
+        VALIDE = "valide", "Validé"
+        REFUSE = "refuse", "Refusé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    fournisseur = models.ForeignKey(
+        "referentiels.Partner", on_delete=models.PROTECT, related_name="agrements_achats", verbose_name="Fournisseur"
+    )
+    domaine = models.CharField(max_length=8, choices=Domaine.choices, verbose_name="Domaine")
+    reference = models.CharField(max_length=120, blank=True, verbose_name="Référence (audit, questionnaire, évaluation)")
+    date_evaluation = models.DateField(default=timezone.localdate, verbose_name="Date d'évaluation")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Agrément valable jusqu'au")
+    note_evaluation = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Note d'évaluation /100")
+    observations = models.TextField(blank=True, verbose_name="Observations")
+    statut = models.CharField(max_length=8, choices=Statut.choices, default=Statut.DEMANDE, verbose_name="Statut")
+    motif_refus = models.TextField(blank=True, verbose_name="Motif du refus")
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Décision par"
+    )
+    valide_le = models.DateTimeField(null=True, blank=True, verbose_name="Décision le")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créé par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Agrément fournisseur"
+        verbose_name_plural = "Agréments fournisseurs"
+
+    def __str__(self):
+        return f"{self.code} — {self.fournisseur} ({self.get_domaine_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = AchatsSequence.next_for("AGR", "AGR")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.date_fin and self.date_fin < self.date_evaluation:
+            raise ValidationError({"date_fin": "La fin d'agrément doit suivre la date d'évaluation."})
+        if self.note_evaluation is not None and not (0 <= self.note_evaluation <= 100):
+            raise ValidationError({"note_evaluation": "Note sur 100."})
+
+
+class RegleInspectionReception(_ParametreBase):
+    """Règle d'inspection M6 à réception par catégorie d'article (ou article) : ITP et / ou CND exigés (provisoire)."""
+
+    TYPES_ARTICLE = [
+        ("produit", "Produit"), ("service", "Service / prestation"), ("matiere", "Matière première"),
+        ("consommable", "Consommable"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    article_type = models.CharField(max_length=12, blank=True, choices=TYPES_ARTICLE, verbose_name="Catégorie d'article")
+    article = models.ForeignKey(
+        "referentiels.Article", null=True, blank=True, on_delete=models.CASCADE, related_name="regles_inspection_achats",
+        verbose_name="Article (règle spécifique)",
+    )
+    exige_itp = models.BooleanField(default=False, verbose_name="ITP exigé")
+    exige_cnd = models.BooleanField(default=False, verbose_name="CND exigé")
+    methode_cnd = models.CharField(
+        max_length=2, blank=True, choices=[("RT", "Radiographie (RT)"), ("UT", "Ultrasons (UT)"), ("PT", "Ressuage (PT)"),
+                                           ("MT", "Magnétoscopie (MT)")],
+        verbose_name="Méthode CND",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Active")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["article_type", "-created_at"]
+        verbose_name = "Règle d'inspection à réception"
+        verbose_name_plural = "Règles d'inspection à réception"
+
+    def __str__(self):
+        cible = self.article.code if self.article_id else self.get_article_type_display()
+        return f"{cible} : ITP={self.exige_itp} CND={self.exige_cnd}"
+
+    def clean(self):
+        if not self.article_id and not self.article_type:
+            raise ValidationError({"article_type": "Catégorie d'article ou article requis."})
+        if self.methode_cnd and not self.exige_cnd:
+            raise ValidationError({"methode_cnd": "Méthode CND sans CND exigé."})
+
+
+class AvoirFournisseur(models.Model):
+    """Avoir fournisseur sur facture comptabilisée : contre-passation (extourne) au prorata de l'écriture d'achat."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        COMPTABILISE = "comptabilise", "Comptabilisé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    facture = models.ForeignKey(PurchaseInvoice, on_delete=models.PROTECT, related_name="avoirs", verbose_name="Facture d'origine")
+    litige = models.ForeignKey(
+        LitigeFournisseur, null=True, blank=True, on_delete=models.SET_NULL, related_name="avoirs", verbose_name="Litige"
+    )
+    reference_fournisseur = models.CharField(max_length=100, blank=True, verbose_name="Réf. avoir fournisseur")
+    date_avoir = models.DateField(default=timezone.localdate, verbose_name="Date de l'avoir")
+    montant_ht = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Montant HT")
+    motif = models.TextField(verbose_name="Motif")
+    statut = models.CharField(max_length=12, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="avoirs_fournisseurs",
+        verbose_name="Écriture comptable",
+    )
+    comptabilise_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Comptabilisé par"
+    )
+    comptabilise_le = models.DateTimeField(null=True, blank=True, verbose_name="Comptabilisé le")
+    document_ged = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Pièce archivée en GED (conservation)",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créé par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_avoir", "-created_at"]
+        verbose_name = "Avoir fournisseur"
+        verbose_name_plural = "Avoirs fournisseurs"
+
+    def __str__(self):
+        return f"{self.code} — {self.facture.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = AchatsSequence.next_for("AVF", "AVF")
+        return super().save(*args, **kwargs)

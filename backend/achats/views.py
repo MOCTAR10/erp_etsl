@@ -44,6 +44,29 @@ from comptabilite.services import CanValidateCompta
 
 from .comptabilisation import comptabiliser_facture
 from .stock_link import entrer_en_stock
+from .ecarts import (
+    archiver_bc,
+    archiver_litige,
+    archiver_reception,
+    bc_depuis_location_gr,
+    controles_bloquants,
+    da_depuis_affaire,
+    declencher_inspections,
+    get_param,
+)
+
+
+def _uuid_or_none(valeur):
+    import uuid
+
+    try:
+        return uuid.UUID(str(valeur))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _drf_error(exc):
+    return ValidationError(exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages})
 from .services import CanApproveDa, CanManageAchats, can_see_amount, can_viser_dg
 
 
@@ -144,6 +167,22 @@ class PurchaseRequestViewSet(_CommonViewSet):
         obj.visa_dg_le = timezone.now()
         obj.save(update_fields=["visa_dg_par", "visa_dg_motif", "visa_dg_le", "updated_at"])
         return Response(self.get_serializer(obj).data)
+
+    @action(detail=False, methods=["post"], url_path="depuis-affaire")
+    def depuis_affaire(self, request):
+        """Amont M1 : DA brouillon pré-remplie depuis une affaire validée (imputation, articles de l'offre gagnée)."""
+        from commercial.models import Affaire
+
+        affaire = Affaire.objects.filter(pk=_uuid_or_none(request.data.get("affaire"))).first()
+        if affaire is None:
+            raise ValidationError({"affaire": "Affaire introuvable."})
+        try:
+            da, n = da_depuis_affaire(affaire, request.user)
+        except DjangoValidationError as exc:
+            raise _drf_error(exc)
+        data = dict(self.get_serializer(da).data)
+        data["lignes_derivees"] = n
+        return Response(data, status=status.HTTP_201_CREATED)
 
 
 class PurchaseRequestLineViewSet(_CommonViewSet):
@@ -266,8 +305,13 @@ class PurchaseOrderViewSet(_CommonViewSet):
         )
         if blocage:
             return Response({"budget": blocage}, status=status.HTTP_400_BAD_REQUEST)
+        # Écart M2 (B) : référence « DS » exigée sur un BC GR si ETSL l'active (paramètre provisoire DS_OBLIGATOIRE_GR).
+        if order.is_global_rental and int(get_param("DS_OBLIGATOIRE_GR")) == 1 and not order.reference_ds.strip():
+            return Response({"reference_ds": "Référence DS obligatoire pour un BC GLOBAL RENTAL."}, status=status.HTTP_400_BAD_REQUEST)
         order.status = PurchaseOrder.Status.CONFIRMEE
-        order.save(update_fields=["status"])
+        # Pièce émise = scellée et archivée en GED (conservation paramétrée, 10 ans par défaut).
+        order.document_ged = archiver_bc(order, request.user)
+        order.save(update_fields=["status", "document_ged"])
         return Response(self.get_serializer(order).data)
 
     @action(detail=True, methods=["post"])
@@ -306,6 +350,9 @@ class PurchaseOrderViewSet(_CommonViewSet):
         if order.request_id and not order.analytic_id and order.request.analytic_id:
             order.analytic_id = order.request.analytic_id
             order.save(update_fields=["analytic"])
+        if order.request_id and not order.affaire_id and order.request.affaire_id:
+            order.affaire_id = order.request.affaire_id
+            order.save(update_fields=["affaire"])
         # La DA approuvée à l'origine du BC est désormais « convertie en commande ».
         if order.request_id and order.request.status == PurchaseRequest.Status.APPROUVEE:
             order.request.status = PurchaseRequest.Status.CONVERTIE
@@ -330,6 +377,29 @@ class PurchaseOrderViewSet(_CommonViewSet):
         """Rapprochement 3-way (RF-ERP-12) : commandé / reçu / facturé par ligne."""
         order = self.get_object()
         return Response({"code": order.code, "conformity": order.conformity})
+
+    @action(detail=False, methods=["post"], url_path="depuis-location-gr")
+    def depuis_location_gr(self, request):
+        """Circuit GR : BC GLOBAL RENTAL (618) généré depuis une location M4 et lié à elle."""
+        from logistique.models import LocationGR
+
+        location = LocationGR.objects.select_related("partenaire", "equipement", "affaire").filter(
+            pk=_uuid_or_none(request.data.get("location"))
+        ).first()
+        if location is None:
+            raise ValidationError({"location": "Location GR introuvable."})
+        try:
+            bc = bc_depuis_location_gr(location, request.user)
+        except DjangoValidationError as exc:
+            raise _drf_error(exc)
+        return Response(self.get_serializer(bc).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="pieces-archivees")
+    def pieces_archivees(self, request):
+        """Pièces d'achat scellées en GED (BC, réceptions, litiges, avoirs) et leur durée de conservation."""
+        from .views_ecarts import pieces_archivees
+
+        return Response(pieces_archivees())
 
 
 class PurchaseOrderLineViewSet(_CommonViewSet):
@@ -361,24 +431,24 @@ class GoodsReceiptViewSet(_CommonViewSet):
     @transaction.atomic
     def valider(self, request, pk=None):
         """Réception validée seulement après le contrôle qualité M6 validé conforme ou accepté sous réserve (§5.11)."""
-        from qualite.models import ControleQualite
-
         receipt = GoodsReceipt.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if receipt.status != GoodsReceipt.Status.EN_ATTENTE:
             return Response({"detail": "Réception déjà validée ou annulée."}, status=status.HTTP_400_BAD_REQUEST)
-        ctrl = receipt.controles_qualite.order_by("-created_at").first()
-        if ctrl is None or ctrl.statut != ControleQualite.Statut.VALIDE:
-            return Response({"detail": "Contrôle qualité à réception (M6) non validé : réception en attente."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        if ctrl.resultat == ControleQualite.Resultat.NON_CONFORME:
-            return Response({"detail": f"Contrôle qualité {ctrl.code} non conforme : ouvrez un litige fournisseur."},
-                            status=status.HTTP_400_BAD_REQUEST)
+        # Aval M6 : ITP / CND exigés par les règles d'inspection (catégorie d'article) — créés s'ils manquent.
+        crees = declencher_inspections(receipt, request.user)
+        if crees:
+            return Response({"detail": f"Inspection exigée à réception : {', '.join(c.code for c in crees)} créé(s) en M6, "
+                                       "à valider avant la réception."}, status=status.HTTP_400_BAD_REQUEST)
+        blocage = controles_bloquants(receipt)
+        if blocage:
+            return Response({"detail": blocage}, status=status.HTTP_400_BAD_REQUEST)
         try:
             entrer_en_stock(receipt, request.user, request.data.get("depot"))
         except DjangoValidationError as exc:
             raise ValidationError(exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages})
         receipt.status = GoodsReceipt.Status.VALIDE
-        receipt.save(update_fields=["status", "updated_at"])
+        receipt.document_ged = archiver_reception(receipt, request.user)
+        receipt.save(update_fields=["status", "document_ged", "updated_at"])
         return Response(self.get_serializer(receipt).data)
 
     def perform_destroy(self, instance):
@@ -457,6 +527,8 @@ class LitigeFournisseurViewSet(_CommonViewSet):
             raise ValidationError({"resolution": "Résolution obligatoire (avoir, remplacement, abandon…)."})
         litige.resolution, litige.resolu_le, litige.statut = resolution, timezone.now(), LitigeFournisseur.Statut.RESOLU
         litige.save()
+        litige.document_ged = archiver_litige(litige, request.user)
+        litige.save(update_fields=["document_ged"])
         return Response(self.get_serializer(litige).data)
 
 
@@ -482,7 +554,8 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
 
     def perform_create(self, serializer):
         self._garde_reception_ouverte(serializer.validated_data["receipt"])
-        serializer.save()
+        ligne = serializer.save()
+        declencher_inspections(ligne.receipt, self.request.user)
 
     def perform_update(self, serializer):
         self._garde_reception_ouverte(serializer.instance.receipt)
