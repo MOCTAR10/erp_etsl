@@ -88,3 +88,33 @@ class CanManageAchats(BasePermission):
 
     def has_permission(self, request, view):
         return can_manage_achats(getattr(request, "user", None))
+
+# Écarts M2 — agrément fournisseur : décision du service du domaine (QA/QC pour M6, HSE pour M7) ou de la Direction.
+AGREMENT_QUALITE_VALIDATION_ROLES = (
+    User.Role.ADMIN,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.QAQC,
+    User.Role.DIRECTION,
+)
+
+AGREMENT_HSE_VALIDATION_ROLES = (
+    User.Role.ADMIN,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.HSE,
+    User.Role.DIRECTION,
+)
+
+# Demande d'agrément et règles d'inspection à réception : Achats + QA/QC + HSE.
+AGREMENT_WRITE_ROLES = ACHAT_WRITE_ROLES + (User.Role.QAQC, User.Role.HSE)
+
+# Confirmation des paramètres provisoires M2 (valeurs attendues d'ETSL).
+ACHAT_PARAM_CONFIRM_ROLES = (
+    User.Role.ADMIN,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.DIRECTEUR_OPERATIONS,
+    User.Role.FINANCE,
+    User.Role.DIRECTION,
+)
