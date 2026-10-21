@@ -74,9 +74,9 @@ PARAMETRES_DEFAUT = {
     ),
     "gr_delai_revue_jours": ("Dossier GR « à jour » : revue exigée tous les N jours", 365),
     "archivage_auto": (
-        "Archivage automatique en GED à la transition : type d'objet -> statuts déclencheurs et type de document",
+        "Archivage automatique en GED à la transition : type d'objet -> statuts déclencheurs et type de document "
+        "(les BC M2 sont déjà archivés par le module Achats)",
         {
-            "achats.purchaseorder": {"statuts": ["confirmee", "cloturee"], "type_document": "devis_bons_de_commande"},
             "qualite.pvcontrole": {"statuts": ["receptionne"], "type_document": "documents_qualite_iso"},
         },
     ),
