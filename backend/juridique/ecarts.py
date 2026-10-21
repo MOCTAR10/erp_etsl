@@ -318,7 +318,7 @@ def alertes_complementaires(horizon_jours=90):
         )
     ]
     mandats = [
-        item("mandat_gr", d.code, f"Mandat {d.mandat_reference or ''} — {d.objet}".strip(), d.mandat_date_fin, d.statut)
+        item("mandat_gr", d.code, f"Mandat intra-groupe {d.mandat_reference}".strip(), d.mandat_date_fin, d.statut)
         for d in DossierGlobalRental.objects.exclude(statut="cloture").filter(
             mandat_date_fin__isnull=False, mandat_date_fin__lte=horizon
         )

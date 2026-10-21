@@ -436,7 +436,7 @@ export function EcartsM12Section() {
           <tbody>
             {dossiersGr.map((d) => (
               <tr key={d.id}>
-                <td>{d.code} · {d.objet}</td>
+                <td title={d.objet}>{d.code}</td>
                 <td>{d.mandat_date_fin ? `${d.mandat_reference || t("ecarts_m12.gr.mandat")} → ${formatDate(d.mandat_date_fin)}` : "—"}</td>
                 <td>
                   <Badge tone={d.controle.a_jour ? "ok" : "warn"}>{d.controle.a_jour ? t("ecarts_m12.gr.aJour") : t("ecarts_m12.gr.pasAJour")}</Badge>{" "}
