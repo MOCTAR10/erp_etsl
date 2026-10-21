@@ -11,6 +11,7 @@ import type { Paginated, PoStatus, PurchaseOrder } from "../types";
 import { DemandesAchat } from "../components/workflow/DemandesAchat";
 import { AchatsPilotage } from "../components/achats/AchatsPilotage";
 import { AchatsSaisie } from "../components/achats/AchatsSaisie";
+import { EcartsM2Section } from "../components/achats/EcartsM2Section";
 
 type Groups = Record<PoStatus, PurchaseOrder[]>;
 
@@ -123,6 +124,8 @@ export function PurchasesPage() {
       <AchatsSaisie />
 
       <AchatsPilotage />
+
+      <EcartsM2Section />
     </>
   );
 }
