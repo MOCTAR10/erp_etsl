@@ -32,7 +32,7 @@ def transferer_paie(pointage):
         return pointage.saisie_temps
     if pointage.status != PointageChantier.Status.VALIDE:
         raise ValidationError("Seul un pointage validé peut être transféré en paie.")
-    employe = Employe.objects.filter(user_id=pointage.worker_id).first() if pointage.worker_id else None
+    employe = pointage.employe or (Employe.objects.filter(user_id=pointage.worker_id).first() if pointage.worker_id else None)
     if employe is None:
         raise ValidationError("Opérateur sans fiche salarié : transfert en paie impossible (rattacher le compte à une fiche RH).")
     saisie = SaisieTemps.objects.create(
@@ -62,21 +62,28 @@ def _weeks(of):
 
 
 def alertes_surcharge():
-    """Capacité finie : heures planifiées (réparties uniformément sur les semaines de l'OF) vs capacité hebdomadaire."""
+    """Capacité finie : heures planifiées (réparties uniformément sur les semaines de l'OF) vs capacité hebdomadaire,
+    pour la main-d'œuvre (heures de gamme) et les machines (heures machine de gamme)."""
+    from .ecarts import heures_machine, param
+
     charge = defaultdict(Decimal)
     actifs = [OrdreFabrication.Status.PREVU, OrdreFabrication.Status.LANCE, OrdreFabrication.Status.EN_COURS]
-    for of in OrdreFabrication.objects.filter(status__in=actifs):
+    for of in OrdreFabrication.objects.filter(status__in=actifs).select_related("gamme"):
         semaines = _weeks(of)
-        part = of.calculated_hours / len(semaines)
-        for w in semaines:
-            charge[(of.scope, w)] += part
+        for ressource, total in (("rh", of.calculated_hours), ("machine", heures_machine(of))):
+            part = total / len(semaines)
+            for w in semaines:
+                charge[(of.scope, ressource, w)] += part
+    seuil = param("SEUIL_ESCALADE_GR_PCT")
     alertes = []
-    for cap in CapaciteAtelier.objects.filter(resource=CapaciteAtelier.Resource.RH):
-        for (scope, w), heures in sorted(charge.items(), key=lambda kv: kv[0][1]):
-            if scope == cap.scope and heures > cap.hours_per_week:
+    for cap in CapaciteAtelier.objects.all():
+        for (scope, ressource, w), heures in sorted(charge.items(), key=lambda kv: kv[0][2]):
+            if scope == cap.scope and ressource == cap.resource and heures > cap.hours_per_week:
+                surcharge = round(heures / cap.hours_per_week * 100 - 100, 1)
                 alertes.append({
-                    "scope": scope, "week": w.isoformat(), "planned_hours": float(round(heures, 2)),
-                    "capacity": float(cap.hours_per_week), "overload_pct": float(round(heures / cap.hours_per_week * 100 - 100, 1)),
+                    "scope": scope, "resource": ressource, "week": w.isoformat(), "planned_hours": float(round(heures, 2)),
+                    "capacity": float(cap.hours_per_week), "overload_pct": float(surcharge),
+                    "escalade_gr": surcharge > seuil,
                 })
     return alertes
 
@@ -97,7 +104,32 @@ def figer_dossier(of):
                       for c in ControleQualite.objects.filter(ordre=of)],
         "non_conformites": [{"code": n.code, "statut": n.statut} for n in NonConformite.objects.filter(controle__ordre=of)],
         "mouvements_stock": [{"code": m.code, "type": m.type_mouvement} for m in of.mouvements_stock.all()],
+        # Écarts M3-08 : situations, rapports, transferts, attachements, fiches de contrôle et documents GED liés.
+        "situations": [{"code": s.code, "statut": s.status, "avancement": s.progress, "periode_fin": s.period_end.isoformat()}
+                       for s in of.situations.all()],
+        "rapports": [{"code": r.code, "type": r.type, "date": r.date.isoformat(), "realise": str(r.quantite_realisee),
+                      "rebut": str(r.quantite_rebut), "statut": r.statut} for r in of.rapports.all()],
+        "transferts": [{"code": t.code, "type": t.type, "destination": t.destination, "statut": t.statut} for t in of.transferts.all()],
+        "attachements": [{"code": a.code, "designation": a.designation, "quantite": str(a.quantite), "unite": a.unite,
+                          "statut": a.statut} for a in of.attachements.all()],
+        "fiches_controle": [{"code": f.code, "objet": f.objet, "conforme": f.conforme} for f in of.fiches_controle.all()],
+        "documents_ged": documents_ged_of(of),
         "libere_le": timezone.now().isoformat(),
     }
+    from .ecarts import param
+
     empreinte = hashlib.sha256(json.dumps(contenu, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    return DossierOperationnel.objects.create(ordre=of, contenu=contenu, sha256=empreinte)
+    return DossierOperationnel.objects.create(
+        ordre=of, contenu=contenu, sha256=empreinte, retention_years=int(param("RETENTION_OPERATIONS_ANS"))
+    )
+
+
+def documents_ged_of(of):
+    """Documents GED liés à l'OF (liens métier M12) : titre, référence, empreinte."""
+    from juridique.models import LienDocument
+
+    return [
+        {"document": str(l.document_id), "titre": l.document.title, "reference": l.document.reference,
+         "sha256": l.document.sha256, "lie_le": l.created_at.isoformat()}
+        for l in LienDocument.objects.filter(objet_type="operations.ordrefabrication", objet_id=str(of.pk)).select_related("document")
+    ]
