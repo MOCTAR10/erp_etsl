@@ -44,6 +44,22 @@ class CommercialSequence(models.Model):
         return number
 
 
+# Profils contractuels (pipe, profils CLM) et natures de coût du chiffrage (écarts M1).
+PROFILS_PIPE = [
+    ("marche_travaux", "Marché de travaux"),
+    ("maintenance", "Contrat de maintenance"),
+    ("global_rental", "GLOBAL RENTAL"),
+    ("autre", "Autre"),
+]
+NATURES_COUT = [
+    ("fourniture", "Fournitures / matières"),
+    ("main_oeuvre", "Main-d'œuvre"),
+    ("sous_traitance", "Sous-traitance"),
+    ("equipement", "Équipements / location"),
+    ("frais_directs", "Autres frais directs"),
+]
+
+
 class ClientProfile(models.Model):
     """Mémoire client — segment, scoring, contacts, historique (M1.1)."""
 
@@ -142,6 +158,9 @@ class Opportunity(models.Model):
     origin = models.CharField(
         max_length=20, choices=Origin.choices, default=Origin.RELATION, verbose_name="Origine"
     )
+    profil_contractuel = models.CharField(
+        max_length=16, blank=True, default="", choices=PROFILS_PIPE, verbose_name="Profil contractuel visé"
+    )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -234,6 +253,14 @@ class Estimate(models.Model):
     valid_until = models.DateField(null=True, blank=True, verbose_name="Validité de l'offre")
     is_global_rental = models.BooleanField(
         default=False, verbose_name="Prestation GLOBAL RENTAL"
+    )
+    # Structure de chiffrage (écarts M1) : à défaut, paramètres provisoires `CHIFFRAGE_*`.
+    taux_frais_indirects = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Frais indirects (%)"
+    )
+    taux_aleas = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Aléas (%)")
+    taux_marge_cible = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Marge cible (%)"
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -334,6 +361,11 @@ class EstimateLine(models.Model):
         related_name="commercial_lines",
         verbose_name="Article",
     )
+    lot = models.CharField(max_length=80, blank=True, verbose_name="Lot / poste de nomenclature")
+    nature = models.CharField(max_length=16, choices=NATURES_COUT, default="fourniture", verbose_name="Nature de coût")
+    cout_unitaire = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, verbose_name="Déboursé unitaire (coût)"
+    )
     label = models.CharField(max_length=200, verbose_name="Désignation")
     quantity = models.DecimalField(max_digits=14, decimal_places=2, default=1, verbose_name="Qté")
     unit = models.ForeignKey(
@@ -404,6 +436,10 @@ class TenderReview(models.Model):
         max_length=12, blank=True, verbose_name="Décision RAO",
         choices=[("go", "Go"), ("go_reserve", "Go sous réserve"), ("no_go", "No-Go")],
     )
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="revues_ao",
+        editable=False, verbose_name="Formulaire RAO archivé (GED)",
+    )
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -425,14 +461,18 @@ class TenderReview(models.Model):
         return f"{self.tender_ref or 'AO'} — {self.get_review_status_display()}"
 
     def calculer_rao(self):
-        """Note pondérée = Σ(poids × note) / Σ poids ; seuils CDC : ≥ 75 % Go, 50-75 % Go sous réserve, < 50 % No-Go."""
+        """Note pondérée = Σ(poids × note) / Σ poids ; seuils paramétrables (défaut CDC : ≥ 75 % Go, 50-75 % Go sous
+        réserve, < 50 % No-Go — `RAO_SEUIL_GO` / `RAO_SEUIL_RESERVE`, provisoires)."""
+        from .ecarts_m1 import get_param
+
         criteres = self.criteres or []
         total = sum(Decimal(str(c.get("poids", 0))) for c in criteres)
         if not criteres or total <= 0:
             self.score, self.decision_rao = None, ""
             return
         self.score = (sum(Decimal(str(c["poids"])) * Decimal(str(c["note"])) for c in criteres) / total).quantize(Decimal("0.01"))
-        self.decision_rao = "go" if self.score >= 75 else ("go_reserve" if self.score >= 50 else "no_go")
+        go, reserve = get_param("RAO_SEUIL_GO"), get_param("RAO_SEUIL_RESERVE")
+        self.decision_rao = "go" if self.score >= go else ("go_reserve" if self.score >= reserve else "no_go")
 
     def save(self, *args, **kwargs):
         self.calculer_rao()
@@ -574,6 +614,10 @@ class RevueCommande(models.Model):
     type_revue = models.CharField(max_length=10, choices=Type.choices, verbose_name="Type de revue")
     statut = models.CharField(max_length=12, choices=Statut.choices, default=Statut.EN_ATTENTE, verbose_name="Statut")
     commentaire = models.TextField(blank=True, verbose_name="Commentaire de revue")
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="revues_commande",
+        editable=False, verbose_name="Revue de commande archivée (GED)",
+    )
     valide_par = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Validée par"
     )
@@ -924,3 +968,66 @@ class SoumissionEvent(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} — {self.happened_at}"
+
+
+class ParametreCommercial(models.Model):
+    """Paramètre M1 modifiable par ETSL sans développeur (scoring, alertes, chiffrage, profils, durées, RAO).
+
+    Valeur provisoire tant qu'ETSL ne l'a pas confirmée ; défauts créés à la volée par `ecarts_m1.get_param`.
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut de la valeur"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre commercial"
+        verbose_name_plural = "Paramètres commerciaux"
+
+    def __str__(self):
+        return f"{self.code} = {self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class HabilitationRequise(models.Model):
+    """Habilitation exigée du personnel affecté (aval M9) : par profil contractuel (défaut) ou par contrat."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contract = models.ForeignKey(
+        Contract, null=True, blank=True, on_delete=models.CASCADE, related_name="habilitations_requises",
+        verbose_name="Contrat",
+    )
+    profile = models.CharField(max_length=14, blank=True, choices=Contract.Profile.choices, verbose_name="Profil")
+    mot_cle = models.CharField(max_length=80, verbose_name="Mot-clé de la qualification exigée")
+    libelle = models.CharField(max_length=200, blank=True, verbose_name="Libellé")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["profile", "mot_cle"]
+        verbose_name = "Habilitation requise"
+        verbose_name_plural = "Habilitations requises"
+
+    def __str__(self):
+        return f"{self.contract or self.get_profile_display()} — {self.mot_cle}"
+
+    def clean(self):
+        if not self.contract_id and not self.profile:
+            raise ValidationError({"profile": "Indiquez un contrat ou un profil contractuel."})
