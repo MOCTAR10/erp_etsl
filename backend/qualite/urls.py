@@ -21,6 +21,16 @@ from .views import (
     WpsWpqrViewSet,
 )
 
+from .views_systeme import (
+    AuditQualiteViewSet,
+    CompetencesQualiteViewSet,
+    ConstatAuditQualiteViewSet,
+    DocumentQualiteViewSet,
+    ProcessusQualiteViewSet,
+    ResponsabiliteQualiteViewSet,
+    RevueDirectionQualiteViewSet,
+)
+
 router = DefaultRouter()
 router.register("soudeurs", SoudeurViewSet, basename="soudeurs")
 router.register("qualifications", QualificationSoudeurViewSet, basename="qualifications")
@@ -39,6 +49,13 @@ router.register("criteres", CritereControleViewSet, basename="criteres-controle"
 router.register("parametres", ParametreQualiteViewSet, basename="parametres-qualite")
 router.register("indicateurs", IndicateursQualiteViewSet, basename="indicateurs-qualite")
 router.register("personnel", PersonnelQualiteViewSet, basename="personnel-qualite")
+router.register("processus", ProcessusQualiteViewSet, basename="processus-qualite")
+router.register("organisation", ResponsabiliteQualiteViewSet, basename="organisation-qualite")
+router.register("documents-qualite", DocumentQualiteViewSet, basename="documents-qualite")
+router.register("audits", AuditQualiteViewSet, basename="audits-qualite")
+router.register("constats-audit", ConstatAuditQualiteViewSet, basename="constats-audit-qualite")
+router.register("revues-direction", RevueDirectionQualiteViewSet, basename="revues-direction-qualite")
+router.register("competences", CompetencesQualiteViewSet, basename="competences-qualite")
 
 urlpatterns = [
     path("", include(router.urls)),

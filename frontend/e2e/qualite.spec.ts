@@ -36,6 +36,34 @@ test.describe("M6 Qualité : écarts M6-B", () => {
   });
 });
 
+// Écarts M6-C (2026-10-21) : système qualité ISO 9001 (liste maîtresse, processus, audits, compétences, revue de direction).
+test.describe("M6 Qualité : écarts M6-C", () => {
+  test("le QA/QC crée une procédure, l'approuve et planifie un audit", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.qaqc, DEMO_PASSWORD);
+    await page.goto("/qualite");
+    const docs = page.getByTestId("liste-maitresse");
+    await docs.getByRole("button", { name: "Nouveau document qualité" }).click();
+    const form = page.getByRole("form", { name: "Nouveau document qualité" });
+    const titre = `E2E PROCEDURE ${Date.now()}`;
+    await form.getByLabel("Titre *").fill(titre);
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+    const ligne = docs.locator("tr").filter({ hasText: titre });
+    page.once("dialog", (d) => void d.accept());
+    await ligne.getByRole("button", { name: "Approuver" }).click();
+    await expect(ligne.getByText("En vigueur")).toBeVisible();
+    const audits = page.getByTestId("audits-qualite");
+    await audits.getByRole("button", { name: "Nouvel audit" }).click();
+    const fa = page.getByRole("form", { name: "Nouvel audit" });
+    const perimetre = `E2E AUDIT ${Date.now()}`;
+    await fa.getByLabel("Périmètre *").fill(perimetre);
+    await fa.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(audits.locator("tr").filter({ hasText: perimetre }).getByText("Planifié")).toBeVisible();
+    await expect(page.getByTestId("competences-qualite")).toBeVisible();
+    await expect(page.getByTestId("revue-qualite").getByText("Audits réalisés / planifiés")).toBeVisible();
+  });
+});
+
 // Écarts M6-A (2026-10-19) : saisies soudage / ITP, cycle WPS, CAPA, punch list, indicateurs et paramètres qualité.
 test.describe("M6 Qualité : écarts M6-A", () => {
   test("le QA/QC saisit un soudeur et pilote WPS, punch list, indicateurs et paramètres", async ({ page }) => {
