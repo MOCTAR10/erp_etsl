@@ -32,7 +32,11 @@ from .views_m9a import (  # noqa: E402
     AbsenceViewSet, EcheanceDeclarationViewSet, ElementFixeViewSet, EvenementCarriereViewSet, GrilleSalaireViewSet,
 )
 
+from .views_m9b import ComptePaieViewSet, CoutMainOeuvreView, ProvisionCongesViewSet  # noqa: E402
+
 router = DefaultRouter()
+router.register("comptes-paie", ComptePaieViewSet, basename="rh-comptes-paie")
+router.register("provisions-conges", ProvisionCongesViewSet, basename="rh-provisions-conges")
 router.register("grilles-salaire", GrilleSalaireViewSet, basename="rh-grilles-salaire")
 router.register("elements-fixes", ElementFixeViewSet, basename="rh-elements-fixes")
 router.register("carriere", EvenementCarriereViewSet, basename="rh-carriere")
@@ -58,6 +62,7 @@ router.register("historique-baremes", HistoriqueBaremeViewSet, basename="rh-hist
 
 urlpatterns = [
     path("reporting/", ReportingRhView.as_view(), name="rh-reporting"),
+    path("cout-main-oeuvre/", CoutMainOeuvreView.as_view(), name="rh-cout-main-oeuvre"),
     path("mon-espace/profil/", MonProfilView.as_view(), name="mon-profil"),
     path("mon-espace/bulletins/", MesBulletinsView.as_view(), name="mes-bulletins"),
     path("mon-espace/bulletins/<uuid:pk>/", MonBulletinView.as_view(), name="mon-bulletin"),

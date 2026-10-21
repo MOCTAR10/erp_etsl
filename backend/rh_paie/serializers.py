@@ -576,3 +576,35 @@ class EcheanceDeclarationSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
+
+
+# --------------------------------------------------------------------------------------------
+# Écarts M9-B
+# --------------------------------------------------------------------------------------------
+from .models import ComptePaie, ProvisionConges  # noqa: E402
+
+
+class ComptePaieSerializer(serializers.ModelSerializer):
+    role_label = serializers.CharField(source="get_role_display", read_only=True)
+    compte_code = serializers.CharField(source="compte.code", read_only=True)
+    compte_label = serializers.CharField(source="compte.label", read_only=True)
+
+    class Meta:
+        model = ComptePaie
+        fields = ["id", "role", "role_label", "organisme", "compte", "compte_code", "compte_label"]
+
+    def validate_organisme(self, value):
+        return (value or "").strip()
+
+
+class ProvisionCongesSerializer(serializers.ModelSerializer):
+    move_number = serializers.CharField(source="move.number", read_only=True, default=None)
+    par_email = serializers.CharField(source="created_by.email", read_only=True, default=None)
+
+    class Meta:
+        model = ProvisionConges
+        fields = [
+            "id", "periode", "base_brut", "taux", "taux_provisoire", "montant", "move", "move_number", "created_by",
+            "par_email", "created_at",
+        ]
+        read_only_fields = fields

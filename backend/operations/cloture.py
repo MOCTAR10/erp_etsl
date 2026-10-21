@@ -42,7 +42,9 @@ def transferer_paie(pointage):
     pointage.saisie_temps = saisie
     pointage.status = PointageChantier.Status.TRANSFERE
     pointage.save(update_fields=["saisie_temps", "status", "updated_at"])
-    return saisie
+    from rh_paie.compta_m9b import valoriser_saisie
+
+    return valoriser_saisie(saisie)  # coût chargé (contrat + charges patronales) retourné à M3 / M11
 
 
 def _weeks(of):

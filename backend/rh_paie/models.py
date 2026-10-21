@@ -539,6 +539,10 @@ class SaisieTemps(models.Model):
     )
     type = models.CharField(max_length=14, choices=Type.choices, default=Type.NORMAL, verbose_name="Type")
     source = models.CharField(max_length=20, default="saisie", verbose_name="Source")
+    cout_charge = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Coût chargé (FCFA)",
+        help_text="Heures × coût horaire chargé du salarié, posé au transfert du pointage M3 (aval M3 / M11).",
+    )
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.SAISI, verbose_name="Statut"
     )
@@ -1285,3 +1289,74 @@ class EcheanceDeclaration(ValeurLegale):
             raise ValidationError({"jour": "Jour entre 1 et 31."})
         if self.periodicite == self.Periodicite.ANNUELLE and not (self.mois and 1 <= self.mois <= 12):
             raise ValidationError({"mois": "Mois (1 à 12) requis pour une échéance annuelle."})
+
+
+# --------------------------------------------------------------------------------------------
+# Écarts M9-B : comptes de paie, provision des congés payés
+# --------------------------------------------------------------------------------------------
+class ComptePaie(models.Model):
+    """Compte du plan comptable utilisé par l'écriture de paie, par rôle et, pour les cotisations, par organisme."""
+
+    class Role(models.TextChoices):
+        BRUT = "brut", "Charges de personnel (brut)"
+        PATRONAL = "patronal", "Charges sociales patronales"
+        NET = "net", "Personnel — net à payer"
+        ORGANISMES = "organismes", "Cotisations à reverser (par organisme)"
+        IMPOT = "impot", "Impôt retenu à la source"
+        AUTRES_RETENUES = "autres_retenues", "Autres retenues"
+        PROVISION_CHARGE = "provision_charge", "Dotation aux provisions pour congés payés"
+        PROVISION_DETTE = "provision_dette", "Dettes provisionnées pour congés payés"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    role = models.CharField(max_length=20, choices=Role.choices, verbose_name="Rôle")
+    organisme = models.CharField(
+        max_length=60, blank=True, verbose_name="Organisme (cotisations)",
+        help_text="Même libellé que l'organisme des barèmes (CNSS, CNAMGS…) ; vide = compte par défaut du rôle.",
+    )
+    compte = models.ForeignKey(
+        "referentiels.Account", on_delete=models.PROTECT, related_name="+", verbose_name="Compte"
+    )
+
+    class Meta:
+        ordering = ["role", "organisme"]
+        verbose_name = "Compte de paie"
+        verbose_name_plural = "Comptes de paie"
+        constraints = [models.UniqueConstraint(fields=["role", "organisme"], name="uniq_compte_paie_role_organisme")]
+
+    def __str__(self):
+        return f"{self.get_role_display()}{' ' + self.organisme if self.organisme else ''} → {self.compte_id}"
+
+
+class ProvisionConges(models.Model):
+    """Dotation mensuelle aux provisions pour congés payés (écriture du journal PAI), scellée."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    periode = models.DateField(unique=True, verbose_name="Période (1er du mois)")
+    base_brut = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Brut des bulletins du mois")
+    taux = models.DecimalField(max_digits=7, decimal_places=3, verbose_name="Taux (%)")
+    taux_provisoire = models.BooleanField(default=True, verbose_name="Taux provisoire")
+    montant = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant provisionné")
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", on_delete=models.PROTECT, related_name="+", verbose_name="Écriture"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Passée par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-periode"]
+        verbose_name = "Provision pour congés payés"
+        verbose_name_plural = "Provisions pour congés payés"
+
+    def __str__(self):
+        return f"Provision CP {self.periode:%m/%Y} — {self.montant}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Une provision passée est scellée (extourne en comptabilité).")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Une provision passée est scellée (extourne en comptabilité).")
