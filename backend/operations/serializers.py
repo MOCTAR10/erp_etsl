@@ -193,8 +193,6 @@ class PointageChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
             raise serializers.ValidationError({"employe": "La fiche salarié ne correspond pas à l'opérateur."})
         ordre = attrs.get("ordre", getattr(inst, "ordre", None))
         jour = attrs.get("date", getattr(inst, "date", None))
-        if ordre and ordre.status in (OrdreFabrication.Status.CLOTURE, OrdreFabrication.Status.ANNULE):
-            raise serializers.ValidationError({"ordre": "OF clôturé ou annulé : pointage impossible."})
         if worker and ordre and ordre.scope == OrdreFabrication.Scope.CHANTIER:
             controler_habilitation_chantier(worker, jour, ordre)
         elif employe and ordre and ordre.scope == OrdreFabrication.Scope.CHANTIER:
