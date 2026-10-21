@@ -20,6 +20,7 @@ import type {
 import { ClotureM6Section } from "../components/qualite/ClotureM6Section";
 import { EcartsM6Section } from "../components/qualite/EcartsM6Section";
 import { EcartsM6bSection } from "../components/qualite/EcartsM6bSection";
+import { SystemeQualiteSection } from "../components/qualite/SystemeQualiteSection";
 import { ItpSection } from "../components/workflow/ItpSection";
 
 type NcGroups = Record<StatutNC, NonConformite[]>;
@@ -342,6 +343,7 @@ export function QualitePage() {
       <ClotureM6Section />
       <EcartsM6Section />
       <EcartsM6bSection />
+      <SystemeQualiteSection />
     </>
   );
 }

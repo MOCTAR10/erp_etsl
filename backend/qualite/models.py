@@ -395,6 +395,7 @@ class NonConformite(models.Model):
         CLIENT = "client", "Client"
         FOURNISSEUR = "fournisseur", "Fournisseur"
         INTERNE = "interne", "Interne"
+        AUDIT = "audit", "Audit qualité"
 
     class Gravite(models.TextChoices):
         MINEURE = "mineure", "Mineure"
@@ -1056,3 +1057,242 @@ class MesureControle(models.Model):
         ordering = ["controle", "saisi_le"]
         verbose_name = "Mesure de contrôle"
         verbose_name_plural = "Mesures de contrôle"
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M6-C : système de management de la qualité (CDC M6.2, ISO 9001)
+# ----------------------------------------------------------------------------------------------------------------
+class ProcessusQualite(models.Model):
+    """Cartographie des processus (ISO 9001 §4.4) : pilote, finalité et indicateur suivi contre une cible."""
+
+    class TypeProcessus(models.TextChoices):
+        MANAGEMENT = "management", "Management"
+        REALISATION = "realisation", "Réalisation"
+        SUPPORT = "support", "Support"
+
+    class Sens(models.TextChoices):
+        MINI = "mini", "Au moins la cible"
+        MAXI = "maxi", "Au plus la cible"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    libelle = models.CharField(max_length=150, verbose_name="Processus")
+    type_processus = models.CharField(max_length=12, choices=TypeProcessus.choices, default=TypeProcessus.REALISATION)
+    pilote = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    finalite = models.TextField(blank=True, verbose_name="Finalité")
+    indicateur = models.CharField(max_length=150, blank=True, verbose_name="Indicateur")
+    unite = models.CharField(max_length=20, blank=True)
+    cible = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    sens = models.CharField(max_length=4, choices=Sens.choices, default=Sens.MINI)
+    valeur = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Dernière mesure")
+    date_mesure = models.DateField(null=True, blank=True)
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["type_processus", "code"]
+        verbose_name = "Processus qualité"
+        verbose_name_plural = "Processus qualité"
+
+    def __str__(self):
+        return f"{self.code} — {self.libelle}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("PROC", "PROC-")
+        return super().save(*args, **kwargs)
+
+    @property
+    def cible_atteinte(self):
+        if self.cible is None or self.valeur is None:
+            return None
+        return self.valeur >= self.cible if self.sens == self.Sens.MINI else self.valeur <= self.cible
+
+
+class ResponsabiliteQualite(models.Model):
+    """Organisation qualité (ISO 9001 §5.3) : fonction, titulaire, suppléant, missions et autorités."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    fonction = models.CharField(max_length=150, verbose_name="Fonction")
+    titulaire = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    suppleant = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    rattachement = models.CharField(max_length=150, blank=True, verbose_name="Rattachement hiérarchique")
+    missions = models.TextField(verbose_name="Missions et responsabilités")
+    autorites = models.TextField(blank=True, verbose_name="Autorités (signature, arrêt, libération)")
+    processus = models.ForeignKey(ProcessusQualite, null=True, blank=True, on_delete=models.SET_NULL, related_name="responsabilites")
+
+    class Meta:
+        ordering = ["fonction"]
+        verbose_name = "Responsabilité qualité"
+        verbose_name_plural = "Organisation qualité"
+
+    def __str__(self):
+        return self.fonction
+
+
+class DocumentQualite(models.Model):
+    """Liste maîtresse des documents qualité (MDR) : politique, manuel, procédures, plans qualité ; versionnés et
+    scellés à l'approbation (la version précédente devient obsolète), archivés en GED 10 ans."""
+
+    class TypeDoc(models.TextChoices):
+        POLITIQUE = "politique", "Politique qualité"
+        MANUEL = "manuel", "Manuel qualité"
+        PROCEDURE = "procedure", "Procédure"
+        INSTRUCTION = "instruction", "Instruction / mode opératoire"
+        FORMULAIRE = "formulaire", "Formulaire / enregistrement"
+        PLAN_QUALITE = "plan_qualite", "Plan qualité (affaire)"
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        APPROUVE = "approuve", "Approuvé (en vigueur)"
+        OBSOLETE = "obsolete", "Obsolète"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    reference = models.CharField(max_length=30, verbose_name="Référence")
+    version = models.PositiveSmallIntegerField(default=1)
+    type_doc = models.CharField(max_length=14, choices=TypeDoc.choices, verbose_name="Type")
+    titre = models.CharField(max_length=200)
+    processus = models.ForeignKey(ProcessusQualite, null=True, blank=True, on_delete=models.SET_NULL, related_name="documents")
+    affaire = models.ForeignKey("commercial.Affaire", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    fichier = models.FileField(upload_to="qualite/documents/", blank=True)
+    motif_revision = models.TextField(blank=True, verbose_name="Objet de la révision")
+    periodicite_revue_mois = models.PositiveSmallIntegerField(default=36, verbose_name="Revue tous les (mois)")
+    date_revue = models.DateField(null=True, blank=True, verbose_name="Prochaine revue")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON)
+    redige_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    approuve_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    approuve_le = models.DateTimeField(null=True, blank=True)
+    document = models.ForeignKey("documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["type_doc", "reference", "-version"]
+        verbose_name = "Document qualité"
+        verbose_name_plural = "Liste maîtresse des documents qualité"
+        constraints = [models.UniqueConstraint(fields=["reference", "version"], name="uniq_doc_qualite_version")]
+
+    def __str__(self):
+        return f"{self.reference} v{self.version} — {self.titre}"
+
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            self.reference = QualiteSequence.next_for("DQ", "DQ-")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.type_doc == self.TypeDoc.PLAN_QUALITE and not self.affaire_id:
+            raise ValidationError({"affaire": "Un plan qualité se rattache à une affaire."})
+
+
+class AuditQualite(models.Model):
+    """Audit interne, externe, de certification ou fournisseur (ISO 9001 §9.2) : planifié, réalisé, clôturé quand
+    les NC ouvertes sur ses écarts sont clôturées ; un audit fournisseur conclut l'agrément qualité du partenaire."""
+
+    class TypeAudit(models.TextChoices):
+        INTERNE = "interne", "Audit interne"
+        EXTERNE = "externe", "Audit externe (client)"
+        CERTIFICATION = "certification", "Audit de certification"
+        FOURNISSEUR = "fournisseur", "Audit fournisseur / sous-traitant"
+
+    class Statut(models.TextChoices):
+        PLANIFIE = "planifie", "Planifié"
+        REALISE = "realise", "Réalisé"
+        CLOTURE = "cloture", "Clôturé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True)
+    type_audit = models.CharField(max_length=14, choices=TypeAudit.choices, default=TypeAudit.INTERNE)
+    referentiel = models.CharField(max_length=120, default="ISO 9001:2015")
+    perimetre = models.CharField(max_length=200, verbose_name="Périmètre")
+    processus = models.ForeignKey(ProcessusQualite, null=True, blank=True, on_delete=models.SET_NULL, related_name="audits")
+    fournisseur = models.ForeignKey("referentiels.Partner", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    organisme = models.CharField(max_length=150, blank=True, verbose_name="Organisme / client auditeur")
+    auditeur = models.CharField(max_length=150, blank=True, verbose_name="Auditeur(s)")
+    date_prevue = models.DateField(default=timezone.localdate)
+    date_realisation = models.DateField(null=True, blank=True)
+    score = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Score (%)")
+    conclusion = models.TextField(blank=True)
+    agrement_accorde = models.BooleanField(null=True, blank=True, verbose_name="Agrément qualité accordé")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.PLANIFIE)
+    realise_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    cloture_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    cloture_le = models.DateTimeField(null=True, blank=True)
+    rapport = models.ForeignKey("documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_prevue"]
+        verbose_name = "Audit qualité"
+        verbose_name_plural = "Audits qualité"
+
+    def __str__(self):
+        return f"{self.code} — {self.get_type_audit_display()} {self.perimetre}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("AUDQ", "AUDQ-")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.type_audit == self.TypeAudit.FOURNISSEUR and not self.fournisseur_id:
+            raise ValidationError({"fournisseur": "Un audit fournisseur désigne le fournisseur audité."})
+
+    @property
+    def nc_ouvertes(self):
+        return NonConformite.objects.filter(constats_audit__audit=self).exclude(statut=NonConformite.Statut.CLOTUREE)
+
+
+class ConstatAuditQualite(models.Model):
+    """Constat d'audit ; un écart ouvre automatiquement une NC (source « audit ») suivie par le workflow NC / CAPA."""
+
+    class TypeConstat(models.TextChoices):
+        POINT_FORT = "point_fort", "Point fort"
+        OBSERVATION = "observation", "Observation / piste de progrès"
+        ECART_MINEUR = "ecart_mineur", "Écart mineur"
+        ECART_MAJEUR = "ecart_majeur", "Écart majeur"
+
+    ECARTS = (TypeConstat.ECART_MINEUR, TypeConstat.ECART_MAJEUR)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    audit = models.ForeignKey(AuditQualite, on_delete=models.CASCADE, related_name="constats")
+    type_constat = models.CharField(max_length=14, choices=TypeConstat.choices, default=TypeConstat.OBSERVATION)
+    exigence = models.CharField(max_length=80, blank=True, verbose_name="Exigence / clause")
+    description = models.TextField()
+    nc = models.ForeignKey(NonConformite, null=True, blank=True, on_delete=models.PROTECT, related_name="constats_audit")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Constat d'audit qualité"
+        verbose_name_plural = "Constats d'audit qualité"
+
+
+class RevueDirectionQualite(models.Model):
+    """Revue de direction qualité annuelle (ISO 9001 §9.3) : bilan figé, validée par la direction, scellée en GED."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        VALIDEE = "validee", "Validée (scellée)"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True)
+    annee = models.PositiveSmallIntegerField(unique=True, verbose_name="Année revue")
+    date_revue = models.DateField(default=timezone.localdate)
+    participants = models.TextField(blank=True)
+    conclusions = models.TextField(blank=True, verbose_name="Conclusions (efficacité du système qualité)")
+    decisions = models.TextField(blank=True, verbose_name="Décisions, objectifs et ressources")
+    bilan = models.JSONField(default=dict, blank=True)
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON)
+    validee_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    validee_le = models.DateTimeField(null=True, blank=True)
+    document = models.ForeignKey("documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-annee"]
+        verbose_name = "Revue de direction qualité"
+        verbose_name_plural = "Revues de direction qualité"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("RDQ", "RDQ-")
+        return super().save(*args, **kwargs)
