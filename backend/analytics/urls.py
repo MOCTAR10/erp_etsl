@@ -5,6 +5,10 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AlertesAgregeesView,
+    AlertesCalendairesView,
+    ControlerSeuilsView,
+    PilotageDirectionView,
+    ScelleMartViewSet,
     CubeAlimenterView,
     CubeArchiveViewSet,
     CubeView,
@@ -17,6 +21,7 @@ from .views import (
 router = DefaultRouter()
 router.register("cubes/archives", CubeArchiveViewSet, basename="cube-archive")
 router.register("cubes/parametres", ParametreCubeViewSet, basename="cube-parametre")
+router.register("marts/scelles", ScelleMartViewSet, basename="mart-scelle")
 
 urlpatterns = [
     path("dashboard/", DashboardDirectionView.as_view(), name="analytics-dashboard"),
@@ -24,6 +29,9 @@ urlpatterns = [
     path("alertes/", AlertesAgregeesView.as_view(), name="analytics-alertes"),
     path("tendances/", TendancesView.as_view(), name="analytics-tendances"),
     path("cubes/", CubeView.as_view(), name="analytics-cube"),
+    path("pilotage/", PilotageDirectionView.as_view(), name="analytics-pilotage"),
+    path("pilotage/controler-seuils/", ControlerSeuilsView.as_view(), name="analytics-controler-seuils"),
+    path("alertes-calendaires/", AlertesCalendairesView.as_view(), name="analytics-alertes-calendaires"),
     path("cubes/alimenter/", CubeAlimenterView.as_view(), name="analytics-cube-alimenter"),
     path("", include(router.urls)),
 ]

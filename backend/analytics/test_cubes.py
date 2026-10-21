@@ -146,7 +146,8 @@ class ApiTests(CubeBase):
     def test_parametre_provisoire_puis_confirme(self):
         r = self.client.get(BASE + "parametres/")
         self.assertEqual(r.status_code, 200, r.content)
-        p = r.json()[0] if isinstance(r.json(), list) else r.json()["results"][0]
+        rows = r.json() if isinstance(r.json(), list) else r.json()["results"]
+        p = next(x for x in rows if x["code"] == "RETENTION_ANS")
         self.assertEqual((p["code"], p["est_provisoire"]), ("RETENTION_ANS", True))
         r = self.client.post(f"{BASE}parametres/{p['id']}/confirmer/")
         self.assertEqual((r.status_code, r.json()["est_provisoire"]), (200, False))
