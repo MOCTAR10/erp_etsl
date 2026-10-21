@@ -9,6 +9,7 @@ import { ClotureSection } from "../components/workflow/ClotureSection";
 import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
 import { LettrageSection } from "../components/workflow/LettrageSection";
+import { EcartsM10Section } from "../components/comptabilite/EcartsM10Section";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
@@ -155,6 +156,11 @@ export function ComptabilitePage() {
   const controles = useQuery({ queryKey: ["compta-controles"], queryFn: () => api.listAll<ControleInterne>("/api/comptabilite/controles/") });
 
   const releves = usePagedList<ReleveBancaire>("compta-releves", (q) => api.relevesBancaires(q));
+  const analytiques = useQuery({
+    queryKey: ["compta-analytiques"],
+    queryFn: () => api.listAll<{ id: string; code: string; label: string }>("/api/referentiels/analytic-accounts/"),
+    retry: 0,
+  });
 
   if (paiementsTous.isLoading || engagements.isLoading || !paiementsTous.data || !engagements.data)
     return <BoardSkeleton cols={4} rows={3} />;
@@ -228,6 +234,13 @@ export function ComptabilitePage() {
             options: (engagementsTous.data ?? []).filter((e) => e.statut === "approuve").map((e) => ({ value: e.id, label: `${e.code} · ${e.objet}` })),
           },
           { name: "reference", label: t("comptabilite.form.reference") },
+          {
+            name: "analytic_account",
+            label: t("ecarts_m10.paiement.analytique"),
+            type: "select",
+            options: (analytiques.data ?? []).map((a) => ({ value: String(a.id), label: `${a.code} · ${a.label}` })),
+          },
+          { name: "retenue_source", label: t("ecarts_m10.paiement.retenue"), type: "select", options: [{ value: "true", label: t("ecarts_m10.paiement.oui") }] },
         ]}
       />
 
@@ -375,6 +388,8 @@ export function ComptabilitePage() {
       <BanqueSection />
 
       <LettrageSection />
+
+      <EcartsM10Section />
 
       {tvaAll.length > 0 ? (
         <>

@@ -68,6 +68,7 @@ class BudgetRevisionSerializer(serializers.ModelSerializer):
             "visa_daf_le",
             "visa_cg_par",
             "visa_cg_le",
+            "pv_document",
             "created_by",
             "created_by_name",
             "has_amount_access",
@@ -76,8 +77,10 @@ class BudgetRevisionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "code", "numero", "ancien_montant", "statut", "created_by",
-            "visa_daf_par", "visa_daf_le", "visa_cg_par", "visa_cg_le",
+            "visa_daf_par", "visa_daf_le", "visa_cg_par", "visa_cg_le", "pv_document",
         ]
+        # Sans montant : la révision part du montant en vigueur (révision par ligne mensuelle ensuite).
+        extra_kwargs = {"nouveau_montant": {"required": False}}
 
     def get_has_amount_access(self, obj):
         from .services import can_see_amount
@@ -135,13 +138,14 @@ class BudgetSerializer(serializers.ModelSerializer):
             "visa_daf_le",
             "visa_cg_par",
             "visa_cg_le",
+            "pv_document",
             "created_by",
             "has_amount_access",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
-            "code", "statut", "created_by", "visa_daf_par", "visa_daf_le", "visa_cg_par", "visa_cg_le",
+            "code", "statut", "created_by", "visa_daf_par", "visa_daf_le", "visa_cg_par", "visa_cg_le", "pv_document",
         ]
 
     def get_has_amount_access(self, obj):
@@ -225,10 +229,10 @@ class ParametreGestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ParametreGestion
         fields = [
-            "id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire",
+            "id", "code", "label", "valeur", "unite", "table", "statut_valeur", "est_provisoire",
             "confirme_par", "confirme_le",
         ]
-        read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
+        read_only_fields = ["code", "label", "unite", "table", "statut_valeur", "confirme_par", "confirme_le"]
 
     def validate_valeur(self, value):
         if value < 0:

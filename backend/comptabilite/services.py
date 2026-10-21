@@ -171,6 +171,16 @@ def build_paiement_move(paiement, user):
     montant = Decimal(paiement.montant)
     from accounting_kernel.models import AccountMove, AccountMoveLine
 
+    # Analytique (M10.2 → M11) : imputation saisie, sinon celle du bon de commande de la facture fournisseur.
+    analytic = paiement.analytic_account
+    if analytic is None and paiement.facture_id:
+        analytic = paiement.facture.purchase_order.analytic
+    retenue = Decimal("0")
+    if paiement.retenue_source and paiement.sens == paiement.Sens.SORTIE:
+        retenue = (montant * get_param("RETENUE_SOURCE_TAUX") / Decimal("100")).quantize(Decimal("0.01"))
+        if retenue >= montant:
+            raise ValidationError("Retenue à la source supérieure ou égale au montant du paiement.")
+
     move = AccountMove.objects.create(
         journal=journal,
         period=period,
@@ -185,6 +195,7 @@ def build_paiement_move(paiement, user):
         move=move,
         account=compte_depense,
         partner=paiement.tiers,
+        analytic_account=analytic,
         label=paiement.engagement.objet if paiement.engagement_id else (paiement.tiers.name if paiement.tiers_id else paiement.get_sens_display()),
         debit=montant if paiement.sens == paiement.Sens.SORTIE else 0,
         credit=montant if paiement.sens == paiement.Sens.ENTREE else 0,
@@ -196,58 +207,27 @@ def build_paiement_move(paiement, user):
         partner=None,
         label=paiement.compte_bancaire.label,
         debit=montant if paiement.sens == paiement.Sens.ENTREE else 0,
-        credit=montant if paiement.sens == paiement.Sens.SORTIE else 0,
+        credit=(montant - retenue) if paiement.sens == paiement.Sens.SORTIE else 0,
         order=2,
     )
+    if retenue:
+        AccountMoveLine.objects.create(
+            move=move, account=_account("447000"), partner=paiement.tiers, label=f"Retenue à la source {paiement.code}",
+            debit=0, credit=retenue, order=3,
+        )
     posted = post_move(move, user=user)
     paiement.move = posted
     paiement.statut = paiement.Statut.VALIDE
-    paiement.save(update_fields=["move", "statut", "updated_at"])
+    paiement.montant_retenue = retenue
+    paiement.save(update_fields=["move", "statut", "montant_retenue", "updated_at"])
     return posted
 
 
 def compute_declaration_tva(declaration):
-    """Recalcule la TVA d'un mois à partir des paiements validés du mois.
+    """TVA du mois sur les écritures 443 / 445 (repli sur les paiements validés à défaut) — voir `fiscal`."""
+    from .fiscal import compute_declaration_tva as calcul
 
-    Base imposable = encaissements produits (entrees) ; TVA collectée = 18 %.
-    TVA déductible = 18 % des décaissements hors refacturation intra-groupe.
-    (Approche opérationnelle M10 ; la reprise SAGE / comptabilisation exacte
-    reste celle du référentiel — SYSCOHADA révisée via `accounting_kernel`.)
-    """
-    from datetime import date as dt
-
-    start = declaration.mois
-    end = dt(start.year, start.month % 12 + 1, 1)
-    if start.month == 12:
-        end = dt(start.year + 1, 1, 1)
-
-    paiements = Paiement.objects.filter(
-        statut=Paiement.Statut.VALIDE, date__gte=start, date__lt=end
-    )
-    taux = Decimal(declaration.taux_tva.taux) / 100
-
-    base = sum((p.montant for p in paiements.filter(sens=Paiement.Sens.ENTREE)), Decimal("0"))
-    collectee = base * taux
-    deductible = sum(
-        (
-            p.montant for p in paiements.filter(sens=Paiement.Sens.SORTIE).exclude(imputation_618=True)
-        ),
-        Decimal("0"),
-    ) * taux
-
-    declaration.base_imposable = base
-    declaration.tva_collectee = collectee.quantize(Decimal("0.01"))
-    declaration.tva_deductible = deductible.quantize(Decimal("0.01"))
-    declaration.net_a_payer = (collectee - deductible).quantize(Decimal("0.01"))
-    declaration.save(
-        update_fields=[
-            "base_imposable",
-            "tva_collectee",
-            "tva_deductible",
-            "net_a_payer",
-        ]
-    )
-    return declaration
+    return calcul(declaration)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -261,6 +241,14 @@ PARAMETRES_DEFAUT = {
     "CLOTURE_JOUR_ENVOI": ("Jour d'envoi de la synthèse à la Direction (J+n après la fin du mois)", Decimal("4"), "jours"),
     "RAPPRO_TOLERANCE_JOURS": ("Écart de date toléré entre relevé et paiement", Decimal("3"), "jours"),
     "RAPPRO_TOLERANCE_MONTANT": ("Écart de montant toléré entre relevé et paiement", Decimal("0"), "FCFA"),
+    "TRESO_HORIZON_SEMAINES": ("Horizon du plan de trésorerie glissant", Decimal("13"), "semaines"),
+    "TRESO_SEUIL_ALERTE": ("Seuil d'alerte du solde de trésorerie prévu", Decimal("0"), "FCFA"),
+    "TRESO_DELAI_FOURNISSEUR_JOURS": ("Délai de règlement prévu des factures fournisseurs", Decimal("30"), "jours"),
+    "BAL_AGEE_TRANCHE_1": ("Balance âgée : fin de la 1re tranche", Decimal("30"), "jours"),
+    "BAL_AGEE_TRANCHE_2": ("Balance âgée : fin de la 2e tranche", Decimal("60"), "jours"),
+    "BAL_AGEE_TRANCHE_3": ("Balance âgée : fin de la 3e tranche", Decimal("90"), "jours"),
+    "RETENUE_SOURCE_TAUX": ("Taux de retenue à la source sur les règlements fournisseurs", Decimal("10"), "%"),
+    "CONSERVATION_ANS": ("Durée de conservation des écritures et pièces fiscales", Decimal("10"), "ans"),
 }
 
 

@@ -194,10 +194,21 @@ def compute_variance(budget, fiscal_year=None):
 
     year = fiscal_year or budget.fiscal_year_id
     qs = _posted_lines_qs(year)
-    if budget.axis_id:
-        qs = qs.filter(analytic_account__axis_id=budget.axis_id)
-    if budget.analytic_id:
-        qs = qs.filter(analytic_account_id=budget.analytic_id)
+    from .models import AxeAnalytiqueM11
+
+    nature = AxeAnalytiqueM11.objects.filter(axis_id=budget.axis_id).values_list("nature", flat=True).first() \
+        if budget.axis_id else None
+    if nature:
+        # Axes activité / profil : réalisé = écritures des affaires de cette activité / de ce profil.
+        from .ecarts_m11 import analytiques_par_valeur
+
+        code = budget.analytic.code if budget.analytic_id else None
+        qs = qs.filter(analytic_account_id__in=analytiques_par_valeur(nature, code))
+    else:
+        if budget.axis_id:
+            qs = qs.filter(analytic_account__axis_id=budget.axis_id)
+        if budget.analytic_id:
+            qs = qs.filter(analytic_account_id=budget.analytic_id)
 
     if budget.type_budget == budget.TypeBudget.PRODUIT:
         expr = _net(Q(account__account_type=Account.AccountType.INCOME), "credit", "debit")
@@ -338,16 +349,48 @@ PARAMETRES_DEFAUT = {
     "RGM_TOLERANCE_MIX": ("Doctrine d'imputation : écart toléré à la cible", Decimal("5"), "points"),
     "REPORTING_JOUR_J4": ("Reporting Direction : jour cible (J+n après la fin du mois)", Decimal("4"), "jours"),
     "REPORTING_JOUR_J6": ("Reporting Direction : jour limite (J+n après la fin du mois)", Decimal("6"), "jours"),
+    # Écarts M11 (2026-10-21) — valeurs provisoires à confirmer par ETSL.
+    "REPORTING_HORIZON_J4": ("Reporting publié à J+4 : horizon (mois réalisés)", Decimal("12"), "mois"),
+    "REPORTING_HORIZON_J6": ("Reporting publié à J+6 : horizon (mois de prévision)", Decimal("3"), "mois"),
+    "CONSERVATION_BUDGET_ANS": ("Conservation des versions budgétaires, PV et reportings (GED)", Decimal("10"), "ans"),
+    "PLAN_ACTION_DELAI": ("Délai par défaut d'un plan d'action de sous-activité", Decimal("30"), "jours"),
+    "PROVISION_FNP_COMPTE": ("Compte de provision des factures non parvenues", Decimal("408100"), "compte"),
+    # Table RGM_PARAM_STRUCTURE
+    "STRUCT_CLE_REPARTITION": (
+        "Clé de répartition des charges de structure (1 = heures productives, 2 = chiffre d'affaires)",
+        Decimal("1"), "clé", "RGM_PARAM_STRUCTURE",
+    ),
+    "STRUCT_SANS_AXE": (
+        "Charges sans axe analytique traitées en charges de structure (1 = oui, 0 = charges directes)",
+        Decimal("1"), "oui/non", "RGM_PARAM_STRUCTURE",
+    ),
+    "MARGE_NIVEAU_GR": (
+        "Déduction du coût GLOBAL RENTAL (618) : 1 = dès la marge brute, 3 = en marge nette",
+        Decimal("3"), "niveau", "RGM_PARAM_STRUCTURE",
+    ),
+    # Table RGM_TAUX_STRUCTURE (taux standard de frais de structure par profil contractuel)
+    "TAUX_STRUCT_MARCHE_TRAVAUX": ("Taux standard de structure : marché de travaux", Decimal("12"), "%", "RGM_TAUX_STRUCTURE"),
+    "TAUX_STRUCT_MAINTENANCE": ("Taux standard de structure : contrat de maintenance", Decimal("10"), "%", "RGM_TAUX_STRUCTURE"),
+    "TAUX_STRUCT_GLOBAL_RENTAL": ("Taux standard de structure : GLOBAL RENTAL", Decimal("5"), "%", "RGM_TAUX_STRUCTURE"),
+    "TAUX_STRUCT_AUTRE": ("Taux standard de structure : affaires sans contrat", Decimal("12"), "%", "RGM_TAUX_STRUCTURE"),
+    # Table RGM_POND_PROSPECT (pipe pondéré → budget de produits)
+    "POND_SIGNE": ("Pondération du pipe : affaires signées (gagnées)", Decimal("90"), "%", "RGM_POND_PROSPECT"),
+    "POND_EN_COURS": ("Pondération du pipe : offres en cours (offre, négociation)", Decimal("60"), "%", "RGM_POND_PROSPECT"),
+    "POND_PROSPECT": ("Pondération du pipe : prospects (prospection, qualification)", Decimal("25"), "%", "RGM_POND_PROSPECT"),
 }
+# Cibles des 12 KPI KP-M11 (table KPI_CIBLES)
+for _num, _cible in {"01": 25, "02": 12, "03": 8, "04": 100, "05": 95, "06": 5, "07": 100, "08": 4, "09": 100,
+                     "10": 100, "11": 15, "12": 100}.items():
+    PARAMETRES_DEFAUT[f"KPI_{_num}"] = (f"Cible du KPI KP-M11-{_num}", Decimal(_cible), "", "KPI_CIBLES")
 
 
 def get_param_gestion(code):
     """Valeur du paramètre `code` ; crée le défaut provisoire si absent."""
     from .models import ParametreGestion
 
-    label, valeur, unite = PARAMETRES_DEFAUT[code]
+    label, valeur, unite, *table = PARAMETRES_DEFAUT[code]
     obj, _ = ParametreGestion.objects.get_or_create(
-        code=code, defaults={"label": label, "valeur": valeur, "unite": unite}
+        code=code, defaults={"label": label, "valeur": valeur, "unite": unite, "table": table[0] if table else ""}
     )
     return obj.valeur
 
@@ -529,6 +572,10 @@ def compute_niveaux_marge(fiscal_year):
     qs = _posted_lines_qs(fiscal_year).filter(account__account_class__in=(6, 7))
     is_gr = Q(account__code="618000")
     directs = Q(analytic_account__axis__axis_type__in=(AnalyticAxis.AxisType.PROJET, AnalyticAxis.AxisType.CHANTIER))
+    # Définitions provisoires paramétrées (table RGM_PARAM_STRUCTURE) : charges sans axe, niveau de déduction du GR.
+    if not get_param_gestion("STRUCT_SANS_AXE"):
+        directs = directs | Q(analytic_account__isnull=True)
+    niveau_gr = int(get_param_gestion("MARGE_NIVEAU_GR"))
     charge = Q(account__account_type=Account.AccountType.EXPENSE) & ~is_gr
     agg = qs.aggregate(
         produits=Sum(_net(Q(account__account_type=Account.AccountType.INCOME), "credit", "debit")),
@@ -537,9 +584,9 @@ def compute_niveaux_marge(fiscal_year):
         cout_gr=Sum(_net(is_gr, "debit", "credit")),
     )
     produits, directes, structure, cout_gr = (agg[k] or ZERO for k in ("produits", "directes", "structure", "cout_gr"))
-    brute = produits - directes
+    brute = produits - directes - (cout_gr if niveau_gr == 1 else ZERO)
     operationnelle = brute - structure
-    nette = operationnelle - cout_gr
+    nette = operationnelle - (ZERO if niveau_gr == 1 else cout_gr)
 
     def taux(m):
         return (m * 100 / produits).quantize(Decimal("0.01")) if produits else None
@@ -548,6 +595,7 @@ def compute_niveaux_marge(fiscal_year):
         "produits": produits, "charges_directes": directes, "charges_structure": structure, "cout_gr": cout_gr,
         "marge_brute": brute, "marge_operationnelle": operationnelle, "marge_nette": nette,
         "taux_brute": taux(brute), "taux_operationnelle": taux(operationnelle), "taux_nette": taux(nette),
+        "niveau_gr": niveau_gr, "provisoire": parametres_gestion_provisoires(("STRUCT_SANS_AXE", "MARGE_NIVEAU_GR")),
     }
 
 

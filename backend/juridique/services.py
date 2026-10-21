@@ -87,9 +87,14 @@ class CanManageJuridique(BasePermission):
 
 def can_validate_dg(user):
     """Actes qui engagent la société sur une caution / assurance : Direction Générale (CDC M12 §14.8)."""
+    if not (user and user.is_authenticated):
+        return False
     if is_admin_or_staff(user):
         return True
-    return bool(user and user.is_authenticated and user.role == User.Role.PDG)
+    # Rôles « DG » : paramètre provisoire (PDG seul par défaut ; ETSL peut y ajouter le DGA).
+    from .ecarts import parametre
+
+    return user.role in (parametre("roles_dg") or [User.Role.PDG])
 
 
 class CanValidateDg(BasePermission):
@@ -167,11 +172,11 @@ def compute_alertes():
             }
         )
 
-    compteurs = {band: 0 for band in EXPIRY_LABELS}
-    for liste in alertes.values():
-        for item in liste:
-            if item["bande"] in compteurs:
-                compteurs[item["bande"]] += 1
+    # Écarts M12 : contrats M1, jalons de contentieux et mandats GR rejoignent les alertes juridiques.
+    from .ecarts import alertes_complementaires, compteurs_bandes
+
+    alertes.update(alertes_complementaires())
+    compteurs = compteurs_bandes(*alertes.values())
 
     alertes["compteurs"] = compteurs
     alertes["total"] = sum(compteurs.values())
@@ -236,6 +241,16 @@ OBJETS_LIEABLES = {
     "maintenance.ordretravail": "M8",
     "comptabilite.factureclient": "M10",
     "controle_gestion.budget": "M11",
+    # Écarts M12 : M9 et M12 deviennent liables.
+    "rh_paie.employe": "M9",
+    "rh_paie.contrattravail": "M9",
+    "rh_paie.sanction": "M9",
+    "juridique.convention": "M12",
+    "juridique.contentieux": "M12",
+    "juridique.caution": "M12",
+    "juridique.assurance": "M12",
+    "juridique.courrier": "M12",
+    "juridique.dossierglobalrental": "M12",
 }
 RECHERCHE_MIN = 2
 

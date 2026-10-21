@@ -58,3 +58,15 @@ class ReunionAdmin(admin.ModelAdmin):
 class DossierGlobalRentalAdmin(admin.ModelAdmin):
     list_display = ("code", "partenaire_gr", "objet", "signe_618", "date_fin", "statut")
     list_filter = ("statut", "signe_618")
+
+from .models import ActionContentieux, JalonContentieux, ParametreJuridique, PieceDossier  # noqa: E402
+
+
+@admin.register(ParametreJuridique)
+class ParametreJuridiqueAdmin(admin.ModelAdmin):
+    list_display = ("cle", "libelle", "provisoire", "confirme_le")
+
+
+admin.site.register(JalonContentieux)
+admin.site.register(ActionContentieux)
+admin.site.register(PieceDossier)

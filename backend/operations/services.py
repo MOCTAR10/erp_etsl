@@ -26,6 +26,14 @@ OPERATION_WRITE_ROLES = (
     User.Role.DIRECTION,
 )
 
+OPERATIONS_CONFIRM_ROLES = (  # confirmation des paramètres provisoires M3
+    User.Role.ADMIN,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.DIRECTEUR_OPERATIONS,
+    User.Role.DIRECTION,
+)
+
 OPERATION_AMOUNT_ROLES = (
     User.Role.ADMIN,
     User.Role.PDG,

@@ -111,7 +111,7 @@ class OffresVersionneesTests(BaseM1):
 class ContratsSignesEtAvenantsTests(BaseM1):
     def contrat(self, **kw):
         data = {"client": self.cli, "profile": "maintenance", "start_date": date.today(), "end_date": date.today() + timedelta(days=730),
-                "months": 24, "amount_initial": Decimal("100000000"), "currency": self.xaf}
+                "months": 24, "amount_initial": Decimal("100000000"), "currency": self.xaf, "sla": "Intervention sous 24 h"}
         data.update(kw)
         return Contract.objects.create(**data)
 
