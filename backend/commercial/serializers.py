@@ -11,7 +11,9 @@ from .models import (
     Estimate,
     EstimateLine,
     EstimateOption,
+    HabilitationRequise,
     Milestone,
+    ParametreCommercial,
     Opportunity,
     SoumissionEvent,
     RevueCommande,
@@ -81,6 +83,7 @@ class OpportunitySerializer(AmountMaskMixin, serializers.ModelSerializer):
             "probability",
             "expected_close",
             "origin",
+            "profil_contractuel",
             "owner",
             "owner_name",
             "description",
@@ -96,6 +99,11 @@ class OpportunitySerializer(AmountMaskMixin, serializers.ModelSerializer):
         if not obj.owner:
             return None
         return (obj.owner.first_name + " " + obj.owner.last_name).strip() or obj.owner.email
+
+    def validate(self, attrs):
+        if self.instance and "stage" in attrs and attrs["stage"] != self.instance.stage:
+            raise serializers.ValidationError({"stage": "Changement d'étape par l'action « changer-etape » uniquement."})
+        return attrs
 
 
 class EstimateSerializer(AmountMaskMixin, serializers.ModelSerializer):
@@ -133,6 +141,9 @@ class EstimateSerializer(AmountMaskMixin, serializers.ModelSerializer):
             "margin",
             "valid_until",
             "is_global_rental",
+            "taux_frais_indirects",
+            "taux_aleas",
+            "taux_marge_cible",
             "created_by",
             "options_total",
             "lines_total",
@@ -180,6 +191,7 @@ class EstimateOptionSerializer(serializers.ModelSerializer):
 class EstimateLineSerializer(serializers.ModelSerializer):
     article_code = serializers.CharField(source="article.code", read_only=True, default=None)
     unit_label = serializers.CharField(source="unit.label", read_only=True, default=None)
+    nature_label = serializers.CharField(source="get_nature_display", read_only=True)
 
     class Meta:
         model = EstimateLine
@@ -194,6 +206,10 @@ class EstimateLineSerializer(serializers.ModelSerializer):
             "unit_label",
             "unit_price",
             "price_total",
+            "lot",
+            "nature",
+            "nature_label",
+            "cout_unitaire",
         ]
         read_only_fields = ["id", "price_total"]
 
@@ -224,12 +240,14 @@ class TenderReviewSerializer(serializers.ModelSerializer):
             "criteres",
             "score",
             "decision_rao",
+            "document",
             "reviewed_by",
             "reviewed_at",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["reviewed_by", "id", "review_status", "score", "decision_rao", "created_at", "updated_at"]
+        read_only_fields = ["reviewed_by", "id", "review_status", "score", "decision_rao", "document", "created_at",
+                            "updated_at"]
 
     def validate_criteres(self, value):
         if not isinstance(value, list):
@@ -283,6 +301,12 @@ class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeria
     milestones_total = serializers.IntegerField(source="milestones.count", read_only=True)
     responsable_email = serializers.EmailField(source="responsable.email", read_only=True, default=None)
     analytic_code = serializers.CharField(source="analytic.code", read_only=True, default=None)
+    bons_sortie_total = serializers.SerializerMethodField()
+
+    def get_bons_sortie_total(self, obj):
+        from .ecarts_m1 import bons_sortie
+
+        return bons_sortie(obj)
 
     class Meta:
         model = Affaire
@@ -310,6 +334,7 @@ class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeria
             "responsable_email",
             "analytic",
             "analytic_code",
+            "bons_sortie_total",
             "created_at",
             "updated_at",
         ]
@@ -328,6 +353,12 @@ class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeri
     days_to_expiry = serializers.IntegerField(read_only=True)
     expiry_status = serializers.CharField(read_only=True)
     services_total = serializers.IntegerField(source="services.count", read_only=True)
+    alerte_duree = serializers.SerializerMethodField()
+
+    def get_alerte_duree(self, obj):
+        from .ecarts_m1 import controle_duree, duree_mois
+
+        return controle_duree(obj.profile, duree_mois(obj.start_date, obj.end_date, obj.months))
 
     class Meta:
         model = Contract
@@ -358,6 +389,7 @@ class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeri
             "services_total",
             "montant_actuel",
             "avenants_total",
+            "alerte_duree",
             "document",
             "signe_le",
             "created_at",
@@ -382,6 +414,12 @@ class ContractSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeri
                 raise serializers.ValidationError(
                     {f: "Contrat signé : modification uniquement par avenant." for f in figes}
                 )
+        from .ecarts_m1 import controle_duree, duree_bloquante, duree_mois
+
+        valeur = lambda f: attrs[f] if f in attrs else getattr(self.instance, f, None)  # noqa: E731
+        alerte = controle_duree(valeur("profile"), duree_mois(valeur("start_date"), valeur("end_date"), valeur("months")))
+        if alerte and duree_bloquante():
+            raise serializers.ValidationError({"months": alerte})
         return super().validate(attrs)
 
 
@@ -467,11 +505,36 @@ class RevueCommandeSerializer(serializers.ModelSerializer):
         fields = [
             "id", "affaire", "affaire_code", "montant_offre", "montant_commande", "delai_offre_jours",
             "delai_commande_jours", "delta_prix_pct", "delta_delai_jours", "type_revue", "type_label", "statut",
-            "statut_label", "commentaire", "valide_par", "valide_le", "created_at", "updated_at",
+            "statut_label", "commentaire", "document", "valide_par", "valide_le", "created_at", "updated_at",
         ]
-        read_only_fields = ["type_revue", "statut", "valide_par", "valide_le", "created_at", "updated_at"]
+        read_only_fields = ["type_revue", "statut", "document", "valide_par", "valide_le", "created_at", "updated_at"]
 
     def validate_montant_offre(self, value):
         if value <= 0:
             raise serializers.ValidationError("Montant de l'offre strictement positif requis.")
+        return value
+
+
+class ParametreCommercialSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ParametreCommercial
+        fields = ["id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le"]
+        read_only_fields = ["id", "code", "label", "unite", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le"]
+
+
+class HabilitationRequiseSerializer(ModelCleanMixin, serializers.ModelSerializer):
+    contract_code = serializers.CharField(source="contract.code", read_only=True, default=None)
+    profile_label = serializers.CharField(source="get_profile_display", read_only=True)
+
+    class Meta:
+        model = HabilitationRequise
+        fields = ["id", "contract", "contract_code", "profile", "profile_label", "mot_cle", "libelle", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def validate_mot_cle(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Mot-clé requis.")
         return value
