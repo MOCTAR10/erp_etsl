@@ -96,10 +96,16 @@ def reporting_achats(voir_montants):
             "quantite": f"{row['quantite']:.2f}",
             "prix_moyen": f"{moyen:.2f}" if voir_montants else None,
         })
+    from .ecarts import get_param
+    from .models import ParametreAchats
+
+    # Écart M2 (B) : « engagement » = reste à facturer (1, défaut) ou total commandé (2) — paramètre provisoire ETSL.
+    mesure = int(get_param("ENGAGEMENT_MESURE"))
+    expression = Sum("price_total") if mesure == 2 else Sum((F("quantity") - F("invoiced_qty")) * F("unit_price"))
     engagements = []
     for row in (
         lignes.values("purchase_order__analytic__code", "purchase_order__analytic__label")
-        .annotate(engage=Sum((F("quantity") - F("invoiced_qty")) * F("unit_price")))
+        .annotate(engage=expression)
         .order_by("purchase_order__analytic__code")
     ):
         engagements.append({
@@ -107,4 +113,8 @@ def reporting_achats(voir_montants):
             "libelle": row["purchase_order__analytic__label"] or "Non imputé",
             "engage": f"{row['engage'] or 0:.2f}" if voir_montants else None,
         })
-    return {"prix_moyens": prix, "engagements": engagements, "fournisseurs": performance_fournisseurs()}
+    provisoire = ParametreAchats.objects.filter(code="ENGAGEMENT_MESURE").exclude(statut_valeur="confirme").exists()
+    return {
+        "prix_moyens": prix, "engagements": engagements, "fournisseurs": performance_fournisseurs(),
+        "mesure_engagement": "total_commande" if mesure == 2 else "reste_a_facturer", "mesure_provisoire": provisoire,
+    }
