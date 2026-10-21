@@ -23,7 +23,7 @@ from .serializers import (
     PeriodSerializer,
     SequenceSerializer,
 )
-from .services import close_period, post_move, reopen_period, reverse_move
+from .services import post_move, reverse_move
 
 
 class DjangoValidationMixin:
@@ -48,6 +48,13 @@ class FiscalYearViewSet(AdminWriteMixin, viewsets.ModelViewSet):
     queryset = FiscalYear.objects.prefetch_related("periods").all()
     serializer_class = FiscalYearSerializer
 
+    def destroy(self, request, *args, **kwargs):
+        # Conservation des écritures (10 ans) : un exercice portant des écritures comptabilisées ne se supprime pas.
+        fy = self.get_object()
+        if AccountMove.objects.filter(period__fiscal_year=fy).exclude(status=AccountMove.Status.DRAFT).exists():
+            raise DRFValidationError("Exercice portant des écritures comptabilisées : conservation obligatoire, suppression impossible.")
+        return super().destroy(request, *args, **kwargs)
+
 
 class PeriodViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
     """Périodes comptables — clôture/réouverture réservées aux admins."""
@@ -69,15 +76,21 @@ class PeriodViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
             return [IsAdminOrStaff()]
         return [IsAuthenticated()]
 
+    MESSAGE_CLOTURE = (
+        "Clôture et réouverture d'une période : passez par Comptabilité → Clôture mensuelle "
+        "(contrôles, chrono < 2 h, synthèse Direction) — /api/comptabilite/clotures-mensuelles/."
+    )
+
     @action(detail=True, methods=["post"])
     def close(self, request, pk=None):
-        period = close_period(self.get_object())
-        return Response(self.get_serializer(period).data)
+        # Clôture directe interdite : elle contournait les contrôles et le chrono de la clôture mensuelle M10.
+        self.get_object()
+        raise DRFValidationError(self.MESSAGE_CLOTURE)
 
     @action(detail=True, methods=["post"])
     def reopen(self, request, pk=None):
-        period = reopen_period(self.get_object())
-        return Response(self.get_serializer(period).data)
+        self.get_object()
+        raise DRFValidationError(self.MESSAGE_CLOTURE)
 
 
 class JournalViewSet(AdminWriteMixin, viewsets.ModelViewSet):

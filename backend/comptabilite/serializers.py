@@ -19,6 +19,9 @@ from .models import (
     RapprochementBancaire,
     ReleveBancaire,
     TauxTva,
+    PrevisionTresorerie,
+    AutoFacture,
+    GabaritEtat,
 )
 
 
@@ -210,6 +213,9 @@ class PaiementSerializer(serializers.ModelSerializer):
             "facture",
             "facture_code",
             "imputation_618",
+            "analytic_account",
+            "retenue_source",
+            "montant_retenue",
             "reference",
             "statut",
             "statut_label",
@@ -219,7 +225,7 @@ class PaiementSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["code", "statut", "move", "move_number"]
+        read_only_fields = ["code", "statut", "move", "move_number", "montant_retenue"]
 
     def validate_montant(self, value):
         if value is None or value <= 0:
@@ -238,6 +244,7 @@ class PaiementSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not can_see_amount(getattr(request, "user", None)):
             data["montant"] = None
+            data["montant_retenue"] = None
             data["has_amount_access"] = False
         return data
 
@@ -259,6 +266,10 @@ class DeclarationTvaSerializer(serializers.ModelSerializer):
             "tva_collectee",
             "tva_deductible",
             "net_a_payer",
+            "tva_autoliquidee",
+            "retenues_source",
+            "source_calcul",
+            "document",
             "statut",
             "statut_label",
             "has_amount_access",
@@ -271,6 +282,10 @@ class DeclarationTvaSerializer(serializers.ModelSerializer):
             "tva_collectee",
             "tva_deductible",
             "net_a_payer",
+            "tva_autoliquidee",
+            "retenues_source",
+            "source_calcul",
+            "document",
         ]
 
     def get_has_amount_access(self, obj):
@@ -284,7 +299,7 @@ class DeclarationTvaSerializer(serializers.ModelSerializer):
 
         request = self.context.get("request")
         if not can_see_amount(getattr(request, "user", None)):
-            for key in ("base_imposable", "tva_collectee", "tva_deductible", "net_a_payer"):
+            for key in ("base_imposable", "tva_collectee", "tva_deductible", "net_a_payer", "tva_autoliquidee", "retenues_source"):
                 data[key] = None
             data["has_amount_access"] = False
         return data
@@ -496,7 +511,7 @@ class ClotureMensuelleSerializer(serializers.ModelSerializer):
         fields = [
             "id", "period", "periode", "periode_statut", "fin_periode", "statut", "demarree_le", "demarree_par",
             "cloturee_le", "cloturee_par", "duree_minutes", "dans_objectif", "objectif_minutes", "echeance_envoi",
-            "controles", "synthese", "envoyee_le", "envoyee_par", "destinataires", "reouvertures", "retard",
+            "controles", "synthese", "envoyee_le", "envoyee_par", "destinataires", "emails_envoyes", "document", "reouvertures", "retard",
             "has_amount_access",
         ]
         read_only_fields = fields
@@ -519,3 +534,74 @@ class ClotureMensuelleSerializer(serializers.ModelSerializer):
         if not data["has_amount_access"]:
             data["synthese"] = {}
         return data
+
+
+class _MasqueMontantsMixin:
+    """Montants masqués hors cercle des montants (RF-59) ; `has_amount_access` lu par le SPA."""
+
+    champs_montants: tuple = ()
+
+    def get_has_amount_access(self, obj):
+        from .services import can_see_amount
+
+        return can_see_amount(getattr(self.context.get("request"), "user", None))
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data.get("has_amount_access"):
+            for key in self.champs_montants:
+                data[key] = None
+        return data
+
+
+class PrevisionTresorerieSerializer(_MasqueMontantsMixin, serializers.ModelSerializer):
+    champs_montants = ("montant",)
+    sens_label = serializers.CharField(source="get_sens_display", read_only=True)
+    categorie_label = serializers.CharField(source="get_categorie_display", read_only=True)
+    has_amount_access = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PrevisionTresorerie
+        fields = [
+            "id", "code", "date_prevue", "sens", "sens_label", "categorie", "categorie_label", "libelle", "montant",
+            "compte_bancaire", "has_amount_access", "created_at",
+        ]
+        read_only_fields = ["code", "created_at"]
+
+    def validate_montant(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError("Le montant doit être strictement positif.")
+        return value
+
+
+class AutoFactureSerializer(_MasqueMontantsMixin, serializers.ModelSerializer):
+    champs_montants = ("montant_ht", "montant_tva")
+    fournisseur_name = serializers.CharField(source="fournisseur.name", read_only=True)
+    compte_charge_code = serializers.CharField(source="compte_charge.code", read_only=True)
+    taux = serializers.DecimalField(source="taux_tva.taux", max_digits=6, decimal_places=2, read_only=True)
+    move_number = serializers.CharField(source="move.number", read_only=True, default=None)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    has_amount_access = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AutoFacture
+        fields = [
+            "id", "code", "fournisseur", "fournisseur_name", "date", "objet", "montant_ht", "taux_tva", "taux",
+            "montant_tva", "compte_charge", "compte_charge_code", "analytic", "statut", "statut_label", "move",
+            "move_number", "emise_par", "emise_le", "has_amount_access", "created_at",
+        ]
+        read_only_fields = ["code", "montant_tva", "statut", "move", "emise_par", "emise_le", "created_at"]
+
+    def validate_montant_ht(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError("Le montant HT doit être strictement positif.")
+        return value
+
+
+class GabaritEtatSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = GabaritEtat
+        fields = ["id", "code", "label", "parametres", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le", "modifie_le"]
+        read_only_fields = fields

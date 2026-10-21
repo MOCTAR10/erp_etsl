@@ -23,6 +23,9 @@ from .models import (
     RapprochementBancaire,
     ReleveBancaire,
     TauxTva,
+    PrevisionTresorerie,
+    AutoFacture,
+    GabaritEtat,
 )
 from config.inputs import date_input
 
@@ -43,6 +46,9 @@ from .serializers import (
     RapprochementBancaireSerializer,
     ReleveBancaireSerializer,
     TauxTvaSerializer,
+    PrevisionTresorerieSerializer,
+    AutoFactureSerializer,
+    GabaritEtatSerializer,
 )
 from users.permissions import can_read_module
 from .services import (
@@ -405,6 +411,9 @@ class DeclarationTvaViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.Mo
             raise DRFValidationError("Calculez d'abord la déclaration.")
         declaration.statut = DeclarationTva.Statut.DEPOSEE
         declaration.save(update_fields=["statut"])
+        from . import fiscal
+
+        fiscal.archiver_declaration(declaration, request.user)  # pièce fiscale scellée en GED (10 ans)
         return Response(self.get_serializer(declaration).data)
 
 
@@ -711,3 +720,301 @@ class ClotureMensuelleViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewS
     def rouvrir(self, request, pk=None):
         c = cloture.rouvrir(self.get_object(), request.user, request.data.get("motif", ""))
         return Response(self.get_serializer(c).data)
+
+
+# --------------------------------------------------------------------------------------------------
+# Écarts M10 : états, trésorerie 13 semaines, autofacturation, gabarits fiscaux, écriture 618 des locations GR
+# --------------------------------------------------------------------------------------------------
+def _reponse_etat(request, etat, nom):
+    """JSON (décimaux en chaînes) ou export `?export=xlsx|pdf` (journalisé par le middleware d'exports)."""
+    from django.http import HttpResponse
+
+    from . import etats
+
+    fmt = request.query_params.get("export")
+    if fmt == "xlsx":
+        rep = HttpResponse(
+            etats.to_xlsx(etat), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        rep["Content-Disposition"] = f'attachment; filename="{nom}.xlsx"'
+        return rep
+    if fmt == "pdf":
+        rep = HttpResponse(etats.to_pdf(etat), content_type="application/pdf")
+        rep["Content-Disposition"] = f'attachment; filename="{nom}.pdf"'
+        return rep
+    if fmt:
+        raise DRFValidationError({"export": "Formats acceptés : xlsx, pdf."})
+    return Response(etats.jsonable(etat))
+
+
+class EtatsViewSet(DjangoValidationMixin, viewsets.ViewSet):
+    """États comptables et fiscaux (SYSCOHADA) calculés sur les écritures comptabilisées, exportables."""
+
+    permission_classes = [CanManageCompta]
+
+    def _montants(self, request):
+        from rest_framework.exceptions import PermissionDenied
+
+        if not can_see_amount(request.user):
+            raise PermissionDenied("Rôle non autorisé à consulter les montants (RF-59).")
+
+    def _dates(self, request):
+        p = request.query_params
+        return date_input(p.get("date_from"), "date_from"), date_input(p.get("date_to"), "date_to")
+
+    def _exercice(self, request):
+        brut = request.query_params.get("exercice") or (request.data.get("exercice") if request.method == "POST" else None)
+        brut = str(brut or timezone.localdate().year)
+        if not brut.isdigit() or not 2000 <= int(brut) <= 2100:
+            raise DRFValidationError({"exercice": "Année attendue (AAAA)."})
+        return int(brut)
+
+    @action(detail=False, methods=["get"], url_path="grand-livre")
+    def grand_livre(self, request):
+        from . import etats
+
+        self._montants(request)
+        debut, fin = self._dates(request)
+        compte = (request.query_params.get("compte") or "").strip()
+        if compte and not compte.isdigit():
+            raise DRFValidationError({"compte": "Numéro (ou début de numéro) de compte attendu."})
+        return _reponse_etat(request, etats.grand_livre(debut, fin, compte or None), "grand-livre")
+
+    @action(detail=False, methods=["get"])
+    def balance(self, request):
+        from . import etats
+
+        self._montants(request)
+        debut, fin = self._dates(request)
+        return _reponse_etat(request, etats.balance(debut, fin), "balance-generale")
+
+    @action(detail=False, methods=["get"])
+    def bilan(self, request):
+        from . import etats
+
+        self._montants(request)
+        return _reponse_etat(request, etats.bilan(self._dates(request)[1]), "bilan")
+
+    @action(detail=False, methods=["get"], url_path="compte-resultat")
+    def compte_resultat(self, request):
+        from . import etats
+
+        self._montants(request)
+        debut, fin = self._dates(request)
+        return _reponse_etat(request, etats.compte_resultat(debut, fin), "compte-de-resultat")
+
+    @action(detail=False, methods=["get"], url_path="balance-agee")
+    def balance_agee(self, request):
+        from . import etats
+
+        self._montants(request)
+        nature = request.query_params.get("nature") or "clients"
+        if nature not in ("clients", "fournisseurs"):
+            raise DRFValidationError({"nature": "clients ou fournisseurs."})
+        return _reponse_etat(request, etats.balance_agee(nature, self._dates(request)[1]), f"balance-agee-{nature}")
+
+    @action(detail=False, methods=["get"], url_path="plan-comptable")
+    def plan_comptable(self, request):
+        from . import etats
+
+        return _reponse_etat(request, etats.plan_comptable(), "plan-comptable")
+
+    @action(detail=False, methods=["get"])
+    def conservation(self, request):
+        from . import etats
+
+        return _reponse_etat(request, etats.conservation(), "conservation")
+
+    @action(detail=False, methods=["get"])
+    def liasse(self, request):
+        from . import fiscal
+
+        self._montants(request)
+        exercice = self._exercice(request)
+        return _reponse_etat(request, fiscal.liasse(exercice), f"liasse-{exercice}")
+
+    @action(detail=False, methods=["get"], url_path="etat-2460")
+    def etat_2460(self, request):
+        from . import fiscal
+
+        self._montants(request)
+        exercice = self._exercice(request)
+        return _reponse_etat(request, fiscal.etat_2460(exercice), f"etat-2460-{exercice}")
+
+    @action(detail=False, methods=["post"], url_path="archiver-liasse")
+    def archiver_liasse(self, request):
+        from . import fiscal
+
+        self._montants(request)
+        exercice = self._exercice(request)
+        doc = fiscal.archiver_liasse(exercice, request.user)
+        return Response({"document": str(doc.pk), "titre": doc.title}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"])
+    def tresorerie(self, request):
+        from . import etats, tresorerie
+
+        self._montants(request)
+        debut = date_input(request.query_params.get("debut"), "debut")
+        semaines = request.query_params.get("semaines")
+        if semaines and not str(semaines).isdigit():
+            raise DRFValidationError({"semaines": "Nombre de semaines attendu."})
+        plan = tresorerie.plan_tresorerie(debut, int(semaines) if semaines else None)
+        if request.query_params.get("export"):
+            from .etats import _col
+
+            etat = {
+                "titre": "Plan de trésorerie glissant", "sous_titre": f"{plan['semaines']} semaines à partir du {plan['debut']}",
+                "provisoire": plan["provisoire"], "avertissement": "Hypothèses et seuil d'alerte provisoires — à confirmer par ETSL.",
+                "tableaux": [{"titre": "Trésorerie", "colonnes": [
+                    _col("semaine", "Semaine du"), _col("prevu_encaissements", "Encaissements prévus", True),
+                    _col("prevu_decaissements", "Décaissements prévus", True), _col("realise_encaissements", "Encaissements réalisés", True),
+                    _col("realise_decaissements", "Décaissements réalisés", True), _col("solde_fin_prevu", "Solde prévu", True),
+                    _col("solde_fin_reel", "Solde réel", True),
+                ], "lignes": plan["rows"]}],
+            }
+            return _reponse_etat(request, etat, "tresorerie-13-semaines")
+        return Response(etats.jsonable(plan))
+
+
+class PrevisionTresorerieViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+    serializer_class = PrevisionTresorerieSerializer
+    permission_classes = [CanManageCompta]
+    search_fields = ("code", "libelle")
+
+    def get_queryset(self):
+        return PrevisionTresorerie.objects.select_related("compte_bancaire").all()
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class AutoFactureViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+    """Autofactures (TVA autoliquidée) : brouillon modifiable, émission = écriture 6xx / 445 / 401 / 443 scellée."""
+
+    serializer_class = AutoFactureSerializer
+    search_fields = ("code", "objet")
+
+    def get_queryset(self):
+        return AutoFacture.objects.select_related("fournisseur", "taux_tva", "compte_charge", "move").all()
+
+    def get_permissions(self):
+        if self.action == "emettre":
+            return [CanValidateCompta()]
+        return [CanManageCompta()]
+
+    def perform_create(self, serializer):
+        serializer.save(cree_par=self.request.user)
+
+    def _brouillon(self):
+        af = self.get_object()
+        if af.statut != AutoFacture.Statut.BROUILLON:
+            raise DRFValidationError("Autofacture émise : non modifiable ni supprimable.")
+
+    def update(self, request, *args, **kwargs):
+        self._brouillon()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._brouillon()
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"])
+    def emettre(self, request, pk=None):
+        from . import fiscal
+
+        af = fiscal.emettre_autofacture(self.get_object(), request.user)
+        return Response(self.get_serializer(af).data)
+
+
+class GabaritEtatViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
+    """Gabarits d'états (bilan, résultat, liasse, état 2460) : provisoires, modifiables par ETSL."""
+
+    serializer_class = GabaritEtatSerializer
+
+    def get_queryset(self):
+        from . import fiscal
+
+        return fiscal.tous_gabarits()
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        if self.action == "confirmer":
+            return [CanValidateCompta()]
+        return [IsComptaAdmin()]
+
+    @action(detail=True, methods=["post"])
+    def modifier(self, request, pk=None):
+        """Remplace les paramètres (objet JSON, ou texte JSON) ; le gabarit redevient provisoire."""
+        import json
+
+        g = self.get_object()
+        brut = request.data.get("parametres")
+        if isinstance(brut, str):
+            try:
+                brut = json.loads(brut)
+            except ValueError:
+                raise DRFValidationError({"parametres": "JSON invalide."})
+        if not isinstance(brut, dict):
+            raise DRFValidationError({"parametres": "Objet JSON attendu."})
+        g.parametres = brut
+        g.statut_valeur = GabaritEtat.StatutValeur.PROVISOIRE
+        g.confirme_par = g.confirme_le = None
+        g.save()
+        return Response(self.get_serializer(g).data)
+
+    @action(detail=True, methods=["post"])
+    def confirmer(self, request, pk=None):
+        g = self.get_object()
+        g.statut_valeur = GabaritEtat.StatutValeur.CONFIRME
+        g.confirme_par, g.confirme_le = request.user, timezone.now()
+        g.save(update_fields=["statut_valeur", "confirme_par", "confirme_le", "modifie_le"])
+        return Response(self.get_serializer(g).data)
+
+
+class LocationGrComptaViewSet(DjangoValidationMixin, viewsets.ViewSet):
+    """Locations GLOBAL RENTAL terminées à comptabiliser au 618 (M4 → M10) et écritures passées."""
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        return [CanValidateCompta()]
+
+    def list(self, request):
+        from accounting_kernel.models import AccountMove
+
+        from . import gr
+
+        voit = can_see_amount(request.user)
+        a_faire = [
+            {
+                "id": str(loc.pk), "code": loc.code, "equipement": loc.equipement.label,
+                "affaire": loc.affaire.code if loc.affaire_id else None,
+                "date_retour": loc.date_retour.isoformat() if loc.date_retour else None,
+                "montant": str(gr.montant_location(loc)) if voit else None,
+            }
+            for loc in gr.locations_a_comptabiliser()
+        ]
+        passees = [
+            {"numero": m.number, "date": m.date.isoformat(), "location": m.source_ref, "libelle": m.label,
+             "montant": str(m.total_debit) if voit else None}
+            for m in AccountMove.objects.filter(source=gr.SOURCE_GR).exclude(status="draft").prefetch_related("lines")[:50]
+        ]
+        return Response({"a_comptabiliser": a_faire, "ecritures": passees, "has_amount_access": voit})
+
+    @action(detail=True, methods=["post"])
+    def comptabiliser(self, request, pk=None):
+        from logistique.models import LocationGR
+
+        from . import gr
+
+        if not _est_uuid(pk):
+            raise DRFValidationError("Location inconnue.")
+        location = LocationGR.objects.filter(pk=pk).first()
+        if location is None:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound("Location inconnue.")
+        move = gr.comptabiliser_location_gr(location, request.user)
+        return Response({"numero": move.number, "montant": str(move.total_debit)}, status=status.HTTP_201_CREATED)

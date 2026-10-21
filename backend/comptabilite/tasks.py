@@ -45,4 +45,22 @@ def suivre_clotures_mensuelles():
             if not Notification.objects.filter(user=user, subject=sujet, created_at__gte=debut_jour).exists():
                 Notification.objects.create(user=user, subject=sujet, message=message, kind="reminder")
         alertes.append(str(periode))
-    return {"envoyees": envoyees, "alertes": alertes}
+    return {
+        "envoyees": envoyees, "alertes": alertes, "tresorerie": alerter_tresorerie_13_semaines(),
+        "locations_gr": comptabiliser_locations_gr(),
+    }
+
+
+def comptabiliser_locations_gr():
+    """Fil rouge 618 : passe l'écriture Dr 618 / Cr 401100 des locations GR terminées (M4) non encore comptabilisées."""
+    from .gr import comptabiliser_location_gr_auto, locations_a_comptabiliser
+
+    return [loc.code for loc in locations_a_comptabiliser() if comptabiliser_location_gr_auto(loc)]
+
+
+@shared_task
+def alerter_tresorerie_13_semaines():
+    """Alerte (notification + e-mail) si le solde de trésorerie prévu passe sous le seuil dans l'horizon."""
+    from .tresorerie import alerter_tresorerie
+
+    return alerter_tresorerie()
