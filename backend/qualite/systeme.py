@@ -155,7 +155,10 @@ def competences():
             "origine": "soudage", "code": q.code, "intitule": f"{q.get_norme_display()} {q.get_procede_display()} {q.position}".strip(),
             "date_validite": q.date_validite, "valide": bool(q.date_validite and q.date_validite >= jour),
         })
-    for q in Qualification.objects.select_related("employe").exclude(employe__statut=Employe.Statut.SORTI):
+    # Les copies RH des qualifications soudeur (source M6) sont déjà listées ci-dessus.
+    for q in Qualification.objects.select_related("employe").exclude(employe__statut=Employe.Statut.SORTI).exclude(
+        source=Qualification.Source.M6
+    ):
         ligne(q.employe)["items"].append({
             "origine": "rh", "code": q.code, "intitule": q.intitule, "date_validite": q.date_validite, "valide": not q.expiree,
         })

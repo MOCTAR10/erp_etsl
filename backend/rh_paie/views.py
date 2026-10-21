@@ -251,16 +251,34 @@ class FormationsViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="realiser")
     def realiser(self, request, pk=None):
+        """`{"evaluation", "cout_reel", "gain_estime", "note_evaluation"}` (facultatifs) : la qualification du
+        catalogue est délivrée à chaque participant."""
+        from .formation_m9c import realiser_formation
+
+        montant = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=0, allow_null=True)
+        data = request.data
+        champs = {
+            "cout_reel": montant.run_validation(data.get("cout_reel")) if data.get("cout_reel") not in (None, "") else None,
+            "gain_estime": montant.run_validation(data.get("gain_estime")) if data.get("gain_estime") not in (None, "") else None,
+            "note": serializers.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=20).run_validation(
+                data.get("note_evaluation")) if data.get("note_evaluation") not in (None, "") else None,
+        }
+        try:
+            formation = realiser_formation(self.get_object(), evaluation=data.get("evaluation") or "", **champs)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(formation).data)
+
+    @action(detail=True, methods=["post"], url_path="inscrire")
+    def inscrire(self, request, pk=None):
+        """`{"employe": <id>}` : inscrit un salarié à une session prévue."""
         formation = self.get_object()
         if formation.type != Formation.Type.PLANIFIE:
-            return Response(
-                {"detail": "Seule une formation prévue peut être marquée réalisée."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        formation.type = Formation.Type.REALISEE
-        if request.data.get("evaluation"):
-            formation.evaluation = request.data.get("evaluation")
-        formation.save()
+            raise serializers.ValidationError({"detail": "Inscription possible seulement sur une session prévue."})
+        employe = serializers.PrimaryKeyRelatedField(queryset=Employe.objects.all()).run_validation(
+            request.data.get("employe")
+        )
+        formation.participants.add(employe)
         return Response(self.get_serializer(formation).data)
 
     @action(detail=True, methods=["post"], url_path="annuler")
@@ -576,6 +594,25 @@ class BulletinViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="pdf")
     def pdf(self, request, pk=None):
         return _reponse_pdf(self.get_object())
+
+    @action(detail=True, methods=["post"], url_path="signer")
+    def signer(self, request, pk=None):
+        """Soumet le bulletin archivé à la signature électronique avancée (`{"signataire": <user id>}`, défaut :
+        l'utilisateur courant) ; la signature se fait dans « Signatures » (code à usage unique + sceau)."""
+        from django.contrib.auth import get_user_model
+
+        from .formation_m9c import demander_signature_bulletin
+
+        signataire = None
+        if request.data.get("signataire"):
+            signataire = serializers.PrimaryKeyRelatedField(
+                queryset=get_user_model().objects.filter(is_active=True)
+            ).run_validation(request.data.get("signataire"))
+        try:
+            demander_signature_bulletin(self.get_object(), request.user, signataire=signataire)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(self.get_object()).data)
 
     @action(detail=True, methods=["post"], url_path="diffuser")
     def diffuser(self, request, pk=None):

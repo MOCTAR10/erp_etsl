@@ -193,6 +193,13 @@ def cout_main_oeuvre(debut, fin, ordre=None):
         else:
             ligne["cout"] += p.saisie_temps.cout_charge
     sortie = sorted(par_of.values(), key=lambda l: l["ordre_code"])
+    from operations.models import OrdreFabrication
+
+    from .formation_m9c import depassement_mo
+
+    ordres = OrdreFabrication.objects.in_bulk([l["ordre"] for l in sortie])
+    for ligne in sortie:
+        ligne["depassement"] = depassement_mo(ordres[ligne["ordre"]]) if ligne["ordre"] in ordres else False
     for ligne in sortie:  # montants en chaînes (pas de flottant JSON)
         for champ in ("heures", "cout", "heures_non_valorisees", "heures_prevues"):
             ligne[champ] = None if ligne[champ] is None else str(ligne[champ])

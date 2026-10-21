@@ -43,8 +43,11 @@ def transferer_paie(pointage):
     pointage.status = PointageChantier.Status.TRANSFERE
     pointage.save(update_fields=["saisie_temps", "status", "updated_at"])
     from rh_paie.compta_m9b import valoriser_saisie
+    from rh_paie.formation_m9c import alerter_depassement_mo
 
-    return valoriser_saisie(saisie)  # coût chargé (contrat + charges patronales) retourné à M3 / M11
+    saisie = valoriser_saisie(saisie)  # coût chargé (contrat + charges patronales) retourné à M3 / M11
+    alerter_depassement_mo(pointage.ordre)  # heures pointées > prévues (+ seuil) : alerte opérations
+    return saisie
 
 
 def _weeks(of):

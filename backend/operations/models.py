@@ -174,6 +174,9 @@ class OrdreFabrication(models.Model):
     calculated_hours = models.DecimalField(
         max_digits=14, decimal_places=2, default=0, verbose_name="Heures calculées (gamme)"
     )
+    alerte_mo_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Alerte de dépassement de main-d'œuvre émise le"
+    )
     responsible = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

@@ -1602,6 +1602,7 @@ export interface BulletinPaie {
   baremes_provisoires?: string[];
   charges_patronales?: string | null;
   disponible_le?: string | null;
+  signature_statut?: string | null;
   consulte_le?: string | null;
   move?: string | null;
   move_number?: string | null;

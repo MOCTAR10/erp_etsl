@@ -32,6 +32,7 @@ from .views_m9a import (  # noqa: E402
     AbsenceViewSet, EcheanceDeclarationViewSet, ElementFixeViewSet, EvenementCarriereViewSet, GrilleSalaireViewSet,
 )
 
+from .views_m9c import CatalogueFormationViewSet, HabilitationPosteViewSet, PlanFormationViewSet
 from .views_m9b import ComptePaieViewSet, CoutMainOeuvreView, ProvisionCongesViewSet  # noqa: E402
 
 router = DefaultRouter()
@@ -47,6 +48,9 @@ router.register("contrats", ContratViewSet, basename="rh-contrats")
 router.register("qualifications", QualificationViewSet, basename="rh-qualifications")
 router.register("recrutements", RecrutementViewSet, basename="rh-recrutements")
 router.register("formations", FormationsViewSet, basename="rh-formations")
+router.register("catalogue-formations", CatalogueFormationViewSet, basename="rh-catalogue-formations")
+router.register("plans-formation", PlanFormationViewSet, basename="rh-plans-formation")
+router.register("habilitations-postes", HabilitationPosteViewSet, basename="rh-habilitations-postes")
 router.register("conges", DemandeCongeViewSet, basename="rh-conges")
 router.register("sanctions", SanctionViewSet, basename="rh-sanctions")
 router.register("temps", SaisieTempsViewSet, basename="rh-temps")

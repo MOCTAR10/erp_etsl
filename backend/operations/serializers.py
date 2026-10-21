@@ -178,7 +178,7 @@ class PointageChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
         ordre = attrs.get("ordre", getattr(inst, "ordre", None))
         jour = attrs.get("date", getattr(inst, "date", None))
         if worker and ordre and ordre.scope == OrdreFabrication.Scope.CHANTIER:
-            controler_habilitation_chantier(worker, jour)
+            controler_habilitation_chantier(worker, jour, ordre)
         return attrs
 
     def get_worker_name_filled(self, obj):
@@ -253,7 +253,7 @@ class SituationTravauxSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
         return (obj.validated_by.first_name + " " + obj.validated_by.last_name).strip() or obj.validated_by.email
 
 
-def controler_habilitation_chantier(worker, jour):
+def controler_habilitation_chantier(worker, jour, ordre=None):
     """CDC M9 §10.8 / M7 §9.11 : aucun salarié non habilité affecté à un chantier (habilitation valide à la date)."""
     from django.db.models import Q
 
@@ -273,6 +273,13 @@ def controler_habilitation_chantier(worker, jour):
     if not habilite:
         raise serializers.ValidationError(
             {"worker": f"{nom} n'a aucune habilitation valide au {jour:%d/%m/%Y} : affectation chantier interdite (CDC M9 §10.8)."}
+        )
+    from rh_paie.formation_m9c import habilitations_manquantes
+
+    manquantes = habilitations_manquantes(fiche, ordre, jour)
+    if manquantes:  # matrice habilitation ↔ poste (CDC M9.4)
+        raise serializers.ValidationError(
+            {"worker": f"{nom} n'a pas l'habilitation exigée par le poste ({', '.join(manquantes)}) : affectation chantier interdite."}
         )
 
 

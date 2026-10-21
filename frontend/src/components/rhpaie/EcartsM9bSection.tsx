@@ -35,6 +35,7 @@ interface CoutOf {
   cout: string;
   heures_non_valorisees: string;
   heures_prevues: string | null;
+  depassement: boolean;
 }
 
 const ROLES = ["brut", "patronal", "net", "organismes", "impot", "autres_retenues", "provision_charge", "provision_dette"];
@@ -65,6 +66,7 @@ export function CoutMainOeuvreSection() {
               <td>
                 {formatNumber(Number(l.heures))} h{l.heures_prevues ? ` / ${formatNumber(Number(l.heures_prevues))} h` : ""}
                 {Number(l.heures_non_valorisees) > 0 && <Badge tone="warn">{t("m9b.cout.nonValorisees", { n: l.heures_non_valorisees })}</Badge>}
+                {l.depassement && <Badge tone="err">{t("m9b.cout.depassement")}</Badge>}
               </td>
               <td>{fcfa(l.cout)}</td>
             </tr>

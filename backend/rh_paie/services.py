@@ -531,7 +531,6 @@ PRIMES_HORAIRES = (
     ("nuit", "MAJ_NUIT", "NUIT-TEMPS", "Majoration des heures de nuit"),
     ("astreinte", "MAJ_ASTREINTE", "ASTR-TEMPS", "Heures d'astreinte"),
 )
-JOURS_OUVRES_AN = Decimal("220")  # base d'absentéisme (jours ouvrés/an) ; à confirmer avec la convention collective
 
 
 def parametre(code, periode):
@@ -756,9 +755,11 @@ def generer_declaration(type_, debut, fin, user=None):
 
 def reporting_rh(annee):
     """Turnover et absentéisme de l'année (indicateurs RH)."""
-    from .models import DemandesConge, Employe
+    from .formation_m9c import JOURS_OUVRES_AN_DEFAUT, valeur_parametre
+    from .models import Absence, DemandesConge, Employe
 
     debut, fin = date(annee, 1, 1), date(annee, 12, 31)
+    jours_ouvres, jours_ouvres_provisoire = valeur_parametre("JOURS_OUVRES_AN", fin, JOURS_OUVRES_AN_DEFAUT)
     en_poste = lambda jour: Employe.objects.filter(  # noqa: E731
         date_embauche__lte=jour
     ).exclude(date_sortie__lte=jour).count()
@@ -772,10 +773,13 @@ def reporting_rh(annee):
         type__in=(DemandesConge.Type.MALADIE, DemandesConge.Type.SANS_SOLDE, DemandesConge.Type.EXCEPTIONNEL),
     )
     jours = sum(c.nb_jours for c in absents)
+    for a in Absence.objects.filter(statut=Absence.Statut.VALIDEE, date_debut__lte=fin, date_fin__gte=debut):
+        jours += (min(a.date_fin, fin) - max(a.date_debut, debut)).days + 1  # absences hors congés (M9.2)
     pct = lambda num, den: (str(_arrondi(Decimal(num) * 100 / den)) if den else None)  # noqa: E731
     return {
         "annee": annee, "effectif_debut": effectif_debut, "effectif_fin": effectif_fin, "entrees": entrees,
         "sorties": sorties, "turnover_pct": pct(Decimal(entrees + sorties) / 2, moyen),
-        "jours_absence": jours, "jours_ouvres_an": str(JOURS_OUVRES_AN),
-        "absenteisme_pct": pct(jours, moyen * JOURS_OUVRES_AN),
+        "jours_absence": jours, "jours_ouvres_an": str(jours_ouvres),
+        "jours_ouvres_provisoire": jours_ouvres_provisoire,
+        "absenteisme_pct": pct(jours, moyen * jours_ouvres),
     }
