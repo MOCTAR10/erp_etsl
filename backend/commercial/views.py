@@ -1,5 +1,6 @@
 """API module M1 — Commercial / CRM / CLM (RF-ERP-01…05)."""
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -16,8 +17,10 @@ from .models import (
     Estimate,
     EstimateLine,
     EstimateOption,
+    HabilitationRequise,
     Milestone,
     Opportunity,
+    ParametreCommercial,
     SoumissionEvent,
     RevueCommande,
     TenderReview,
@@ -31,7 +34,9 @@ from .serializers import (
     EstimateLineSerializer,
     EstimateOptionSerializer,
     EstimateSerializer,
+    HabilitationRequiseSerializer,
     MilestoneSerializer,
+    ParametreCommercialSerializer,
     OpportunitySerializer,
     SoumissionEventSerializer,
     RevueCommandeSerializer,
@@ -51,6 +56,35 @@ from .services import (
     marges_affaires,
     pipeline_stats,
 )
+from . import ecarts_m1
+
+
+def _svc(fonction, *args, **kwargs):
+    """Appelle un service M1 ; une `ValidationError` Django devient une 400 DRF."""
+    try:
+        return fonction(*args, **kwargs)
+    except DjangoValidationError as e:
+        raise DRFValidationError(e.message_dict if hasattr(e, "error_dict") else {"detail": e.messages[0]})
+
+
+def _entier(valeur, nom, defaut=None):
+    if valeur in (None, ""):
+        return defaut
+    try:
+        return int(valeur)
+    except (TypeError, ValueError):
+        raise DRFValidationError({nom: "Nombre entier attendu."})
+
+
+def _decimal(valeur, nom):
+    from decimal import Decimal, InvalidOperation
+
+    if valeur in (None, ""):
+        return None
+    try:
+        return Decimal(str(valeur))
+    except InvalidOperation:
+        raise DRFValidationError({nom: "Nombre attendu."})
 
 
 class _CommonViewSet(viewsets.ModelViewSet):
@@ -82,6 +116,23 @@ class ClientProfileViewSet(_CommonViewSet):
             qs = qs.filter(is_active=active)
         return qs
 
+    @action(detail=True, methods=["get"], url_path="vue-360")
+    def vue_360(self, request, pk=None):
+        """Vue 360° : contacts, historique, score détaillé, signaux faibles, opportunités, offres, affaires, contrats."""
+        return Response(ecarts_m1.vue_360(self.get_object(), can_see_amount(request.user)))
+
+    @action(detail=False, methods=["get"])
+    def signaux(self, request):
+        """Clients actifs : score calculé vs enregistré et signaux faibles (inactivité, relance, pertes, échéance)."""
+        return Response({"lignes": ecarts_m1.clients_signaux(),
+                         "provisoire": ecarts_m1.provisoires(tuple(c for c in ecarts_m1.PARAMETRES_DEFAUT
+                                                                   if c.startswith(("SCORE_", "CLIENT_"))))})
+
+    @action(detail=False, methods=["post"], url_path="recalculer-scores")
+    @transaction.atomic
+    def recalculer_scores(self, request):
+        return Response({"modifies": ecarts_m1.recalculer_scores()})
+
 
 class OpportunityViewSet(_CommonViewSet):
     serializer_class = OpportunitySerializer
@@ -104,6 +155,26 @@ class OpportunityViewSet(_CommonViewSet):
     def pipeline(self, request):
         """Pilotage M1.4 — pipeline par étape, taux de conversion, marge par segment."""
         return Response(pipeline_stats())
+
+    @action(detail=False, methods=["get"], url_path="pipe-par-profil")
+    def pipe_par_profil(self, request):
+        """Ventilation du pipe par profil contractuel (marché de travaux, maintenance, GLOBAL RENTAL…)."""
+        return Response({"lignes": ecarts_m1.pipe_par_profil(can_see_amount(request.user))})
+
+    @action(detail=False, methods=["get"])
+    def alertes(self, request):
+        """Opportunités ouvertes sans mouvement depuis N jours ou dont la clôture prévue est dépassée."""
+        lignes = [{k: v for k, v in o.items() if k != "owner_id"} for o in ecarts_m1.alertes_opportunites()]
+        return Response({"lignes": lignes, "jours": str(ecarts_m1.get_param("OPP_INACTIVITE_JOURS")),
+                         "provisoire": ecarts_m1.provisoires(("OPP_INACTIVITE_JOURS",))})
+
+    @action(detail=True, methods=["post"], url_path="changer-etape")
+    @transaction.atomic
+    def changer_etape(self, request, pk=None):
+        """Avance / recule l'étape du funnel (glisser-déposer du pipeline) ; « perdue » enregistre le motif."""
+        opp = Opportunity.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        _svc(ecarts_m1.changer_etape, opp, str(request.data.get("stage") or ""), str(request.data.get("motif") or ""))
+        return Response(self.get_serializer(opp).data)
 
 
 class EstimateViewSet(_CommonViewSet):
@@ -158,6 +229,11 @@ class EstimateViewSet(_CommonViewSet):
             raise DRFValidationError({"detail": "Seule une offre soumise se révise (un brouillon se modifie directement)."})
         nouvelle = offre.reviser(request.user)
         return Response(self.get_serializer(nouvelle).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def structure(self, request, pk=None):
+        """Structure de chiffrage : déboursé sec par nature / lot, frais indirects, aléas, prix de revient, marge."""
+        return Response(ecarts_m1.structure_chiffrage(self.get_object(), can_see_amount(request.user)))
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -226,6 +302,20 @@ class TenderReviewViewSet(_CommonViewSet):
     def perform_create(self, serializer):
         serializer.save(reviewed_by=self.request.user, reviewed_at=timezone.now())
 
+    @action(detail=False, methods=["get"], url_path="criteres-defaut")
+    def criteres_defaut(self, request):
+        """Critères du formulaire ENG-PR1-01 (provisoires) et seuils Go / Go sous réserve paramétrables."""
+        return Response({"criteres": ecarts_m1.CRITERES_RAO_DEFAUT, "seuil_go": str(ecarts_m1.get_param("RAO_SEUIL_GO")),
+                         "seuil_reserve": str(ecarts_m1.get_param("RAO_SEUIL_RESERVE")), "provisoire": True})
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def archiver(self, request, pk=None):
+        """Formulaire RAO (PDF) archivé en GED pour 10 ans."""
+        rao = TenderReview.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        _svc(ecarts_m1.archiver_rao, rao, request.user)
+        return Response(self.get_serializer(rao).data)
+
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def soumettre(self, request, pk=None):
@@ -244,6 +334,8 @@ class TenderReviewViewSet(_CommonViewSet):
         rao.decision = justification
         rao.review_status = TenderReview.Status.SOUMIS
         rao.save()
+        if not rao.document_id:
+            ecarts_m1.archiver_rao(rao, request.user)
         return Response(self.get_serializer(rao).data)
 
 
@@ -289,7 +381,10 @@ class AffaireViewSet(_CommonViewSet):
     @transaction.atomic
     def demarrer(self, request, pk=None):
         """Démarrage : CRRL (réunion de lancement tenue, compte-rendu en GED) exigé — CDC M1 §3.6."""
-        affaire, erreur = self._transition(Affaire.Status.CONFIRMEE, Affaire.Status.EN_COURS, controle_crrl)
+        affaire, erreur = self._transition(
+            Affaire.Status.CONFIRMEE, Affaire.Status.EN_COURS,
+            lambda a: controle_crrl(a) or ecarts_m1.controle_habilitations_affaire(a),
+        )
         return erreur or Response(self.get_serializer(affaire).data)
 
     @action(detail=False, methods=["get"])
@@ -299,6 +394,33 @@ class AffaireViewSet(_CommonViewSet):
         if par not in MARGE_AXES:
             raise DRFValidationError({"par": f"Valeurs possibles : {', '.join(MARGE_AXES)}."})
         return Response(marges_affaires(par, can_see_amount(request.user)))
+
+    @action(detail=False, methods=["get"])
+    def derives(self, request):
+        """Dérive des coûts : coût réel (grand livre, axe affaire) vs coût prévu (offre gagnée) à l'avancement."""
+        return Response(ecarts_m1.derives_affaires(can_see_amount(request.user)))
+
+    @action(detail=True, methods=["post"], url_path="besoins-achat")
+    @transaction.atomic
+    def besoins_achat(self, request, pk=None):
+        """Génère la DA (M2) des lignes achetables de l'offre gagnée, imputée à l'affaire."""
+        affaire = Affaire.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        da = _svc(ecarts_m1.generer_besoins_achat, affaire, request.user)
+        return Response({"id": str(da.pk), "code": da.code, "lignes": da.lines.count()}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def achats(self, request, pk=None):
+        """DA et BC (M2) imputés au compte analytique de l'affaire, et nombre de bons de sortie (BS) consommés."""
+        affaire = self.get_object()
+        data = ecarts_m1.achats_affaire(affaire, can_see_amount(request.user))
+        data["bons_sortie"] = ecarts_m1.bons_sortie(affaire)
+        data["definition_bs"] = ecarts_m1.DEFINITION_BS
+        return Response(data)
+
+    @action(detail=True, methods=["get"], url_path="plan-charge")
+    def plan_charge(self, request, pk=None):
+        """Plan de charge nominatif : personnel des équipes affectées aux OF de l'affaire."""
+        return Response({"lignes": ecarts_m1.plan_charge(self.get_object())})
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -368,8 +490,43 @@ class ContractViewSet(_CommonViewSet):
         motif = controle_document_contractuel(document)
         if motif:
             raise DRFValidationError({"document": motif})
+        if contrat.profile == Contract.Profile.MARCHE_TRAVAUX and contrat.retenue_rate is None:
+            contrat.retenue_rate = ecarts_m1.get_param("RETENUE_GARANTIE_PCT")
+        manquants = ecarts_m1.controle_profil(contrat)
+        if manquants:
+            raise DRFValidationError({"detail": " ".join(manquants)})
         contrat.document, contrat.signe_le = document, timezone.now()
         return self._passer(contrat, (Contract.Status.BROUILLON,), Contract.Status.ACTIF)
+
+    @action(detail=True, methods=["get"])
+    def calculs(self, request, pk=None):
+        """Retenue de garantie, pénalités de retard (?jours_retard=), indexation (?indice=&indice_base=), durée, SLA."""
+        q = request.query_params
+        jours = _entier(q.get("jours_retard"), "jours_retard", 0)
+        if jours < 0:
+            raise DRFValidationError({"jours_retard": "Valeur positive attendue."})
+        indice, base = _decimal(q.get("indice"), "indice"), _decimal(q.get("indice_base"), "indice_base")
+        return Response(ecarts_m1.calculs_contrat(self.get_object(), can_see_amount(request.user), jours, indice, base))
+
+    @action(detail=True, methods=["post"], url_path="generer-echeancier")
+    @transaction.atomic
+    def generer_echeancier(self, request, pk=None):
+        """Échéancier type (jalons facturables mensuels) du contrat en vigueur."""
+        contrat = self._contrat()
+        if contrat.status not in (Contract.Status.ACTIF, Contract.Status.SUSPENDU):
+            raise DRFValidationError({"detail": "Seul un contrat signé (actif) reçoit un échéancier."})
+        jalons = _svc(ecarts_m1.generer_echeancier, contrat)
+        return Response({"jalons": len(jalons)}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def retenues(self, request, pk=None):
+        """Retenue de garantie cumulée sur les factures émises de l'affaire et date de libération."""
+        return Response(ecarts_m1.retenues_contrat(self.get_object(), can_see_amount(request.user)))
+
+    @action(detail=True, methods=["get"])
+    def habilitations(self, request, pk=None):
+        """Conformité du personnel affecté aux habilitations exigées par le contrat (ou son profil)."""
+        return Response(ecarts_m1.conformite_habilitations(self.get_object()))
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -513,4 +670,76 @@ class RevueCommandeViewSet(_CommonViewSet):
         revue.valide_par = request.user
         revue.valide_le = timezone.now()
         revue.save()
+        if not revue.document_id:
+            ecarts_m1.archiver_rc(revue, request.user)
         return Response(self.get_serializer(revue).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def archiver(self, request, pk=None):
+        revue = RevueCommande.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        _svc(ecarts_m1.archiver_rc, revue, request.user)
+        return Response(self.get_serializer(revue).data)
+
+
+CONFIRMATION_PARAM_ROLES = (User.Role.ADMIN, User.Role.PDG, User.Role.DGA, User.Role.DIRECTION)
+
+
+class ParametreCommercialViewSet(_CommonViewSet):
+    """Paramètres M1 provisoires (prédéfinis) : valeur modifiable par le commercial, confirmation par la Direction."""
+
+    serializer_class = ParametreCommercialSerializer
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        ecarts_m1.assurer_parametres()
+        return ParametreCommercial.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        return Response({"detail": "Les paramètres sont prédéfinis : modifiez leur valeur."},
+                        status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @action(detail=True, methods=["post"])
+    def confirmer(self, request, pk=None):
+        if not (request.user.is_staff or request.user.role in CONFIRMATION_PARAM_ROLES):
+            return Response({"detail": "Confirmation réservée à la Direction."}, status=status.HTTP_403_FORBIDDEN)
+        p = self.get_object()
+        p.statut_valeur = ParametreCommercial.StatutValeur.CONFIRME
+        p.confirme_par, p.confirme_le = request.user, timezone.now()
+        p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(p).data)
+
+
+class HabilitationRequiseViewSet(_CommonViewSet):
+    serializer_class = HabilitationRequiseSerializer
+
+    def get_queryset(self):
+        qs = HabilitationRequise.objects.select_related("contract")
+        if contract := self.request.query_params.get("contract"):
+            qs = qs.filter(contract_id=contract)
+        return qs
+
+
+class PilotageM1ViewSet(viewsets.ViewSet):
+    """Échéances J-90 / J-60 / J-30 (offres, contrats, avenants), relances, indicateurs commerciaux (Couche D)."""
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("commercial")()]
+        return [CanManageCommercial()]
+
+    @action(detail=False, methods=["get"])
+    def echeances(self, request):
+        lignes = [{k: v for k, v in e.items() if k != "destinataire_id"} for e in ecarts_m1.echeances_m1()]
+        return Response({"paliers": ecarts_m1.paliers(), "lignes": lignes,
+                         "provisoire": ecarts_m1.provisoires(("ECHEANCE_PALIER_1", "ECHEANCE_PALIER_2", "ECHEANCE_PALIER_3"))})
+
+    @action(detail=False, methods=["post"])
+    @transaction.atomic
+    def relancer(self, request):
+        """Envoie maintenant les relances du jour (sinon envoyées après la tâche quotidienne des échéances)."""
+        return Response({"notifications": ecarts_m1.relances_commerciales()})
+
+    @action(detail=False, methods=["get"])
+    def indicateurs(self, request):
+        return Response(ecarts_m1.indicateurs_commerciaux(can_see_amount(request.user)))

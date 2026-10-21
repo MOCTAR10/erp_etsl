@@ -6,7 +6,8 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { formatDate, formatNumber } from "../lib/format";
 import { CommercialSections } from "../components/commercial/CommercialSections";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { EcartsM1Section } from "../components/commercial/EcartsM1Section";
+import { ActionBar, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
 import type { Opportunity, OpportunityStage, Paginated } from "../types";
 
 const COLUMNS: Array<{ stage: OpportunityStage; badge: "brand" | "warn" | "ok" | "err" }> = [
@@ -45,6 +46,22 @@ function OppCard({ opp, index }: { opp: Opportunity; index: number }) {
         <span className="badge brand">{opp.probability}%</span>
         <span>{opp.amount === null ? t("pipeline.masked") : formatNumber(opp.amount)}</span>
       </div>
+      {opp.stage !== "gagne" && opp.stage !== "perdu" ? (
+        <ActionBar
+          actions={[
+            {
+              label: t("ecarts_m1.pipe.changer"),
+              path: `/api/commercial/opportunities/${opp.id}/changer-etape/`,
+              tone: "ghost",
+              prompt: {
+                name: "stage",
+                label: t("ecarts_m1.pipe.etape"),
+                options: COLUMNS.filter((c) => c.stage !== opp.stage).map((c) => ({ value: c.stage, label: t(`pipeline.${c.stage}`) })),
+              },
+            },
+          ]}
+        />
+      ) : null}
     </BoardCard>
   );
 }
@@ -111,6 +128,7 @@ export function PipelinePage() {
       </div>
 
       <CommercialSections />
+      <EcartsM1Section />
     </>
   );
 }
