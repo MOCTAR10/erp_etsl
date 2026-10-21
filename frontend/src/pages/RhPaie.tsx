@@ -15,6 +15,7 @@ import type {
   StatutConge,
 } from "../types";
 import { BaremesSection } from "../components/workflow/BaremesSection";
+import { EcartsM9aSection } from "../components/rhpaie/EcartsM9aSection";
 import { DeclarationsSection } from "../components/workflow/DeclarationsSection";
 import { VirementsSection } from "../components/workflow/VirementsSection";
 
@@ -92,6 +93,7 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
         actions={[
           ...(b.statut === "brouillon"
             ? [
+                { label: t("m9a.preparer"), path: `/api/rh-paie/bulletins/${b.id}/preparer/` },
                 { label: t("actions.calculer"), path: `/api/rh-paie/bulletins/${b.id}/calculer/`, tone: "ghost" as const },
                 { label: t("declarations.integrer"), path: `/api/rh-paie/bulletins/${b.id}/integrer-temps/`, tone: "ghost" as const },
                 { label: t("actions.valider"), path: `/api/rh-paie/bulletins/${b.id}/valider/` },
@@ -280,6 +282,7 @@ export function RhPaiePage() {
           />
         </>
       ) : null}
+      <EcartsM9aSection />
       <DeclarationsSection />
       <VirementsSection />
       <BaremesSection />

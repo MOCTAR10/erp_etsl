@@ -451,6 +451,15 @@ def alertes_agregees(user=None):
             "statut": qualif.date_validite < timezone.localdate() and "expiree" or "active",
         })
 
+    # Échéances des déclarations sociales et fiscales (CDC M9) : cercle de la paie uniquement.
+    if _allowed("rh_paie"):
+        from rh_paie.services import can_manage_paie
+
+        if user is None or can_manage_paie(user):
+            from rh_paie.paie_m9a import alertes_echeances_declarations
+
+            rh_liste += alertes_echeances_declarations(_band)
+
     # Aptitudes médicales et EPI à renouveler (CDC M7-04 / M7-05) : délais paramétrables par ETSL.
     if _allowed("hse"):
         from hse.models import AptitudeMedicale, Epi

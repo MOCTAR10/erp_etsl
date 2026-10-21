@@ -104,13 +104,14 @@ class ContratSerializer(serializers.ModelSerializer):
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     expire_dans = serializers.IntegerField(read_only=True)
     a_renouveler = serializers.BooleanField(read_only=True)
+    grille_label = serializers.CharField(source="grille.code", read_only=True, default=None)
 
     class Meta:
         model = ContratTravail
         fields = [
             "id", "code", "employe", "employe_nom", "type", "type_label",
             "date_debut", "date_fin", "salaire_base", "regime_horaire",
-            "lieu_affectation", "statut", "statut_label", "expire_dans",
+            "lieu_affectation", "grille", "grille_label", "statut", "statut_label", "expire_dans",
             "a_renouveler", "notes", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "expire_dans", "a_renouveler"]
@@ -475,3 +476,103 @@ class DeclarationSocialeSerializer(serializers.ModelSerializer):
             "avertissement", "created_by", "par_email", "created_at",
         ]
         read_only_fields = fields
+
+
+# --------------------------------------------------------------------------------------------
+# Écarts M9-A
+# --------------------------------------------------------------------------------------------
+from .models import Absence, EcheanceDeclaration, ElementFixe, EvenementCarriere, GrilleSalaire  # noqa: E402
+
+
+class GrilleSalaireSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(read_only=True)
+    categorie_label = serializers.CharField(source="get_categorie_display", read_only=True)
+
+    class Meta:
+        model = GrilleSalaire
+        fields = [
+            "id", "code", "convention", "categorie", "categorie_label", "classe", "echelon", "salaire_base",
+            "date_effet", "date_fin", *VALEUR_LEGALE_FIELDS,
+        ]
+        read_only_fields = VALEUR_LEGALE_READONLY
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs)
+
+
+class ElementFixeSerializer(serializers.ModelSerializer):
+    contrat_code = serializers.CharField(source="contrat.code", read_only=True)
+    employe_nom = serializers.CharField(source="contrat.employe.nom_complet", read_only=True)
+    rubrique_label = serializers.CharField(source="rubrique.label", read_only=True)
+
+    class Meta:
+        model = ElementFixe
+        fields = [
+            "id", "contrat", "contrat_code", "employe_nom", "rubrique", "rubrique_label", "montant", "taux",
+            "date_debut", "date_fin", "created_at",
+        ]
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs)
+
+
+class EvenementCarriereSerializer(serializers.ModelSerializer):
+    employe_nom = serializers.CharField(source="employe.nom_complet", read_only=True)
+    type_label = serializers.CharField(source="get_type_display", read_only=True)
+    grille_avant_label = serializers.CharField(source="grille_avant.code", read_only=True, default=None)
+    grille_apres_label = serializers.CharField(source="grille_apres.code", read_only=True, default=None)
+    cree_par_email = serializers.CharField(source="cree_par.email", read_only=True, default=None)
+
+    class Meta:
+        model = EvenementCarriere
+        fields = [
+            "id", "code", "employe", "employe_nom", "contrat", "type", "type_label", "date_effet", "categorie_avant",
+            "categorie_apres", "fonction_avant", "fonction_apres", "grille_avant", "grille_avant_label", "grille_apres",
+            "grille_apres_label", "salaire_avant", "salaire_apres", "motif", "cree_par", "cree_par_email", "created_at",
+        ]
+        read_only_fields = fields
+
+
+class EvenementCarriereInputSerializer(serializers.Serializer):
+    employe = serializers.PrimaryKeyRelatedField(queryset=Employe.objects.all())
+    type = serializers.ChoiceField(choices=EvenementCarriere.Type.choices)
+    date_effet = serializers.DateField()
+    categorie = serializers.ChoiceField(choices=Employe.Categorie.choices, required=False, allow_blank=True)
+    fonction = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    grille = serializers.PrimaryKeyRelatedField(queryset=GrilleSalaire.objects.all(), required=False, allow_null=True)
+    salaire = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True, min_value=0)
+    motif = serializers.CharField(required=False, allow_blank=True)
+
+
+class AbsenceSerializer(serializers.ModelSerializer):
+    employe_nom = serializers.CharField(source="employe.nom_complet", read_only=True)
+    type_label = serializers.CharField(source="get_type_display", read_only=True)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    nb_jours = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Absence
+        fields = [
+            "id", "code", "employe", "employe_nom", "type", "type_label", "date_debut", "date_fin", "nb_jours",
+            "remuneree", "motif", "statut", "statut_label", "valide_par", "valide_le", "created_at",
+        ]
+        read_only_fields = ["code", "statut", "valide_par", "valide_le"]
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs)
+
+
+class EcheanceDeclarationSerializer(serializers.ModelSerializer):
+    type_label = serializers.CharField(source="get_type_declaration_display", read_only=True)
+    periodicite_label = serializers.CharField(source="get_periodicite_display", read_only=True)
+
+    class Meta:
+        model = EcheanceDeclaration
+        fields = [
+            "id", "code", "libelle", "type_declaration", "type_label", "periodicite", "periodicite_label", "jour",
+            "mois", "actif", *VALEUR_LEGALE_FIELDS,
+        ]
+        read_only_fields = VALEUR_LEGALE_READONLY
+
+    def validate(self, attrs):
+        return _apply_and_validate(self, attrs)
