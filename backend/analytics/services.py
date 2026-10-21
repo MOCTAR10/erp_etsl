@@ -69,6 +69,10 @@ def dashboard_direction(user):
             # Pipe pondéré 90/60/25 publié vers M11 / Couche D (clôture M1, CDC §3.11).
             "pipe_pondere": stats["pipe_pondere"]["total"] if see_amount else None,
         }
+        # Reporting commercial Couche D (M1) : prix moyen, transformation, scoring clients (montants masqués RF-59).
+        from commercial.ecarts_m1 import indicateurs_commerciaux
+
+        result["indicateurs"] = indicateurs_commerciaux(see_amount)
         if not see_amount:
             result["ca_gagne"] = None
         return result

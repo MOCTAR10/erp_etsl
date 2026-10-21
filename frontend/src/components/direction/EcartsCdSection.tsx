@@ -60,6 +60,14 @@ interface AlerteCal {
   jours: number;
   bande: string;
 }
+interface IndicateursCommerciaux {
+  prix_moyen: string | null;
+  offres_gagnees: number;
+  taux_transformation_pct: string | null;
+  score_moyen: string | null;
+  clients_sous_seuil: number;
+  clients_70_plus: number;
+}
 interface ItpCnd {
   itp?: { plans: number; plans_approuves: number; points: number; points_arret_en_attente: number; points_leves: number; points_non_conformes: number; taux_levee: number };
   cnd?: { controles: number; en_cours: number; par_methode: Record<string, number>; conformes: number; sous_reserve: number; non_conformes: number; taux_rejet: number };
@@ -102,6 +110,12 @@ export function EcartsCdSection() {
     retry: 0,
   });
   const qualite = useQuery({ queryKey: ["cd", "itp-cnd"], queryFn: () => api.get<ItpCnd>("/api/analytics/petrolier/"), retry: 0 });
+  const dashboard = useQuery({
+    queryKey: ["cd", "commercial"],
+    queryFn: () => api.get<{ commercial: { indicateurs?: IndicateursCommerciaux } }>("/api/analytics/dashboard/"),
+    retry: 0,
+  });
+  const ic = dashboard.data?.commercial.indicateurs;
   const p = pilotage.data;
   const q = qualite.data;
 
@@ -115,6 +129,18 @@ export function EcartsCdSection() {
           {p && <Exports path="/api/analytics/pilotage/" nom="pilotage_direction" label={t("ecarts_cd.exports.pilotage")} />}
         </div>
       </SectionCard>
+
+      {ic && (
+        <SectionCard title={t("ecarts_cd.commercial.title")}>
+          <table className="table" data-testid="indicateurs-commerciaux">
+            <tbody>
+              <tr><td>{t("ecarts_cd.commercial.prixMoyen")}</td><td>{fcfa(ic.prix_moyen)} ({t("ecarts_cd.commercial.gagnees", { n: ic.offres_gagnees })}) <Badge tone="warn">{t("ecarts_cd.provisoire")}</Badge></td></tr>
+              <tr><td>{t("ecarts_cd.commercial.transformation")}</td><td>{ic.taux_transformation_pct === null ? "—" : `${ic.taux_transformation_pct} %`}</td></tr>
+              <tr><td>{t("ecarts_cd.commercial.score")}</td><td>{ic.score_moyen ?? "—"} · {t("ecarts_cd.commercial.sousSeuil", { n: ic.clients_sous_seuil })} · {t("ecarts_cd.commercial.plus70", { n: ic.clients_70_plus })}</td></tr>
+            </tbody>
+          </table>
+        </SectionCard>
+      )}
 
       {q?.itp && q.cnd && (
         <SectionCard title={t("ecarts_cd.itpCnd.title")}>

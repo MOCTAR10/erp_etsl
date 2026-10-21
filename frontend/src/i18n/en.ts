@@ -2154,6 +2154,15 @@ export const en = {
       retard: "{{n}} days late",
       types: { garantie: "Warranty", agrement_fournisseur: "Supplier approval", audit_interne: "Internal audit", revue_direction: "Management review" },
     },
+    commercial: {
+      title: "Sales reporting — average price and scoring",
+      prixMoyen: "Average price of won offers",
+      gagnees: "{{n}} won offer(s)",
+      transformation: "Offer conversion rate",
+      score: "Average customer score",
+      sousSeuil: "{{n}} customer(s) below threshold",
+      plus70: "{{n}} customer(s) ≥ 70",
+    },
     pilotage: { title: "Management steering — cash, pipeline and budget" },
     publication: {
       bloque: "Financial data published to management only after M11 closing.",

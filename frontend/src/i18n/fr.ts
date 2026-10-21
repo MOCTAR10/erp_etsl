@@ -2154,6 +2154,15 @@ export const fr = {
       retard: "{{n}} j de retard",
       types: { garantie: "Garantie", agrement_fournisseur: "Agrément fournisseur", audit_interne: "Audit interne", revue_direction: "Revue de direction" },
     },
+    commercial: {
+      title: "Reporting commercial — prix moyen et scoring",
+      prixMoyen: "Prix moyen des offres gagnées",
+      gagnees: "{{n}} offre(s) gagnée(s)",
+      transformation: "Taux de transformation des offres",
+      score: "Score client moyen",
+      sousSeuil: "{{n}} client(s) sous le seuil",
+      plus70: "{{n}} client(s) ≥ 70",
+    },
     pilotage: { title: "Pilotage Direction — trésorerie, pipe et budget" },
     publication: {
       bloque: "Données financières publiées à la Direction après clôture M11 uniquement.",

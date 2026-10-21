@@ -116,6 +116,13 @@ class PetrolierEtExportsTests(_Base):
             self.assertTrue(r.content.startswith(b"%PDF"))
         self.assertEqual(self.client.get(f"{BASE}petrolier/?export=doc").status_code, 400)
 
+    def test_indicateurs_commerciaux_dans_le_cockpit(self):
+        from analytics.services import dashboard_direction
+
+        ind = dashboard_direction(self.finance)["commercial"]["indicateurs"]
+        self.assertTrue({"prix_moyen", "taux_transformation_pct", "score_moyen", "clients_sous_seuil"} <= set(ind))
+        self.assertIsNone(dashboard_direction(self.logistique)["commercial"]["indicateurs"]["prix_moyen"] or None)
+
     def test_export_cube_reserve_au_cercle_des_montants(self):
         self.client.force_authenticate(self.logistique)
         self.assertEqual(self.client.get(f"{BASE}cubes/?export=xlsx").status_code, 403)
