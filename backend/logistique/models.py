@@ -83,6 +83,10 @@ class EquipementParc(models.Model):
         max_digits=14, decimal_places=2, default=0, verbose_name="Valeur compteur"
     )
     site = models.CharField(max_length=120, blank=True, verbose_name="Site / dépôt")
+    plafond_compteur = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Plafond du compteur",
+        help_text="Kilométrage / heures maximal avant révision ou réforme (sens provisoire, à confirmer par ETSL).",
+    )
     is_global_rental = models.BooleanField(default=False, verbose_name="GLOBAL RENTAL")
     proprietaire = models.ForeignKey(
         "referentiels.Partner",
@@ -356,6 +360,28 @@ class LocationGR(models.Model):
         related_name="locations",
         verbose_name="Version de grille tarifaire GR",
     )
+    valide_m2_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Validation Achats (M2) par",
+    )
+    valide_m2_le = models.DateTimeField(null=True, blank=True, verbose_name="Validation Achats (M2) le")
+    valide_dr_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Validation Direction (DR) par",
+    )
+    valide_dr_le = models.DateTimeField(null=True, blank=True, verbose_name="Validation Direction (DR) le")
+    bon_commande_achat = models.ForeignKey(
+        "achats.PurchaseOrder", null=True, blank=True, on_delete=models.PROTECT, related_name="locations_gr",
+        verbose_name="BC achats GLOBAL RENTAL (M2)",
+    )
+    facture_achat = models.ForeignKey(
+        "achats.PurchaseInvoice", null=True, blank=True, on_delete=models.PROTECT, related_name="locations_gr",
+        verbose_name="Facture GLOBAL RENTAL rapprochée",
+    )
+    facture_ecart = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Écart facture / montant attendu",
+    )
+    facture_conforme = models.BooleanField(null=True, blank=True, verbose_name="Facture dans la tolérance")
     emis_le = models.DateTimeField(null=True, blank=True, verbose_name="BC / GR émis le")
     emis_par = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -635,3 +661,218 @@ class ParametreLogistique(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+# --------------------------------------------------------------------------------------------------
+# Écarts M4 : historique des compteurs du parc, lignes BC / BL, réception BL, archive GR, audit photo
+# --------------------------------------------------------------------------------------------------
+class ReleveCompteurParc(models.Model):
+    """Historique du kilométrage / des heures d'un équipement du parc (interne ou GR) — jamais à la baisse."""
+
+    class Source(models.TextChoices):
+        SAISIE = "saisie", "Saisie parc"
+        LOCATION = "location", "Relevé de location GR"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    equipement = models.ForeignKey(
+        EquipementParc, on_delete=models.CASCADE, related_name="releves", verbose_name="Équipement"
+    )
+    date = models.DateField(verbose_name="Date du relevé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur compteur")
+    source = models.CharField(max_length=10, choices=Source.choices, default=Source.SAISIE, verbose_name="Source")
+    commentaire = models.CharField(max_length=200, blank=True, verbose_name="Commentaire")
+    saisi_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Saisi par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Relevé de compteur du parc"
+        verbose_name_plural = "Historique des compteurs du parc"
+        indexes = [models.Index(fields=["equipement", "date"])]
+
+    def __str__(self):
+        return f"{self.equipement.code} — {self.date} — {self.valeur}"
+
+
+class HistoriqueEquipement(models.Model):
+    """Piste d'audit des modifications d'un équipement (champ, ancienne / nouvelle valeur) — inaltérable."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    equipement = models.ForeignKey(
+        EquipementParc, on_delete=models.PROTECT, related_name="historique", verbose_name="Équipement"
+    )
+    champ = models.CharField(max_length=60, verbose_name="Champ modifié")
+    ancienne_valeur = models.TextField(blank=True, verbose_name="Ancienne valeur")
+    nouvelle_valeur = models.TextField(blank=True, verbose_name="Nouvelle valeur")
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Modifié par",
+    )
+    modifie_le = models.DateTimeField(auto_now_add=True, verbose_name="Modifié le")
+
+    class Meta:
+        ordering = ["-modifie_le"]
+        verbose_name = "Historique d'équipement"
+        verbose_name_plural = "Historique des équipements"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Historique inaltérable : modification interdite.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Historique inaltérable : suppression interdite.")
+
+
+class AuditEquipement(models.Model):
+    """Audit d'un équipement avec photo de la machine (empreinte SHA-256), conservé N années (paramètre)."""
+
+    class Etat(models.TextChoices):
+        BON = "bon", "Bon état"
+        USAGE = "usage", "Usure normale"
+        DEGRADE = "degrade", "Dégradé"
+        HORS_SERVICE = "hors_service", "Hors service"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    equipement = models.ForeignKey(
+        EquipementParc, on_delete=models.PROTECT, related_name="audits", verbose_name="Équipement"
+    )
+    date_audit = models.DateField(verbose_name="Date de l'audit")
+    etat = models.CharField(max_length=12, choices=Etat.choices, default=Etat.BON, verbose_name="État constaté")
+    compteur = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Compteur constaté"
+    )
+    observations = models.TextField(blank=True, verbose_name="Observations")
+    photo = models.FileField(upload_to="logistique/audits/%Y/", verbose_name="Photo de la machine")
+    photo_sha256 = models.CharField(max_length=64, verbose_name="Empreinte SHA-256 de la photo")
+    conserver_jusqu_au = models.DateField(verbose_name="Conservation jusqu'au")
+    auditeur = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Auditeur",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_audit", "-created_at"]
+        verbose_name = "Audit d'équipement (photo)"
+        verbose_name_plural = "Audits d'équipement (photo)"
+
+    def __str__(self):
+        return f"{self.code} — {self.equipement.code}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Audit scellé : modification interdite.")
+        if not self.code:
+            self.code = LogistiqueSequence.next_for("AUD", "AUD")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Audit conservé (durée de conservation) : suppression interdite.")
+
+
+class LigneLocationGR(models.Model):
+    """Ligne détaillée du BC GR (désignation, quantité, prix) et quantité livrée au BL."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    location = models.ForeignKey(
+        LocationGR, on_delete=models.CASCADE, related_name="lignes", verbose_name="Prestation GR"
+    )
+    designation = models.CharField(max_length=200, verbose_name="Désignation")
+    quantite = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Quantité commandée")
+    unite = models.CharField(max_length=20, blank=True, default="u", verbose_name="Unité")
+    prix_unitaire = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire")
+    quantite_livree = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Quantité livrée (BL)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Ligne de prestation GR"
+        verbose_name_plural = "Lignes de prestation GR"
+
+    def __str__(self):
+        return f"{self.location.code} — {self.designation}"
+
+    def clean(self):
+        if self.quantite is not None and self.quantite <= 0:
+            raise ValidationError({"quantite": "La quantité doit être strictement positive."})
+        if self.prix_unitaire is not None and self.prix_unitaire < 0:
+            raise ValidationError({"prix_unitaire": "Le prix ne peut être négatif."})
+
+    @property
+    def montant(self):
+        return (self.quantite or 0) * (self.prix_unitaire or 0)
+
+
+class ReceptionBLGR(models.Model):
+    """Réception contrôlée du bon de livraison GR : écarts par ligne, escalade M12 au-delà du seuil."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    location = models.ForeignKey(
+        LocationGR, on_delete=models.PROTECT, related_name="receptions_bl", verbose_name="Prestation GR"
+    )
+    reference_bl = models.CharField(max_length=40, verbose_name="Référence du BL")
+    date_reception = models.DateField(verbose_name="Date de réception")
+    lignes = models.JSONField(default=list, blank=True, verbose_name="Contrôle par ligne")
+    ecart_pct = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="Écart global (%)")
+    reserves = models.TextField(blank=True, verbose_name="Réserves")
+    litige = models.BooleanField(default=False, verbose_name="Litige")
+    contentieux = models.ForeignKey(
+        "juridique.Contentieux", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Contentieux M12",
+    )
+    dossier_gr = models.ForeignKey(
+        "juridique.DossierGlobalRental", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Dossier GR M12",
+    )
+    recu_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Reçu par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_reception", "-created_at"]
+        verbose_name = "Réception de BL GR"
+        verbose_name_plural = "Réceptions de BL GR"
+
+    def __str__(self):
+        return f"{self.code} — {self.reference_bl}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = LogistiqueSequence.next_for("RBL", "RBL")
+        return super().save(*args, **kwargs)
+
+
+class ArchiveCompteurGR(models.Model):
+    """Archive scellée des compteurs d'une prestation GR à sa clôture (relevés, formule glissante, coût)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    location = models.OneToOneField(
+        LocationGR, on_delete=models.PROTECT, related_name="archive_compteurs", verbose_name="Prestation GR"
+    )
+    contenu = models.JSONField(default=dict, verbose_name="Contenu archivé")
+    sha256 = models.CharField(max_length=64, verbose_name="Empreinte SHA-256")
+    conserver_jusqu_au = models.DateField(verbose_name="Conservation jusqu'au")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Archive des compteurs GR"
+        verbose_name_plural = "Archives des compteurs GR"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Archive scellée : modification interdite.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Archive scellée : suppression interdite.")
