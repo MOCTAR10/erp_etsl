@@ -1324,7 +1324,7 @@ export const fr = {
     },
     absences: { title: "Absences" },
     echeances: {
-      title: "Échéances des déclarations sociales et fiscales",
+      title: "Calendrier de dépôt (CNSS, CNAMGS, DGI)",
       limite: "Date limite",
       deposee: "Déposée",
       retard: "En retard de {{n}} j",
