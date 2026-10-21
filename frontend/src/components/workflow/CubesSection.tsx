@@ -61,7 +61,7 @@ function ParametresCube() {
               <td>{p.label}</td>
               <td>
                 {edit?.id === p.id ? (
-                  <input type="number" min="1" step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+                  <input type="number" min="0" step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
                 ) : (
                   `${p.valeur} ${p.unite}`
                 )}

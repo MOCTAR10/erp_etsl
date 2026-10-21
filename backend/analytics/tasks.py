@@ -5,7 +5,6 @@ from datetime import timedelta
 from celery import shared_task
 from django.utils import timezone
 
-from config.echeances import PALIERS_NOTIFICATION
 from users.models import User
 from workflow.models import Notification
 from workflow.notifications import notify
@@ -25,6 +24,11 @@ DESTINATAIRES = {
     "inspection_reglementaire": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
     "qualification_soudeur": (User.Role.QAQC, User.Role.DIRECTEUR_OPERATIONS),
     "etalonnage": (User.Role.QAQC,),
+    # Familles calendaires de la Couche D (destinataires provisoires, à confirmer par ETSL).
+    "garantie": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
+    "agrement_fournisseur": (User.Role.QAQC, User.Role.HSE),
+    "audit_interne": (User.Role.QAQC,),
+    "revue_direction": (User.Role.QAQC, User.Role.PDG, User.Role.DGA),
 }
 
 
@@ -35,6 +39,7 @@ def _items(alertes):
     yield from alertes["rh"]
     yield from alertes.get("qualite", [])
     yield from alertes["maintenance"]
+    yield from alertes.get("calendrier", [])
 
 
 @shared_task
@@ -46,12 +51,15 @@ def notifier_echeances():
     from hse.services import expirer_permis
     from qualite.ecarts import relances_qualite
 
+    from .pilotage import paliers_notification
+
     expirer_permis()
     relances_qualite()
+    paliers = paliers_notification()  # J-90 / J-30 / J-15 / J-0 + palier paramétrable (J-60)
     debut_jour = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
     envoyees = 0
     for item in _items(alertes_agregees()):
-        if item.get("jours") not in PALIERS_NOTIFICATION:
+        if item.get("jours") not in paliers:
             continue
         roles = DESTINATAIRES.get(item["type"])
         if not roles:
@@ -71,8 +79,11 @@ def notifier_echeances():
 
 @shared_task
 def alimenter_cubes():
-    """Alimente chaque jour, sans ressaisie, les cubes du mois courant et du mois précédent (si non archivés)."""
-    from . import cubes
+    """Alimente chaque jour, sans ressaisie, les cubes du mois courant et du mois précédent (si non archivés).
+
+    Accroche aussi (sans nouvelle tâche planifiée) : contrôle des seuils budgétaires 90 / 100 / 110 %, scellement
+    des marts et purge des archives dont la conservation est échue."""
+    from . import cubes, pilotage
 
     aujourdhui = timezone.localdate()
     mois = [aujourdhui.strftime("%Y-%m"), (aujourdhui.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")]
@@ -82,4 +93,7 @@ def alimenter_cubes():
             faits += cubes.alimenter_cube(periode)
         except ValueError:
             continue  # mois déjà archivé : on ne le touche plus
+    pilotage.controler_seuils_budgetaires()
+    pilotage.sceller_marts()
+    pilotage.purger_archives_expirees()
     return faits

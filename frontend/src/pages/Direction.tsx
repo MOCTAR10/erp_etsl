@@ -23,6 +23,7 @@ import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { api } from "../api/client";
+import { EcartsCdSection } from "../components/direction/EcartsCdSection";
 import { CubesSection } from "../components/workflow/CubesSection";
 import { ChartCard, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, ProgressBar, SectionTitle, Sparkline } from "../components/ui";
 import { formatNumber } from "../lib/format";
@@ -131,6 +132,7 @@ function DirectionInner() {
     ...(a.juridique.assurances ?? []),
     ...a.rh,
     ...(a.qualite ?? []),
+    ...((a as { calendrier?: AlerteEcheanceItem[] }).calendrier ?? []),
   ]
     .filter((e) => e.jours !== null)
     .sort((x, y) => (x.jours ?? 0) - (y.jours ?? 0))
@@ -316,6 +318,8 @@ function DirectionInner() {
       </div>
 
       <CubesSection />
+
+      <EcartsCdSection />
 
       <section id="echeances">
         <SectionTitle>{`${t("direction.alertes")} · ${a.total}`}</SectionTitle>

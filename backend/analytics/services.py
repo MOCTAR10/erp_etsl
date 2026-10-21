@@ -307,6 +307,7 @@ def reporting_petrolier(user):
 
     quals = QualificationSoudeur.objects.all()
     nc = NonConformite.objects.all()
+    itp_cnd = _indicateurs_itp_cnd()
 
     return {
         "asmr": {
@@ -353,6 +354,50 @@ def reporting_petrolier(user):
             "nc_critiques": nc.filter(gravite=NonConformite.Gravite.CRITIQUE)
             .exclude(statut=NonConformite.Statut.CLOTUREE).count(),
             "pv_sous_reserve": PvControle.objects.filter(statut=PvControle.Statut.RESERVE).count(),
+        },
+        "itp": itp_cnd["itp"],
+        "cnd": itp_cnd["cnd"],
+    }
+
+
+def _indicateurs_itp_cnd():
+    """Qualité ITP (points d'arrêt / d'observation) et CND (méthodes, résultats, taux de rejet) pour le client pétrolier."""
+    from django.db.models import Count
+
+    from qualite.models import ControleQualite, PointInspection
+
+    actifs = ControleQualite.objects.exclude(statut=ControleQualite.Statut.ANNULE)
+    itp = actifs.filter(type_controle=ControleQualite.TypeControle.ITP)
+    points = PointInspection.objects.filter(controle__in=itp)
+    n_points = points.count()
+    leves = points.filter(statut=PointInspection.Statut.LEVE).count()
+    cnd = actifs.filter(type_controle=ControleQualite.TypeControle.CND)
+    tranches = {r["resultat"]: r["n"] for r in cnd.filter(statut=ControleQualite.Statut.VALIDE).values("resultat").annotate(n=Count("id"))}
+    juges = sum(tranches.values())
+    rejets = tranches.get(ControleQualite.Resultat.NON_CONFORME, 0)
+    return {
+        "itp": {
+            "plans": itp.count(),
+            "plans_approuves": itp.filter(approuve_le__isnull=False).count(),
+            "points": n_points,
+            "points_arret_en_attente": points.filter(
+                type_point=PointInspection.TypePoint.ARRET, statut=PointInspection.Statut.EN_ATTENTE
+            ).count(),
+            "points_leves": leves,
+            "points_non_conformes": points.filter(statut=PointInspection.Statut.NON_CONFORME).count(),
+            "taux_levee": round(leves / n_points, 4) if n_points else 0.0,
+        },
+        "cnd": {
+            "controles": cnd.count(),
+            "en_cours": cnd.exclude(statut=ControleQualite.Statut.VALIDE).count(),
+            "par_methode": {
+                (r["methode_cnd"] or "non_precisee"): r["n"]
+                for r in cnd.values("methode_cnd").annotate(n=Count("id")).order_by("methode_cnd")
+            },
+            "conformes": tranches.get(ControleQualite.Resultat.CONFORME, 0),
+            "sous_reserve": tranches.get(ControleQualite.Resultat.RESERVE, 0),
+            "non_conformes": rejets,
+            "taux_rejet": round(rejets / juges, 4) if juges else 0.0,
         },
     }
 
@@ -536,7 +581,13 @@ def alertes_agregees(user=None):
                 "statut": insp.statut,
             })
 
+    # Familles calendaires de la Couche D : garantie, agrément fournisseur, audit interne, revue de direction.
+    from .pilotage import alertes_calendaires
+
+    calendrier_liste = alertes_calendaires(user)
+
     _add(document_liste)
+    _add(calendrier_liste)
     _add(juridique["conventions"] + juridique["cautions"] + juridique["assurances"])
     _add(rh_liste)
     _add(qualite_liste)
@@ -548,6 +599,7 @@ def alertes_agregees(user=None):
         "rh": rh_liste,
         "qualite": qualite_liste,
         "maintenance": maintenance_liste,
+        "calendrier": calendrier_liste,
         "compteurs": compteurs,
         "total": sum(compteurs.values()),
     }
