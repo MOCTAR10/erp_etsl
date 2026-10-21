@@ -28,7 +28,16 @@ from .views import (
     SanctionViewSet,
 )
 
+from .views_m9a import (  # noqa: E402
+    AbsenceViewSet, EcheanceDeclarationViewSet, ElementFixeViewSet, EvenementCarriereViewSet, GrilleSalaireViewSet,
+)
+
 router = DefaultRouter()
+router.register("grilles-salaire", GrilleSalaireViewSet, basename="rh-grilles-salaire")
+router.register("elements-fixes", ElementFixeViewSet, basename="rh-elements-fixes")
+router.register("carriere", EvenementCarriereViewSet, basename="rh-carriere")
+router.register("absences", AbsenceViewSet, basename="rh-absences")
+router.register("echeances-declarations", EcheanceDeclarationViewSet, basename="rh-echeances-declarations")
 router.register("employes", EmployeViewSet, basename="rh-employes")
 router.register("contrats", ContratViewSet, basename="rh-contrats")
 router.register("qualifications", QualificationViewSet, basename="rh-qualifications")

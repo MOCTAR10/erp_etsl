@@ -169,6 +169,7 @@ class ContratTravail(models.Model):
         CHANTIER = "chantier", "Contrat de chantier"
         MISSION = "mission", "Mission / intérim"
         STAGE = "stage", "Stage / apprentissage"
+        EXPATRIE = "expatrie", "Expatrié"
 
     class Statut(models.TextChoices):
         ACTIF = "actif", "Actif"
@@ -194,6 +195,11 @@ class ContratTravail(models.Model):
         max_length=40, blank=True, verbose_name="Régime horaire"
     )
     lieu_affectation = models.CharField(max_length=120, blank=True, verbose_name="Lieu d'affectation")
+    grille = models.ForeignKey(
+        "GrilleSalaire", null=True, blank=True, on_delete=models.PROTECT, related_name="contrats",
+        verbose_name="Position dans la grille de salaires",
+        help_text="Si renseignée, le salaire de base du bulletin est celui de la grille en vigueur à la période.",
+    )
     statut = models.CharField(
         max_length=8, choices=Statut.choices, default=Statut.ACTIF, verbose_name="Statut"
     )
@@ -710,6 +716,10 @@ class BaremeCotisation(ValeurLegale):
     date_effet = models.DateField(verbose_name="Date d'effet")
     date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin")
     ordre = models.PositiveSmallIntegerField(default=0, verbose_name="Ordre")
+    exclure_expatries = models.BooleanField(
+        default=False, verbose_name="Non applicable aux contrats expatriés",
+        help_text="Cotisation non retenue sur le bulletin d'un salarié sous contrat « expatrié ».",
+    )
 
     class Meta:
         ordering = ["nature", "ordre", "code", "-date_effet"]
@@ -746,6 +756,10 @@ class BaremeImpot(ValeurLegale):
         max_digits=5, decimal_places=2, default=0, verbose_name="Abattement (%)"
     )
     cotisations_deductibles = models.BooleanField(default=True, verbose_name="Cotisations salariales déductibles")
+    abattement_plafond_annuel = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Plafond annuel de l'abattement (FCFA)",
+        help_text="Abattement forfaitaire maximal (ex. 833 333 FCFA / an) : l'abattement mensuel est plafonné au 1/12.",
+    )
     date_effet = models.DateField(verbose_name="Date d'effet")
     date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin")
 
@@ -995,6 +1009,8 @@ class DeclarationSociale(models.Model):
         CNAMGS = "cnamgs", "CNAMGS — déclaration trimestrielle des salaires"
         IRPP = "irpp", "IRPP — état des retenues (2460)"
         DADS = "dads", "DADS — déclaration annuelle des salaires"
+        FNH = "fnh", "FNH — Fonds national de l'habitat"
+        CFP = "cfp", "CFP — contribution à la formation professionnelle"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
@@ -1035,3 +1051,237 @@ class DeclarationSociale(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Une déclaration générée est scellée.")
+
+
+# --------------------------------------------------------------------------------------------
+# Écarts M9-A : grille de salaires, primes récurrentes, carrière, absences, calendrier déclaratif
+# --------------------------------------------------------------------------------------------
+class GrilleSalaire(ValeurLegale):
+    """Grille de salaires conventionnelle (catégorie, classe, échelon), versionnée par date d'effet.
+
+    Valeurs = DONNÉES à fournir par ETSL (convention collective applicable), provisoires tant que non confirmées.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    convention = models.CharField(max_length=120, blank=True, verbose_name="Convention collective")
+    categorie = models.CharField(max_length=20, choices=Employe.Categorie.choices, verbose_name="Catégorie")
+    classe = models.CharField(max_length=20, blank=True, verbose_name="Classe / niveau")
+    echelon = models.PositiveSmallIntegerField(default=1, verbose_name="Échelon")
+    salaire_base = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Salaire de base mensuel (FCFA)")
+    date_effet = models.DateField(verbose_name="Date d'effet")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin")
+
+    class Meta:
+        ordering = ["categorie", "classe", "echelon", "-date_effet"]
+        verbose_name = "Grille de salaires"
+        verbose_name_plural = "Grilles de salaires"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["convention", "categorie", "classe", "echelon", "date_effet"], name="uniq_grille_position_effet"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.code} : {self.salaire_base} FCFA dès {self.date_effet}"
+
+    @property
+    def code(self):
+        return f"{self.categorie}-{self.classe or '0'}-E{self.echelon}"[:40]
+
+    def clean(self):
+        if self.salaire_base is not None and self.salaire_base <= 0:
+            raise ValidationError({"salaire_base": "Le salaire de base doit être positif."})
+        if self.date_fin and self.date_effet and self.date_fin < self.date_effet:
+            raise ValidationError({"date_fin": "La date de fin précède la date d'effet."})
+
+
+class ElementFixe(models.Model):
+    """Prime ou indemnité récurrente d'un contrat (transport, logement, panier…) reprise à chaque bulletin préparé."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contrat = models.ForeignKey(
+        ContratTravail, on_delete=models.CASCADE, related_name="elements_fixes", verbose_name="Contrat"
+    )
+    rubrique = models.ForeignKey(RubriquePaie, on_delete=models.PROTECT, related_name="+", verbose_name="Rubrique")
+    montant = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Montant mensuel (FCFA)"
+    )
+    taux = models.DecimalField(
+        max_digits=6, decimal_places=3, null=True, blank=True, verbose_name="Taux (% du salaire de base)"
+    )
+    date_debut = models.DateField(verbose_name="Du")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Au")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["contrat", "rubrique__ordre"]
+        verbose_name = "Élément fixe de paie"
+        verbose_name_plural = "Éléments fixes de paie"
+
+    def __str__(self):
+        return f"{self.contrat.code} — {self.rubrique.label}"
+
+    def clean(self):
+        if self.rubrique_id and self.rubrique.nature != RubriquePaie.Nature.GAIN:
+            raise ValidationError({"rubrique": "Un élément fixe porte sur une rubrique de gain."})
+        if (self.montant is None) == (self.taux is None):
+            raise ValidationError("Renseigner soit un montant, soit un taux (l'un ou l'autre).")
+        if self.date_fin and self.date_debut and self.date_fin < self.date_debut:
+            raise ValidationError({"date_fin": "La date de fin précède la date de début."})
+
+
+class EvenementCarriere(models.Model):
+    """Historique de carrière INALTÉRABLE : promotion, reclassement, mutation, augmentation… (avant / après)."""
+
+    class Type(models.TextChoices):
+        EMBAUCHE = "embauche", "Embauche"
+        PROMOTION = "promotion", "Promotion"
+        RECLASSEMENT = "reclassement", "Reclassement"
+        MUTATION = "mutation", "Mutation"
+        AUGMENTATION = "augmentation", "Augmentation"
+        AVENANT = "avenant", "Avenant au contrat"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    employe = models.ForeignKey(Employe, on_delete=models.PROTECT, related_name="carriere", verbose_name="Employé")
+    contrat = models.ForeignKey(
+        ContratTravail, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Contrat"
+    )
+    type = models.CharField(max_length=14, choices=Type.choices, verbose_name="Type")
+    date_effet = models.DateField(verbose_name="Date d'effet")
+    categorie_avant = models.CharField(max_length=20, blank=True, verbose_name="Catégorie avant")
+    categorie_apres = models.CharField(max_length=20, blank=True, verbose_name="Catégorie après")
+    fonction_avant = models.CharField(max_length=150, blank=True, verbose_name="Fonction avant")
+    fonction_apres = models.CharField(max_length=150, blank=True, verbose_name="Fonction après")
+    grille_avant = models.ForeignKey(
+        GrilleSalaire, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Grille avant"
+    )
+    grille_apres = models.ForeignKey(
+        GrilleSalaire, null=True, blank=True, on_delete=models.PROTECT, related_name="+", verbose_name="Grille après"
+    )
+    salaire_avant = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    salaire_apres = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    motif = models.TextField(blank=True, verbose_name="Motif / décision")
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Enregistré par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_effet", "-created_at"]
+        verbose_name = "Événement de carrière"
+        verbose_name_plural = "Carrière — historique"
+
+    def __str__(self):
+        return f"{self.code} — {self.employe.nom_complet} ({self.get_type_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("L'historique de carrière est inaltérable.")
+        if not self.code:
+            self.code = RhPaieSequence.next_for("CAR", "CAR")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("L'historique de carrière est inaltérable.")
+
+
+class Absence(models.Model):
+    """Absence hors congés (CDC M9.2) : non rémunérée et validée, elle est retenue au bulletin préparé du mois."""
+
+    class Type(models.TextChoices):
+        INJUSTIFIEE = "injustifiee", "Absence injustifiée"
+        AUTORISEE_NP = "autorisee_np", "Absence autorisée non payée"
+        AUTORISEE_P = "autorisee_p", "Absence autorisée payée"
+        MALADIE = "maladie", "Arrêt maladie"
+        ACCIDENT_TRAVAIL = "accident_travail", "Accident du travail"
+        MISE_A_PIED = "mise_a_pied", "Mise à pied"
+
+    NON_REMUNEREES = ("injustifiee", "autorisee_np", "mise_a_pied")
+
+    class Statut(models.TextChoices):
+        SAISIE = "saisie", "Saisie"
+        VALIDEE = "validee", "Validée"
+        ANNULEE = "annulee", "Annulée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    employe = models.ForeignKey(Employe, on_delete=models.PROTECT, related_name="absences", verbose_name="Employé")
+    type = models.CharField(max_length=20, choices=Type.choices, verbose_name="Type")
+    date_debut = models.DateField(verbose_name="Du")
+    date_fin = models.DateField(verbose_name="Au")
+    remuneree = models.BooleanField(
+        null=True, blank=True, verbose_name="Rémunérée",
+        help_text="Vide = selon le type (injustifiée, autorisée non payée et mise à pied ne sont pas payées).",
+    )
+    motif = models.CharField(max_length=200, blank=True, verbose_name="Motif / justificatif")
+    statut = models.CharField(max_length=8, choices=Statut.choices, default=Statut.SAISIE, verbose_name="Statut")
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Validée par",
+    )
+    valide_le = models.DateTimeField(null=True, blank=True, verbose_name="Validée le")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_debut"]
+        verbose_name = "Absence"
+        verbose_name_plural = "Absences"
+        indexes = [models.Index(fields=["employe", "statut", "date_debut"])]
+
+    def __str__(self):
+        return f"{self.code} — {self.employe.nom_complet} ({self.get_type_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = RhPaieSequence.next_for("ABS", "ABS")
+        if self.remuneree is None:
+            self.remuneree = self.type not in self.NON_REMUNEREES
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
+            raise ValidationError({"date_fin": "La date de fin précède la date de début."})
+
+    @property
+    def nb_jours(self):
+        return (self.date_fin - self.date_debut).days + 1
+
+
+class EcheanceDeclaration(ValeurLegale):
+    """Date limite de dépôt d'une déclaration sociale ou fiscale (calendrier ETSL), alertée tant qu'elle manque."""
+
+    class Periodicite(models.TextChoices):
+        MENSUELLE = "mensuelle", "Mensuelle"
+        TRIMESTRIELLE = "trimestrielle", "Trimestrielle"
+        ANNUELLE = "annuelle", "Annuelle"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    libelle = models.CharField(max_length=150, verbose_name="Libellé")
+    type_declaration = models.CharField(
+        max_length=10, choices=DeclarationSociale.Type.choices, verbose_name="Déclaration"
+    )
+    periodicite = models.CharField(max_length=14, choices=Periodicite.choices, verbose_name="Périodicité")
+    jour = models.PositiveSmallIntegerField(verbose_name="Jour limite")
+    mois = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="Mois limite (annuelle)",
+        help_text="Mensuelle / trimestrielle : le jour limite tombe le mois suivant la période.",
+    )
+    actif = models.BooleanField(default=True, verbose_name="Active")
+
+    class Meta:
+        ordering = ["type_declaration", "code"]
+        verbose_name = "Échéance de déclaration"
+        verbose_name_plural = "Échéances des déclarations"
+
+    def __str__(self):
+        return f"{self.code} — {self.libelle}"
+
+    def clean(self):
+        if not self.jour or not 1 <= self.jour <= 31:
+            raise ValidationError({"jour": "Jour entre 1 et 31."})
+        if self.periodicite == self.Periodicite.ANNUELLE and not (self.mois and 1 <= self.mois <= 12):
+            raise ValidationError({"mois": "Mois (1 à 12) requis pour une échéance annuelle."})

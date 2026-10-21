@@ -141,7 +141,9 @@ def _instantane(bareme, type_):
     elif type_ == "parametre":
         snap.update(valeur=str(bareme.valeur))
     else:
-        snap.update(abattement_pct=str(bareme.abattement_pct), tranches=bareme.tranches)
+        snap.update(abattement_pct=str(bareme.abattement_pct), tranches=bareme.tranches,
+                    abattement_plafond_annuel=None if bareme.abattement_plafond_annuel is None
+                    else str(bareme.abattement_plafond_annuel))
     return snap
 
 
@@ -236,7 +238,12 @@ def calculer_bulletin(bulletin):
     )
     patronal = Decimal("0")
     utilises = [s for s in (bulletin.baremes_utilises or []) if s.get("type") == "parametre"]  # paramètres d'intégration temps
+    from .paie_m9a import est_expatrie
+
+    expatrie = est_expatrie(bulletin)
     for bareme in baremes_en_vigueur(bulletin.periode):
+        if expatrie and bareme.exclure_expatries:
+            continue  # cotisation non applicable aux contrats expatriés (paramètre du barème)
         utilises.append(_instantane(bareme, "cotisation"))
         assiette = gains if bareme.base == bareme.Base.BRUT else bulletin.salaire_base
         if bareme.plafond is not None:
@@ -262,7 +269,10 @@ def calculer_bulletin(bulletin):
     for bareme in baremes_impot_en_vigueur(bulletin.periode):
         utilises.append(_instantane(bareme, "impot"))
         base = gains - (cotisations if bareme.cotisations_deductibles else Decimal("0"))
-        base = max(base * (Decimal("1") - bareme.abattement_pct / 100), Decimal("0"))
+        abattement = base * bareme.abattement_pct / 100
+        if bareme.abattement_plafond_annuel is not None:  # forfait annuel maximal, ramené au mois
+            abattement = min(abattement, bareme.abattement_plafond_annuel / 12)
+        base = max(base - abattement, Decimal("0"))
         parts = max(Decimal(bulletin.employe.parts_fiscales or 1), Decimal("1"))
         montant = _arrondi(bareme.impot_par_part(base / parts) * parts)
         rubrique, _ = RubriquePaie.objects.get_or_create(
@@ -519,6 +529,7 @@ def generer_virement(periode, compte, date_execution, user=None):
 # Pointages M3 -> heures supplémentaires, déclarations sans ressaisie, reporting RH (clôture M9)
 # --------------------------------------------------------------------------------------------
 HS_RUBRIQUE = "HS-TEMPS"
+HS_PARAMETRES = ("DUREE_LEGALE_HEBDO", "HS_MAJ_1", "HS_MAJ_2", "HS_SEUIL_2")
 JOURS_OUVRES_AN = Decimal("220")  # base d'absentéisme (jours ouvrés/an) ; à confirmer avec la convention collective
 
 
@@ -596,7 +607,10 @@ def integrer_temps(bulletin):
     else:
         bulletin.lignes.filter(rubrique=rubrique).delete()
     SaisieTemps.objects.filter(pk__in=[s.pk for s in res["saisies"]]).update(statut=SaisieTemps.Statut.TRANSFERE_PAIE)
-    snaps = [s for s in (bulletin.baremes_utilises or []) if s.get("type") != "parametre"]
+    snaps = [
+        s for s in (bulletin.baremes_utilises or [])
+        if not (s.get("type") == "parametre" and s.get("code") in HS_PARAMETRES)
+    ]
     bulletin.baremes_utilises = snaps + [_instantane(p, "parametre") for p in res["parametres"]]
     bulletin.save(update_fields=["baremes_utilises", "updated_at"])
     return calculer_bulletin(bulletin), res
@@ -645,6 +659,7 @@ def generer_declaration(type_, debut, fin, user=None):
     if not bulletins:
         raise ValidationError("Aucun bulletin validé sur cette période : rien à déclarer.")
     organisme = {"cnss": "CNSS", "cnamgs": "CNAMGS"}.get(type_)
+    prefixe = {"fnh": "FNH", "cfp": "CFP"}.get(type_)  # contributions patronales identifiées par le code du barème
     par_employe = {}
     provisoires = set()
     tot = {"brut": Decimal("0"), "sal": Decimal("0"), "pat": Decimal("0"), "imp": Decimal("0")}
@@ -663,6 +678,8 @@ def generer_declaration(type_, debut, fin, user=None):
         for v in ventilation_bulletin(b):
             if organisme and v["organisme"] != organisme:
                 continue
+            if prefixe and not v["code"].startswith(prefixe):
+                continue
             assiettes.append(v["assiette"])
             if v["nature"] == "salariale":
                 ligne["sal"] += v["montant"]
@@ -678,6 +695,8 @@ def generer_declaration(type_, debut, fin, user=None):
         w.writerow(["matricule", "nom", "n_affiliation", "brut", "assiette", "cotisation_salariale", "cotisation_patronale"])
     elif type_ == "irpp":
         w.writerow(["matricule", "nom", "parts", "brut", "impot_retenu"])
+    elif prefixe:
+        w.writerow(["matricule", "nom", "brut", "assiette", "contribution_patronale"])
     else:
         w.writerow(["matricule", "nom", "n_cnss", "brut_annuel", "cotisations_salariales", "impot_retenu", "net_paye"])
     for ligne in par_employe.values():
@@ -690,6 +709,8 @@ def generer_declaration(type_, debut, fin, user=None):
             w.writerow([e.code, e.nom_complet, e.matricule_cnps, ligne["brut"], ligne["assiette"], ligne["sal"], ligne["pat"]])
         elif type_ == "irpp":
             w.writerow([e.code, e.nom_complet, e.parts_fiscales, ligne["brut"], ligne["imp"]])
+        elif prefixe:
+            w.writerow([e.code, e.nom_complet, ligne["brut"], ligne["assiette"], ligne["pat"]])
         else:
             w.writerow([e.code, e.nom_complet, e.numero_securite_sociale, ligne["brut"], ligne["sal"], ligne["imp"], ligne["net"]])
     contenu = out.getvalue()

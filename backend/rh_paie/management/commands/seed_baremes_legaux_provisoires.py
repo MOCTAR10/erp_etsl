@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 
-from rh_paie.models import BaremeCotisation, BaremeImpot, ParametrePaie
+from rh_paie.models import BaremeCotisation, BaremeImpot, EcheanceDeclaration, ParametrePaie
 
 EFFET = date(2026, 1, 1)
 
@@ -65,8 +65,23 @@ PARAMETRES = [
      "Sources contradictoires (35 % / 50 %) — à confirmer"),
     ("HS_SEUIL_2", "Seuil de la tranche 2 d'heures supplémentaires", "48", "h", "https://africarrieres.com/gabon/fr/guide/droit-du-travail/heures-et-conges",
      "À confirmer"),
+    ("JOURS_PAIE_MOIS", "Diviseur journalier du salaire (retenue d'absence)", "30", "j",
+     "Usage (mois de 30 jours) — à confirmer avec la convention collective",
+     "Convention collective / pratique ETSL à confirmer (26 jours ouvrables possibles)"),
     ("CNAMGS_PENALITE_DEFAUT", "CNAMGS — majoration pour défaut de déclaration", "25", "%", CNAMGS, CNAMGS_REF),
     ("CNAMGS_PENALITE_RETARD", "CNAMGS — majoration pour paiement tardif", "2", "%", CNAMGS, CNAMGS_REF),
+]
+
+
+ECHEANCES_SOURCE = "Documentation ETSL (DADS au 31/03) ; autres dates : usage, à confirmer"
+# code, libellé, déclaration, périodicité, jour limite, mois limite (annuelle)
+ECHEANCES = [
+    ("ECH-CNSS", "Déclaration et paiement CNSS", "cnss", "mensuelle", 15, None),
+    ("ECH-CNAMGS", "Déclaration trimestrielle CNAMGS", "cnamgs", "trimestrielle", 15, None),
+    ("ECH-IRPP", "Reversement des retenues IRPP", "irpp", "mensuelle", 15, None),
+    ("ECH-FNH", "Contribution FNH", "fnh", "mensuelle", 15, None),
+    ("ECH-CFP", "Contribution à la formation professionnelle", "cfp", "mensuelle", 15, None),
+    ("ECH-DADS", "Déclaration annuelle des salaires (DADS)", "dads", "annuelle", 31, 3),
 ]
 
 
@@ -87,13 +102,26 @@ class Command(BaseCommand):
             defaults=dict(
                 label="IRPP — retenue mensuelle (barème DGI 2026 ÷ 12)", tranches=TRANCHES_MENSUELLES,
                 abattement_pct=Decimal("20"), cotisations_deductibles=True,
+                abattement_plafond_annuel=Decimal("833333"),
                 source="https://www.atekbot.space/blog/irpp-gabon-2026-bareme-calcul-et-declaration-dgi-le-guide-complet",
                 reference_texte=(
                     "CGI art. 174 et loi de finances n°041/2025 du 29/12/2025 (à confirmer) ; abattement 20 % si base "
-                    "< 4 166 666 FCFA/an, sinon forfait 833 333 : le forfait n'est pas géré, à confirmer"
+                    "< 4 166 666 FCFA/an, sinon forfait 833 333 (plafond annuel de l'abattement), à confirmer"
                 ),
             ),
         )
+        # Plafond de l'abattement ajouté après coup : complété sur un barème encore provisoire, jamais sur un confirmé.
+        BaremeImpot.objects.filter(
+            code="IRPP", date_effet=EFFET, statut_valeur="provisoire", abattement_plafond_annuel__isnull=True
+        ).update(abattement_plafond_annuel=Decimal("833333"))
+        for code, libelle, type_, periodicite, jour, mois in ECHEANCES:
+            EcheanceDeclaration.objects.get_or_create(
+                code=code,
+                defaults=dict(
+                    libelle=libelle, type_declaration=type_, periodicite=periodicite, jour=jour, mois=mois,
+                    source=ECHEANCES_SOURCE, reference_texte="Calendrier fiscal et social ETSL à confirmer",
+                ),
+            )
         for code, label, valeur, unite, source, ref in PARAMETRES:
             ParametrePaie.objects.get_or_create(
                 code=code, date_effet=EFFET,

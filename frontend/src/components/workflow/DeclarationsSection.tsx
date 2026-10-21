@@ -83,6 +83,8 @@ export function DeclarationsSection() {
           <option value="cnamgs">CNAMGS</option>
           <option value="irpp">IRPP (2460)</option>
           <option value="dads">DADS</option>
+          <option value="fnh">FNH</option>
+          <option value="cfp">CFP</option>
         </select>
         <input required type="date" aria-label={t("declarations.du")} value={form.periode_debut} onChange={(e) => setForm({ ...form, periode_debut: e.target.value })} />
         <input required type="date" aria-label={t("declarations.au")} value={form.periode_fin} onChange={(e) => setForm({ ...form, periode_fin: e.target.value })} />

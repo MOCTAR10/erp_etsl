@@ -551,6 +551,18 @@ class BulletinViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError({"detail": exc.messages})
         return Response(self.get_serializer(bulletin).data)
 
+    @extend_schema(request=None)
+    @action(detail=True, methods=["post"], url_path="preparer")
+    def preparer(self, request, pk=None):
+        """Prépare le bulletin depuis le contrat : salaire (grille), primes récurrentes, prorata, absences, heures sup."""
+        from .paie_m9a import preparer_bulletin
+
+        try:
+            preparer_bulletin(self.get_object())
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(self.get_object()).data)
+
     @action(detail=True, methods=["post"], url_path="archiver")
     def archiver(self, request, pk=None):
         """Scelle le PDF du bulletin en GED (conservation ≥ 10 ans, accès restreint RH)."""
