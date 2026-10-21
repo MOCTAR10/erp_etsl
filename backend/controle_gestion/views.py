@@ -133,8 +133,13 @@ class BudgetViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         if budget.statut != Budget.Statut.BROUILLON:
             raise DRFValidationError("Seul un budget brouillon peut être approuvé.")
         if _apposer_visa(budget, request):
+            from .ecarts_m11 import archiver_pv_budget
+
             budget.statut = Budget.Statut.APPROUVE
             budget.save(update_fields=["statut", "updated_at"])
+            # PV de validation (double visa) archivé en GED, conservation paramétrée (10 ans provisoire).
+            budget.pv_document = archiver_pv_budget(budget, request.user)
+            budget.save(update_fields=["pv_document", "updated_at"])
         return Response(self.get_serializer(budget).data)
 
     @action(detail=True, methods=["post"])
@@ -234,12 +239,26 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
                 f"Le budget a changé depuis la préparation de {revision.code} "
                 f"({revision.ancien_montant} → {budget.montant}) : préparez une nouvelle révision."
             )
+        lignes = list(revision.lignes.select_related("period"))
+        actuelles = {l.period_id: l for l in budget.lignes.all()}
+        for l in lignes:
+            courant = actuelles[l.period_id].montant if l.period_id in actuelles else 0
+            if courant != l.ancien_montant:
+                raise DRFValidationError(
+                    f"La ligne {l.period} a changé depuis la préparation de {revision.code} : préparez une nouvelle révision."
+                )
         if not _apposer_visa(revision, request):
             return Response(self.get_serializer(revision).data)
+        from .ecarts_m11 import archiver_pv_budget
+
+        # Révision par ligne mensuelle : chaque période révisée remplace la ligne du budget.
+        for l in lignes:
+            BudgetLigne.objects.update_or_create(budget=budget, period=l.period, defaults={"montant": l.nouveau_montant})
         budget.montant = revision.nouveau_montant
         budget.save(update_fields=["montant", "updated_at"])
         revision.statut = BudgetRevision.Statut.APPLIQUEE
-        revision.save(update_fields=["statut", "updated_at"])
+        revision.pv_document = archiver_pv_budget(revision, request.user)
+        revision.save(update_fields=["statut", "pv_document", "updated_at"])
         return Response(
             BudgetSerializer(budget, context=self.get_serializer_context()).data
         )
@@ -472,7 +491,13 @@ class ParametreGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         for code in PARAMETRES_DEFAUT:
             get_param_gestion(code)
-        return super().get_queryset()
+        qs = super().get_queryset()
+        # Liste : paramètres hors tables par défaut ; `?table=RGM_POND_PROSPECT` : une table ; `?table=*` : tout.
+        if self.action == "list":
+            table = self.request.query_params.get("table", "")
+            if table != "*":
+                qs = qs.filter(table=table)
+        return qs
 
     def get_permissions(self):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
