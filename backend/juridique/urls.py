@@ -2,6 +2,11 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    ActionContentieuxViewSet,
+    JalonContentieuxViewSet,
+    ParametreJuridiqueViewSet,
+    PieceDossierViewSet,
+    RisquesViewSet,
     AlertesViewSet,
     AssuranceViewSet,
     CautionViewSet,
@@ -25,6 +30,11 @@ router.register("dossiers-gr", DossierGlobalRentalViewSet, basename="juridique-d
 router.register("liens", LienDocumentViewSet, basename="juridique-liens")
 router.register("recherche", RechercheJuridiqueView, basename="juridique-recherche")
 router.register("alertes", AlertesViewSet, basename="juridique-alertes")
+router.register("parametres", ParametreJuridiqueViewSet, basename="juridique-parametres")
+router.register("jalons", JalonContentieuxViewSet, basename="juridique-jalons")
+router.register("actions-contentieux", ActionContentieuxViewSet, basename="juridique-actions-contentieux")
+router.register("pieces", PieceDossierViewSet, basename="juridique-pieces")
+router.register("risques", RisquesViewSet, basename="juridique-risques")
 
 urlpatterns = [
     path("", include(router.urls)),

@@ -37,11 +37,13 @@ class ValidationDgTests(APITestCase):
     def test_mainlevee_et_appel_de_caution_reserves_au_dg(self):
         for action in ("lever", "appeler"):
             self.assertEqual(self.post(self.finance, f"/api/juridique/cautions/{self.caution.pk}/{action}/").status_code, 403, action)
+        self.post(self.dg, f"/api/juridique/cautions/{self.caution.pk}/valider-dg/")  # écarts M12 : préalable
         self.assertEqual(self.post(self.dg, f"/api/juridique/cautions/{self.caution.pk}/lever/").status_code, 200)
 
     def test_renouvellement_et_resiliation_d_assurance_reserves_au_dg(self):
         url = f"/api/juridique/assurances/{self.assurance.pk}/renouveler/"
         self.assertEqual(self.post(self.finance, url).status_code, 403)
+        self.post(self.dg, f"/api/juridique/assurances/{self.assurance.pk}/valider-dg/")  # écarts M12 : préalable
         self.assertEqual(self.post(self.dg, url).status_code, 200)
         self.assertEqual(self.post(self.finance, f"/api/juridique/assurances/{self.assurance.pk}/resilier/").status_code, 403)
 

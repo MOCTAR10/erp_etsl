@@ -4,6 +4,7 @@ import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { EcartsM12Section } from "../components/juridique/EcartsM12Section";
 import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
@@ -409,6 +410,7 @@ export function JuridiquePage() {
       )}
       <RechercheJuridiqueSection />
       <DocumentsOfficielsSection />
+      <EcartsM12Section />
 
       {(courriers.count > 0 || courriers.search) && (
         <SectionCard title={`${t("juridique.courriers")} · ${courriers.count}`}>
