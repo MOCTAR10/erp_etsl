@@ -29,6 +29,10 @@ class ParametreCube(models.Model):
     label = models.CharField(max_length=200, verbose_name="Libellé")
     valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
     unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    texte = models.CharField(
+        max_length=500, blank=True, verbose_name="Valeur texte",
+        help_text="Paramètres de type liste (ex. rôles destinataires, séparés par des virgules).",
+    )
     statut_valeur = models.CharField(
         max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
         verbose_name="Statut de la valeur",

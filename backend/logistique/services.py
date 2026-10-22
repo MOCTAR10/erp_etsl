@@ -533,10 +533,21 @@ def controles_bc_achat(location, bc):
     return erreurs
 
 
+def _synchroniser_bc(location, bc):
+    """Lien unique location ↔ BC GR : le BC porte aussi la location (lu par M10, exclusion anti-double 618)."""
+    from comptabilite.gr import controler_liaison_bc
+
+    controler_liaison_bc(location, bc)
+    if bc.location_gr_id is None:
+        type(bc).objects.filter(pk=bc.pk).update(location_gr=location)
+        bc.location_gr = location
+
+
 def lier_bc_achat(location, bc):
     erreurs = controles_bc_achat(location, bc)
     if erreurs:
         raise ValidationError(erreurs)
+    _synchroniser_bc(location, bc)
     location.bon_commande_achat = bc
     if not location.reference_bc:
         location.reference_bc = bc.code
@@ -574,6 +585,7 @@ def rapprocher_facture(location, facture):
     ecart = (total - attendu).quantize(CENT)
     tolerance = get_param_logistique("TOLERANCE_FACTURE_PCT")
     conforme = abs(ecart) <= (attendu * tolerance / 100) if attendu else ecart == 0
+    _synchroniser_bc(location, facture.purchase_order)
     location.facture_achat = facture
     if not location.bon_commande_achat_id:
         location.bon_commande_achat = facture.purchase_order

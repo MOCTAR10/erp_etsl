@@ -10,10 +10,11 @@ from .gr_views import (
     WebhookDeliveryViewSet,
     WebhookEndpointViewSet,
 )
-from .views import ImportBatchViewSet, ImportFileView, OpeningBalanceView
+from .views import GabaritImportViewSet, ImportBatchViewSet, ImportFileView, OpeningBalanceView
 
 router = DefaultRouter()
 router.register("batches", ImportBatchViewSet, basename="importbatch")
+router.register("gabarits", GabaritImportViewSet, basename="gabarit-import")
 router.register("api-clients", ApiClientViewSet, basename="api-client")
 router.register("webhooks", WebhookEndpointViewSet, basename="webhook-endpoint")
 router.register("webhook-deliveries", WebhookDeliveryViewSet, basename="webhook-delivery")

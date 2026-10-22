@@ -10,6 +10,7 @@ import { CoutsHseSection } from "../components/hse/HsePermisSection";
 import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaireSection";
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { EcartsM11Section } from "../components/controleGestion/EcartsM11Section";
+import { BalanceAgeeGestionSection, MargesTerminaisonSection } from "../components/suivi/SuiviSections";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
@@ -352,6 +353,8 @@ export function ControleGestionPage() {
       <SaisieBudgetaireSection fiscalYear={fy.data.id} budgets={[...groups.brouillon, ...groups.approuve, ...groups.cloture]} />
       <PilotageGestionSection fiscalYear={fy.data?.id} />
       <EcartsM11Section fiscalYear={fy.data.id} />
+      <MargesTerminaisonSection />
+      <BalanceAgeeGestionSection />
       <GrAffairesSection fiscalYear={fy.data?.id} />
       <MaintenanceCoutsSection />
       <CoutsHseSection />

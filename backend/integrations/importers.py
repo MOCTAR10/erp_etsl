@@ -89,7 +89,9 @@ class PartnerConnector(BaseHandler):
 class GLConnector(BaseHandler):
     """Reprise d'écritures (SAGE) — CSV → écritures comptables via accounting_kernel.
 
-    Colonnes : date, journal, account_debit, account_credit, label, amount, reference.
+    Colonnes : date, journal, account_debit, account_credit, label, amount, reference ; optionnelles : `analytic`
+    (code `AXE:CODE` ou `CODE` d'un compte analytique) ou `affaire` (code d'affaire M1 → son compte analytique),
+    imputés sur la ligne de charge / produit (classe 6 ou 7), à défaut sur la ligne de débit.
     """
 
     REQUIRED_FIELDS = ("date", "journal", "account_debit", "account_credit", "amount")
@@ -138,6 +140,10 @@ class GLConnector(BaseHandler):
         ).exists():
             return ("duplicate", reference or move_date.isoformat())
 
+        from .gabarits import cible_analytique, resoudre_analytique
+
+        analytic = resoudre_analytique(row.get("analytic"), row.get("affaire"))
+        cible = cible_analytique([debit_account, credit_account])
         period = period_for_date(move_date)
         move = AccountMove.objects.create(
             journal=journal,
@@ -149,10 +155,12 @@ class GLConnector(BaseHandler):
             source_ref=f"gl/{reference}",
         )
         AccountMoveLine.objects.create(
-            move=move, account=debit_account, debit=amount, order=0
+            move=move, account=debit_account, debit=amount, order=0,
+            analytic_account=analytic if cible == 0 else None,
         )
         AccountMoveLine.objects.create(
-            move=move, account=credit_account, credit=amount, order=1
+            move=move, account=credit_account, credit=amount, order=1,
+            analytic_account=analytic if cible == 1 else None,
         )
         post_move(move)
         return ("created", reference or move_date.isoformat())
@@ -174,7 +182,7 @@ def parse_csv(content):
     return list(reader), reader.fieldnames
 
 
-def run_import(connector, filename, content, user=None, force=False):
+def run_import(connector, filename, content, user=None, force=False, gabarit=None):
     """Exécute un import de fichier. Retourne (batch, replayed).
 
     - replayed=True si un lot identique (même SHA-256) a déjà abouti et qu'on
@@ -191,6 +199,10 @@ def run_import(connector, filename, content, user=None, force=False):
         return existing, True
 
     handler = HANDLERS.get(connector)
+    if connector == ImportBatch.Connector.SAGE:
+        from .gabarits import SageConnector, gabarit_sage
+
+        handler = SageConnector(gabarit or gabarit_sage())
     if handler is None:
         raise ImportError(f"connecteur inconnu : {connector}")
 
@@ -204,10 +216,17 @@ def run_import(connector, filename, content, user=None, force=False):
     )
 
     try:
-        rows, fieldnames = parse_csv(content)
+        from .gabarits import est_xml, parse_xml
+
+        if hasattr(handler, "parse"):
+            rows, fieldnames = handler.parse(content, filename)
+        elif est_xml(filename, content):
+            rows, fieldnames = parse_xml(content)
+        else:
+            rows, fieldnames = parse_csv(content)
     except Exception as exc:
         batch.status = ImportBatch.Status.FAILED
-        batch.error_message = f"parsing CSV : {exc!r}"
+        batch.error_message = f"lecture du fichier : {exc!r}"
         batch.finished_at = timezone.now()
         batch.save()
         return batch, False
@@ -221,6 +240,8 @@ def run_import(connector, filename, content, user=None, force=False):
         batch.save()
         return batch, False
 
+    if hasattr(handler, "prepare"):
+        rows = handler.prepare(rows)  # SAGE : une écriture par pièce
     batch.total_rows = len(rows)
     batch.save(update_fields=["total_rows", "status"])
 

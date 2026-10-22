@@ -4,8 +4,11 @@
 retard) est comptabilisé au journal des achats : Dr 618000 (analytique de l'affaire) / Cr 401100 (fournisseur
 intra-groupe GLOBAL RENTAL). Une seule écriture par location (source « M4 », réf. = code de la location).
 
-Pas de double charge : une location rattachée à un bon de commande GLOBAL RENTAL (M2, `PurchaseOrder.location_gr`)
-est facturée et comptabilisée au 618 par le circuit achats (facture fournisseur) ; elle est exclue d'ici.
+Pas de double charge : une location rattachée à un bon de commande GLOBAL RENTAL est facturée et comptabilisée au
+618 par le circuit achats (facture fournisseur) ; elle est exclue d'ici. Le lien existe par deux chemins, tous deux
+lus ici (une seule règle, `bc_lie`) : `PurchaseOrder.location_gr` (BC généré depuis la location, M2) et
+`LocationGR.bon_commande_achat` / `facture_achat` (BC lié ou facture rapprochée depuis M4). Les deux liens sont
+synchronisés à l'écriture ; une location déjà passée au 618 par M10 ne peut plus être liée à un BC GR.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -111,7 +114,30 @@ def locations_a_comptabiliser():
 
 
 def bc_lie(location):
-    """BC achats GLOBAL RENTAL (non annulé) rattaché à la location : la charge 618 passe par sa facture (M2)."""
-    from achats.models import PurchaseOrder
+    """BC achats GLOBAL RENTAL (non annulé) rattaché à la location par l'un OU l'autre chemin (M2 ou M4), ou facture
+    GR rapprochée : la charge 618 passe par la facture d'achat, jamais en plus par l'écriture M4."""
+    from achats.models import PurchaseInvoice, PurchaseOrder
 
-    return PurchaseOrder.objects.filter(location_gr=location).exclude(status=PurchaseOrder.Status.ANNULEE).exists()
+    from django.db.models import Q
+
+    cond = Q(location_gr_id=location.pk)
+    if location.bon_commande_achat_id:
+        cond |= Q(pk=location.bon_commande_achat_id)
+    if PurchaseOrder.objects.filter(cond).exclude(status=PurchaseOrder.Status.ANNULEE).exists():
+        return True
+    if location.facture_achat_id:
+        return PurchaseInvoice.objects.filter(pk=location.facture_achat_id).exclude(
+            status=PurchaseInvoice.Status.ANNULEE).exists()
+    return False
+
+
+def controler_liaison_bc(location, bc):
+    """Garde-fou commun M2 / M4 avant de lier un BC GR à une location : pas de location déjà passée au 618 par M10,
+    pas de BC déjà rattaché à une autre location."""
+    if ecriture_location(location):
+        raise ValidationError(
+            f"Location {location.code} déjà comptabilisée au 618 (écriture M10) : la lier à un BC GR créerait une "
+            "double charge. Extournez d'abord l'écriture."
+        )
+    if bc is not None and bc.location_gr_id and bc.location_gr_id != location.pk:
+        raise ValidationError(f"Le BC {bc.code} est déjà rattaché à une autre location GR.")

@@ -254,6 +254,9 @@ def apply_move(mouvement):
     controler_lot_obligatoire(mouvement.article_id, mouvement.lot_id)
     controler_depot(mouvement)
     controler_sortie_lot(mouvement)
+    from .reservations import consommer, controler_sortie
+
+    controler_sortie(mouvement)  # stock réservé par d'autres OF (besoins matière M3)
     prix = mouvement.prix_unitaire
     cout = prix
     if mouvement.source:
@@ -301,6 +304,7 @@ def apply_move(mouvement):
         mouvement.analytic = mouvement.ordre.affaire.assurer_compte_analytique()
     mouvement.executed = True
     mouvement.save(update_fields=["executed", "cout_unitaire", "analytic", "updated_at"])
+    consommer(mouvement)  # solde la réservation de l'OF consommateur
     return mouvement
 
 
@@ -407,6 +411,8 @@ ROLES_ALERTE_STOCK = (User.Role.LOGISTIQUE, User.Role.DIRECTEUR_OPERATIONS)
 PARAMETRES_STOCK_DEFAUT = {
     "PEREMPTION_ALERTE_JOURS": ("Alerte de péremption des lots", "30", "jours"),
     "CERTIFICAT_RETENTION_ANS": ("Conservation des certificats matière en GED", "10", "ans"),
+    "RESERVATION_BLOQUANTE": (
+        "Réservation des besoins M3 : 1 = stock réservé non consommable par un autre OF, 0 = simple alerte", "1", "0/1"),
 }
 TYPE_GED_CERTIFICAT = "certificats-matiere"
 TYPE_GED_PIECE_STOCK = "pieces-stock"

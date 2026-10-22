@@ -520,8 +520,37 @@ class ParametreCommercialSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ParametreCommercial
-        fields = ["id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le"]
+        fields = ["id", "code", "label", "valeur", "unite", "texte", "statut_valeur", "est_provisoire", "confirme_par",
+                  "confirme_le"]
         read_only_fields = ["id", "code", "label", "unite", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le"]
+
+    def validate_texte(self, value):
+        from .ecarts_m1 import CODES_CRITERES_RAO, CODES_TEXTE_SEUL
+
+        code = getattr(self.instance, "code", None)
+        value = (value or "").strip()
+        if code in (*CODES_CRITERES_RAO, *CODES_TEXTE_SEUL):
+            if not value:
+                raise serializers.ValidationError("Texte obligatoire pour ce paramètre.")
+            return value
+        if value:
+            raise serializers.ValidationError("Ce paramètre n'a pas de valeur texte.")
+        return value
+
+    def validate_valeur(self, value):
+        from .ecarts_m1 import CODES_CRITERES_RAO
+
+        if getattr(self.instance, "code", None) in CODES_CRITERES_RAO and value < 0:
+            raise serializers.ValidationError("Le poids d'un critère est positif (0 = critère retiré).")
+        return value
+
+    def update(self, instance, validated_data):
+        # Une valeur ou un texte modifié redevient provisoire jusqu'à nouvelle confirmation.
+        if any(k in validated_data and validated_data[k] != getattr(instance, k) for k in ("valeur", "texte")):
+            instance.statut_valeur = ParametreCommercial.StatutValeur.PROVISOIRE
+            instance.confirme_par = None
+            instance.confirme_le = None
+        return super().update(instance, validated_data)
 
 
 class HabilitationRequiseSerializer(ModelCleanMixin, serializers.ModelSerializer):

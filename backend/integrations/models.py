@@ -17,7 +17,8 @@ class ImportBatch(models.Model):
 
     class Connector(models.TextChoices):
         PARTNERS = "partners", "Tiers (CSV)"
-        GL = "gl", "Écritures générales (CSV — reprise SAGE)"
+        GL = "gl", "Écritures générales (CSV / XML — reprise SAGE)"
+        SAGE = "sage", "Écritures SAGE (fichier d'export, gabarit paramétrable)"
         CFONB = "cfonb", "Relevés bancaires CFONB"
         MT940 = "mt940", "Relevé bancaire SWIFT MT940"
         CNSSG = "cnssg", "Cotisations CNSSG"
@@ -236,3 +237,45 @@ class WebhookDelivery(models.Model):
 
     def __str__(self):
         return f"{self.topic} → {self.endpoint_id} [{self.status}]"
+
+
+class GabaritImport(models.Model):
+    """Gabarit de lecture d'un fichier d'export (SAGE transitoire, H-04 : fichier, jamais d'API).
+
+    Séparateur, encodage, format de date, décimale et correspondance des colonnes sont des DONNÉES ETSL, modifiables
+    à l'écran ; provisoire tant qu'ETSL ne l'a pas confirmé sur un export réel.
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=30, unique=True, verbose_name="Code")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    separateur = models.CharField(max_length=3, default=";", verbose_name="Séparateur de colonnes")
+    encodage = models.CharField(max_length=20, default="cp1252", verbose_name="Encodage")
+    format_date = models.CharField(max_length=20, default="%d/%m/%Y", verbose_name="Format de date (strftime)")
+    separateur_decimal = models.CharField(max_length=1, default=",", verbose_name="Séparateur décimal")
+    colonnes = models.JSONField(default=dict, blank=True, verbose_name="Champ ERP → colonne du fichier")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Gabarit d'import"
+        verbose_name_plural = "Gabarits d'import"
+
+    def __str__(self):
+        return f"{self.code} — {self.label}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME

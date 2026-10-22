@@ -300,3 +300,21 @@ class ParametreStockSerializer(serializers.ModelSerializer):
             instance.confirme_par = None
             instance.confirme_le = None
         return super().update(instance, validated_data)
+
+
+class ReservationStockSerializer(serializers.ModelSerializer):
+    article_code = serializers.CharField(source="article.code", read_only=True)
+    article_label = serializers.CharField(source="article.label", read_only=True)
+    ordre_code = serializers.CharField(source="ordre.code", read_only=True, default=None)
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    reste = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+
+    class Meta:
+        from .models import ReservationStock
+
+        model = ReservationStock
+        fields = [
+            "id", "article", "article_code", "article_label", "ordre", "ordre_code", "besoin_id", "quantite",
+            "quantite_consommee", "reste", "statut", "statut_label", "motif", "created_at", "cloturee_le",
+        ]
+        read_only_fields = fields

@@ -602,7 +602,7 @@ class ControleInterne(models.Model):
             self.code = ComptabiliteSequence.next_for("CON", "CON")
         return super().save(*args, **kwargs)
 
-def clean(self):
+    def clean(self):
         if self.reference_procedure and not self.reference_procedure.startswith("proc. 4."):
             raise ValidationError(
                 {"reference_procedure": "Référence invalide — attendue 'proc. 4.x'."}
@@ -791,6 +791,13 @@ class FactureClient(models.Model):
     montant_ht = models.DecimalField(max_digits=16, decimal_places=2, default=0)
     montant_tva = models.DecimalField(max_digits=16, decimal_places=2, default=0)
     montant_ttc = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    taux_retenue = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0, verbose_name="Taux de retenue de garantie (%)"
+    )
+    montant_retenue = models.DecimalField(
+        max_digits=16, decimal_places=2, default=0, verbose_name="Retenue de garantie",
+        help_text="Fixée à l'émission (contrat de l'affaire, M1) ; portée au 4117.",
+    )
     move = models.ForeignKey(
         "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.SET_NULL,
         related_name="factures_clients",
@@ -826,6 +833,10 @@ class FactureClient(models.Model):
                 else ComptabiliteSequence.next_for("FAC", "FAC")
             )
         return super().save(*args, **kwargs)
+
+    @property
+    def net_a_payer(self):
+        return self.montant_ttc - self.montant_retenue
 
     def recalculer(self):
         """Totaux depuis les lignes et le taux de TVA (arrondi au franc, FCFA sans décimales significatives)."""
@@ -1028,3 +1039,30 @@ class GabaritEtat(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class LiberationRetenue(models.Model):
+    """Libération de la retenue de garantie d'une affaire (Dr 411 / Cr 4117) — voir `retenues.py`."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    affaire = models.ForeignKey(
+        "commercial.Affaire", on_delete=models.PROTECT, related_name="liberations_retenue", verbose_name="Affaire"
+    )
+    montant = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant libéré")
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture",
+    )
+    motif = models.CharField(max_length=250, blank=True, verbose_name="Motif (libération anticipée)")
+    libere_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Libérée par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Libération de retenue de garantie"
+        verbose_name_plural = "Libérations de retenue de garantie"
+
+    def __str__(self):
+        return f"{self.affaire_id} — {self.montant}"

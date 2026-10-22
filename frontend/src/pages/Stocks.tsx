@@ -8,6 +8,7 @@ import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { AlertesStockSection, AuditValorisationSection, CertificatActions, ConfigArticlesSection, ParametresStockSection, TracabiliteSection, lotActions } from "../components/workflow/StocksEcartsSection";
+import { ReservationsStockSection } from "../components/suivi/SuiviSections";
 import type {
   CertificatMatiere,
   Depot,
@@ -424,6 +425,7 @@ export function StocksPage() {
       <TracabiliteSection lots={Object.values(groups).flat()} />
       <ConfigArticlesSection articles={articles.data ?? []} />
       <ParametresStockSection />
+      <ReservationsStockSection />
 
       {certificats.count > 0 && (
         <SectionCard title={t("stocks.certificats")}>

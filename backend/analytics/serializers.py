@@ -25,7 +25,7 @@ class ParametreCubeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ParametreCube
         fields = [
-            "id", "code", "label", "valeur", "unite", "statut_valeur", "est_provisoire",
+            "id", "code", "label", "valeur", "unite", "texte", "statut_valeur", "est_provisoire",
             "confirme_par", "confirme_le",
         ]
         read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
@@ -40,8 +40,26 @@ class ParametreCubeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("La valeur doit être strictement positive.")
         return value
 
+    def validate_texte(self, value):
+        code = getattr(self.instance, "code", None)
+        if code not in cubes.DESTINATAIRES_DEFAUT:
+            if value:
+                raise serializers.ValidationError("Ce paramètre n'a pas de valeur texte.")
+            return value
+        try:
+            roles = cubes.roles_valides(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
+        if not roles:
+            raise serializers.ValidationError("Au moins un rôle destinataire est requis.")
+        return ",".join(roles)
+
     def update(self, instance, validated_data):
         # Une valeur modifiée redevient provisoire jusqu'à nouvelle confirmation.
+        if "texte" in validated_data and validated_data["texte"] != instance.texte:
+            instance.statut_valeur = ParametreCube.StatutValeur.PROVISOIRE
+            instance.confirme_par = None
+            instance.confirme_le = None
         if "valeur" in validated_data and validated_data["valeur"] != instance.valeur:
             instance.statut_valeur = ParametreCube.StatutValeur.PROVISOIRE
             instance.confirme_par = None

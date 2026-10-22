@@ -6,6 +6,7 @@ from .views import (
     BesoinMatiereViewSet,
     BonTransfertViewSet,
     EscaladeSurchargeViewSet,
+    FluxM4View,
     FicheControleChantierViewSet,
     FichePreparationViewSet,
     ParametreOperationsViewSet,
@@ -43,6 +44,7 @@ router.register("transferts", BonTransfertViewSet, basename="bontransfert")
 router.register("attachements", AttachementViewSet, basename="attachement")
 router.register("repartitions", RepartitionAffaireOFViewSet, basename="repartitionaffaireof")
 router.register("escalades", EscaladeSurchargeViewSet, basename="escaladesurcharge")
+router.register("flux-m4", FluxM4View, basename="flux-m4")
 
 urlpatterns = [
     path("", include(router.urls)),

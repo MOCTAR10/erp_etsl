@@ -15,6 +15,9 @@ const moisPrecedent = () => {
   return d.toISOString().slice(0, 7);
 };
 const montant = (v: string) => formatNumber(Number(v));
+/** Paramètre de type liste (destinataires des alertes calendaires) : la valeur est le texte (rôles séparés par « , »). */
+const estTexte = (p: ParametreCube) => p.unite === "rôles";
+const texte = (p: ParametreCube) => (p as ParametreCube & { texte?: string }).texte ?? "";
 
 /** Durée de conservation de l'archive du cube : donnée ETSL modifiable, provisoire puis confirmée. */
 function ParametresCube() {
@@ -29,7 +32,8 @@ function ParametresCube() {
   });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["cube-parametres"] });
   const modifier = useMutation({
-    mutationFn: (v: { id: string; valeur: string }) => api.patch(`/api/analytics/cubes/parametres/${v.id}/`, { valeur: v.valeur }),
+    mutationFn: (v: { id: string; valeur: string; texte?: boolean }) =>
+      api.patch(`/api/analytics/cubes/parametres/${v.id}/`, v.texte ? { texte: v.valeur } : { valeur: v.valeur }),
     onSuccess: () => {
       setEdit(null);
       setError(null);
@@ -61,7 +65,13 @@ function ParametresCube() {
               <td>{p.label}</td>
               <td>
                 {edit?.id === p.id ? (
-                  <input type="number" min="0" step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+                  estTexte(p) ? (
+                    <input aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+                  ) : (
+                    <input type="number" min="0" step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+                  )
+                ) : estTexte(p) ? (
+                  texte(p)
                 ) : (
                   `${p.valeur} ${p.unite}`
                 )}
@@ -70,12 +80,12 @@ function ParametresCube() {
               <td>
                 {edit?.id === p.id ? (
                   <>
-                    <button type="button" className="btn" onClick={() => modifier.mutate(edit)}>{t("pilotageGestion.valider")}</button>{" "}
+                    <button type="button" className="btn" onClick={() => modifier.mutate({ ...edit, texte: estTexte(p) })}>{t("pilotageGestion.valider")}</button>{" "}
                     <button type="button" className="btn ghost" onClick={() => setEdit(null)}>{t("pilotageGestion.annuler")}</button>
                   </>
                 ) : (
                   <>
-                    <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("pilotageGestion.modifier")}</button>{" "}
+                    <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: estTexte(p) ? texte(p) : p.valeur })}>{t("pilotageGestion.modifier")}</button>{" "}
                     {p.est_provisoire && (
                       <button type="button" className="btn ghost" onClick={() => window.confirm(t("cube.confirmConfirmer")) && confirmer.mutate(p.id)}>
                         {t("pilotageGestion.confirmer")}
