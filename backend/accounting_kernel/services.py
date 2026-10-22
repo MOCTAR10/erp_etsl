@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import AccountMove, AccountMoveLine, FiscalYear, Period, Sequence
+from config.i18n import tr
 
 ZERO = Decimal("0")
 
@@ -15,7 +16,7 @@ def period_for_date(date):
     """Retourne la période contenant `date` (exercice non clôturé)."""
     period = Period.objects.filter(start_date__lte=date, end_date__gte=date).first()
     if period is None:
-        raise ValidationError(f"Aucune période comptable pour la date {date}.")
+        raise ValidationError(tr("Aucune période comptable pour la date %(date)s.") % {"date": date})
     return period
 
 
@@ -37,7 +38,7 @@ def validate_move(move):
         total_credit += line.credit
     if total_debit != total_credit:
         raise ValidationError(
-            f"Écriture déséquilibrée : débit {total_debit} ≠ crédit {total_credit}."
+            tr("Écriture déséquilibrée : débit %(total_debit)s ≠ crédit %(total_credit)s.") % {"total_debit": total_debit, "total_credit": total_credit}
         )
     return total_debit
 
@@ -107,8 +108,7 @@ def close_period(period):
     drafts = AccountMove.objects.filter(period=period, status=AccountMove.Status.DRAFT).count()
     if drafts:
         raise ValidationError(
-            f"Clôture impossible : {drafts} écriture(s) en brouillon dans la période "
-            "(comptabilisez-les ou supprimez-les d'abord)."
+            tr("Clôture impossible : %(drafts)s écriture(s) en brouillon dans la période (comptabilisez-les ou supprimez-les d'abord).") % {"drafts": drafts}
         )
     period.status = Period.Status.CLOSED
     period.save(update_fields=["status"])

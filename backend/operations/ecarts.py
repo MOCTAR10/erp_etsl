@@ -20,6 +20,7 @@ from .models import (
     PointageChantier,
     RapportExecution,
 )
+from config.i18n import en_francais, tr
 
 PARAMETRES_OPERATIONS_DEFAUT = {
     "PLANNING_HORIZON_SEMAINES": (
@@ -128,7 +129,7 @@ def controler_pointage_croise(employe, jour, heures, exclure=None):
     nom = f"{employe.nom} {employe.prenom}".strip()
     motif = indisponibilite(employe, jour)
     if motif:
-        raise ValidationError(f"{nom} est indisponible le {jour:%d/%m/%Y} ({motif}) : pointage refusé (croisement M9).")
+        raise ValidationError(tr("%(nom)s est indisponible le %(jour)s (%(motif)s) : pointage refusé (croisement M9).") % {"nom": nom, "jour": format(jour, '%d/%m/%Y'), "motif": motif})
     qs = PointageChantier.objects.filter(date=jour).filter(
         Q(employe=employe) | (Q(worker_id=employe.user_id) if employe.user_id else Q(pk__in=[]))
     )
@@ -138,8 +139,7 @@ def controler_pointage_croise(employe, jour, heures, exclure=None):
     plafond = param("PLAFOND_HEURES_JOUR")
     if cumul + heures > plafond:
         raise ValidationError(
-            f"{nom} : {_q(cumul + heures)} h pointées le {jour:%d/%m/%Y} pour un plafond de {_q(plafond)} h/jour "
-            "(paramètre provisoire)."
+            tr("%(nom)s : %(q)s h pointées le %(jour)s pour un plafond de %(q2)s h/jour (paramètre provisoire).") % {"nom": nom, "q": _q(cumul + heures), "jour": format(jour, '%d/%m/%Y'), "q2": _q(plafond)}
         )
 
 
@@ -471,60 +471,60 @@ def _pdf(titre, blocs, tableau=None):
 
 def of_pdf(of):
     blocs = [
-        ("OF", f"{of.code} — {of.label}"), ("Affaire", of.affaire.code if of.affaire_id else "—"),
-        ("Périmètre", of.get_scope_display()), ("Statut", of.get_status_display()),
-        ("Quantité", of.quantity), ("Période prévue", f"{_d(of.planned_start)} → {_d(of.planned_end)}"),
-        ("Heures prévues", of.calculated_hours), ("Gamme", f"{of.gamme.code} — {of.gamme.label}" if of.gamme_id else "—"),
-        ("Avancement", f"{avancement_of(of) or 0} %"),
+        ("OF", f"{of.code} — {of.label}"), (tr("Affaire"), of.affaire.code if of.affaire_id else "—"),
+        (tr("Périmètre"), of.get_scope_display()), (tr("Statut"), of.get_status_display()),
+        (tr("Quantité"), of.quantity), (tr("Période prévue"), f"{_d(of.planned_start)} → {_d(of.planned_end)}"),
+        (tr("Heures prévues"), of.calculated_hours), (tr("Gamme"), f"{of.gamme.code} — {of.gamme.label}" if of.gamme_id else "—"),
+        (tr("Avancement"), f"{avancement_of(of) or 0} %"),
     ]
-    tableau = [["Rubrique", "Référence", "Détail", "Quantité / heures"]]
+    tableau = [[tr("Rubrique"), tr("Référence"), tr("Détail"), tr("Quantité / heures")]]
     if of.gamme_id:
         for op in of.gamme.operations.all():
-            tableau.append(["Opération", str(op.sequence), f"{op.label} ({op.get_poste_display()})", f"{op.planned_hours} h"])
+            tableau.append([tr("Opération"), str(op.sequence), f"{op.label} ({op.get_poste_display()})", f"{op.planned_hours} h"])
     for b in of.besoins_matiere.select_related("article"):
-        tableau.append(["Matière", b.article.code, f"{b.article.label[:60]} — {b.get_statut_display()}", str(b.quantite)])
+        tableau.append([tr("Matière"), b.article.code, f"{b.article.label[:60]} — {b.get_statut_display()}", str(b.quantite)])
     for p in of.pointages.all()[:50]:
-        tableau.append(["Pointage", p.code, f"{_d(p.date)} · {p.get_nature_mo_display()}", f"{p.hours} h"])
-    return _pdf(f"Ordre de fabrication {of.code}", blocs, tableau if len(tableau) > 1 else None)
+        tableau.append([tr("Pointage"), p.code, f"{_d(p.date)} · {p.get_nature_mo_display()}", f"{p.hours} h"])
+    return _pdf(tr("Ordre de fabrication %(of_code)s") % {"of_code": of.code}, blocs, tableau if len(tableau) > 1 else None)
 
 
 def gamme_pdf(gamme):
-    blocs = [("Gamme", f"{gamme.code} — {gamme.label}"), ("Statut", gamme.get_status_display()),
-             ("Temps total", f"{gamme.total_hours_decimal} h")]
-    tableau = [["Ordre", "Opération", "Poste", "Heures MO", "Heures machine"]] + [
+    blocs = [(tr("Gamme"), f"{gamme.code} — {gamme.label}"), (tr("Statut"), gamme.get_status_display()),
+             (tr("Temps total"), f"{gamme.total_hours_decimal} h")]
+    tableau = [[tr("Ordre"), tr("Opération"), tr("Poste"), tr("Heures MO"), tr("Heures machine")]] + [
         [str(op.sequence), op.label, op.get_poste_display(), str(op.planned_hours), str(op.machine_hours)]
         for op in gamme.operations.all()
     ]
-    return _pdf(f"Gamme opératoire {gamme.code}", blocs, tableau if len(tableau) > 1 else None)
+    return _pdf(tr("Gamme opératoire %(gamme_code)s") % {"gamme_code": gamme.code}, blocs, tableau if len(tableau) > 1 else None)
 
 
 def fiche_preparation_pdf(fiche):
     of = fiche.ordre
-    blocs = [("Fiche", fiche.code), ("OF", f"{of.code} — {of.label}"), ("Statut", fiche.get_statut_display()),
-             ("Outillage réservé", fiche.outillage), ("Consignes", fiche.consignes),
-             ("Validée par", (fiche.valide_par.get_full_name() or fiche.valide_par.email) if fiche.valide_par_id else "—")]
-    tableau = [["Article", "Désignation", "Quantité", "Disponibilité"]] + [
+    blocs = [(tr("Fiche"), fiche.code), ("OF", f"{of.code} — {of.label}"), (tr("Statut"), fiche.get_statut_display()),
+             (tr("Outillage réservé"), fiche.outillage), (tr("Consignes"), fiche.consignes),
+             (tr("Validée par"), (fiche.valide_par.get_full_name() or fiche.valide_par.email) if fiche.valide_par_id else "—")]
+    tableau = [[tr("Article"), tr("Désignation"), tr("Quantité"), tr("Disponibilité")]] + [
         [b.article.code, b.article.label[:60], str(b.quantite), b.get_statut_display()]
         for b in of.besoins_matiere.select_related("article")
     ]
-    return _pdf(f"Fiche de préparation {fiche.code}", blocs, tableau if len(tableau) > 1 else None)
+    return _pdf(tr("Fiche de préparation %(fiche_code)s") % {"fiche_code": fiche.code}, blocs, tableau if len(tableau) > 1 else None)
 
 
 def rapport_pdf(rapport):
     of = rapport.ordre
-    blocs = [(rapport.get_type_display(), rapport.code), ("OF", f"{of.code} — {of.label}"), ("Date", _d(rapport.date)),
-             ("Quantité réalisée", rapport.quantite_realisee), ("Quantité rebutée", rapport.quantite_rebut),
-             ("Avancement déclaré", f"{rapport.avancement} %" if rapport.avancement is not None else "—"),
-             ("Observations", rapport.observations), ("Statut", rapport.get_statut_display())]
+    blocs = [(rapport.get_type_display(), rapport.code), ("OF", f"{of.code} — {of.label}"), (tr("Date"), _d(rapport.date)),
+             (tr("Quantité réalisée"), rapport.quantite_realisee), (tr("Quantité rebutée"), rapport.quantite_rebut),
+             (tr("Avancement déclaré"), f"{rapport.avancement} %" if rapport.avancement is not None else "—"),
+             (tr("Observations"), rapport.observations), (tr("Statut"), rapport.get_statut_display())]
     return _pdf(f"{rapport.get_type_display()} {rapport.code}", blocs)
 
 
 def transfert_pdf(bt):
     blocs = [(bt.get_type_display(), bt.code), ("OF", f"{bt.ordre.code} — {bt.ordre.label}"),
-             ("Origine", bt.origine), ("Destination", bt.destination), ("Transporteur", bt.transporteur),
-             ("Statut", bt.get_statut_display()), ("Expédié le", _d(bt.expedie_le)), ("Réceptionné le", _d(bt.receptionne_le)),
-             ("Réserves", bt.reserves), ("Signatures", "Expéditeur : ____________    Réceptionnaire : ____________")]
-    tableau = [["#", "Désignation", "Quantité"]] + [
+             (tr("Origine"), bt.origine), (tr("Destination"), bt.destination), (tr("Transporteur"), bt.transporteur),
+             (tr("Statut"), bt.get_statut_display()), (tr("Expédié le"), _d(bt.expedie_le)), (tr("Réceptionné le"), _d(bt.receptionne_le)),
+             (tr("Réserves"), bt.reserves), (tr("Signatures"), tr("Expéditeur : ____________    Réceptionnaire : ____________"))]
+    tableau = [["#", tr("Désignation"), tr("Quantité")]] + [
         [str(i + 1), str(l.get("designation", "")), str(l.get("quantite", ""))] for i, l in enumerate(bt.lignes or [])
     ]
     return _pdf(f"{bt.get_type_display()} {bt.code}", blocs, tableau if len(tableau) > 1 else None)
@@ -536,21 +536,21 @@ def rapport_execution_of_pdf(of):
     realise = rapports.aggregate(t=Sum("quantite_realisee"))["t"] or ZERO
     rebut = rapports.aggregate(t=Sum("quantite_rebut"))["t"] or ZERO
     pointe = of.pointages.aggregate(t=Sum("hours"))["t"] or ZERO
-    blocs = [("OF", f"{of.code} — {of.label}"), ("Affaire", of.affaire.code if of.affaire_id else "—"),
-             ("Terminé le", _d(timezone.localdate())), ("Quantité commandée", of.quantity),
-             ("Quantité réalisée", realise), ("Quantité rebutée", rebut),
-             ("Heures prévues / pointées", f"{of.calculated_hours} h / {pointe} h")]
-    tableau = [["Rapport", "Date", "Réalisé", "Rebut", "Observations"]] + [
+    blocs = [("OF", f"{of.code} — {of.label}"), (tr("Affaire"), of.affaire.code if of.affaire_id else "—"),
+             (tr("Terminé le"), _d(timezone.localdate())), (tr("Quantité commandée"), of.quantity),
+             (tr("Quantité réalisée"), realise), (tr("Quantité rebutée"), rebut),
+             (tr("Heures prévues / pointées"), f"{of.calculated_hours} h / {pointe} h")]
+    tableau = [[tr("Rapport"), tr("Date"), tr("Réalisé"), tr("Rebut"), tr("Observations")]] + [
         [r.code, _d(r.date), str(r.quantite_realisee), str(r.quantite_rebut), r.observations[:70]] for r in rapports
     ]
-    return _pdf(f"Rapport d'exécution {of.code}", blocs, tableau if len(tableau) > 1 else None)
+    return _pdf(tr("Rapport d'exécution %(of_code)s") % {"of_code": of.code}, blocs, tableau if len(tableau) > 1 else None)
 
 
 def archiver_rapport_execution(of, user=None):
     from hse.services import archiver_ged
 
     return archiver_ged(
-        rapport_execution_of_pdf(of), f"rapport-execution-{of.code}.pdf", f"Rapport d'exécution {of.code}",
+        en_francais(rapport_execution_of_pdf, of), f"rapport-execution-{of.code}.pdf", f"Rapport d'exécution {of.code}",
         "OPS-REX", "Rapports d'exécution (M3)", of.code, "operations.ordrefabrication", of.pk, user=user,
         mots=("rapport d'exécution", "OF"), module="M3", note="Rapport d'exécution scellé à la terminaison de l'OF",
         retention=int(param("RETENTION_OPERATIONS_ANS")),
@@ -628,7 +628,7 @@ def rapport_periodique_pdf(data):
 
     styles = getSampleStyleSheet()
     buf = io.BytesIO()
-    titre = f"Rapport {data['periode']} des opérations — {data['debut']} au {data['fin']}"
+    titre = tr("Rapport %(periode)s des opérations — %(debut)s au %(fin)s") % {"periode": data['periode'], "debut": data['debut'], "fin": data['fin']}
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=12 * mm, rightMargin=12 * mm, title=titre)
     story = [Paragraph(titre, styles["Title"])]
     for sous_titre, tableau in _tableaux_rapport(data):
@@ -641,7 +641,7 @@ def rapport_periodique_pdf(data):
             ]))
             story.append(t)
         else:
-            story.append(Paragraph("Néant.", styles["Normal"]))
+            story.append(Paragraph(tr("Néant."), styles["Normal"]))
         story.append(Spacer(1, 4 * mm))
     doc.build(story)
     return buf.getvalue()

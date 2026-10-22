@@ -17,6 +17,7 @@ from .models import (
     Reunion,
 )
 from .services import can_see_amount
+from config.i18n import tr
 
 
 class AmountMaskMixin:
@@ -481,7 +482,7 @@ class PieceDossierSerializer(serializers.ModelSerializer):
         requises = pieces_requises(attrs["dossier_type"], dossier)
         if attrs["piece"] not in requises:
             raise serializers.ValidationError(
-                {"piece": "Pièce non prévue pour ce dossier (attendues : " + ", ".join(requises) + ")."}
+                {"piece": tr("Pièce non prévue pour ce dossier (attendues : %(liste)s).") % {"liste": ", ".join(requises)}}
             )
         if not visible_documents(request.user).filter(pk=attrs["document"].pk).exists():
             raise serializers.ValidationError({"document": "Document inaccessible."})

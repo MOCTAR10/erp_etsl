@@ -14,6 +14,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from .models import IdempotencyRecord
+from config.i18n import tr
 
 MAX_KEY_LENGTH = 80
 
@@ -33,7 +34,7 @@ def idempotent(view_method):
         client = getattr(request.user, "api_client", None)  # appel machine (GLOBAL RENTAL…)
         owner = {"client": client} if client is not None else {"user": request.user}
         if len(key) > MAX_KEY_LENGTH:
-            raise ValidationError({"Idempotency-Key": f"{MAX_KEY_LENGTH} caractères maximum."})
+            raise ValidationError({"Idempotency-Key": tr("%(max_key_length)s caractères maximum.") % {"max_key_length": MAX_KEY_LENGTH}})
 
         record = IdempotencyRecord.objects.filter(key=key, **owner).first()
         if record:

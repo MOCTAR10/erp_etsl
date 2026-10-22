@@ -18,6 +18,7 @@ from accounting_kernel.services import period_for_date, post_move
 from referentiels.models import Account, Partner
 
 from .models import FactureClient, LigneFactureClient, ModeleFacture, TauxTva
+from config.i18n import en_francais, tr
 
 TYPE_GED_FACTURE = "factures_clients"
 RETENTION_FACTURE_ANS = 10
@@ -53,7 +54,7 @@ def _compte(code):
     try:
         return Account.objects.get(code=code)
     except Account.DoesNotExist:
-        raise ValidationError(f"Compte {code} absent du plan comptable.")
+        raise ValidationError(tr("Compte %(code)s absent du plan comptable.") % {"code": code})
 
 
 def _echeance(date):
@@ -136,7 +137,7 @@ def creer_avoir(origine, user, montant_ht=None, motif=""):
     if montant <= 0:
         raise ValidationError("Le montant de l'avoir doit être strictement positif.")
     if montant > restant:
-        raise ValidationError(f"Avoir supérieur au reliquat facturable ({restant}).")
+        raise ValidationError(tr("Avoir supérieur au reliquat facturable (%(restant)s).") % {"restant": restant})
     avoir = FactureClient.objects.create(
         nature=FactureClient.Nature.AVOIR, client=origine.client, affaire=origine.affaire, facture_origine=origine,
         objet=(motif or f"Avoir sur {origine.code}")[:250], taux_tva=origine.taux_tva, cree_par=user,
@@ -240,6 +241,16 @@ def _sceller_source(facture):
 
 
 def facture_pdf(facture):
+    """PDF de la facture : en français par défaut (document légal), langue de l'utilisateur si ETSL l'ouvre (EX-G-07)."""
+    from django.utils import translation
+
+    from .services import langue_documents_legaux
+
+    with translation.override(langue_documents_legaux()):
+        return _facture_pdf(facture)
+
+
+def _facture_pdf(facture):
     """PDF de la facture (reportlab) d'après le modèle ETSL ; avertissement tant que le modèle est provisoire."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
@@ -257,23 +268,23 @@ def facture_pdf(facture):
     story = [
         Paragraph(br(modele.entete), styles["Normal"]), Spacer(1, 6 * mm),
         Paragraph(f"{'AVOIR' if avoir else 'FACTURE'} {facture.code}", styles["Title"]),
-        Paragraph(f"Date : {facture.date:%d/%m/%Y}" + (f" · Échéance : {facture.echeance:%d/%m/%Y}" if facture.echeance else ""), styles["Normal"]),
-        Paragraph(f"Client : <b>{facture.client.name}</b> ({facture.client.code})", styles["Normal"]),
+        Paragraph(tr("Date : %(facture_date)s") % {"facture_date": format(facture.date, '%d/%m/%Y')} + (tr(" · Échéance : %(facture_echeance)s") % {"facture_echeance": format(facture.echeance, '%d/%m/%Y')} if facture.echeance else ""), styles["Normal"]),
+        Paragraph(tr("Client : <b>%(client_name)s</b> (%(client_code)s)") % {"client_name": facture.client.name, "client_code": facture.client.code}, styles["Normal"]),
     ]
     if facture.facture_origine_id:
-        story.append(Paragraph(f"Avoir sur la facture {facture.facture_origine.code}", styles["Normal"]))
+        story.append(Paragraph(tr("Avoir sur la facture %(facture_origine_code)s") % {"facture_origine_code": facture.facture_origine.code}, styles["Normal"]))
     if facture.objet:
-        story.append(Paragraph(f"Objet : {facture.objet}", styles["Normal"]))
+        story.append(Paragraph(tr("Objet : %(facture_objet)s") % {"facture_objet": facture.objet}, styles["Normal"]))
     story.append(Spacer(1, 5 * mm))
-    rows = [["Désignation", "Qté", "PU HT", "Montant HT"]]
+    rows = [[tr("Désignation"), tr("Qté"), tr("PU HT"), tr("Montant HT")]]
     for l in facture.lignes.all():
         rows.append([l.designation, f"{l.quantite:g}", fm(l.prix_unitaire), fm(l.montant)])
     taux = facture.taux_tva.taux if facture.taux_tva_id else 0
-    rows += [["", "", "Total HT", fm(facture.montant_ht)], ["", "", f"TVA {taux:g} %", fm(facture.montant_tva)],
-             ["", "", "TOTAL TTC (FCFA)", fm(facture.montant_ttc)]]
+    rows += [["", "", tr("Total HT"), fm(facture.montant_ht)], ["", "", tr("TVA %(taux)s %%") % {"taux": f"{taux:g}"}, fm(facture.montant_tva)],
+             ["", "", tr("TOTAL TTC (FCFA)"), fm(facture.montant_ttc)]]
     if facture.montant_retenue:
-        rows += [["", "", f"Retenue de garantie {facture.taux_retenue:g} %", f"- {fm(facture.montant_retenue)}"],
-                 ["", "", "NET À PAYER (FCFA)", fm(facture.net_a_payer)]]
+        rows += [["", "", tr("Retenue de garantie %(facture_taux_retenue)s %%") % {"facture_taux_retenue": format(facture.taux_retenue, 'g')}, f"- {fm(facture.montant_retenue)}"],
+                 ["", "", tr("NET À PAYER (FCFA)"), fm(facture.net_a_payer)]]
     table = Table(rows, colWidths=[100 * mm, 20 * mm, 35 * mm, 30 * mm])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12308f")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -286,8 +297,7 @@ def facture_pdf(facture):
             story.append(Paragraph(br(texte), styles["Normal"]))
     if facture.modele_provisoire or modele.est_provisoire:
         story += [Spacer(1, 5 * mm), Paragraph(
-            "<font color='#d4142a'><b>AVERTISSEMENT</b> — modèle de facture provisoire : en-tête et mentions légales "
-            "à confirmer par ETSL avant diffusion.</font>", styles["Normal"])]
+            tr("<font color='#d4142a'><b>AVERTISSEMENT</b> — modèle de facture provisoire : en-tête et mentions légales à confirmer par ETSL avant diffusion.</font>"), styles["Normal"])]
     if modele.pied_page:
         story += [Spacer(1, 6 * mm), Paragraph(br(modele.pied_page), styles["Italic"])]
     doc.build(story)
@@ -306,7 +316,7 @@ def archiver_facture(facture, user=None):
     if (type_doc.retention_years or 0) < RETENTION_FACTURE_ANS:
         type_doc.retention_years = RETENTION_FACTURE_ANS
         type_doc.save(update_fields=["retention_years"])
-    contenu = facture_pdf(facture)
+    contenu = en_francais(facture_pdf, facture)  # pièce archivée : français
     sha = hashlib.sha256(contenu).hexdigest()
     nom = f"{facture.code}.pdf"
     document = Document.objects.create(

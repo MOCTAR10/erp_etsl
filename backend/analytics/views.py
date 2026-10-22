@@ -19,6 +19,8 @@ from controle_gestion.services import can_manage_gestion, can_see_amount
 from users.models import User
 
 from . import bi_etat, cubes, pilotage
+from config.i18n import tr
+
 from .exports import FORMATS, reponse_export, sections_indicateurs
 from .models import CubeArchive, ParametreCube, ScelleMart
 from .serializers import CubeArchiveSerializer, ParametreCubeSerializer, ScelleMartSerializer
@@ -168,7 +170,7 @@ class CubeView(APIView):
             colonnes = list(lecture["axes"]) + ["produits", "charges", "cout_gr", "marge"]
             lignes = [[r[c] for c in colonnes] for r in lecture["rows"]]
             lignes.append(["TOTAL"] + [""] * (len(lecture["axes"]) - 1) + [lecture["totaux"][m] for m in colonnes[-4:]])
-            return reponse_export(fmt, "Cube BI — coupe " + " × ".join(lecture["axes"]), "cube_bi",
+            return reponse_export(fmt, tr("Cube BI — coupe %(axes)s") % {"axes": " × ".join(lecture["axes"])}, "cube_bi",
                                   [("cube", colonnes, lignes)])
         return Response(lecture)
 
@@ -274,7 +276,7 @@ class PilotageDirectionView(APIView):
              + [[s[c] for c in cles] for s in cf["semaines"]]),
             ("pipe vers budget", ["Indicateur", "Valeur"], [
                 ["Exercice", pb["annee"]], ["Budget de produits", pb["budget_produits"]], ["Réalisé", pb["realise"]],
-                *[[f"Pipe pondéré {k}", v] for k, v in pb["pipe_pondere"].items()],
+                *[[tr("Pipe pondéré %(cle)s") % {"cle": k}, v] for k, v in pb["pipe_pondere"].items()],
                 ["Atterrissage", pb["atterrissage"]], ["Reste à couvrir", pb["reste_a_couvrir"]],
                 ["Couverture (%)", pb["couverture_pct"]],
             ]),

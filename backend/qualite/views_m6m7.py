@@ -11,6 +11,7 @@ from config.serializers import ModelCleanMixin
 
 from .models import ControleQualite, OrganismeAgree, WpsRequis
 from .services import CanManageQualite, CanValidatePv
+from config.i18n import tr
 
 
 class OrganismeAgreeSerializer(ModelCleanMixin, serializers.ModelSerializer):
@@ -34,7 +35,7 @@ class OrganismeAgreeSerializer(ModelCleanMixin, serializers.ModelSerializer):
         codes = [c.strip().upper() for c in (value or "").split(",") if c.strip()]
         inconnues = sorted(set(codes) - set(ControleQualite.MethodeCnd.values))
         if inconnues:
-            raise serializers.ValidationError(f"Méthode(s) inconnue(s) : {', '.join(inconnues)} (RT, UT, PT, MT).")
+            raise serializers.ValidationError(tr("Méthode(s) inconnue(s) : %(liste)s (RT, UT, PT, MT).") % {"liste": ', '.join(inconnues)})
         return ",".join(codes)
 
 

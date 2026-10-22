@@ -18,6 +18,7 @@ from referentiels.models import Account
 
 from .models import ClotureMensuelle, DeclarationTva, LigneReleve, Paiement
 from .services import anomalies_lettrage, get_param
+from config.i18n import tr
 
 ZERO = Decimal("0")
 COMPTABILISEES = (AccountMove.Status.POSTED, AccountMove.Status.REVERSED)
@@ -125,7 +126,7 @@ def cloturer(cm, user):
     bloquants = [c for c in liste if c["bloquant"] and c["nb"]]
     if bloquants:
         raise ValidationError(
-            "Clôture impossible : " + " ; ".join(f"{c['label']} ({c['nb']})" for c in bloquants) + "."
+            tr("Clôture impossible : %(liste)s.") % {"liste": " ; ".join(f"{c['label']} ({c['nb']})" for c in bloquants)}
         )
     close_period(cm.period)
     cm.period.refresh_from_db()

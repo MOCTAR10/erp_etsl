@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import BatchRow, ImportBatch
+from config.i18n import tr
 
 
 class BatchRowSerializer(serializers.ModelSerializer):
@@ -80,7 +81,7 @@ class GabaritImportSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Objet attendu : {champ ERP : nom de colonne}.")
         inconnus = sorted(set(value) - set(CHAMPS_SAGE))
         if inconnus:
-            raise serializers.ValidationError(f"Champ(s) inconnu(s) : {', '.join(inconnus)}.")
+            raise serializers.ValidationError(tr("Champ(s) inconnu(s) : %(liste)s.") % {"liste": ', '.join(inconnus)})
         return value
 
     def update(self, instance, validated_data):

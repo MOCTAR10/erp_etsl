@@ -12,6 +12,7 @@ import io
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from config.i18n import tr
 
 ZERO = Decimal("0")
 
@@ -59,20 +60,20 @@ def resoudre_analytique(code_analytique="", code_affaire=""):
             axe, code = (p.strip() for p in code_analytique.split(":", 1))
             compte = AnalyticAccount.objects.filter(axis__code=axe, code=code, is_active=True).first()
             if compte is None:
-                raise RowError(f"compte analytique inconnu : {code_analytique}")
+                raise RowError(tr("compte analytique inconnu : %(code_analytique)s") % {"code_analytique": code_analytique})
             return compte
         candidats = list(AnalyticAccount.objects.filter(code=code_analytique, is_active=True)[:2])
         if not candidats:
-            raise RowError(f"compte analytique inconnu : {code_analytique}")
+            raise RowError(tr("compte analytique inconnu : %(code_analytique)s") % {"code_analytique": code_analytique})
         if len(candidats) > 1:
-            raise RowError(f"compte analytique ambigu : {code_analytique} (préciser AXE:CODE)")
+            raise RowError(tr("compte analytique ambigu : %(code_analytique)s (préciser AXE:CODE)") % {"code_analytique": code_analytique})
         return candidats[0]
     if code_affaire:
         from commercial.models import Affaire
 
         affaire = Affaire.objects.filter(code=code_affaire).first()
         if affaire is None:
-            raise RowError(f"affaire inconnue : {code_affaire}")
+            raise RowError(tr("affaire inconnue : %(code_affaire)s") % {"code_affaire": code_affaire})
         return affaire.analytic or affaire.assurer_compte_analytique()
     return None
 
@@ -125,7 +126,7 @@ class SageConnector:
 
         manquantes = [self.colonnes[c] for c in CHAMPS_OBLIGATOIRES if self.colonnes.get(c) not in (fieldnames or ())]
         if manquantes:
-            raise ImportError("Colonnes du gabarit absentes du fichier : " + ", ".join(manquantes) + ".")
+            raise ImportError(tr("Colonnes du gabarit absentes du fichier : %(liste)s.") % {"liste": ", ".join(manquantes)})
 
     def _v(self, row, champ):
         col = self.colonnes.get(champ)
@@ -142,7 +143,7 @@ class SageConnector:
         try:
             return Decimal(brut)
         except InvalidOperation:
-            raise RowError(f"montant invalide : {brut}")
+            raise RowError(tr("montant invalide : %(brut)s") % {"brut": brut})
 
     def prepare(self, rows):
         """Regroupe les lignes par pièce (journal, date, n° de pièce), dans l'ordre du fichier."""
@@ -161,11 +162,11 @@ class SageConnector:
 
         journal = Journal.objects.filter(code=groupe["journal"]).first()
         if journal is None:
-            raise RowError(f"journal inconnu : {groupe['journal']}")
+            raise RowError(tr("journal inconnu : %(journal)s") % {"journal": groupe['journal']})
         try:
             jour = datetime.strptime(groupe["date"], self.gabarit.format_date or "%d/%m/%Y").date()
         except ValueError:
-            raise RowError(f"date invalide (format du gabarit {self.gabarit.format_date}) : {groupe['date']}")
+            raise RowError(tr("date invalide (format du gabarit %(gabarit_format_date)s) : %(date)s") % {"gabarit_format_date": self.gabarit.format_date, "date": groupe['date']})
         reference = groupe["piece"] or f"sage-{jour.isoformat()}"
         if AccountMove.objects.filter(journal=journal, date=jour, reference=reference).exists():
             return ("duplicate", reference)
@@ -174,17 +175,17 @@ class SageConnector:
             code = self._v(row, "compte")
             compte = Account.objects.filter(code=code).first()
             if compte is None:
-                raise RowError(f"compte inconnu : {code} (pièce {reference})")
+                raise RowError(tr("compte inconnu : %(code)s (pièce %(reference)s)") % {"code": code, "reference": reference})
             debit, credit = self._montant(self._v(row, "debit")), self._montant(self._v(row, "credit"))
             if debit < 0 or credit < 0 or (debit and credit) or not (debit or credit):
-                raise RowError(f"ligne invalide (débit OU crédit positif attendu) : pièce {reference}, compte {code}")
+                raise RowError(tr("ligne invalide (débit OU crédit positif attendu) : pièce %(reference)s, compte %(code)s") % {"reference": reference, "code": code})
             analytic = resoudre_analytique(self._v(row, "analytique"))
             tiers = self._v(row, "tiers")
             partner = Partner.objects.filter(code=tiers).first() if tiers else None
             lignes.append((compte, debit, credit, analytic, partner, self._v(row, "libelle")))
             comptes.append(compte)
         if sum(l[1] for l in lignes) != sum(l[2] for l in lignes):
-            raise RowError(f"pièce {reference} déséquilibrée (débit ≠ crédit)")
+            raise RowError(tr("pièce %(reference)s déséquilibrée (débit ≠ crédit)") % {"reference": reference})
         move = AccountMove.objects.create(
             journal=journal, period=period_for_date(jour), date=jour, reference=reference[:120],
             label=(lignes[0][5] or f"Reprise SAGE {reference}")[:200], source="integrations",

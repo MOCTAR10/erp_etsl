@@ -17,6 +17,7 @@ from decimal import Decimal
 
 from .models import Inventaire, InventaireLigne, StockQuant
 from .services import get_param_stock, prix_standard
+from config.i18n import tr
 
 CENT = Decimal("0.01")
 LIBELLE_MAD = "Régularisation MAD (ajustement d'inventaire)"
@@ -125,8 +126,7 @@ def controler_regularisation(inventaire):
     s = synthese_ecarts(inventaire)
     if s["validation_requise"]:
         raise ValueError(
-            f"Écarts valorisés {s['valeur_absolue']:.0f} FCFA au-delà du seuil {s['seuil_validation']:.0f} FCFA : "
-            "la régularisation MAD doit être validée avant la clôture."
+            tr("Écarts valorisés %(valeur_absolue)s FCFA au-delà du seuil %(seuil_validation)s FCFA : la régularisation MAD doit être validée avant la clôture.") % {"valeur_absolue": format(s['valeur_absolue'], '.0f'), "seuil_validation": format(s['seuil_validation'], '.0f')}
         )
 
 
@@ -210,6 +210,8 @@ def tableau_pdf(titre, entetes, lignes, sous_titre=""):
 def reponse_export(fmt, nom, titre, entetes, lignes, sous_titre=""):
     from django.http import HttpResponse
 
+    # EX-G-07 : titres et en-têtes dans la langue de la requête (texte inchangé en français).
+    titre, sous_titre, entetes = tr(titre), tr(sous_titre), [tr(e) for e in entetes]
     if fmt == "xlsx":
         contenu = tableau_xlsx(titre, entetes, lignes)
         ctype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

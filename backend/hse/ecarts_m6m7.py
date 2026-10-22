@@ -9,6 +9,7 @@ modifiables à l'écran HSE, à confirmer par ETSL.
 from django.utils import timezone
 
 from users.models import User
+from config.i18n import tr
 
 # --------------------------------------------------------------------------------------------------------------
 # Listes paramétrables
@@ -228,20 +229,20 @@ def rapport_audit_pdf(audit):
     from .services import _pdf
 
     blocs = [
-        ("Type", audit.get_type_audit_display()), ("Zone / périmètre", audit.zone),
-        ("Référentiel", audit.referentiel), ("Date prévue", f"{audit.date_prevue:%d/%m/%Y}"),
-        ("Réalisé le", f"{audit.date_realisation:%d/%m/%Y}" if audit.date_realisation else "—"),
-        ("Réalisé par", audit.realise_par.get_full_name() if audit.realise_par else "—"),
-        ("Score de conformité", f"{audit.score} %" if audit.score is not None else "—"),
-        ("Statut", audit.get_statut_display()),
+        (tr("Type"), audit.get_type_audit_display()), (tr("Zone / périmètre"), audit.zone),
+        (tr("Référentiel"), audit.referentiel), (tr("Date prévue"), f"{audit.date_prevue:%d/%m/%Y}"),
+        (tr("Réalisé le"), f"{audit.date_realisation:%d/%m/%Y}" if audit.date_realisation else "—"),
+        (tr("Réalisé par"), audit.realise_par.get_full_name() if audit.realise_par else "—"),
+        (tr("Score de conformité"), f"{audit.score} %" if audit.score is not None else "—"),
+        (tr("Statut"), audit.get_statut_display()),
     ]
-    tableau = [["#", "Point contrôlé / constat", "Résultat", "Commentaire / action"]]
+    tableau = [["#", tr("Point contrôlé / constat"), tr("Résultat"), tr("Commentaire / action")]]
     for r in audit.reponses_checklist.all():
         tableau.append([str(r.ordre), r.question[:90], r.get_reponse_display(), (r.commentaire or "")[:60]])
     for c in audit.constats.select_related("action"):
-        action = f"{c.action.code} ({c.action.get_statut_display()})" if c.action_id else "sans action"
+        action = f"{c.action.code} ({c.action.get_statut_display()})" if c.action_id else tr("sans action")
         tableau.append(["C", c.description[:90], c.get_gravite_display(), action])
-    return _pdf(f"Rapport d'audit HSE {audit.code}", blocs, tableau if len(tableau) > 1 else None)
+    return _pdf(tr("Rapport d'audit HSE %(audit_code)s") % {"audit_code": audit.code}, blocs, tableau if len(tableau) > 1 else None)
 
 
 # --------------------------------------------------------------------------------------------------------------

@@ -66,6 +66,7 @@ from .services import (
     habilitations_manquantes,
     peut_signer_niveau,
 )
+from config.i18n import en_francais, tr
 
 
 def _as_bool(value):
@@ -118,7 +119,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
 
     def _modifiable(self, permis):
         if permis.statut in PermisTravail.STATUTS_FIGES:
-            raise serializers.ValidationError({"detail": f"Permis {permis.get_statut_display().lower()} : figé."})
+            raise serializers.ValidationError({"detail": tr("Permis %(statut)s : figé.") % {"statut": permis.get_statut_display().lower()}})
 
     @action(detail=True, methods=["post"], url_path="ajouter-intervenant")
     def ajouter_intervenant(self, request, pk=None):
@@ -150,7 +151,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         if fichier is None:
             raise serializers.ValidationError({"fichier": "Fichier requis."})
         if os.path.splitext(fichier.name)[1].lower() not in PIECES_PERMIS[piece]:
-            raise serializers.ValidationError({"fichier": f"Formats acceptés : {', '.join(PIECES_PERMIS[piece])}."})
+            raise serializers.ValidationError({"fichier": tr("Formats acceptés : %(liste)s.") % {"liste": ', '.join(PIECES_PERMIS[piece])}})
         if fichier.size > PIECE_TAILLE_MAX:
             raise serializers.ValidationError({"fichier": "Fichier trop volumineux (10 Mo au plus)."})
         getattr(permis, piece).save(fichier.name, fichier, save=False)
@@ -184,7 +185,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         libelle = PERMIS_NIVEAU_LIBELLES.get(niveau, niveau)
         if not peut_signer_niveau(request.user, niveau):
             return Response(
-                {"detail": f"Visa attendu : niveau {libelle} — vous n'êtes pas signataire de ce niveau."},
+                {"detail": tr("Visa attendu : niveau %(libelle)s — vous n'êtes pas signataire de ce niveau.") % {"libelle": libelle}},
                 status=status.HTTP_403_FORBIDDEN,
             )
         # Séparation des tâches : le demandeur ne signe aucun niveau (hors admin), personne ne signe deux niveaux.
@@ -194,7 +195,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         deja = [n for n in ("superviseur", "hse", "dg") if getattr(permis, f"visa_{n}_par_id") == request.user.id]
         if deja:
             return Response(
-                {"detail": f"Vous avez déjà signé le niveau {PERMIS_NIVEAU_LIBELLES[deja[0]]} : un autre signataire est requis."},
+                {"detail": tr("Vous avez déjà signé le niveau %(permis_niveau_libelles)s : un autre signataire est requis.") % {"permis_niveau_libelles": PERMIS_NIVEAU_LIBELLES[deja[0]]}},
                 status=status.HTTP_403_FORBIDDEN,
             )
         accept = _as_bool(request.data.get("accept", True))
@@ -229,7 +230,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         aujourdhui = timezone.localdate()
         if permis.date_debut > aujourdhui:
             return Response(
-                {"detail": f"Le permis ne débute que le {permis.date_debut:%d/%m/%Y}."},
+                {"detail": tr("Le permis ne débute que le %(permis_date_debut)s.") % {"permis_date_debut": format(permis.date_debut, '%d/%m/%Y')}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if permis.date_fin and permis.date_fin < aujourdhui:
@@ -243,15 +244,13 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
             return Response({"detail": erreur_gr}, status=status.HTTP_400_BAD_REQUEST)
         if manquantes := habilitations_manquantes(permis, aujourdhui):
             return Response(
-                {"detail": "Habilitation manquante ou expirée - " + " ; ".join(manquantes)},
+                {"detail": tr("Habilitation manquante ou expirée - %(liste)s") % {"liste": " ; ".join(manquantes)}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if permis.gaz_obligatoire and not permis.test_gaz_valide:
             return Response(
                 {"detail": (
-                    "Test gaz conforme requis avant démarrage "
-                    f"(valable {PermisTravail.TEST_GAZ_VALIDITE_HEURES} h) - "
-                    f"type {permis.get_type_permis_display()}."
+                    tr("Test gaz conforme requis avant démarrage (valable %(permistravail_test_gaz_validite_heures)s h) - type %(type_permis)s.") % {"permistravail_test_gaz_validite_heures": PermisTravail.TEST_GAZ_VALIDITE_HEURES, "type_permis": permis.get_type_permis_display()}
                 )},
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -285,8 +284,7 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
             controler_synchro(saisi_le, request, None, "Test gaz")
             if permis.test_gaz_date and permis.test_gaz_date > saisi_le and not as_bool(request.data.get("forcer")):
                 raise ConflitSaisie(
-                    f"Un test gaz plus récent ({timezone.localtime(permis.test_gaz_date):%d/%m/%Y %H:%M}) est déjà "
-                    "enregistré : forcer pour le remplacer, ou abandonner."
+                    tr("Un test gaz plus récent (%(permis_test_gaz_date)s) est déjà enregistré : forcer pour le remplacer, ou abandonner.") % {"permis_test_gaz_date": format(timezone.localtime(permis.test_gaz_date), '%d/%m/%Y %H:%M')}
                 )
         permis.test_gaz_resultat = resultat
         permis.test_gaz_valeur = str(request.data.get("valeur", ""))[:120]
@@ -558,7 +556,7 @@ class IncidentViewSet(viewsets.ModelViewSet):
         ouvertes = incident.actions.exclude(statut=ActionHse.Statut.CLOTUREE)
         if ouvertes.exists():
             return Response(
-                {"detail": f"Actions non soldées : {', '.join(a.code for a in ouvertes)} — clôturez-les d'abord."},
+                {"detail": tr("Actions non soldées : %(liste)s — clôturez-les d'abord.") % {"liste": ', '.join(a.code for a in ouvertes)}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         rex = str(request.data.get("retour_experience") or incident.retour_experience or "").strip()
@@ -599,7 +597,7 @@ class IncidentViewSet(viewsets.ModelViewSet):
         from .services import TYPE_GED_RAPPORT_HSE, archiver_ged, rapport_incident_pdf
 
         incident.document = archiver_ged(
-            rapport_incident_pdf(incident), f"{incident.code}.pdf",
+            en_francais(rapport_incident_pdf, incident), f"{incident.code}.pdf",
             f"Rapport d'incident {incident.code} — {incident.get_type_incident_display()}", TYPE_GED_RAPPORT_HSE,
             "Rapports HSE (incidents, accidents)", incident.code, "hse.incident", incident.pk, request.user,
             mots=("hse", "incident", incident.code),
@@ -787,12 +785,12 @@ class EpiViewSet(viewsets.ModelViewSet):
         epi = Epi.objects.filter(employe=employe).order_by("-date_dotation")
         if request.query_params.get("export") != "pdf":
             return Response(EpiSerializer(epi, many=True, context=self.get_serializer_context()).data)
-        tableau = [["EPI", "Désignation", "Taille", "Dotation", "Renouvellement", "Statut"]] + [
+        tableau = [["EPI", tr("Désignation"), tr("Taille"), tr("Dotation"), tr("Renouvellement"), tr("Statut")]] + [
             [e.get_type_epi_display(), e.designation, e.taille or "—", f"{e.date_dotation:%d/%m/%Y}",
              f"{e.date_renouvellement:%d/%m/%Y}" if e.date_renouvellement else "—", e.get_statut_display()]
             for e in epi
         ]
-        contenu = _pdf(f"Fiche individuelle de dotation EPI — {employe}", [("Matricule", employe.code)],
+        contenu = _pdf(tr("Fiche individuelle de dotation EPI — %(employe)s") % {"employe": employe}, [(tr("Matricule"), employe.code)],
                        tableau if len(tableau) > 1 else None)
         reponse = HttpResponse(contenu, content_type="application/pdf")
         reponse["Content-Disposition"] = f'inline; filename="dotation-epi-{employe.code}.pdf"'
@@ -944,7 +942,7 @@ class AuditHseViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Seul un audit réalisé peut être clôturé."}, status=status.HTTP_400_BAD_REQUEST)
         if ecarts := audit.ecarts_ouverts:
             return Response(
-                {"detail": f"{len(ecarts)} écart(s) sans action corrective clôturée : clôture impossible."},
+                {"detail": tr("%(nb_ecarts)s écart(s) sans action corrective clôturée : clôture impossible.") % {"nb_ecarts": len(ecarts)}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         audit.statut = AuditHse.Statut.CLOTURE
@@ -1013,7 +1011,7 @@ class DuerViewSet(viewsets.ModelViewSet):
         ]
         if sans_mesure:
             return Response(
-                {"detail": f"Risque(s) élevé(s)/critique(s) sans mesure de prévention : {', '.join(sans_mesure)}."},
+                {"detail": tr("Risque(s) élevé(s)/critique(s) sans mesure de prévention : %(liste)s.") % {"liste": ', '.join(sans_mesure)}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         duer.statut = Duer.Statut.APPROUVE
@@ -1243,7 +1241,7 @@ class RevueDirectionHseViewSet(viewsets.ModelViewSet):
         revue.validee_par, revue.validee_le = request.user, timezone.now()
         titre = f"Revue de direction HSE {revue.annee}"
         revue.document = archiver_ged(
-            bilan_pdf(revue.bilan, titre, revue), f"{revue.code}.pdf", titre, TYPE_GED_RAPPORT_HSE, "Rapports HSE",
+            en_francais(bilan_pdf, revue.bilan, titre, revue), f"{revue.code}.pdf", titre, TYPE_GED_RAPPORT_HSE, "Rapports HSE",
             revue.code, "hse.revuedirectionhse", revue.pk, user=request.user, mots=("revue de direction", "bilan HSE"),
         )
         revue.save(update_fields=["statut", "validee_par", "validee_le", "document"])

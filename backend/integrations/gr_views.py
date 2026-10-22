@@ -19,6 +19,7 @@ from .auth import ApiKeyAuthentication, HasApiScope
 from .gr import validate_webhook_url
 from .idempotency import idempotent
 from .models import ApiClient, WebhookDelivery, WebhookEndpoint
+from config.i18n import tr
 
 REFERENCE_RE = re.compile(r"^[A-Za-z0-9._/\- ]{1,40}$")
 
@@ -76,7 +77,7 @@ def _location(code):
     try:
         return LocationGR.objects.select_for_update().get(code=code)
     except LocationGR.DoesNotExist:
-        raise serializers.ValidationError({"location": f"Prestation {code} inconnue."})
+        raise serializers.ValidationError({"location": tr("Prestation %(code)s inconnue.") % {"code": code}})
 
 
 class CompteurEntrantSerializer(serializers.Serializer):
@@ -113,7 +114,7 @@ class GrCompteursView(GrAPIView):
             ) else None
             if plancher is not None and d["valeur"] < plancher:
                 raise serializers.ValidationError(
-                    {"valeur": f"Compteur en baisse : {d['valeur']} < dernier relevé connu {plancher}."}
+                    {"valeur": tr("Compteur en baisse : %(valeur)s < dernier relevé connu %(plancher)s.") % {"valeur": d['valeur'], "plancher": plancher}}
                 )
             lecture = LectureCompteur.objects.create(
                 location=loc, date=d["date"], valeur=d["valeur"], type_lecture=d["type_lecture"],
@@ -160,7 +161,7 @@ class GrDocumentsView(GrAPIView):
             actuel = getattr(loc, champ)
             if actuel and actuel != d["reference"]:
                 return Response(
-                    {"detail": f"{champ} déjà renseignée ({actuel}) : correction par l'ETSL uniquement."},
+                    {"detail": tr("%(champ)s déjà renseignée (%(actuel)s) : correction par l'ETSL uniquement.") % {"champ": champ, "actuel": actuel}},
                     status=status.HTTP_409_CONFLICT,
                 )
             setattr(loc, champ, d["reference"])
@@ -180,7 +181,7 @@ class ApiClientSerializer(serializers.ModelSerializer):
     def validate_scopes(self, value):
         allowed = {"gr:read", "gr:write"}
         if not value or not set(value) <= allowed:
-            raise serializers.ValidationError(f"Scopes autorisés : {sorted(allowed)}.")
+            raise serializers.ValidationError(tr("Scopes autorisés : %(sorted)s.") % {"sorted": sorted(allowed)})
         return value
 
 

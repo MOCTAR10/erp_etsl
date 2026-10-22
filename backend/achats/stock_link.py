@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from stocks.models import ArticleStock, CertificatMatiere, Depot, LotMatiere, MouvementStock
 from stocks.services import apply_move
+from config.i18n import tr
 
 
 def _depot_reception(depot_id):
@@ -69,8 +70,7 @@ def entrer_en_stock(receipt, user, depot_id=None):
     for ligne in lignes:
         if ligne.purchase_order_line.article_id in obligatoires and not ligne.numero_lot.strip():
             raise ValidationError({"numero_lot": (
-                f"Lot obligatoire pour l'article {ligne.purchase_order_line.article.code} (traçabilité client pétrolier) : "
-                "renseignez le n° de lot sur la ligne de réception."
+                tr("Lot obligatoire pour l'article %(article_code)s (traçabilité client pétrolier) : renseignez le n° de lot sur la ligne de réception.") % {"article_code": ligne.purchase_order_line.article.code}
             )})
     depot = _depot_reception(depot_id)
     mouvements = []

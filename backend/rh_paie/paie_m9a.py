@@ -11,6 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .services import _arrondi, _instantane, calculer_bulletin, integrer_temps, parametre
+from config.i18n import tr
 
 RUBRIQUE_SALAIRE = "SAL-BASE"
 RUBRIQUE_ABSENCES = "ABS-NP"
@@ -107,7 +108,7 @@ def preparer_bulletin(bulletin):
     contrat = contrat_en_vigueur(bulletin.employe, periode)
     if contrat is None:
         raise ValidationError(
-            f"Aucun contrat actif de {bulletin.employe.nom_complet} sur {periode:%m/%Y} : bulletin non préparable."
+            tr("Aucun contrat actif de %(employe_nom_complet)s sur %(periode)s : bulletin non préparable.") % {"employe_nom_complet": bulletin.employe.nom_complet, "periode": format(periode, '%m/%Y')}
         )
     grille = grille_en_vigueur(contrat.grille, periode) if contrat.grille_id else None
     salaire = grille.salaire_base if grille else contrat.salaire_base

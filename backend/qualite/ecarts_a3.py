@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from .ecarts import get_param_qualite
 from .models import CoutNonQualite
 from .services import CanManageQualite
+from config.i18n import tr
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -46,13 +47,13 @@ def controler_lot_joint(attrs):
             )
         return attrs
     if lot.statut == lot.Statut.BLOQUE:
-        raise serializers.ValidationError({"lot": f"Lot {lot.code} en quarantaine : soudage interdit."})
+        raise serializers.ValidationError({"lot": tr("Lot %(lot_code)s en quarantaine : soudage interdit.") % {"lot_code": lot.code}})
     if get_param_qualite("JOINT_LOT_CONSOMME_OF") and lot.pk not in lots_of:
-        raise serializers.ValidationError({"lot": f"Lot {lot.code} non sorti du stock pour l'OF {ordre.code}."})
+        raise serializers.ValidationError({"lot": tr("Lot %(lot_code)s non sorti du stock pour l'OF %(ordre_code)s.") % {"lot_code": lot.code, "ordre_code": ordre.code}})
     coulee = (attrs.get("numero_coulee") or "").strip()
     if coulee and lot.numero_coulee and coulee != lot.numero_coulee:
         raise serializers.ValidationError(
-            {"numero_coulee": f"Coulée {coulee} différente de celle du lot {lot.code} ({lot.numero_coulee})."}
+            {"numero_coulee": tr("Coulée %(coulee)s différente de celle du lot %(lot_code)s (%(lot_numero_coulee)s).") % {"coulee": coulee, "lot_code": lot.code, "lot_numero_coulee": lot.numero_coulee}}
         )
     attrs["numero_coulee"] = lot.numero_coulee or coulee
     return attrs
@@ -135,7 +136,7 @@ def _compte(code_param):
     code = str(int(get_param_qualite(code_param)))
     compte = Account.objects.filter(code=code).first()
     if compte is None:
-        raise DjangoValidationError(f"Compte {code} ({code_param}) absent du plan comptable : corriger le paramètre.")
+        raise DjangoValidationError(tr("Compte %(code)s (%(code_param)s) absent du plan comptable : corriger le paramètre.") % {"code": code, "code_param": code_param})
     return compte
 
 

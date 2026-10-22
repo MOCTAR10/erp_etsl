@@ -22,6 +22,7 @@ from .models import (
 )
 from .serializers import _apply_and_validate
 from .services import CanManageHse, CanValidateHse, can_validate_hse
+from config.i18n import tr
 
 
 # --------------------------------------------------------------------------------------------------------------
@@ -148,7 +149,7 @@ class PrestataireDechetSerializer(serializers.ModelSerializer):
         codes = [c.strip() for c in (value or "").split(",") if c.strip()]
         inconnus = sorted(set(codes) - codes_actifs("type_dechet"))
         if inconnus:
-            raise serializers.ValidationError(f"Type(s) de déchet inconnu(s) : {', '.join(inconnus)}.")
+            raise serializers.ValidationError(tr("Type(s) de déchet inconnu(s) : %(liste)s.") % {"liste": ', '.join(inconnus)})
         return ",".join(codes)
 
 

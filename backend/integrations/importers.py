@@ -18,6 +18,7 @@ from accounting_kernel.services import period_for_date, post_move
 from referentiels.models import Currency, Partner
 
 from .models import BatchRow, ImportBatch
+from config.i18n import tr
 
 
 class RowError(Exception):
@@ -37,7 +38,7 @@ class BaseHandler:
         missing = set(self.REQUIRED_FIELDS) - set(fieldnames or ())
         if missing:
             raise ImportError(
-                "Colonnes manquantes : " + ", ".join(sorted(missing)) + "."
+                tr("Colonnes manquantes : %(liste)s.") % {"liste": ", ".join(sorted(missing))}
             )
 
     def handle_row(self, row):
@@ -58,7 +59,7 @@ class PartnerConnector(BaseHandler):
 
         kind = (row.get("kind") or "both").strip().lower()
         if kind not in Partner.Kind.values:
-            raise RowError(f"kind invalide : {kind}")
+            raise RowError(tr("kind invalide : %(kind)s") % {"kind": kind})
         is_global_rental = (row.get("is_global_rental") or "").strip().lower() in (
             "1",
             "true",
@@ -77,7 +78,7 @@ class PartnerConnector(BaseHandler):
         if currency_code:
             currency = Currency.objects.filter(code=currency_code).first()
             if currency is None:
-                raise RowError(f"devise inconnue : {currency_code}")
+                raise RowError(tr("devise inconnue : %(currency_code)s") % {"currency_code": currency_code})
             defaults["currency"] = currency
 
         partner, was_created = Partner.objects.update_or_create(
@@ -101,14 +102,14 @@ class GLConnector(BaseHandler):
         try:
             amount = Decimal(raw_amount)
         except InvalidOperation:
-            raise RowError(f"montant invalide : {raw_amount}")
+            raise RowError(tr("montant invalide : %(raw_amount)s") % {"raw_amount": raw_amount})
         if amount <= 0:
             raise RowError("montant doit être strictement positif.")
 
         journal_code = (row.get("journal") or "").strip().upper()
         journal = Journal.objects.filter(code=journal_code).first()
         if journal is None:
-            raise RowError(f"journal inconnu : {journal_code}")
+            raise RowError(tr("journal inconnu : %(journal_code)s") % {"journal_code": journal_code})
 
         debit_code = (row.get("account_debit") or "").strip()
         credit_code = (row.get("account_credit") or "").strip()
@@ -117,14 +118,14 @@ class GLConnector(BaseHandler):
         debit_account = Account.objects.filter(code=debit_code).first()
         credit_account = Account.objects.filter(code=credit_code).first()
         if debit_account is None:
-            raise RowError(f"compte débit inconnu : {debit_code}")
+            raise RowError(tr("compte débit inconnu : %(debit_code)s") % {"debit_code": debit_code})
         if credit_account is None:
-            raise RowError(f"compte crédit inconnu : {credit_code}")
+            raise RowError(tr("compte crédit inconnu : %(credit_code)s") % {"credit_code": credit_code})
 
         try:
             move_date = datetime.strptime((row.get("date") or "").strip(), "%Y-%m-%d").date()
         except ValueError:
-            raise RowError(f"date invalide (attendu AAAA-MM-JJ) : {row.get('date')}")
+            raise RowError(tr("date invalide (attendu AAAA-MM-JJ) : %(get)s") % {"get": row.get('date')})
 
         reference = (row.get("reference") or "").strip()
         label = (row.get("label") or f"Import {reference}").strip()
@@ -204,7 +205,7 @@ def run_import(connector, filename, content, user=None, force=False, gabarit=Non
 
         handler = SageConnector(gabarit or gabarit_sage())
     if handler is None:
-        raise ImportError(f"connecteur inconnu : {connector}")
+        raise ImportError(tr("connecteur inconnu : %(connector)s") % {"connector": connector})
 
     batch = ImportBatch.objects.create(
         connector=connector,

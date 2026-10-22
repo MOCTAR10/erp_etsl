@@ -20,6 +20,7 @@ from users.models import User
 from users.rbac import can_read_app
 
 from .models import ArticleStock, Inventaire, InventaireLigne, LotMatiere, MouvementStock, StockQuant  # noqa: F401
+from config.i18n import tr
 
 STOCK_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -102,19 +103,19 @@ def controler_sortie_lot(mouvement):
         return
     lot = mouvement.lot
     if lot.statut == LotMatiere.Statut.BLOQUE:
-        raise ValueError(f"Lot {lot.code} ({lot.numero_lot}) en quarantaine : sortie interdite (CDC M5 §7.8).")
+        raise ValueError(tr("Lot %(lot_code)s (%(lot_numero_lot)s) en quarantaine : sortie interdite (CDC M5 §7.8).") % {"lot_code": lot.code, "lot_numero_lot": lot.numero_lot})
     jour = mouvement.date or timezone.localdate()
     if lot.date_peremption and lot.date_peremption < jour:
-        raise ValueError(f"Lot {lot.code} ({lot.numero_lot}) périmé depuis le {lot.date_peremption} : sortie interdite.")
+        raise ValueError(tr("Lot %(lot_code)s (%(lot_numero_lot)s) périmé depuis le %(lot_date_peremption)s : sortie interdite.") % {"lot_code": lot.code, "lot_numero_lot": lot.numero_lot, "lot_date_peremption": lot.date_peremption})
     certificats = list(lot.certificats.all())
     if certificats:
         if not any(c.conforme and c.date_validation for c in certificats):
             raise ValueError(
-                f"Lot {lot.code} ({lot.numero_lot}) : certificat MTC / CoC non validé ou non conforme — sortie interdite."
+                tr("Lot %(lot_code)s (%(lot_numero_lot)s) : certificat MTC / CoC non validé ou non conforme — sortie interdite.") % {"lot_code": lot.code, "lot_numero_lot": lot.numero_lot}
             )
     elif ArticleStock.objects.filter(article_id=mouvement.article_id, certificat_requis=True).exists():
         raise ValueError(
-            f"Lot {lot.code} ({lot.numero_lot}) sans certificat MTC / CoC : exigé pour cet article (traçabilité pétrolière)."
+            tr("Lot %(lot_code)s (%(lot_numero_lot)s) sans certificat MTC / CoC : exigé pour cet article (traçabilité pétrolière).") % {"lot_code": lot.code, "lot_numero_lot": lot.numero_lot}
         )
 
 
@@ -191,10 +192,10 @@ def controler_depot(mouvement, user=None):
         if depot is None:
             continue
         if depot.is_global_rental:
-            raise ValueError(f"Dépôt {depot.code} : site GLOBAL RENTAL consultable en lecture seule, aucun mouvement ETSL.")
+            raise ValueError(tr("Dépôt %(depot_code)s : site GLOBAL RENTAL consultable en lecture seule, aucun mouvement ETSL.") % {"depot_code": depot.code})
         if user is not None and depot.roles_autorises and not (user.is_staff or user.role == User.Role.ADMIN
                                                                or user.role in depot.roles_autorises):
-            raise ValueError(f"Dépôt {depot.code} : votre fonction n'est pas autorisée à y mouvementer du stock.")
+            raise ValueError(tr("Dépôt %(depot_code)s : votre fonction n'est pas autorisée à y mouvementer du stock.") % {"depot_code": depot.code})
 
 
 def audit_valorisation(depot, article, lot=None):
@@ -263,8 +264,7 @@ def apply_move(mouvement):
         src = _quant(mouvement.source, mouvement.article, mouvement.lot)
         if float(src.quantity) + 1e-9 < float(mouvement.quantite):
             raise ValueError(
-                f"Stock insuffisant au dépôt {mouvement.source.label} : "
-                f"{float(src.quantity)} dispo pour {float(mouvement.quantite)}."
+                tr("Stock insuffisant au dépôt %(source_label)s : %(src_quantity)s dispo pour %(mouvement_quantite)s.") % {"source_label": mouvement.source.label, "src_quantity": float(src.quantity), "mouvement_quantite": float(mouvement.quantite)}
             )
         unit_cost = cout_sortie(mouvement, src)
         if mouvement.destination:
@@ -488,7 +488,7 @@ def alertes_stock(aujourdhui=None):
         stock = StockQuant.objects.filter(article_id=cfg.article_id).aggregate(q=Sum("quantity"))["q"] or 0
         if stock < cfg.seuil_minimal:
             rows.append({"type": "stock_mini", "article": cfg.article.code, "libelle": cfg.article.label, "lot": None,
-                         "detail": f"stock {stock:g} < seuil {cfg.seuil_minimal:g}", "date": None, "jours": None})
+                         "detail": tr("stock %(stock)s < seuil %(cfg_seuil_minimal)s") % {"stock": format(stock, 'g'), "cfg_seuil_minimal": format(cfg.seuil_minimal, 'g')}, "date": None, "jours": None})
     lots = LotMatiere.objects.filter(quantite_restante__gt=0).exclude(statut=LotMatiere.Statut.EPUISE).select_related("article")
     for lot in lots.filter(date_peremption__isnull=False, date_peremption__lte=aujourdhui + timedelta(days=delai)):
         jours = (lot.date_peremption - aujourdhui).days
@@ -503,7 +503,7 @@ def alertes_stock(aujourdhui=None):
             continue
         vus.add(cert.lot_id)
         rows.append({"type": "fournisseur_non_agree", "article": cert.lot.article.code, "libelle": cert.lot.article.label,
-                     "lot": cert.lot.code, "detail": f"fournisseur {cert.fournisseur.name} non agréé qualité / HSE",
+                     "lot": cert.lot.code, "detail": tr("fournisseur %(fournisseur_name)s non agréé qualité / HSE") % {"fournisseur_name": cert.fournisseur.name},
                      "date": None, "jours": None})
     return {"rows": rows, "peremption_jours": delai, "provisoire": parametres_stock_provisoires()}
 
@@ -562,20 +562,20 @@ def bon_de_sortie_pdf(mouvement):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, title=f"BS {mouvement.code}")
     m = mouvement
-    ordre = f"{m.ordre.code}" + (f" — affaire {m.ordre.affaire.code}" if m.ordre_id and m.ordre.affaire_id else "") if m.ordre_id else "—"
+    ordre = f"{m.ordre.code}" + (tr(" — affaire %(affaire_code)s") % {"affaire_code": m.ordre.affaire.code} if m.ordre_id and m.ordre.affaire_id else "") if m.ordre_id else "—"
     rows = [
-        ["Mouvement", m.code, "Date", f"{m.date:%d/%m/%Y}" if m.date else "—"],
-        ["Article", f"{m.article.code} — {m.article.label}", "Quantité", f"{m.quantite:g}"],
-        ["Lot", f"{m.lot.code} ({m.lot.numero_lot})" if m.lot_id else "—", "Dépôt", m.source.code if m.source_id else "—"],
-        ["Ordre de fabrication", ordre, "Destination", m.destination.code if m.destination_id else "Consommation"],
-        ["Référence", m.document_reference or "—", "Saisi par", str(m.created_by or "—")],
+        [tr("Mouvement"), m.code, tr("Date"), f"{m.date:%d/%m/%Y}" if m.date else "—"],
+        [tr("Article"), f"{m.article.code} — {m.article.label}", tr("Quantité"), f"{m.quantite:g}"],
+        [tr("Lot"), f"{m.lot.code} ({m.lot.numero_lot})" if m.lot_id else "—", tr("Dépôt"), m.source.code if m.source_id else "—"],
+        [tr("Ordre de fabrication"), ordre, tr("Destination"), m.destination.code if m.destination_id else tr("Consommation")],
+        [tr("Référence"), m.document_reference or "—", tr("Saisi par"), str(m.created_by or "—")],
     ]
     table = Table(rows, colWidths=[35 * mm, 70 * mm, 25 * mm, 50 * mm])
     table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.3, colors.grey), ("FONTSIZE", (0, 0), (-1, -1), 9),
                                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eef1f8")),
                                ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#eef1f8"))]))
-    signatures = Table([["Magasinier", "Receveur"], ["\n\n\n", "\n\n\n"]], colWidths=[90 * mm, 90 * mm])
+    signatures = Table([[tr("Magasinier"), tr("Receveur")], ["\n\n\n", "\n\n\n"]], colWidths=[90 * mm, 90 * mm])
     signatures.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.3, colors.grey)]))
-    doc.build([Paragraph(f"Bon de sortie magasin {m.code}", styles["Title"]), Spacer(1, 4 * mm), table,
+    doc.build([Paragraph(tr("Bon de sortie magasin %(m_code)s") % {"m_code": m.code}, styles["Title"]), Spacer(1, 4 * mm), table,
                Spacer(1, 10 * mm), signatures])
     return buf.getvalue()

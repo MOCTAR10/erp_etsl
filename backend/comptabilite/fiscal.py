@@ -19,6 +19,7 @@ from accounting_kernel.services import period_for_date, post_move
 from referentiels.models import Account
 
 from .models import AutoFacture, DeclarationTva, GabaritEtat, Paiement
+from config.i18n import en_francais, tr
 
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
@@ -62,7 +63,7 @@ def _compte(code):
     try:
         return Account.objects.get(code=code)
     except Account.DoesNotExist:
-        raise ValidationError(f"Compte {code} absent du plan comptable (seed_referentiels).")
+        raise ValidationError(tr("Compte %(code)s absent du plan comptable (seed_referentiels).") % {"code": code})
 
 
 def _bornes_mois(mois):
@@ -321,7 +322,7 @@ def archiver_journal_periode(period, user=None):
     """Journal (grand livre) de la période clôturée, scellé en GED 10 ans."""
     from .etats import grand_livre, to_pdf
 
-    contenu = to_pdf(grand_livre(period.start_date, period.end_date))
+    contenu = en_francais(lambda: to_pdf(grand_livre(period.start_date, period.end_date)))  # archive : français
     return archiver_piece(
         contenu, f"journal-{period}.pdf", f"Grand livre de la période {period}", TYPE_GED_JOURNAUX,
         "Journaux comptables", f"GL-{period}", period.end_date, user, mots=("journal", str(period)),
@@ -331,7 +332,7 @@ def archiver_journal_periode(period, user=None):
 def archiver_liasse(exercice, user=None):
     from .etats import to_pdf
 
-    contenu = to_pdf(liasse(exercice))
+    contenu = en_francais(lambda: to_pdf(liasse(exercice)))  # archive : français
     return archiver_piece(
         contenu, f"liasse-{exercice}.pdf", f"Liasse fiscale {exercice}", TYPE_GED_DECLARATIONS,
         "Déclarations fiscales", f"LIASSE-{exercice}", _bornes_exercice(exercice)[1], user, mots=("liasse", str(exercice)),

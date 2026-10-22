@@ -12,6 +12,7 @@ from documents.models import AuditLog, Document
 from documents.services import visible_documents
 
 from .services import dashboard, export_sage, export_selection
+from config.i18n import tr
 
 
 @extend_schema(
@@ -34,7 +35,7 @@ class ExportView(APIView):
                 request.user, format, request.query_params
             )
         except Exception as exc:
-            return Response({"detail": f"export error: {exc!r}"}, status=500)
+            return Response({"detail": tr("export error: %(exc)s") % {"exc": repr(exc)}}, status=500)
         log_audit(
             request.user,
             AuditLog.Action.DOWNLOAD,

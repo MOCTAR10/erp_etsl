@@ -15,6 +15,7 @@ from .models import (
     PurchaseRequest,
     PurchaseRequestLine,
 )
+from config.i18n import tr
 
 
 class AmountMaskMixin:
@@ -121,7 +122,7 @@ class ConsultationRequestSerializer(serializers.ModelSerializer):
             PurchaseRequest.Status.APPROUVEE, PurchaseRequest.Status.CONVERTIE
         ):
             raise serializers.ValidationError(
-                f"DA {value.code} non approuvée ({value.get_status_display().lower()}) : consultation / commande impossible."
+                tr("DA %(value_code)s non approuvée (%(status)s) : consultation / commande impossible.") % {"value_code": value.code, "status": value.get_status_display().lower()}
             )
         return value
 
@@ -249,7 +250,7 @@ class PurchaseOrderSerializer(AmountMaskMixin, ModelCleanMixin, serializers.Mode
             PurchaseRequest.Status.APPROUVEE, PurchaseRequest.Status.CONVERTIE
         ):
             raise serializers.ValidationError(
-                f"DA {value.code} non approuvée ({value.get_status_display().lower()}) : consultation / commande impossible."
+                tr("DA %(value_code)s non approuvée (%(status)s) : consultation / commande impossible.") % {"value_code": value.code, "status": value.get_status_display().lower()}
             )
         return value
 

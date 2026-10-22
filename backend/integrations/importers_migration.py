@@ -25,6 +25,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models_migration import HistoriquePaie, LigneReprise, LotReprise, ParametreReprise
+from config.i18n import tr
 
 MASQUE = "•••"
 
@@ -87,7 +88,7 @@ def lire_xml(contenu: bytes):
     try:
         racine = ET.fromstring(contenu)
     except ET.ParseError as exc:
-        raise FichierErreur(f"XML illisible : {exc}.")
+        raise FichierErreur(tr("XML illisible : %(exc)s.") % {"exc": exc})
     lignes, colonnes = [], []
     for element in racine:
         ligne = {k.strip(): (v or "").strip() for k, v in element.attrib.items()}
@@ -114,14 +115,14 @@ def lire_fichier(nom: str, contenu: bytes):
 def _txt(row, cle, longueur=None):
     valeur = (row.get(cle) or "").strip()
     if longueur and len(valeur) > longueur:
-        raise LigneErreur(f"{cle} : {longueur} caractères maximum ({len(valeur)}).")
+        raise LigneErreur(tr("%(cle)s : %(longueur)s caractères maximum (%(nb_valeur)s).") % {"cle": cle, "longueur": longueur, "nb_valeur": len(valeur)})
     return valeur
 
 
 def _req(row, cle, longueur=None):
     valeur = _txt(row, cle, longueur)
     if not valeur:
-        raise LigneErreur(f"{cle} obligatoire.")
+        raise LigneErreur(tr("%(cle)s obligatoire.") % {"cle": cle})
     return valeur
 
 
@@ -129,28 +130,28 @@ def _date(row, cle, obligatoire=False):
     valeur = _txt(row, cle)
     if not valeur:
         if obligatoire:
-            raise LigneErreur(f"{cle} obligatoire (AAAA-MM-JJ).")
+            raise LigneErreur(tr("%(cle)s obligatoire (AAAA-MM-JJ).") % {"cle": cle})
         return None
     try:
         return datetime.strptime(valeur, "%Y-%m-%d").date()
     except ValueError:
-        raise LigneErreur(f"{cle} invalide (attendu AAAA-MM-JJ) : {valeur}.")
+        raise LigneErreur(tr("%(cle)s invalide (attendu AAAA-MM-JJ) : %(valeur)s.") % {"cle": cle, "valeur": valeur})
 
 
 def _dec(row, cle, defaut=None, obligatoire=False, positif=True):
     valeur = _txt(row, cle).replace(" ", "").replace(" ", "").replace(",", ".")
     if not valeur:
         if obligatoire:
-            raise LigneErreur(f"{cle} obligatoire.")
+            raise LigneErreur(tr("%(cle)s obligatoire.") % {"cle": cle})
         return defaut
     try:
         nombre = Decimal(valeur)
     except InvalidOperation:
-        raise LigneErreur(f"{cle} : nombre invalide ({valeur}).")
+        raise LigneErreur(tr("%(cle)s : nombre invalide (%(valeur)s).") % {"cle": cle, "valeur": valeur})
     if not nombre.is_finite():
-        raise LigneErreur(f"{cle} : nombre invalide ({valeur}).")
+        raise LigneErreur(tr("%(cle)s : nombre invalide (%(valeur)s).") % {"cle": cle, "valeur": valeur})
     if positif and nombre < 0:
-        raise LigneErreur(f"{cle} : valeur négative interdite ({valeur}).")
+        raise LigneErreur(tr("%(cle)s : valeur négative interdite (%(valeur)s).") % {"cle": cle, "valeur": valeur})
     return nombre
 
 
@@ -162,7 +163,7 @@ def _bool(row, cle, defaut=False):
         return True
     if valeur in ("0", "false", "non", "no", "n", "faux"):
         return False
-    raise LigneErreur(f"{cle} : booléen attendu (oui / non), reçu {valeur}.")
+    raise LigneErreur(tr("%(cle)s : booléen attendu (oui / non), reçu %(valeur)s.") % {"cle": cle, "valeur": valeur})
 
 
 def _norm(texte):
@@ -177,7 +178,7 @@ def _choix(row, cle, choices, defaut=None, alias=None):
     valeur = _txt(row, cle)
     if not valeur:
         if defaut is None:
-            raise LigneErreur(f"{cle} obligatoire ({', '.join(v for v, _ in choices)}).")
+            raise LigneErreur(tr("%(cle)s obligatoire (%(liste)s).") % {"cle": cle, "liste": ', '.join(v for v, _ in choices)})
         return defaut
     cible = _norm(valeur)
     for code, libelle in choices:
@@ -186,7 +187,7 @@ def _choix(row, cle, choices, defaut=None, alias=None):
     for k, code in (alias or {}).items():
         if cible == _norm(k):
             return code
-    raise LigneErreur(f"{cle} invalide : {valeur} (attendu : {', '.join(v for v, _ in choices)}).")
+    raise LigneErreur(tr("%(cle)s invalide : %(valeur)s (attendu : %(liste)s).") % {"cle": cle, "valeur": valeur, "liste": ', '.join(v for v, _ in choices)})
 
 
 def _valider(obj):
@@ -204,7 +205,7 @@ def _partner(code):
         return None
     partner = Partner.objects.filter(code=code).first()
     if partner is None:
-        raise LigneErreur(f"tiers inconnu : {code} (chargez d'abord le gabarit Tiers).")
+        raise LigneErreur(tr("tiers inconnu : %(code)s (chargez d'abord le gabarit Tiers).") % {"code": code})
     return partner
 
 
@@ -215,7 +216,7 @@ def _currency(code):
         return None
     devise = Currency.objects.filter(code=code.upper()).first()
     if devise is None:
-        raise LigneErreur(f"devise inconnue : {code}.")
+        raise LigneErreur(tr("devise inconnue : %(code)s.") % {"code": code})
     return devise
 
 
@@ -281,12 +282,12 @@ def _articles(row, ctx):
     if unite:
         defaults["unit"] = UnitOfMeasure.objects.filter(code=unite).first()
         if defaults["unit"] is None:
-            raise LigneErreur(f"unité inconnue : {unite}.")
+            raise LigneErreur(tr("unité inconnue : %(unite)s.") % {"unite": unite})
     compte = _txt(row, "compte")
     if compte:
         defaults["account"] = Account.objects.filter(code=compte).first()
         if defaults["account"] is None:
-            raise LigneErreur(f"compte inconnu : {compte}.")
+            raise LigneErreur(tr("compte inconnu : %(compte)s.") % {"compte": compte})
     _, cree = Article.objects.update_or_create(code=code, defaults=defaults)
     return ("creee" if cree else "maj"), code
 
@@ -304,7 +305,7 @@ def _salaries(row, ctx):
             .exclude(code=matricule).values_list("code", flat=True).first()
         )
         if homonyme:
-            raise LigneErreur(f"doublon probable : même nom, prénom et date de naissance que le matricule {homonyme}.")
+            raise LigneErreur(tr("doublon probable : même nom, prénom et date de naissance que le matricule %(homonyme)s.") % {"homonyme": homonyme})
     defaults = {
         "nom": nom,
         "prenom": prenom,
@@ -354,7 +355,7 @@ def _salaries(row, ctx):
         contrat = (ContratTravail.objects.filter(code=numero).first() if numero
                    else ContratTravail.objects.filter(employe=employe, date_debut=debut).first())
         if contrat is not None and contrat.employe_id != employe.pk:
-            raise LigneErreur(f"contrat {numero} déjà rattaché à un autre salarié ({contrat.employe.code}).")
+            raise LigneErreur(tr("contrat %(numero)s déjà rattaché à un autre salarié (%(employe_code)s).") % {"numero": numero, "employe_code": contrat.employe.code})
         if contrat is None:
             contrat = ContratTravail(code=numero, **valeurs)
         else:
@@ -376,7 +377,7 @@ def _periode(row):
             return jour.replace(day=1)
         except ValueError:
             continue
-    raise LigneErreur(f"periode invalide (attendu AAAA-MM) : {valeur}.")
+    raise LigneErreur(tr("periode invalide (attendu AAAA-MM) : %(valeur)s.") % {"valeur": valeur})
 
 
 def _paie_historique(row, ctx):
@@ -385,7 +386,7 @@ def _paie_historique(row, ctx):
     matricule = _req(row, "matricule")
     employe = Employe.objects.filter(code=matricule).first()
     if employe is None:
-        raise LigneErreur(f"salarié inconnu : {matricule} (chargez d'abord le gabarit Salariés).")
+        raise LigneErreur(tr("salarié inconnu : %(matricule)s (chargez d'abord le gabarit Salariés).") % {"matricule": matricule})
     periode = _periode(row)
     if periode > timezone.localdate():
         raise LigneErreur("période future : seul l'historique est repris.")
@@ -434,7 +435,7 @@ def _wps(row, ctx):
             raise LigneErreur("wpqr_support ne concerne qu'un WPS.")
         valeurs["wpqr"] = WpsWpqr.objects.filter(code=support, type=WpsWpqr.Type.WPQR).first()
         if valeurs["wpqr"] is None:
-            raise LigneErreur(f"WPQR support inconnu : {support} (placez les WPQR avant les WPS).")
+            raise LigneErreur(tr("WPQR support inconnu : %(support)s (placez les WPQR avant les WPS).") % {"support": support})
     _, cree = WpsWpqr.objects.update_or_create(code=numero, defaults=valeurs)
     return ("creee" if cree else "maj"), numero
 
@@ -463,7 +464,7 @@ def _soudeurs(row, ctx):
         return ("creee" if cree else "maj"), code
     qualif = QualificationSoudeur.objects.filter(code=numero).first()
     if qualif is not None and qualif.soudeur_id != soudeur.pk:
-        raise LigneErreur(f"qualification {numero} déjà rattachée au soudeur {qualif.soudeur.code}.")
+        raise LigneErreur(tr("qualification %(numero)s déjà rattachée au soudeur %(soudeur_code)s.") % {"numero": numero, "soudeur_code": qualif.soudeur.code})
     q_valeurs = {
         "soudeur": soudeur,
         "norme": _choix(row, "norme", QualificationSoudeur.Norme.choices, defaut=QualificationSoudeur.Norme.ISO_9606,
@@ -498,7 +499,7 @@ def _affaires(row, ctx):
     code = _req(row, "code", 20)
     existante = Affaire.objects.filter(code=code).first()
     if existante and existante.status in (Affaire.Status.CLOTUREE, Affaire.Status.ARCHIVEE):
-        raise LigneErreur(f"affaire {code} clôturée / archivée : non modifiable.")
+        raise LigneErreur(tr("affaire %(code)s clôturée / archivée : non modifiable.") % {"code": code})
     partner = _partner(_txt(row, "client"))
     gr = _bool(row, "global_rental", False)
     if gr and partner is not None and not partner.is_global_rental:
@@ -534,12 +535,12 @@ def _contrats(row, ctx):
     code = _req(row, "code", 20)
     existant = Contract.objects.filter(code=code).first()
     if existant and existant.status != Contract.Status.BROUILLON:
-        raise LigneErreur(f"contrat {code} déjà signé / actif : toute modification passe par un avenant.")
+        raise LigneErreur(tr("contrat %(code)s déjà signé / actif : toute modification passe par un avenant.") % {"code": code})
     affaire = None
     if _txt(row, "affaire"):
         affaire = Affaire.objects.filter(code=_txt(row, "affaire")).first()
         if affaire is None:
-            raise LigneErreur(f"affaire inconnue : {_txt(row, 'affaire')} (chargez d'abord le gabarit Affaires).")
+            raise LigneErreur(tr("affaire inconnue : %(txt)s (chargez d'abord le gabarit Affaires).") % {"txt": _txt(row, 'affaire')})
     partner = _partner(_txt(row, "client"))
     gr = _bool(row, "global_rental", False)
     if gr and partner is not None and not partner.is_global_rental:
@@ -582,11 +583,11 @@ def _stocks_ouverture(row, ctx):
     depot = Depot.objects.filter(code=code_depot).first()
     if depot is None:
         if not _txt(row, "depot_libelle"):
-            raise LigneErreur(f"dépôt inconnu : {code_depot} (renseignez depot_libelle pour le créer).")
+            raise LigneErreur(tr("dépôt inconnu : %(code_depot)s (renseignez depot_libelle pour le créer).") % {"code_depot": code_depot})
         depot = Depot.objects.create(code=code_depot, label=_txt(row, "depot_libelle", 200))
     article = Article.objects.filter(code=_req(row, "article")).first()
     if article is None:
-        raise LigneErreur(f"article inconnu : {_txt(row, 'article')} (chargez d'abord le gabarit Articles).")
+        raise LigneErreur(tr("article inconnu : %(txt)s (chargez d'abord le gabarit Articles).") % {"txt": _txt(row, 'article')})
     quantite = _dec(row, "quantite", obligatoire=True)
     if quantite <= 0:
         raise LigneErreur("quantite doit être strictement positive.")
@@ -650,12 +651,12 @@ def _ged(row, ctx):
     try:
         info = ctx.archive.getinfo(nom)
     except KeyError:
-        raise LigneErreur(f"fichier absent du lot : {nom}.")
+        raise LigneErreur(tr("fichier absent du lot : %(nom)s.") % {"nom": nom})
     contenu = ctx.archive.read(info)
     empreinte = hashlib.sha256(contenu).hexdigest()
     attendue = _txt(row, "sha256").lower()
     if attendue and attendue != empreinte:
-        raise LigneErreur(f"empreinte SHA-256 différente du bordereau (calculée {empreinte}).")
+        raise LigneErreur(tr("empreinte SHA-256 différente du bordereau (calculée %(empreinte)s).") % {"empreinte": empreinte})
     if Document.objects.filter(sha256=empreinte).exists():
         return "doublon", empreinte
     code_type = _txt(row, "type", 60)
@@ -664,7 +665,7 @@ def _ged(row, ctx):
         type_doc = DocumentType.objects.filter(code=code_type).first()
         if type_doc is None:
             if not _txt(row, "type_libelle"):
-                raise LigneErreur(f"type de document inconnu : {code_type} (renseignez type_libelle pour le créer).")
+                raise LigneErreur(tr("type de document inconnu : %(code_type)s (renseignez type_libelle pour le créer).") % {"code_type": code_type})
             retention = _dec(row, "retention_annees")
             type_doc = DocumentType.objects.create(code=code_type, label=_txt(row, "type_libelle", 120),
                                                    retention_years=int(retention) if retention is not None else None)
@@ -865,7 +866,7 @@ def _lire_lot_ged(contenu, user):
     if len(infos) > 20000:
         raise FichierErreur("lot GED : 20 000 fichiers maximum par archive.")
     if sum(i.file_size for i in infos) > plafond:
-        raise FichierErreur(f"lot GED : taille décompressée supérieure à {plafond / 1024 / 1024:.0f} Mo (paramètre).")
+        raise FichierErreur(tr("lot GED : taille décompressée supérieure à %(valeur)s Mo (paramètre).") % {"valeur": format(plafond / 1024 / 1024, '.0f')})
     manifeste = next((i for i in infos if i.filename.rsplit("/", 1)[-1].lower() in ("manifeste.csv", "manifeste.xml")), None)
     if manifeste is None:
         raise FichierErreur("lot GED : manifeste.csv (ou manifeste.xml) absent de l'archive.")
@@ -881,7 +882,7 @@ def executer_lot(code, nom, contenu, user, mode=LotReprise.Mode.BLANC, force=Fal
     """Retourne `(lot, rejeu)`. Lève FichierErreur seulement pour un gabarit inconnu (400)."""
     gabarit = GABARITS.get(code)
     if gabarit is None:
-        raise FichierErreur(f"gabarit inconnu : {code}.")
+        raise FichierErreur(tr("gabarit inconnu : %(code)s.") % {"code": code})
     empreinte = hashlib.sha256(contenu).hexdigest()
     if mode == LotReprise.Mode.REEL and not force:
         deja = LotReprise.objects.filter(
@@ -905,11 +906,11 @@ def executer_lot(code, nom, contenu, user, mode=LotReprise.Mode.BLANC, force=Fal
         else:
             plafond = get_param_reprise("TAILLE_MAX_FICHIER_MO") * 1024 * 1024
             if len(contenu) > plafond:
-                raise FichierErreur(f"fichier supérieur à {plafond / 1024 / 1024:.0f} Mo (paramètre).")
+                raise FichierErreur(tr("fichier supérieur à %(valeur)s Mo (paramètre).") % {"valeur": format(plafond / 1024 / 1024, '.0f')})
             lot.format, lignes, colonnes = lire_fichier(nom, contenu)
         manquantes = [c.nom for c in gabarit.colonnes if c.obligatoire and c.nom not in colonnes]
         if manquantes:
-            raise FichierErreur("Colonnes manquantes : " + ", ".join(manquantes) + ".")
+            raise FichierErreur(tr("Colonnes manquantes : %(liste)s.") % {"liste": ", ".join(manquantes)})
         if not lignes:
             raise FichierErreur("Fichier vide.")
         for opt in gabarit.options:

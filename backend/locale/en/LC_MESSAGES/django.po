@@ -3818,3 +3818,2421 @@ msgstr "Unknown role."
 #: workflow/views.py:84
 msgid "Nombre de jours entier attendu."
 msgstr "Integer number of days expected."
+
+# ── Lot a8 : messages dynamiques (gabarits « %(nom)s », tr(...) % {...}) ──
+#, python-format
+msgid "Aucune période comptable pour la date %(date)s."
+msgstr "No accounting period for the date %(date)s."
+
+#, python-format
+msgid "Écriture déséquilibrée : débit %(total_debit)s ≠ crédit %(total_credit)s."
+msgstr "Unbalanced entry: debit %(total_debit)s ≠ credit %(total_credit)s."
+
+#, python-format
+msgid "Clôture impossible : %(drafts)s écriture(s) en brouillon dans la période (comptabilisez-les ou supprimez-les d'abord)."
+msgstr "Closing not possible: %(drafts)s draft entry(ies) in the period (post or delete them first)."
+
+#, python-format
+msgid "Compte %(code)s absent du plan comptable (seed_referentiels)."
+msgstr "Account %(code)s missing from the chart of accounts (seed_referentiels)."
+
+#, python-format
+msgid "Avoirs cumulés (%(valeur)s) supérieurs au HT de la facture (%(total_ht)s)."
+msgstr "Cumulative credit notes (%(valeur)s) exceed the invoice amount excl. tax (%(total_ht)s)."
+
+#, python-format
+msgid "Affaire %(affaire_code)s %(status)s : seule une affaire validée (confirmée / en cours) génère ses besoins d'achat."
+msgstr "Project %(affaire_code)s %(status)s: only a validated project (confirmed / in progress) generates its purchasing needs."
+
+#, python-format
+msgid "Un BC achats est déjà lié à la location %(location_code)s."
+msgstr "A purchase order is already linked to rental %(location_code)s."
+
+#, python-format
+msgid "Valeurs admises : %(liste)s."
+msgstr "Allowed values: %(liste)s."
+
+#, python-format
+msgid "DA %(value_code)s non approuvée (%(status)s) : consultation / commande impossible."
+msgstr "Purchase request %(value_code)s not approved (%(status)s): request for quotation / order not possible."
+
+#, python-format
+msgid "Avoirs cumulés (%(cumul)s) supérieurs au HT de la facture (%(facture_total)s)."
+msgstr "Cumulative credit notes (%(cumul)s) exceed the invoice amount excl. tax (%(facture_total)s)."
+
+#, python-format
+msgid "Lot obligatoire pour l'article %(article_code)s (traçabilité client pétrolier) : renseignez le n° de lot sur la ligne de réception."
+msgstr "Batch required for item %(article_code)s (oil client traceability): enter the batch number on the receipt line."
+
+#, python-format
+msgid "Réception hors ligne de %(get)s sur « %(ligne_bc_label)s » : déjà reçu %(ligne_bc_received_qty)s pour %(ligne_bc_quantity)s commandé(s) entre-temps. Forcer (sur-réception) ou abandonner."
+msgstr "Offline receipt of %(get)s on “%(ligne_bc_label)s”: %(ligne_bc_received_qty)s already received out of %(ligne_bc_quantity)s ordered in the meantime. Force (over-receipt) or discard."
+
+#, python-format
+msgid "DA %(status)s : action impossible."
+msgstr "Purchase request %(status)s: action not possible."
+
+#, python-format
+msgid "BC %(status)s : confirmation impossible."
+msgstr "Purchase order %(status)s: confirmation not possible."
+
+#, python-format
+msgid "Fournisseur %(nom)s non agréé qualité / HSE (ou agrément expiré) : BC non émis."
+msgstr "Supplier %(nom)s not approved for quality / HSE (or approval expired): purchase order not issued."
+
+#, python-format
+msgid "Inspection exigée à réception : %(liste)s créé(s) en M6, à valider avant la réception."
+msgstr "Inspection required at receipt: %(liste)s created in M6, to be validated before the receipt."
+
+#, python-format
+msgid "Facture %(status)s : rapprochement impossible."
+msgstr "Invoice %(status)s: matching not possible."
+
+#, python-format
+msgid "Facture %(status)s : lignes non modifiables."
+msgstr "Invoice %(status)s: lines cannot be modified."
+
+#, python-format
+msgid "Décision réservée au service %(service)s et à la Direction."
+msgstr "Decision reserved to the %(service)s department and Management."
+
+#, python-format
+msgid "Rôle(s) inconnu(s) : %(liste)s."
+msgstr "Unknown role(s): %(liste)s."
+
+#, python-format
+msgid "Le cube %(periode)s est archivé : il ne peut plus être recalculé."
+msgstr "Cube %(periode)s is archived: it can no longer be recomputed."
+
+#, python-format
+msgid "Le cube %(periode)s est déjà archivé."
+msgstr "Cube %(periode)s is already archived."
+
+#, python-format
+msgid "Axe inconnu : %(a)s (attendu : %(liste)s)."
+msgstr "Unknown axis: %(a)s (expected: %(liste)s)."
+
+#, python-format
+msgid "Filtre inconnu : %(k)s."
+msgstr "Unknown filter: %(k)s."
+
+#, python-format
+msgid "Modèle dbt introuvable : %(nom)s"
+msgstr "dbt model not found: %(nom)s"
+
+#, python-format
+msgid "Critère %(i)s : libellé requis."
+msgstr "Criterion %(i)s: label required."
+
+#, python-format
+msgid "Critère %(i)s : poids strictement positif requis."
+msgstr "Criterion %(i)s: strictly positive weight required."
+
+#, python-format
+msgid "Critère %(i)s : note entre 0 et 100 requise."
+msgstr "Criterion %(i)s: score between 0 and 100 required."
+
+#, python-format
+msgid "Critère %(i)s : poids et note numériques requis."
+msgstr "Criterion %(i)s: numeric weight and score required."
+
+#, python-format
+msgid "Offre %(status)s : action impossible."
+msgstr "Quotation %(status)s: action not possible."
+
+#, python-format
+msgid "No-Go (note %(rao_score)s %% < 50 %%) : offre non soumise."
+msgstr "No-Go (score %(rao_score)s %% < 50 %%): quotation not submitted."
+
+#, python-format
+msgid "Go sous réserve (note %(rao_score)s %%) : justification obligatoire."
+msgstr "Go with reservations (score %(rao_score)s %%): justification required."
+
+#, python-format
+msgid "Valeurs possibles : %(liste)s."
+msgstr "Possible values: %(liste)s."
+
+#, python-format
+msgid "Contrat %(status)s : action impossible."
+msgstr "Contract %(status)s: action not possible."
+
+#, python-format
+msgid "Affaire %(status)s : action impossible."
+msgstr "Project %(status)s: action not possible."
+
+#, python-format
+msgid "Revue complète (Δ prix %(revue_delta_prix_pct)s %%, Δ délai %(revue_delta_delai_jours)s j) : validation réservée à la Direction."
+msgstr "Full review (price Δ %(revue_delta_prix_pct)s %%, lead time Δ %(revue_delta_delai_jours)s d): validation reserved to Management."
+
+#, python-format
+msgid "Affaire %(affaire_code)s : aucun budget de charges approuvé (M11) — méthode des coûts impossible."
+msgstr "Project %(affaire_code)s: no approved cost budget (M11) — cost-to-cost method not possible."
+
+#, python-format
+msgid "Affaire %(affaire_code)s sans montant de contrat : rien à reconnaître."
+msgstr "Project %(affaire_code)s has no contract amount: nothing to recognise."
+
+#, python-format
+msgid "Une reconnaissance plus récente existe déjà (%(dernier_code)s au %(dernier_date_arrete)s)."
+msgstr "A more recent recognition already exists (%(dernier_code)s as of %(dernier_date_arrete)s)."
+
+#, python-format
+msgid "Format inconnu : %(format)s"
+msgstr "Unknown format: %(format)s"
+
+#, python-format
+msgid "montant illisible : %(champ)s"
+msgstr "unreadable amount: %(champ)s"
+
+#, python-format
+msgid "montant illisible : %(s)s"
+msgstr "unreadable amount: %(s)s"
+
+#, python-format
+msgid "Clôture impossible : %(liste)s."
+msgstr "Closing not possible: %(liste)s."
+
+#, python-format
+msgid "Aucun cours %(devise_code)s connu au %(jour)s : saisissez-le (Comptabilité → cours de change)."
+msgstr "No %(devise_code)s exchange rate known on %(jour)s: enter it (Accounting → exchange rates)."
+
+#, python-format
+msgid "Dernier cours %(devise_code)s du %(cours_date)s : plus de %(max_jours)s jours avant le %(jour)s. Saisissez le cours du jour."
+msgstr "Last %(devise_code)s rate dated %(cours_date)s: more than %(max_jours)s days before %(jour)s. Enter today's rate."
+
+#, python-format
+msgid "Devise inconnue : %(devise_code)s."
+msgstr "Unknown currency: %(devise_code)s."
+
+#, python-format
+msgid "Une provision pour perte de change existe au %(derniere_date_cloture)s : la réévaluation de clôture ne peut pas être antérieure."
+msgstr "A provision for exchange loss exists as of %(derniere_date_cloture)s: the closing revaluation cannot be earlier."
+
+#, python-format
+msgid "Compte %(code)s absent du plan comptable."
+msgstr "Account %(code)s missing from the chart of accounts."
+
+#, python-format
+msgid "Nombre invalide : %(texte)s."
+msgstr "Invalid number: %(texte)s."
+
+#, python-format
+msgid "Cours %(devise_code)s du %(jour)s déjà confirmé : non modifiable."
+msgstr "%(devise_code)s rate of %(jour)s already confirmed: cannot be modified."
+
+#, python-format
+msgid "Cours %(devise_code)s du %(jour)s déjà saisi."
+msgstr "%(devise_code)s rate of %(jour)s already entered."
+
+#, python-format
+msgid "Avoir supérieur au reliquat facturable (%(restant)s)."
+msgstr "Credit note exceeds the remaining billable amount (%(restant)s)."
+
+#, python-format
+msgid "Location %(location_code)s déjà comptabilisée au 618 (écriture M10) : la lier à un BC GR créerait une double charge. Extournez d'abord l'écriture."
+msgstr "Rental %(location_code)s already posted to 618 (M10 entry): linking it to a GR purchase order would double the charge. Reverse the entry first."
+
+#, python-format
+msgid "Le BC %(bc_code)s est déjà rattaché à une autre location GR."
+msgstr "Purchase order %(bc_code)s is already linked to another GR rental."
+
+#, python-format
+msgid "Garantie non échue (libération prévue le %(date_liberation)s) : motif obligatoire pour une libération anticipée."
+msgstr "Guarantee not yet due (release scheduled on %(date_liberation)s): a reason is required for an early release."
+
+#, python-format
+msgid "Le compte %(compte_code)s n'est pas lettrable."
+msgstr "Account %(compte_code)s cannot be matched (lettering)."
+
+#, python-format
+msgid "Lettrage déséquilibré : écart %(ecart)s supérieur à la tolérance."
+msgstr "Unbalanced matching: difference %(ecart)s exceeds the tolerance."
+
+#, python-format
+msgid "Dépassement de l'engagement : solde disponible %(eng_solde)s, paiement %(paiement_montant)s."
+msgstr "Commitment exceeded: available balance %(eng_solde)s, payment %(paiement_montant)s."
+
+#, python-format
+msgid "Journal %(journal_codes)s absent (seed_accounting)."
+msgstr "Journal %(journal_codes)s missing (seed_accounting)."
+
+#, python-format
+msgid "Le compte du fichier (%(compte)s) diffère de celui du compte bancaire (%(compte_bancaire_numero)s)."
+msgstr "The file's account (%(compte)s) differs from the bank account's (%(compte_bancaire_numero)s)."
+
+#, python-format
+msgid "Facture %(facture_code)s rapprochée mais non comptabilisée : comptabilisez-la (Achats) avant le paiement."
+msgstr "Invoice %(facture_code)s matched but not posted: post it (Purchasing) before payment."
+
+#, python-format
+msgid "Facture %(facture_code)s non rapprochée (3-way BR / BC / facture) : comptabilisation impossible."
+msgstr "Invoice %(facture_code)s not matched (3-way GRN / PO / invoice): posting not possible."
+
+#, python-format
+msgid "Ligne de relevé introuvable : %(ligne_pk)s"
+msgstr "Statement line not found: %(ligne_pk)s"
+
+#, python-format
+msgid "Ligne %(ligne_pk)s rattachée à un autre compte bancaire."
+msgstr "Line %(ligne_pk)s belongs to another bank account."
+
+#, python-format
+msgid "Valeur de filtre invalide. (%(brut)s)"
+msgstr "Invalid filter value. (%(brut)s)"
+
+#, python-format
+msgid "Date invalide (format attendu AAAA-MM-JJ). (%(brut)s)"
+msgstr "Invalid date (expected format YYYY-MM-DD). (%(brut)s)"
+
+#, python-format
+msgid "Choix invalide. (%(liste)s)"
+msgstr "Invalid choice. (%(liste)s)"
+
+#, python-format
+msgid "Valeur inconnue : %(raw)s."
+msgstr "Unknown value: %(raw)s."
+
+#, python-format
+msgid "Extournez d'abord la provision %(ouverte_code)s (%(ouverte_date_arrete)s)."
+msgstr "Reverse provision %(ouverte_code)s (%(ouverte_date_arrete)s) first."
+
+#, python-format
+msgid "Visa %(visa)s déjà apposé."
+msgstr "Approval %(visa)s already given."
+
+#, python-format
+msgid "Le budget a changé depuis la préparation de %(revision_code)s (%(revision_ancien_montant)s → %(budget_montant)s) : préparez une nouvelle révision."
+msgstr "The budget has changed since %(revision_code)s was prepared (%(revision_ancien_montant)s → %(budget_montant)s): prepare a new revision."
+
+#, python-format
+msgid "La ligne %(l_period)s a changé depuis la préparation de %(revision_code)s : préparez une nouvelle révision."
+msgstr "Line %(l_period)s has changed since %(revision_code)s was prepared: prepare a new revision."
+
+#, python-format
+msgid "Rétention en cours jusqu'au %(fin)s."
+msgstr "Retention in progress until %(fin)s."
+
+#, python-format
+msgid "Document encore référencé (%(liste)s) : purge impossible."
+msgstr "Document still referenced (%(liste)s): purge not possible."
+
+#, python-format
+msgid "Fichier trop volumineux (max %(valeur)s Mo, RF-03)."
+msgstr "File too large (max %(valeur)s MB, RF-03)."
+
+#, python-format
+msgid "Patientez %(otp_resend_seconds)s secondes avant de redemander un code."
+msgstr "Wait %(otp_resend_seconds)s seconds before requesting a new code."
+
+#, python-format
+msgid "Code ou mot de passe invalide (%(attempts)s/%(max_attempts)s essais)."
+msgstr "Invalid code or password (%(attempts)s/%(max_attempts)s attempts)."
+
+#, python-format
+msgid "Lecture du fichier impossible : %(exc)s"
+msgstr "Unable to read the file: %(exc)s"
+
+#, python-format
+msgid "Code de %(maxi)s caractères au plus pour cette catégorie."
+msgstr "Code of at most %(maxi)s characters for this category."
+
+#, python-format
+msgid "Permis %(statut)s : figé."
+msgstr "Permit %(statut)s: locked."
+
+#, python-format
+msgid "Formats acceptés : %(liste)s."
+msgstr "Accepted formats: %(liste)s."
+
+#, python-format
+msgid "Visa attendu : niveau %(libelle)s — vous n'êtes pas signataire de ce niveau."
+msgstr "Approval expected: level %(libelle)s — you are not a signatory for this level."
+
+#, python-format
+msgid "Vous avez déjà signé le niveau %(permis_niveau_libelles)s : un autre signataire est requis."
+msgstr "You have already signed level %(permis_niveau_libelles)s: another signatory is required."
+
+#, python-format
+msgid "Le permis ne débute que le %(permis_date_debut)s."
+msgstr "The permit only starts on %(permis_date_debut)s."
+
+#, python-format
+msgid "Habilitation manquante ou expirée - %(liste)s"
+msgstr "Missing or expired authorisation - %(liste)s"
+
+#, python-format
+msgid "Test gaz conforme requis avant démarrage (valable %(permistravail_test_gaz_validite_heures)s h) - type %(type_permis)s."
+msgstr "Compliant gas test required before start (valid %(permistravail_test_gaz_validite_heures)s h) - type %(type_permis)s."
+
+#, python-format
+msgid "Un test gaz plus récent (%(permis_test_gaz_date)s) est déjà enregistré : forcer pour le remplacer, ou abandonner."
+msgstr "A more recent gas test (%(permis_test_gaz_date)s) is already recorded: force to replace it, or discard."
+
+#, python-format
+msgid "Actions non soldées : %(liste)s — clôturez-les d'abord."
+msgstr "Open actions: %(liste)s — close them first."
+
+#, python-format
+msgid "%(nb_ecarts)s écart(s) sans action corrective clôturée : clôture impossible."
+msgstr "%(nb_ecarts)s finding(s) without a closed corrective action: closing not possible."
+
+#, python-format
+msgid "Risque(s) élevé(s)/critique(s) sans mesure de prévention : %(liste)s."
+msgstr "High/critical risk(s) without a prevention measure: %(liste)s."
+
+#, python-format
+msgid "Type(s) de déchet inconnu(s) : %(liste)s."
+msgstr "Unknown waste type(s): %(liste)s."
+
+#, python-format
+msgid "compte analytique inconnu : %(code_analytique)s"
+msgstr "unknown analytic account: %(code_analytique)s"
+
+#, python-format
+msgid "compte analytique ambigu : %(code_analytique)s (préciser AXE:CODE)"
+msgstr "ambiguous analytic account: %(code_analytique)s (specify AXIS:CODE)"
+
+#, python-format
+msgid "affaire inconnue : %(code_affaire)s"
+msgstr "unknown project: %(code_affaire)s"
+
+#, python-format
+msgid "Colonnes du gabarit absentes du fichier : %(liste)s."
+msgstr "Template columns missing from the file: %(liste)s."
+
+#, python-format
+msgid "journal inconnu : %(journal)s"
+msgstr "unknown journal: %(journal)s"
+
+#, python-format
+msgid "pièce %(reference)s déséquilibrée (débit ≠ crédit)"
+msgstr "document %(reference)s unbalanced (debit ≠ credit)"
+
+#, python-format
+msgid "montant invalide : %(brut)s"
+msgstr "invalid amount: %(brut)s"
+
+#, python-format
+msgid "date invalide (format du gabarit %(gabarit_format_date)s) : %(date)s"
+msgstr "invalid date (template format %(gabarit_format_date)s): %(date)s"
+
+#, python-format
+msgid "compte inconnu : %(code)s (pièce %(reference)s)"
+msgstr "unknown account: %(code)s (document %(reference)s)"
+
+#, python-format
+msgid "ligne invalide (débit OU crédit positif attendu) : pièce %(reference)s, compte %(code)s"
+msgstr "invalid line (positive debit OR credit expected): document %(reference)s, account %(code)s"
+
+#, python-format
+msgid "Nom d'hôte introuvable : %(exc)s"
+msgstr "Host name not found: %(exc)s"
+
+#, python-format
+msgid "Adresse interne interdite (%(ip)s)."
+msgstr "Internal address forbidden (%(ip)s)."
+
+#, python-format
+msgid "Prestation %(code)s inconnue."
+msgstr "Service %(code)s unknown."
+
+#, python-format
+msgid "Scopes autorisés : %(sorted)s."
+msgstr "Allowed scopes: %(sorted)s."
+
+#, python-format
+msgid "Compteur en baisse : %(valeur)s < dernier relevé connu %(plancher)s."
+msgstr "Meter going down: %(valeur)s < last known reading %(plancher)s."
+
+#, python-format
+msgid "%(champ)s déjà renseignée (%(actuel)s) : correction par l'ETSL uniquement."
+msgstr "%(champ)s already entered (%(actuel)s): correction by ETSL only."
+
+#, python-format
+msgid "%(max_key_length)s caractères maximum."
+msgstr "%(max_key_length)s characters maximum."
+
+#, python-format
+msgid "connecteur inconnu : %(connector)s"
+msgstr "unknown connector: %(connector)s"
+
+#, python-format
+msgid "Colonnes manquantes : %(liste)s."
+msgstr "Missing columns: %(liste)s."
+
+#, python-format
+msgid "kind invalide : %(kind)s"
+msgstr "invalid kind: %(kind)s"
+
+#, python-format
+msgid "journal inconnu : %(journal_code)s"
+msgstr "unknown journal: %(journal_code)s"
+
+#, python-format
+msgid "compte débit inconnu : %(debit_code)s"
+msgstr "unknown debit account: %(debit_code)s"
+
+#, python-format
+msgid "compte crédit inconnu : %(credit_code)s"
+msgstr "unknown credit account: %(credit_code)s"
+
+#, python-format
+msgid "devise inconnue : %(currency_code)s"
+msgstr "unknown currency: %(currency_code)s"
+
+#, python-format
+msgid "montant invalide : %(raw_amount)s"
+msgstr "invalid amount: %(raw_amount)s"
+
+#, python-format
+msgid "date invalide (attendu AAAA-MM-JJ) : %(get)s"
+msgstr "invalid date (expected YYYY-MM-DD): %(get)s"
+
+#, python-format
+msgid "salarié inconnu : %(matricule)s (chargez d'abord le gabarit Salariés)."
+msgstr "unknown employee: %(matricule)s (load the Employees template first)."
+
+#, python-format
+msgid "« %(intitule)s » est synchronisée depuis %(source)s : non modifiable par reprise."
+msgstr "“%(intitule)s” is synchronised from %(source)s: cannot be modified by data migration."
+
+#, python-format
+msgid "équipement inconnu : %(code)s (chargez d'abord le gabarit Équipements du parc)."
+msgstr "unknown equipment: %(code)s (load the Fleet equipment template first)."
+
+#, python-format
+msgid "le compteur ne peut baisser (valeur actuelle : %(existant_compteur_value)s)."
+msgstr "the meter cannot go down (current value: %(existant_compteur_value)s)."
+
+#, python-format
+msgid "quantite_recue (%(recue)s) supérieure à la quantité commandée (%(quantite)s)."
+msgstr "quantite_recue (%(recue)s) exceeds the ordered quantity (%(quantite)s)."
+
+#, python-format
+msgid "facture %(numero)s déjà saisie dans l'ERP : non reprise."
+msgstr "invoice %(numero)s already entered in the ERP: not migrated."
+
+#, python-format
+msgid "facture %(numero)s déjà reprise avec un solde de %(total)s : extournez la reprise avant de la recharger."
+msgstr "invoice %(numero)s already migrated with a balance of %(total)s: reverse the migration before reloading it."
+
+#, python-format
+msgid "équipement du parc inconnu : %(txt)s (chargez d'abord le parc)."
+msgstr "unknown fleet equipment: %(txt)s (load the fleet first)."
+
+#, python-format
+msgid "BC %(numero)s déjà saisi dans l'ERP : non modifiable par reprise."
+msgstr "purchase order %(numero)s already entered in the ERP: cannot be modified by data migration."
+
+#, python-format
+msgid "BC %(numero)s déjà mouvementé dans l'ERP (réception ou facture) : non modifiable."
+msgstr "purchase order %(numero)s already has movements in the ERP (receipt or invoice): cannot be modified."
+
+#, python-format
+msgid "BC %(numero)s : fournisseur différent de celui déjà repris (%(supplier_code)s)."
+msgstr "purchase order %(numero)s: supplier differs from the one already migrated (%(supplier_code)s)."
+
+#, python-format
+msgid "affaire inconnue : %(txt)s (chargez d'abord le gabarit Affaires)."
+msgstr "unknown project: %(txt)s (load the Projects template first)."
+
+#, python-format
+msgid "article inconnu : %(txt)s (chargez d'abord le gabarit Articles)."
+msgstr "unknown item: %(txt)s (load the Items template first)."
+
+#, python-format
+msgid "unité inconnue : %(txt)s."
+msgstr "unknown unit: %(txt)s."
+
+#, python-format
+msgid "facture %(numero)s déjà reprise pour un autre client."
+msgstr "invoice %(numero)s already migrated for another customer."
+
+#, python-format
+msgid "affaire inconnue : %(txt)s."
+msgstr "unknown project: %(txt)s."
+
+#, python-format
+msgid "%(cle)s : booléen attendu (oui / non), reçu %(valeur)s."
+msgstr "%(cle)s: boolean expected (yes / no), received %(valeur)s."
+
+#, python-format
+msgid "%(cle)s invalide : %(valeur)s (attendu : %(liste)s)."
+msgstr "%(cle)s invalid: %(valeur)s (expected: %(liste)s)."
+
+#, python-format
+msgid "periode invalide (attendu AAAA-MM) : %(valeur)s."
+msgstr "invalid period (expected YYYY-MM): %(valeur)s."
+
+#, python-format
+msgid "%(cle)s : %(longueur)s caractères maximum (%(nb_valeur)s)."
+msgstr "%(cle)s: %(longueur)s characters maximum (%(nb_valeur)s)."
+
+#, python-format
+msgid "%(cle)s obligatoire."
+msgstr "%(cle)s required."
+
+#, python-format
+msgid "%(cle)s : nombre invalide (%(valeur)s)."
+msgstr "%(cle)s: invalid number (%(valeur)s)."
+
+#, python-format
+msgid "%(cle)s : valeur négative interdite (%(valeur)s)."
+msgstr "%(cle)s: negative value not allowed (%(valeur)s)."
+
+#, python-format
+msgid "tiers inconnu : %(code)s (chargez d'abord le gabarit Tiers)."
+msgstr "unknown third party: %(code)s (load the Third parties template first)."
+
+#, python-format
+msgid "devise inconnue : %(code)s."
+msgstr "unknown currency: %(code)s."
+
+#, python-format
+msgid "qualification %(numero)s déjà rattachée au soudeur %(soudeur_code)s."
+msgstr "qualification %(numero)s already linked to welder %(soudeur_code)s."
+
+#, python-format
+msgid "affaire %(code)s clôturée / archivée : non modifiable."
+msgstr "project %(code)s closed / archived: cannot be modified."
+
+#, python-format
+msgid "contrat %(code)s déjà signé / actif : toute modification passe par un avenant."
+msgstr "contract %(code)s already signed / active: any change requires an amendment."
+
+#, python-format
+msgid "empreinte SHA-256 différente du bordereau (calculée %(empreinte)s)."
+msgstr "SHA-256 fingerprint differs from the transmittal slip (computed %(empreinte)s)."
+
+#, python-format
+msgid "lot GED : taille décompressée supérieure à %(valeur)s Mo (paramètre)."
+msgstr "EDMS batch: uncompressed size exceeds %(valeur)s MB (parameter)."
+
+#, python-format
+msgid "gabarit inconnu : %(code)s."
+msgstr "unknown template: %(code)s."
+
+#, python-format
+msgid "XML illisible : %(exc)s."
+msgstr "Unreadable XML: %(exc)s."
+
+#, python-format
+msgid "%(cle)s obligatoire (AAAA-MM-JJ)."
+msgstr "%(cle)s required (YYYY-MM-DD)."
+
+#, python-format
+msgid "%(cle)s invalide (attendu AAAA-MM-JJ) : %(valeur)s."
+msgstr "%(cle)s invalid (expected YYYY-MM-DD): %(valeur)s."
+
+#, python-format
+msgid "%(cle)s obligatoire (%(liste)s)."
+msgstr "%(cle)s required (%(liste)s)."
+
+#, python-format
+msgid "unité inconnue : %(unite)s."
+msgstr "unknown unit: %(unite)s."
+
+#, python-format
+msgid "compte inconnu : %(compte)s."
+msgstr "unknown account: %(compte)s."
+
+#, python-format
+msgid "doublon probable : même nom, prénom et date de naissance que le matricule %(homonyme)s."
+msgstr "probable duplicate: same last name, first name and date of birth as employee number %(homonyme)s."
+
+#, python-format
+msgid "contrat %(numero)s déjà rattaché à un autre salarié (%(employe_code)s)."
+msgstr "contract %(numero)s already linked to another employee (%(employe_code)s)."
+
+#, python-format
+msgid "WPQR support inconnu : %(support)s (placez les WPQR avant les WPS)."
+msgstr "unknown support WPQR: %(support)s (place the WPQRs before the WPSs)."
+
+#, python-format
+msgid "dépôt inconnu : %(code_depot)s (renseignez depot_libelle pour le créer)."
+msgstr "unknown warehouse: %(code_depot)s (fill in depot_libelle to create it)."
+
+#, python-format
+msgid "fichier absent du lot : %(nom)s."
+msgstr "file missing from the batch: %(nom)s."
+
+#, python-format
+msgid "type de document inconnu : %(code_type)s (renseignez type_libelle pour le créer)."
+msgstr "unknown document type: %(code_type)s (fill in type_libelle to create it)."
+
+#, python-format
+msgid "fichier supérieur à %(valeur)s Mo (paramètre)."
+msgstr "file larger than %(valeur)s MB (parameter)."
+
+#, python-format
+msgid "Une balance d'ouverture (%(reference)s) existe déjà pour l'exercice %(fy_year)s : extournez-la avant d'en importer une autre."
+msgstr "An opening balance (%(reference)s) already exists for fiscal year %(fy_year)s: reverse it before importing another one."
+
+#, python-format
+msgid "Ligne %(line_no)s : %(column)s négatif interdit (%(raw)s)."
+msgstr "Line %(line_no)s: negative %(column)s not allowed (%(raw)s)."
+
+#, python-format
+msgid "Aucun exercice comptable ne couvre le %(day)s."
+msgstr "No fiscal year covers %(day)s."
+
+#, python-format
+msgid "Exercice %(fy_year)s clôturé : balance d'ouverture impossible."
+msgstr "Fiscal year %(fy_year)s closed: opening balance not possible."
+
+#, python-format
+msgid "La balance d'ouverture se date du premier jour de l'exercice (%(fy_start_date)s)."
+msgstr "The opening balance is dated on the first day of the fiscal year (%(fy_start_date)s)."
+
+#, python-format
+msgid "Comptes absents du plan comptable : %(liste)s."
+msgstr "Accounts missing from the chart of accounts: %(liste)s."
+
+#, python-format
+msgid "Balance déséquilibrée : débit %(total_debit)s ≠ crédit %(total_credit)s (écart %(valeur)s)."
+msgstr "Unbalanced trial balance: debit %(total_debit)s ≠ credit %(total_credit)s (difference %(valeur)s)."
+
+#, python-format
+msgid "Ligne %(line_no)s : %(column)s invalide (%(raw)s)."
+msgstr "Line %(line_no)s: invalid %(column)s (%(raw)s)."
+
+#, python-format
+msgid "Ligne %(line_no)s : compte manquant."
+msgstr "Line %(line_no)s: missing account."
+
+#, python-format
+msgid "Ligne %(line_no)s : débit ET crédit sur la même ligne (compte %(compte)s)."
+msgstr "Line %(line_no)s: debit AND credit on the same line (account %(compte)s)."
+
+#, python-format
+msgid "Total de contrôle SAGE %(expected)s ≠ total importé %(total_debit)s."
+msgstr "SAGE control total %(expected)s ≠ imported total %(total_debit)s."
+
+#, python-format
+msgid "Champ(s) inconnu(s) : %(liste)s."
+msgstr "Unknown field(s): %(liste)s."
+
+#, python-format
+msgid "Valeur de type %(attendu___name)s attendue."
+msgstr "Value of type %(attendu___name)s expected."
+
+#, python-format
+msgid "%(acte)s impossible : la Direction Générale doit d'abord valider %(obj_code)s."
+msgstr "%(acte)s not possible: General Management must first validate %(obj_code)s."
+
+#, python-format
+msgid "Dossier incomplet : pièces manquantes %(liste)s."
+msgstr "Incomplete file: missing documents %(liste)s."
+
+#, python-format
+msgid "Garanties non validées par la Direction Générale : %(liste)s."
+msgstr "Guarantees not validated by General Management: %(liste)s."
+
+#, python-format
+msgid "Rôles inconnus pour la famille %(famille)s."
+msgstr "Unknown roles for family %(famille)s."
+
+#, python-format
+msgid "Courrier %(statut)s : déjà enregistré."
+msgstr "Mail %(statut)s: already registered."
+
+#, python-format
+msgid "Courrier %(statut)s : classement impossible."
+msgstr "Mail %(statut)s: filing not possible."
+
+#, python-format
+msgid "Pièce non prévue pour ce dossier (attendues : %(liste)s)."
+msgstr "Document not expected for this file (expected: %(liste)s)."
+
+#, python-format
+msgid "Type d'objet non liable : %(objet_type)s."
+msgstr "Object type cannot be linked: %(objet_type)s."
+
+#, python-format
+msgid "Saisissez au moins %(recherche_min)s caractères."
+msgstr "Enter at least %(recherche_min)s characters."
+
+#, python-format
+msgid "Dossier GR incomplet : pièces manquantes %(liste)s."
+msgstr "Incomplete GR file: missing documents %(liste)s."
+
+#, python-format
+msgid "Le compteur ne peut baisser (dernière valeur : %(equipement_compteur_value)s)."
+msgstr "The meter cannot go down (last value: %(equipement_compteur_value)s)."
+
+#, python-format
+msgid "Demande %(statut)s : soumission impossible."
+msgstr "Request %(statut)s: submission not possible."
+
+#, python-format
+msgid "Demande %(statut)s : seule une demande soumise se traite."
+msgstr "Request %(statut)s: only a submitted request can be processed."
+
+#, python-format
+msgid "Le BC %(bc_code)s n'est pas un BC GLOBAL RENTAL (compte 618)."
+msgstr "Purchase order %(bc_code)s is not a GLOBAL RENTAL order (account 618)."
+
+#, python-format
+msgid "Le BC %(bc_code)s est annulé."
+msgstr "Purchase order %(bc_code)s is cancelled."
+
+#, python-format
+msgid "OT déjà rattaché au BC %(bc_gr_code)s."
+msgstr "Work order already linked to purchase order %(bc_gr_code)s."
+
+#, python-format
+msgid "Le compteur ne peut pas reculer (valeur actuelle %(actif_compteur_value)s)."
+msgstr "The meter cannot go back (current value %(actif_compteur_value)s)."
+
+#, python-format
+msgid "Habilitation manquante : %(liste)s."
+msgstr "Missing authorisation: %(liste)s."
+
+#, python-format
+msgid "%(nom)s est indisponible le %(jour)s (%(motif)s) : pointage refusé (croisement M9)."
+msgstr "%(nom)s is unavailable on %(jour)s (%(motif)s): timesheet refused (M9 cross-check)."
+
+#, python-format
+msgid "%(nom)s : %(q)s h pointées le %(jour)s pour un plafond de %(q2)s h/jour (paramètre provisoire)."
+msgstr "%(nom)s: %(q)s h recorded on %(jour)s against a limit of %(q2)s h/day (provisional parameter)."
+
+#, python-format
+msgid "%(nom)s n'est rattaché à aucune fiche salarié : habilitation chantier invérifiable."
+msgstr "%(nom)s is not linked to any employee record: site authorisation cannot be checked."
+
+#, python-format
+msgid "%(nom)s n'a aucune habilitation valide au %(jour)s : affectation chantier interdite (CDC M9 §10.8)."
+msgstr "%(nom)s has no valid authorisation on %(jour)s: site assignment forbidden (CDC M9 §10.8)."
+
+#, python-format
+msgid "%(nom)s n'a pas l'habilitation exigée par le poste (%(liste)s) : affectation chantier interdite."
+msgstr "%(nom)s does not hold the authorisation required by the position (%(liste)s): site assignment forbidden."
+
+#, python-format
+msgid "Total des parts %(total)s %% > 100 %%."
+msgstr "Total of shares %(total)s %% > 100 %%."
+
+#, python-format
+msgid "Salarié indisponible en M9 (%(motif_m9)s) : présence incohérente."
+msgstr "Employee unavailable in M9 (%(motif_m9)s): inconsistent attendance."
+
+#, python-format
+msgid "%(objet)s saisie le %(saisi_le)s, synchronisée plus de %(jours)s j après : à confirmer (Forcer) ou à abandonner."
+msgstr "%(objet)s entered on %(saisi_le)s, synchronised more than %(jours)s d later: confirm (Force) or discard."
+
+#, python-format
+msgid "%(objet)s identique déjà enregistrée sur le serveur (doublon probable) : forcer ou abandonner."
+msgstr "Identical %(objet)s already recorded on the server (probable duplicate): force or discard."
+
+#, python-format
+msgid "OF %(status)s : action impossible."
+msgstr "Manufacturing order %(status)s: action not possible."
+
+#, python-format
+msgid "OF %(ordre_code)s clos ou annulé : mobilisation impossible."
+msgstr "Manufacturing order %(ordre_code)s closed or cancelled: mobilisation not possible."
+
+#, python-format
+msgid "Rupture matière sur %(nb_ruptures)s article(s) : DA générée(s), préparation non validable."
+msgstr "Material shortage on %(nb_ruptures)s item(s): purchase request(s) generated, preparation cannot be validated."
+
+#, python-format
+msgid "Lot %(lot_code)s en quarantaine : soudage interdit."
+msgstr "Batch %(lot_code)s in quarantine: welding forbidden."
+
+#, python-format
+msgid "Lot %(lot_code)s non sorti du stock pour l'OF %(ordre_code)s."
+msgstr "Batch %(lot_code)s not issued from stock for manufacturing order %(ordre_code)s."
+
+#, python-format
+msgid "Coulée %(coulee)s différente de celle du lot %(lot_code)s (%(lot_numero_coulee)s)."
+msgstr "Heat %(coulee)s differs from that of batch %(lot_code)s (%(lot_numero_coulee)s)."
+
+#, python-format
+msgid "Compte %(code)s (%(code_param)s) absent du plan comptable : corriger le paramètre."
+msgstr "Account %(code)s (%(code_param)s) missing from the chart of accounts: correct the parameter."
+
+#, python-format
+msgid "Échéance au plus tard le %(limite)s : les CAPA se clôturent sous %(delai)s jours (CDC M6)."
+msgstr "Due date no later than %(limite)s: CAPAs are closed within %(delai)s days (CDC M6)."
+
+#, python-format
+msgid "WPS %(wps_code)s non validé ou obsolète : soudage interdit."
+msgstr "WPS %(wps_code)s not validated or obsolete: welding forbidden."
+
+#, python-format
+msgid "WPS %(wps_code)s non diffusé sur l'OF %(code)s."
+msgstr "WPS %(wps_code)s not released on manufacturing order %(code)s."
+
+#, python-format
+msgid "Poste %(poste_code)s non vérifié, bloqué ou pas un poste à souder."
+msgstr "Station %(poste_code)s not checked, blocked or not a welding station."
+
+#, python-format
+msgid "Qualification du soudeur hors domaine du WPS %(wps_code)s (procédé %(procede)s, position %(valeur)s)."
+msgstr "Welder qualification outside the range of WPS %(wps_code)s (process %(procede)s, position %(valeur)s)."
+
+#, python-format
+msgid "%(wps_code)s %(statut)s : procédure scellée (réviser = nouveau WPS)."
+msgstr "%(wps_code)s %(statut)s: procedure sealed (revise = new WPS)."
+
+#, python-format
+msgid "WPS %(statut)s : validation impossible."
+msgstr "WPS %(statut)s: validation not possible."
+
+#, python-format
+msgid "OF %(ordre_code)s clos : diffusion inutile."
+msgstr "Manufacturing order %(ordre_code)s closed: release unnecessary."
+
+#, python-format
+msgid "Critères non mesurés : %(liste)s (confirmer un contrôle partiel)."
+msgstr "Criteria not measured: %(liste)s (confirm a partial inspection)."
+
+#, python-format
+msgid "NC %(statut)s : décidez d'abord du traitement."
+msgstr "NC %(statut)s: decide on the treatment first."
+
+#, python-format
+msgid "CAPA non clôturée(s) : %(liste)s — clôturez-les avant la NC."
+msgstr "CAPA(s) not closed: %(liste)s — close them before the NC."
+
+#, python-format
+msgid "Maintien insuffisant : %(ep_duree_minutes)s min requises."
+msgstr "Insufficient holding time: %(ep_duree_minutes)s min required."
+
+#, python-format
+msgid "Méthode(s) inconnue(s) : %(liste)s (RT, UT, PT, MT)."
+msgstr "Unknown method(s): %(liste)s (RT, UT, PT, MT)."
+
+#, python-format
+msgid "%(n)s NC d'audit non clôturée(s) : clôture impossible."
+msgstr "%(n)s audit NC(s) not closed: closing not possible."
+
+#, python-format
+msgid "export error: %(exc)s"
+msgstr "export error: %(exc)s"
+
+#, python-format
+msgid "Compte de paie « %(label)s » non paramétré : le renseigner dans les comptes de paie."
+msgstr "Payroll account “%(label)s” not configured: enter it in the payroll accounts."
+
+#, python-format
+msgid "Budget du plan %(plan_annee)s dépassé : %(arrondi)s F engagés pour %(arrondi2)s F votés."
+msgstr "Budget of plan %(plan_annee)s exceeded: %(arrondi)s F committed for %(arrondi2)s F voted."
+
+#, python-format
+msgid "Le nombre de jours doit être compris entre 1 et %(duree)s (durée de la période)."
+msgstr "The number of days must be between 1 and %(duree)s (length of the period)."
+
+#, python-format
+msgid "Tranche %(valeur)s : « plafond » et « taux » requis."
+msgstr "Bracket %(valeur)s: “plafond” and “taux” required."
+
+#, python-format
+msgid "Tranche %(valeur)s : taux hors de [0, 100]."
+msgstr "Bracket %(valeur)s: rate outside [0, 100]."
+
+#, python-format
+msgid "Chiffres uniquement, %(n)s au plus."
+msgstr "Digits only, %(n)s at most."
+
+#, python-format
+msgid "Tranche %(valeur)s : plafond positif requis."
+msgstr "Bracket %(valeur)s: positive ceiling required."
+
+#, python-format
+msgid "Aucun contrat actif de %(employe_nom_complet)s sur %(periode)s : bulletin non préparable."
+msgstr "No active contract for %(employe_nom_complet)s over %(periode)s: payslip cannot be prepared."
+
+#, python-format
+msgid "RIB incomplet pour : %(liste)s."
+msgstr "Incomplete bank details for: %(liste)s."
+
+#, python-format
+msgid "Paramètre de paie « %(code)s » absent : à saisir dans le paramétrage de la paie."
+msgstr "Payroll parameter “%(code)s” missing: enter it in the payroll settings."
+
+#, python-format
+msgid "Salarié déjà sorti (le %(e_date_sortie)s)."
+msgstr "Employee already left (on %(e_date_sortie)s)."
+
+#, python-format
+msgid "Solde insuffisant : %(solde)s jour(s) restant(s), %(dc_nb_jours)s demande(s)."
+msgstr "Insufficient balance: %(solde)s day(s) remaining, %(dc_nb_jours)s requested."
+
+#, python-format
+msgid "Déjà mis à disposition le %(bulletin_disponible_le)s."
+msgstr "Already made available on %(bulletin_disponible_le)s."
+
+#, python-format
+msgid "Des mouvements postérieurs au %(fin)s existent : le stock courant ne représente plus la fin de %(periode)s."
+msgstr "Movements after %(fin)s exist: current stock no longer represents the end of %(periode)s."
+
+#, python-format
+msgid "La valorisation %(periode)s du dépôt %(depot_code)s est déjà figée."
+msgstr "The %(periode)s valuation of warehouse %(depot_code)s is already frozen."
+
+#, python-format
+msgid "Écarts valorisés %(valeur_absolue)s FCFA au-delà du seuil %(seuil_validation)s FCFA : la régularisation MAD doit être validée avant la clôture."
+msgstr "Valued discrepancies of %(valeur_absolue)s FCFA above the threshold of %(seuil_validation)s FCFA: the MAD adjustment must be validated before closing."
+
+#, python-format
+msgid "Stock réservé par d'autres OF (%(reserve_autres)s) : %(max)s seulement consommable(s) pour %(mouvement_quantite)s demandé(s). Libérez une réservation ou consommez depuis l'OF réservataire."
+msgstr "Stock reserved by other manufacturing orders (%(reserve_autres)s): only %(max)s can be consumed for %(mouvement_quantite)s requested. Release a reservation or consume from the reserving order."
+
+#, python-format
+msgid "Lot %(lot_code)s (%(lot_numero_lot)s) en quarantaine : sortie interdite (CDC M5 §7.8)."
+msgstr "Batch %(lot_code)s (%(lot_numero_lot)s) in quarantine: issue forbidden (CDC M5 §7.8)."
+
+#, python-format
+msgid "Lot %(lot_code)s (%(lot_numero_lot)s) périmé depuis le %(lot_date_peremption)s : sortie interdite."
+msgstr "Batch %(lot_code)s (%(lot_numero_lot)s) expired since %(lot_date_peremption)s: issue forbidden."
+
+#, python-format
+msgid "Lot %(lot_code)s (%(lot_numero_lot)s) : certificat MTC / CoC non validé ou non conforme — sortie interdite."
+msgstr "Batch %(lot_code)s (%(lot_numero_lot)s): MTC / CoC certificate not validated or non-compliant — issue forbidden."
+
+#, python-format
+msgid "Lot %(lot_code)s (%(lot_numero_lot)s) sans certificat MTC / CoC : exigé pour cet article (traçabilité pétrolière)."
+msgstr "Batch %(lot_code)s (%(lot_numero_lot)s) without MTC / CoC certificate: required for this item (oil traceability)."
+
+#, python-format
+msgid "Dépôt %(depot_code)s : site GLOBAL RENTAL consultable en lecture seule, aucun mouvement ETSL."
+msgstr "Warehouse %(depot_code)s: GLOBAL RENTAL site, read-only, no ETSL movement."
+
+#, python-format
+msgid "Dépôt %(depot_code)s : votre fonction n'est pas autorisée à y mouvementer du stock."
+msgstr "Warehouse %(depot_code)s: your position is not authorised to move stock there."
+
+#, python-format
+msgid "Stock insuffisant au dépôt %(source_label)s : %(src_quantity)s dispo pour %(mouvement_quantite)s."
+msgstr "Insufficient stock in warehouse %(source_label)s: %(src_quantity)s available for %(mouvement_quantite)s."
+
+#, python-format
+msgid "fournisseur %(fournisseur_name)s non agréé qualité / HSE"
+msgstr "supplier %(fournisseur_name)s not approved for quality / HSE"
+
+#, python-format
+msgid "stock %(stock)s < seuil %(cfg_seuil_minimal)s"
+msgstr "stock %(stock)s < threshold %(cfg_seuil_minimal)s"
+
+#, python-format
+msgid "NC %(nc_blocage_code)s ouverte : clôturer la NC (CAPA) avant de lever la quarantaine."
+msgstr "NC %(nc_blocage_code)s open: close the NC (CAPA) before lifting the quarantine."
+
+#, python-format
+msgid "Ligne inconnue : %(item)s."
+msgstr "Unknown line: %(item)s."
+
+#, python-format
+msgid "Le circuit %(circuit_code)s ne contient aucune étape."
+msgstr "Circuit %(circuit_code)s contains no step."
+
+#, python-format
+msgid "Seul l'assigné peut %(verb)s cette tâche."
+msgstr "Only the assignee can %(verb)s this task."
+
+#, python-format
+msgid "Tâche non assignée : seul un utilisateur du rôle « %(step_actor_role)s » peut %(verb)s."
+msgstr "Unassigned task: only a user with role “%(step_actor_role)s” can %(verb)s."
+
+# ── Lot a8 : messages fixes des lots a5 / a7 et verbes du circuit ──
+msgid "Format de relevé non reconnu (MT940 ou CFONB 120 attendu)."
+msgstr "Statement format not recognised (MT940 or CFONB 120 expected)."
+
+msgid "Aucun champ MT940 reconnu."
+msgstr "No MT940 field recognised."
+
+msgid "Aucun mouvement dans le fichier MT940."
+msgstr "No transaction in the MT940 file."
+
+msgid "Aucun enregistrement CFONB 120 reconnu."
+msgstr "No CFONB 120 record recognised."
+
+msgid "Clé d'API invalide."
+msgstr "Invalid API key."
+
+msgid "date_validite antérieure à date_obtention."
+msgstr "date_validite earlier than date_obtention."
+
+msgid "équipement GLOBAL RENTAL : le propriétaire doit être un tiers is_global_rental (compte 618)."
+msgstr "GLOBAL RENTAL equipment: the owner must be an is_global_rental third party (account 618)."
+
+msgid "date_releve obligatoire quand compteur est renseigné."
+msgstr "date_releve required when compteur is filled in."
+
+msgid "solde (reste dû) doit être strictement positif."
+msgstr "solde (amount outstanding) must be strictly positive."
+
+msgid "journal OD (opérations diverses) absent."
+msgstr "OD journal (miscellaneous operations) missing."
+
+msgid "date de bascule invalide (AAAA-MM-JJ)."
+msgstr "invalid cut-over date (YYYY-MM-DD)."
+
+msgid "Fiche validée : non modifiable."
+msgstr "Record validated: cannot be modified."
+
+msgid "Fiche validée : non supprimable."
+msgstr "Record validated: cannot be deleted."
+
+msgid "Besoin réservé ou servi : non modifiable."
+msgstr "Requirement reserved or served: cannot be modified."
+
+msgid "Besoin réservé ou servi : non supprimable."
+msgstr "Requirement reserved or served: cannot be deleted."
+
+msgid "Rapport validé : non modifiable."
+msgstr "Report validated: cannot be modified."
+
+msgid "Rapport validé : non supprimable (conservation)."
+msgstr "Report validated: cannot be deleted (retention)."
+
+msgid "Bon expédié : non modifiable."
+msgstr "Note shipped: cannot be modified."
+
+msgid "Bon expédié : non supprimable."
+msgstr "Note shipped: cannot be deleted."
+
+msgid "Attachement signé : non modifiable."
+msgstr "Progress statement signed: cannot be modified."
+
+msgid "Attachement signé : non supprimable."
+msgstr "Progress statement signed: cannot be deleted."
+
+msgid "Ce code de site existe déjà."
+msgstr "This site code already exists."
+
+msgid "terminer"
+msgstr "complete"
+
+msgid "rejeter"
+msgstr "reject"
+
+msgid "déléguer"
+msgstr "delegate"
+
+# ── Lot a8 : exports, états comptables et PDF des modules (titres, en-têtes, libellés) ──
+#, python-format
+msgid "oui"
+msgstr "yes"
+
+#, python-format
+msgid "non"
+msgstr "no"
+
+#, python-format
+msgid "ETSL — édité le %(date)s"
+msgstr "ETSL — printed on %(date)s"
+
+#, python-format
+msgid "Cube BI — coupe %(axes)s"
+msgstr "BI cube — breakdown %(axes)s"
+
+#, python-format
+msgid "Pipe pondéré %(cle)s"
+msgstr "Weighted pipeline %(cle)s"
+
+#, python-format
+msgid "Du %(debut)s au %(fin)s"
+msgstr "From %(debut)s to %(fin)s"
+
+#, python-format
+msgid "Balance générale"
+msgstr "Trial balance"
+
+#, python-format
+msgid "Grand livre"
+msgstr "General ledger"
+
+#, python-format
+msgid "Produits"
+msgstr "Income"
+
+#, python-format
+msgid "Charges"
+msgstr "Expenses"
+
+#, python-format
+msgid "Compte de résultat"
+msgstr "Income statement"
+
+#, python-format
+msgid "Bilan"
+msgstr "Balance sheet"
+
+#, python-format
+msgid "Tranches d'ancienneté provisoires — à confirmer ou modifier par ETSL (Paramètres)."
+msgstr "Provisional ageing brackets — to be confirmed or changed by ETSL (Settings)."
+
+#, python-format
+msgid "Plan comptable SYSCOHADA (multi-niveaux)"
+msgstr "SYSCOHADA chart of accounts (multi-level)"
+
+#, python-format
+msgid "Plan provisoire : comptes détaillés et nombre de niveaux à confirmer par ETSL."
+msgstr "Provisional chart: detailed accounts and number of levels to be confirmed by ETSL."
+
+#, python-format
+msgid "Piste d'audit et conservation des écritures"
+msgstr "Audit trail and retention of entries"
+
+#, python-format
+msgid "Durée de conservation provisoire — à confirmer par ETSL."
+msgstr "Provisional retention period — to be confirmed by ETSL."
+
+#, python-format
+msgid "TOTAL"
+msgstr "TOTAL"
+
+#, python-format
+msgid "TOTAL GÉNÉRAL"
+msgstr "GRAND TOTAL"
+
+#, python-format
+msgid "Rubrique"
+msgstr "Heading"
+
+#, python-format
+msgid "Montant"
+msgstr "Amount"
+
+#, python-format
+msgid "Créances et emplois assimilés (comptes de tiers débiteurs)"
+msgstr "Receivables and similar assets (debit third-party accounts)"
+
+#, python-format
+msgid "Trésorerie-Actif"
+msgstr "Cash - assets"
+
+#, python-format
+msgid "Résultat net de l'exercice (non affecté)"
+msgstr "Net income for the year (not allocated)"
+
+#, python-format
+msgid "Passif circulant (comptes de tiers créditeurs)"
+msgstr "Current liabilities (credit third-party accounts)"
+
+#, python-format
+msgid "Trésorerie-Passif"
+msgstr "Cash - liabilities"
+
+#, python-format
+msgid "TOTAL ACTIF"
+msgstr "TOTAL ASSETS"
+
+#, python-format
+msgid "TOTAL PASSIF"
+msgstr "TOTAL LIABILITIES"
+
+#, python-format
+msgid "Réf."
+msgstr "Ref."
+
+#, python-format
+msgid "Montant net"
+msgstr "Net amount"
+
+#, python-format
+msgid "Au %(date)s"
+msgstr "As of %(date)s"
+
+#, python-format
+msgid "Balance âgée %(valeur)s"
+msgstr "Aged balance %(valeur)s"
+
+#, python-format
+msgid "Au %(date_to)s — lignes non lettrées, ancienneté depuis la date de pièce"
+msgstr "As of %(date_to)s — unmatched lines, age from the document date"
+
+#, python-format
+msgid "%(nb_comptes)s comptes — classe › compte principal › compte › sous-compte"
+msgstr "%(nb_comptes)s accounts — class › main account › account › sub-account"
+
+#, python-format
+msgid "Écritures comptabilisées immuables (correction par extourne), conservées %(ans)s ans après la clôture"
+msgstr "Posted entries are immutable (correction by reversal), retained %(ans)s years after closing"
+
+#, python-format
+msgid "Résultat"
+msgstr "Result"
+
+#, python-format
+msgid "Résultat affecté (compte 13)"
+msgstr "Allocated result (account 13)"
+
+#, python-format
+msgid "Passif"
+msgstr "Liabilities"
+
+#, python-format
+msgid "Balance âgée"
+msgstr "Aged balance"
+
+#, python-format
+msgid "Plan comptable"
+msgstr "Chart of accounts"
+
+#, python-format
+msgid "Conservation par exercice"
+msgstr "Retention by fiscal year"
+
+#, python-format
+msgid "ETSL — %(titre)s"
+msgstr "ETSL — %(titre)s"
+
+#, python-format
+msgid "Édité le %(localtime)s — ERP ETSL"
+msgstr "Printed on %(localtime)s — ETSL ERP"
+
+#, python-format
+msgid "%(compte_obj_label)s — solde à nouveau"
+msgstr "%(compte_obj_label)s — opening balance"
+
+#, python-format
+msgid "Total %(compte_obj_code)s"
+msgstr "Total %(compte_obj_code)s"
+
+#, python-format
+msgid " — comptes %(compte)s*"
+msgstr " — accounts %(compte)s*"
+
+#, python-format
+msgid "Total %(titre)s"
+msgstr "Total %(titre)s"
+
+#, python-format
+msgid "(sans tiers)"
+msgstr "(no third party)"
+
+#, python-format
+msgid "<font color='#d4142a'><b>PROVISOIRE</b> — %(get)s</font>"
+msgstr "<font color='#d4142a'><b>PROVISIONAL</b> — %(get)s</font>"
+
+#, python-format
+msgid "Compte"
+msgstr "Account"
+
+#, python-format
+msgid "Intitulé"
+msgstr "Title"
+
+#, python-format
+msgid "Ouverture débit"
+msgstr "Opening debit"
+
+#, python-format
+msgid "Ouverture crédit"
+msgstr "Opening credit"
+
+#, python-format
+msgid "Mouvements débit"
+msgstr "Debit movements"
+
+#, python-format
+msgid "Mouvements crédit"
+msgstr "Credit movements"
+
+#, python-format
+msgid "Solde débiteur"
+msgstr "Debit balance"
+
+#, python-format
+msgid "Solde créditeur"
+msgstr "Credit balance"
+
+#, python-format
+msgid "Date"
+msgstr "Date"
+
+#, python-format
+msgid "Journal"
+msgstr "Journal"
+
+#, python-format
+msgid "Pièce"
+msgstr "Document"
+
+#, python-format
+msgid "Tiers"
+msgstr "Third party"
+
+#, python-format
+msgid "Analytique"
+msgstr "Analytic"
+
+#, python-format
+msgid "Débit"
+msgstr "Debit"
+
+#, python-format
+msgid "Crédit"
+msgstr "Credit"
+
+#, python-format
+msgid "Solde"
+msgstr "Balance"
+
+#, python-format
+msgid "Résultat net (bénéfice si positif, perte si négatif)"
+msgstr "Net income (profit if positive, loss if negative)"
+
+#, python-format
+msgid "Niveau"
+msgstr "Level"
+
+#, python-format
+msgid "Rattaché à"
+msgstr "Attached to"
+
+#, python-format
+msgid "Exercice"
+msgstr "Fiscal year"
+
+#, python-format
+msgid "Écritures"
+msgstr "Entries"
+
+#, python-format
+msgid "Extournées"
+msgstr "Reversed"
+
+#, python-format
+msgid "Saisies manuelles"
+msgstr "Manual entries"
+
+#, python-format
+msgid "Pièces fiscales en GED"
+msgstr "Tax documents in EDMS"
+
+#, python-format
+msgid "Conserver jusqu'au"
+msgstr "Retain until"
+
+#, python-format
+msgid "PROVISOIRE — %(get)s"
+msgstr "PROVISIONAL — %(get)s"
+
+#, python-format
+msgid "Désignation"
+msgstr "Description"
+
+#, python-format
+msgid "Qté"
+msgstr "Qty"
+
+#, python-format
+msgid "PU HT"
+msgstr "Unit price excl. tax"
+
+#, python-format
+msgid "Montant HT"
+msgstr "Amount excl. tax"
+
+#, python-format
+msgid "Total HT"
+msgstr "Total excl. tax"
+
+#, python-format
+msgid "TOTAL TTC (FCFA)"
+msgstr "TOTAL INCL. TAX (FCFA)"
+
+#, python-format
+msgid "Client : <b>%(client_name)s</b> (%(client_code)s)"
+msgstr "Customer: <b>%(client_name)s</b> (%(client_code)s)"
+
+#, python-format
+msgid "TVA %(taux)s %%"
+msgstr "VAT %(taux)s %%"
+
+#, python-format
+msgid "NET À PAYER (FCFA)"
+msgstr "NET PAYABLE (FCFA)"
+
+#, python-format
+msgid "<font color='#d4142a'><b>AVERTISSEMENT</b> — modèle de facture provisoire : en-tête et mentions légales à confirmer par ETSL avant diffusion.</font>"
+msgstr "<font color='#d4142a'><b>WARNING</b> — provisional invoice template: header and legal notices to be confirmed by ETSL before release.</font>"
+
+#, python-format
+msgid "Date : %(facture_date)s"
+msgstr "Date: %(facture_date)s"
+
+#, python-format
+msgid "Avoir sur la facture %(facture_origine_code)s"
+msgstr "Credit note on invoice %(facture_origine_code)s"
+
+#, python-format
+msgid "Objet : %(facture_objet)s"
+msgstr "Subject: %(facture_objet)s"
+
+#, python-format
+msgid "Retenue de garantie %(facture_taux_retenue)s %%"
+msgstr "Retention guarantee %(facture_taux_retenue)s %%"
+
+#, python-format
+msgid " · Échéance : %(facture_echeance)s"
+msgstr " · Due date: %(facture_echeance)s"
+
+#, python-format
+msgid "Reporting de gestion %(period_label)s — %(valeur)s %(horizon)s mois (J+%(valeur2)s)"
+msgstr "Management reporting %(period_label)s — %(valeur)s %(horizon)s months (D+%(valeur2)s)"
+
+#, python-format
+msgid "Clôture"
+msgstr "Closing"
+
+#, python-format
+msgid "Échéance de publication"
+msgstr "Publication deadline"
+
+#, python-format
+msgid "Avertissement"
+msgstr "Warning"
+
+#, python-format
+msgid "Horizons et jours de publication provisoires, à confirmer par ETSL."
+msgstr "Provisional horizons and publication days, to be confirmed by ETSL."
+
+#, python-format
+msgid "Période"
+msgstr "Period"
+
+#, python-format
+msgid "Budget produits"
+msgstr "Income budget"
+
+#, python-format
+msgid "Budget charges"
+msgstr "Expense budget"
+
+#, python-format
+msgid "Coût GR"
+msgstr "GR cost"
+
+#, python-format
+msgid "Marge"
+msgstr "Margin"
+
+#, python-format
+msgid "Type"
+msgstr "Type"
+
+#, python-format
+msgid "Zone / périmètre"
+msgstr "Area / scope"
+
+#, python-format
+msgid "Référentiel"
+msgstr "Standard"
+
+#, python-format
+msgid "Date prévue"
+msgstr "Planned date"
+
+#, python-format
+msgid "Réalisé le"
+msgstr "Performed on"
+
+#, python-format
+msgid "Réalisé par"
+msgstr "Performed by"
+
+#, python-format
+msgid "Score de conformité"
+msgstr "Compliance score"
+
+#, python-format
+msgid "Point contrôlé / constat"
+msgstr "Checkpoint / finding"
+
+#, python-format
+msgid "Commentaire / action"
+msgstr "Comment / action"
+
+#, python-format
+msgid "sans action"
+msgstr "no action"
+
+#, python-format
+msgid "Rapport d'audit HSE %(audit_code)s"
+msgstr "HSE audit report %(audit_code)s"
+
+#, python-format
+msgid "Gravité"
+msgstr "Severity"
+
+#, python-format
+msgid "Lieu"
+msgstr "Location"
+
+#, python-format
+msgid "Zone"
+msgstr "Area"
+
+#, python-format
+msgid "Description"
+msgstr "Description"
+
+#, python-format
+msgid "Personnes impliquées"
+msgstr "Persons involved"
+
+#, python-format
+msgid "Cause immédiate"
+msgstr "Immediate cause"
+
+#, python-format
+msgid "Cause profonde"
+msgstr "Root cause"
+
+#, python-format
+msgid "Conséquences"
+msgstr "Consequences"
+
+#, python-format
+msgid "Conséquence humaine"
+msgstr "Human consequence"
+
+#, python-format
+msgid "Jours d'arrêt"
+msgstr "Days lost"
+
+#, python-format
+msgid "Déclaré par"
+msgstr "Reported by"
+
+#, python-format
+msgid "Enquêteur"
+msgstr "Investigator"
+
+#, python-format
+msgid "Escalade DG"
+msgstr "Escalation to GM"
+
+#, python-format
+msgid "Rapport d'enquête"
+msgstr "Investigation report"
+
+#, python-format
+msgid "Retour d'expérience"
+msgstr "Lessons learned"
+
+#, python-format
+msgid "Rapport d'incident %(incident_code)s"
+msgstr "Incident report %(incident_code)s"
+
+#, python-format
+msgid "Salarié"
+msgstr "Employee"
+
+#, python-format
+msgid "Matricule"
+msgstr "Employee number"
+
+#, python-format
+msgid "Passeport sécurité — %(employe)s"
+msgstr "Safety passport — %(employe)s"
+
+#, python-format
+msgid "Heures travaillées"
+msgstr "Hours worked"
+
+#, python-format
+msgid "TRIR / LTIR / LTIFR"
+msgstr "TRIR / LTIR / LTIFR"
+
+#, python-format
+msgid "Cas enregistrables / avec arrêt"
+msgstr "Recordable cases / lost-time cases"
+
+#, python-format
+msgid "Incidents (clôturés)"
+msgstr "Incidents (closed)"
+
+#, python-format
+msgid "Par type"
+msgstr "By type"
+
+#, python-format
+msgid "Taux de formation"
+msgstr "Training rate"
+
+#, python-format
+msgid "Taux de recyclage à jour"
+msgstr "Up-to-date refresher rate"
+
+#, python-format
+msgid "Conformité ISO (score moyen des audits)"
+msgstr "ISO compliance (average audit score)"
+
+#, python-format
+msgid "Incidents environnementaux"
+msgstr "Environmental incidents"
+
+#, python-format
+msgid "Permis / formations / audits"
+msgstr "Permits / trainings / audits"
+
+#, python-format
+msgid "Actions HSE ouvertes"
+msgstr "Open HSE actions"
+
+#, python-format
+msgid "Émissions"
+msgstr "Emissions"
+
+#, python-format
+msgid "Déchets"
+msgstr "Waste"
+
+#, python-format
+msgid "Plans de réduction"
+msgstr "Reduction plans"
+
+#, python-format
+msgid "Responsable"
+msgstr "Owner"
+
+#, python-format
+msgid "Échéance"
+msgstr "Due date"
+
+#, python-format
+msgid "Aptitude médicale"
+msgstr "Medical fitness"
+
+#, python-format
+msgid "%(enregistrables)s / %(avec_arret)s (%(jours_perdus)s jours perdus)"
+msgstr "%(enregistrables)s / %(avec_arret)s (%(jours_perdus)s days lost)"
+
+#, python-format
+msgid "%(incidents_environnement)s (taux %(nd)s)"
+msgstr "%(incidents_environnement)s (rate %(nd)s)"
+
+#, python-format
+msgid "Date de la revue"
+msgstr "Review date"
+
+#, python-format
+msgid "Participants"
+msgstr "Participants"
+
+#, python-format
+msgid "Conclusions"
+msgstr "Conclusions"
+
+#, python-format
+msgid "Décisions"
+msgstr "Decisions"
+
+#, python-format
+msgid "Validée par"
+msgstr "Validated by"
+
+#, python-format
+msgid "Validée le"
+msgstr "Validated on"
+
+#, python-format
+msgid "Ressource"
+msgstr "Resource"
+
+#, python-format
+msgid "Quantité"
+msgstr "Quantity"
+
+#, python-format
+msgid "kg CO2e"
+msgstr "kg CO2e"
+
+#, python-format
+msgid "Formation / habilitation"
+msgstr "Training / authorisation"
+
+#, python-format
+msgid "Obtention"
+msgstr "Obtained"
+
+#, python-format
+msgid "Validité"
+msgstr "Validity"
+
+#, python-format
+msgid "EPI : %(type)s — %(designation)s"
+msgstr "PPE: %(type)s — %(designation)s"
+
+#, python-format
+msgid "%(resultat)s — visite du %(visite)s"
+msgstr "%(resultat)s — examination on %(visite)s"
+
+#, python-format
+msgid ", valable jusqu'au %(validite)s"
+msgstr ", valid until %(validite)s"
+
+#, python-format
+msgid "sans échéance"
+msgstr "no expiry"
+
+#, python-format
+msgid " (expirée)"
+msgstr " (expired)"
+
+#, python-format
+msgid ", réalisé %(realise_pct)s %% / %(cible_pct)s %%"
+msgstr ", achieved %(realise_pct)s %% / %(cible_pct)s %%"
+
+#, python-format
+msgid "Fiche individuelle de dotation EPI — %(employe)s"
+msgstr "Individual PPE issue record — %(employe)s"
+
+#, python-format
+msgid "Taille"
+msgstr "Size"
+
+#, python-format
+msgid "Dotation"
+msgstr "Issue"
+
+#, python-format
+msgid "Renouvellement"
+msgstr "Renewal"
+
+#, python-format
+msgid "Cumul"
+msgstr "Cumulative"
+
+#, python-format
+msgid "Coûts de maintenance %(annee)s (XAF)"
+msgstr "Maintenance costs %(annee)s (XAF)"
+
+#, python-format
+msgid "Centre %(centre)s"
+msgstr "Centre %(centre)s"
+
+#, python-format
+msgid "Rapport %(periode)s des opérations — %(debut)s au %(fin)s"
+msgstr "%(periode)s operations report — %(debut)s to %(fin)s"
+
+#, python-format
+msgid "Affaire"
+msgstr "Project"
+
+#, python-format
+msgid "Périmètre"
+msgstr "Scope"
+
+#, python-format
+msgid "Période prévue"
+msgstr "Planned period"
+
+#, python-format
+msgid "Heures prévues"
+msgstr "Planned hours"
+
+#, python-format
+msgid "Gamme"
+msgstr "Routing"
+
+#, python-format
+msgid "Avancement"
+msgstr "Progress"
+
+#, python-format
+msgid "Référence"
+msgstr "Reference"
+
+#, python-format
+msgid "Détail"
+msgstr "Detail"
+
+#, python-format
+msgid "Quantité / heures"
+msgstr "Quantity / hours"
+
+#, python-format
+msgid "Ordre de fabrication %(of_code)s"
+msgstr "Manufacturing order %(of_code)s"
+
+#, python-format
+msgid "Temps total"
+msgstr "Total time"
+
+#, python-format
+msgid "Gamme opératoire %(gamme_code)s"
+msgstr "Operating routing %(gamme_code)s"
+
+#, python-format
+msgid "Fiche"
+msgstr "Record"
+
+#, python-format
+msgid "Outillage réservé"
+msgstr "Reserved tooling"
+
+#, python-format
+msgid "Consignes"
+msgstr "Instructions"
+
+#, python-format
+msgid "Fiche de préparation %(fiche_code)s"
+msgstr "Preparation sheet %(fiche_code)s"
+
+#, python-format
+msgid "Quantité réalisée"
+msgstr "Quantity produced"
+
+#, python-format
+msgid "Quantité rebutée"
+msgstr "Quantity scrapped"
+
+#, python-format
+msgid "Avancement déclaré"
+msgstr "Declared progress"
+
+#, python-format
+msgid "Observations"
+msgstr "Observations"
+
+#, python-format
+msgid "Origine"
+msgstr "Origin"
+
+#, python-format
+msgid "Destination"
+msgstr "Destination"
+
+#, python-format
+msgid "Transporteur"
+msgstr "Carrier"
+
+#, python-format
+msgid "Expédié le"
+msgstr "Shipped on"
+
+#, python-format
+msgid "Réceptionné le"
+msgstr "Received on"
+
+#, python-format
+msgid "Réserves"
+msgstr "Reservations"
+
+#, python-format
+msgid "Signatures"
+msgstr "Signatures"
+
+#, python-format
+msgid "Expéditeur : ____________    Réceptionnaire : ____________"
+msgstr "Shipper: ____________    Receiver: ____________"
+
+#, python-format
+msgid "Terminé le"
+msgstr "Completed on"
+
+#, python-format
+msgid "Quantité commandée"
+msgstr "Quantity ordered"
+
+#, python-format
+msgid "Heures prévues / pointées"
+msgstr "Planned / recorded hours"
+
+#, python-format
+msgid "Rapport d'exécution %(of_code)s"
+msgstr "Execution report %(of_code)s"
+
+#, python-format
+msgid "Matière"
+msgstr "Material"
+
+#, python-format
+msgid "Pointage"
+msgstr "Timesheet"
+
+#, python-format
+msgid "Ordre"
+msgstr "Order"
+
+#, python-format
+msgid "Opération"
+msgstr "Operation"
+
+#, python-format
+msgid "Poste"
+msgstr "Station"
+
+#, python-format
+msgid "Heures MO"
+msgstr "Labour hours"
+
+#, python-format
+msgid "Heures machine"
+msgstr "Machine hours"
+
+#, python-format
+msgid "Article"
+msgstr "Item"
+
+#, python-format
+msgid "Disponibilité"
+msgstr "Availability"
+
+#, python-format
+msgid "Rapport"
+msgstr "Report"
+
+#, python-format
+msgid "Réalisé"
+msgstr "Achieved"
+
+#, python-format
+msgid "Rebut"
+msgstr "Scrap"
+
+#, python-format
+msgid "Néant."
+msgstr "None."
+
+#, python-format
+msgid "Ordre de fabrication"
+msgstr "Manufacturing order"
+
+#, python-format
+msgid "Date du PV"
+msgstr "Acceptance report date"
+
+#, python-format
+msgid "Levée de réserve"
+msgstr "Reservation lifted"
+
+#, python-format
+msgid "Validé par"
+msgstr "Validated by"
+
+#, python-format
+msgid "Conservation"
+msgstr "Retention"
+
+#, python-format
+msgid "Résultat / statut"
+msgstr "Result / status"
+
+#, python-format
+msgid "Dossier qualité %(valeur)s"
+msgstr "Quality dossier %(valeur)s"
+
+#, python-format
+msgid "Rapport qualité %(valeur)s — %(periode)s"
+msgstr "Quality report %(valeur)s — %(periode)s"
+
+#, python-format
+msgid "CONFORME - UTILISABLE"
+msgstr "COMPLIANT - USABLE"
+
+#, python-format
+msgid "INTERDIT D'USAGE"
+msgstr "DO NOT USE"
+
+#, python-format
+msgid "Prochaine échéance : %(instrument_echeance_etalonnage)s"
+msgstr "Next due date: %(instrument_echeance_etalonnage)s"
+
+#, python-format
+msgid "%(ans)s ans (Oil & Gas)"
+msgstr "%(ans)s years (Oil & Gas)"
+
+#, python-format
+msgid "Indicateur"
+msgstr "Indicator"
+
+#, python-format
+msgid "Édité le"
+msgstr "Printed on"
+
+#, python-format
+msgid "Joint"
+msgstr "Weld joint"
+
+#, python-format
+msgid "Épreuve"
+msgstr "Test"
+
+#, python-format
+msgid "Punch list"
+msgstr "Punch list"
+
+#, python-format
+msgid "Certificat : %(dernier_certificat)s"
+msgstr "Certificate: %(dernier_certificat)s"
+
+#, python-format
+msgid "%(soudeur_display_name)s · WPS %(valeur)s · coulée %(valeur2)s"
+msgstr "%(soudeur_display_name)s · WPS %(valeur)s · heat %(valeur2)s"
+
+#, python-format
+msgid "  Point ITP"
+msgstr "  ITP point"
+
+#, python-format
+msgid "Audit"
+msgstr "Audit"
+
+#, python-format
+msgid "Fournisseur"
+msgstr "Supplier"
+
+#, python-format
+msgid "Organisme / auditeurs"
+msgstr "Body / auditors"
+
+#, python-format
+msgid "Score"
+msgstr "Score"
+
+#, python-format
+msgid "Conclusion"
+msgstr "Conclusion"
+
+#, python-format
+msgid "Rapport d'audit %(audit_code)s"
+msgstr "Audit report %(audit_code)s"
+
+#, python-format
+msgid "Année"
+msgstr "Year"
+
+#, python-format
+msgid "Politique qualité en vigueur"
+msgstr "Quality policy in force"
+
+#, python-format
+msgid "Donnée d'entrée"
+msgstr "Input data"
+
+#, python-format
+msgid "Agrément qualité"
+msgstr "Quality approval"
+
+#, python-format
+msgid "Constat"
+msgstr "Finding"
+
+#, python-format
+msgid "Exigence"
+msgstr "Requirement"
+
+#, python-format
+msgid "Accordé"
+msgstr "Granted"
+
+#, python-format
+msgid "Refusé"
+msgstr "Refused"
+
+#, python-format
+msgid "Registres"
+msgstr "Registers"
+
+#, python-format
+msgid "document"
+msgstr "document"
+
+#, python-format
+msgid "Documents"
+msgstr "Documents"
+
+#, python-format
+msgid "Rapport documents — ETSL (RF-98)"
+msgstr "Documents report — ETSL (RF-98)"
+
+#, python-format
+msgid "Gains"
+msgstr "Earnings"
+
+#, python-format
+msgid "Retenues"
+msgstr "Deductions"
+
+#, python-format
+msgid "Brut"
+msgstr "Gross"
+
+#, python-format
+msgid "Charges patronales (information)"
+msgstr "Employer contributions (information)"
+
+#, python-format
+msgid "Document à conserver sans limitation de durée (archivage ETSL : 10 ans minimum)."
+msgstr "Document to be kept without time limit (ETSL archiving: 10 years minimum)."
+
+#, python-format
+msgid "Bulletin de paie — %(bulletin_periode)s"
+msgstr "Payslip — %(bulletin_periode)s"
+
+#, python-format
+msgid "%(bulletin_code)s · %(e_nom_complet)s · matricule %(e_code)s · %(valeur)s"
+msgstr "%(bulletin_code)s · %(e_nom_complet)s · employee no. %(e_code)s · %(valeur)s"
+
+#, python-format
+msgid "N° CNSS : %(valeur)s · CNAMGS : %(valeur2)s · parts fiscales : %(e_parts_fiscales)s"
+msgstr "CNSS no.: %(valeur)s · CNAMGS: %(valeur2)s · tax shares: %(e_parts_fiscales)s"
+
+#, python-format
+msgid "<font color='#d4142a'><b>AVERTISSEMENT</b> — %(avertissement)s</font>"
+msgstr "<font color='#d4142a'><b>WARNING</b> — %(avertissement)s</font>"
+
+#, python-format
+msgid "Mouvement"
+msgstr "Movement"
+
+#, python-format
+msgid "Lot"
+msgstr "Batch"
+
+#, python-format
+msgid "Dépôt"
+msgstr "Warehouse"
+
+#, python-format
+msgid "Saisi par"
+msgstr "Entered by"
+
+#, python-format
+msgid "Consommation"
+msgstr "Consumption"
+
+#, python-format
+msgid "Magasinier"
+msgstr "Storekeeper"
+
+#, python-format
+msgid "Receveur"
+msgstr "Recipient"
+
+#, python-format
+msgid " — affaire %(affaire_code)s"
+msgstr " — project %(affaire_code)s"
+
+#, python-format
+msgid "Bon de sortie magasin %(m_code)s"
+msgstr "Store issue note %(m_code)s"
+
+#, python-format
+msgid "Dépôt %(depot)s — année %(annee)s — %(nb)s écart(s), %(hors)s hors tolérance"
+msgstr "Warehouse %(depot)s — year %(annee)s — %(nb)s discrepancy(ies), %(hors)s outside tolerance"
+
+#, python-format
+msgid " — valeur nette %(valeur)s FCFA"
+msgstr " — net value %(valeur)s FCFA"
+
+#, python-format
+msgid "État des écarts d'inventaire %(code)s"
+msgstr "Inventory discrepancy statement %(code)s"
+
+# ── Lot a8 : en-têtes passés aux fonctions d export (mois, colonnes, sections) ──
+msgid "Janv."
+msgstr "Jan."
+
+msgid "Févr."
+msgstr "Feb."
+
+msgid "Mars"
+msgstr "Mar."
+
+msgid "Avr."
+msgstr "Apr."
+
+msgid "Mai"
+msgstr "May"
+
+msgid "Juin"
+msgstr "Jun."
+
+msgid "Juil."
+msgstr "Jul."
+
+msgid "Août"
+msgstr "Aug."
+
+msgid "Sept."
+msgstr "Sep."
+
+msgid "Oct."
+msgstr "Oct."
+
+msgid "Nov."
+msgstr "Nov."
+
+msgid "Déc."
+msgstr "Dec."
+
+msgid "Machine"
+msgstr "Machine"
+
+msgid "Centre"
+msgstr "Centre"
+
+msgid "Compte"
+msgstr "Account"
+
+msgid "OT"
+msgstr "WO"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Par machine, par centre analytique et cumul mensuel"
+msgstr "By machine, by analytic centre and monthly cumulative"
+
+msgid "Inventaire"
+msgstr "Inventory"
+
+msgid "Article"
+msgstr "Item"
+
+msgid "Lot"
+msgstr "Batch"
+
+msgid "Qté système"
+msgstr "System qty"
+
+msgid "Qté réelle"
+msgstr "Actual qty"
+
+msgid "Écart"
+msgstr "Discrepancy"
+
+msgid "Écart %"
+msgstr "Discrepancy %"
+
+msgid "Hors tolérance"
+msgstr "Outside tolerance"
+
+msgid "Valeur écart (FCFA)"
+msgstr "Discrepancy value (FCFA)"
+
+msgid "Tableau de bord Direction"
+msgstr "Management dashboard"
+
+msgid "Reporting client pétrolier — ASMR / HSE / Qualité"
+msgstr "Oil client reporting — ASMR / HSE / Quality"
+
+msgid "Pilotage Direction — trésorerie et budget"
+msgstr "Management steering — cash and budget"
+
+msgid "Indicateur"
+msgstr "Indicator"
+
+msgid "semaine"
+msgstr "week"
+
+msgid "debut"
+msgstr "start"
+
+msgid "fin"
+msgstr "end"
+
+msgid "encaissements"
+msgstr "receipts"
+
+msgid "decaissements"
+msgstr "disbursements"
+
+msgid "flux_net"
+msgstr "net_flow"
+
+msgid "solde_fin"
+msgstr "closing_balance"
+
+msgid "cash-flow 13 semaines"
+msgstr "13-week cash flow"
+
+msgid "pipe vers budget"
+msgstr "pipeline to budget"
+
+msgid "seuils budgetaires"
+msgstr "budget thresholds"
+
+msgid "ouverture"
+msgstr "opening"
+
+msgid "Exercice"
+msgstr "Fiscal year"
+
+msgid "Budget de produits"
+msgstr "Income budget"
+
+msgid "Réalisé"
+msgstr "Achieved"
+
+msgid "Atterrissage"
+msgstr "Landing forecast"
+
+msgid "Reste à couvrir"
+msgstr "Remaining to cover"
+
+msgid "Couverture (%)"
+msgstr "Coverage (%)"
+
+msgid "Budget"
+msgstr "Budget"
+
+msgid "Montant"
+msgstr "Amount"
+
+msgid "Taux %"
+msgstr "Rate %"
+
+msgid "Niveau"
+msgstr "Level"
+
+msgid "produits"
+msgstr "income"
+
+msgid "charges"
+msgstr "expenses"
+
+msgid "cout_gr"
+msgstr "gr_cost"
+
+msgid "marge"
+msgstr "margin"
+
+msgid "cube"
+msgstr "cube"
+
+msgid "numero"
+msgstr "number"
+
+msgid "registre"
+msgstr "register"
+
+msgid "titre"
+msgstr "title"
+
+msgid "statut"
+msgstr "status"
+
+msgid "contrepartie"
+msgstr "counterparty"
+
+msgid "projet"
+msgstr "project"
+
+msgid "date_document"
+msgstr "document_date"
+
+msgid "montant"
+msgstr "amount"
+
+msgid "dossier"
+msgstr "folder"
+
+msgid "cree_par"
+msgstr "created_by"
+
+msgid "cree_le"
+msgstr "created_on"
+
+msgid "retention_fin"
+msgstr "retention_end"

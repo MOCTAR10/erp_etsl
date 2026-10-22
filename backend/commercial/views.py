@@ -59,6 +59,7 @@ from .services import (
     pipeline_stats,
 )
 from . import ecarts_m1
+from config.i18n import tr
 
 
 def _svc(fonction, *args, **kwargs):
@@ -206,7 +207,7 @@ class EstimateViewSet(_CommonViewSet):
 
     def _decider(self, offre, depuis, vers, **champs):
         if offre.status not in depuis:
-            raise DRFValidationError({"detail": f"Offre {offre.get_status_display().lower()} : action impossible."})
+            raise DRFValidationError({"detail": tr("Offre %(status)s : action impossible.") % {"status": offre.get_status_display().lower()}})
         offre.status = vers
         for nom, valeur in champs.items():
             setattr(offre, nom, valeur)
@@ -330,10 +331,10 @@ class TenderReviewViewSet(_CommonViewSet):
         if not rao.decision_rao:
             return Response({"detail": "Notez les critères de la revue avant de soumettre."}, status=status.HTTP_400_BAD_REQUEST)
         if rao.decision_rao == "no_go":
-            return Response({"detail": f"No-Go (note {rao.score} % < 50 %) : offre non soumise."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": tr("No-Go (note %(rao_score)s %% < 50 %%) : offre non soumise.") % {"rao_score": rao.score}}, status=status.HTTP_400_BAD_REQUEST)
         justification = (request.data.get("decision") or rao.decision or "").strip()
         if rao.decision_rao == "go_reserve" and not justification:
-            return Response({"decision": f"Go sous réserve (note {rao.score} %) : justification obligatoire."},
+            return Response({"decision": tr("Go sous réserve (note %(rao_score)s %%) : justification obligatoire.") % {"rao_score": rao.score}},
                             status=status.HTTP_400_BAD_REQUEST)
         rao.decision = justification
         rao.review_status = TenderReview.Status.SOUMIS
@@ -363,7 +364,7 @@ class AffaireViewSet(FiltresMulticriteresMixin, _CommonViewSet):
     def _transition(self, depuis, vers, controle=None):
         affaire = Affaire.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if affaire.status != depuis:
-            return None, Response({"detail": f"Affaire {affaire.get_status_display().lower()} : action impossible."},
+            return None, Response({"detail": tr("Affaire %(status)s : action impossible.") % {"status": affaire.get_status_display().lower()}},
                                   status=status.HTTP_400_BAD_REQUEST)
         if controle:
             blocage = controle(affaire)
@@ -399,7 +400,7 @@ class AffaireViewSet(FiltresMulticriteresMixin, _CommonViewSet):
         """Marges prévues / réelles par client, profil, affaire ou responsable (CDC M1 §3.4 / §3.7)."""
         par = request.query_params.get("par", "client")
         if par not in MARGE_AXES:
-            raise DRFValidationError({"par": f"Valeurs possibles : {', '.join(MARGE_AXES)}."})
+            raise DRFValidationError({"par": tr("Valeurs possibles : %(liste)s.") % {"liste": ', '.join(MARGE_AXES)}})
         return Response(marges_affaires(par, can_see_amount(request.user)))
 
     @action(detail=False, methods=["get"])
@@ -481,7 +482,7 @@ class ContractViewSet(_CommonViewSet):
 
     def _passer(self, contrat, depuis, vers):
         if contrat.status not in depuis:
-            raise DRFValidationError({"detail": f"Contrat {contrat.get_status_display().lower()} : action impossible."})
+            raise DRFValidationError({"detail": tr("Contrat %(status)s : action impossible.") % {"status": contrat.get_status_display().lower()}})
         contrat.status = vers
         contrat.save()
         return Response(self.get_serializer(contrat).data)
@@ -665,8 +666,7 @@ class RevueCommandeViewSet(_CommonViewSet):
         if revue.type_revue == RevueCommande.Type.COMPLETE:
             if not (request.user.is_staff or request.user.role in REVUE_COMPLETE_ROLES):
                 return Response(
-                    {"detail": f"Revue complète (Δ prix {revue.delta_prix_pct} %, Δ délai {revue.delta_delai_jours} j) : "
-                               "validation réservée à la Direction."},
+                    {"detail": tr("Revue complète (Δ prix %(revue_delta_prix_pct)s %%, Δ délai %(revue_delta_delai_jours)s j) : validation réservée à la Direction.") % {"revue_delta_prix_pct": revue.delta_prix_pct, "revue_delta_delai_jours": revue.delta_delai_jours}},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             if not commentaire:

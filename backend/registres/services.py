@@ -6,6 +6,8 @@ import io
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from config.i18n import tr
+
 
 def _data_keys(entries):
     keys = []
@@ -19,7 +21,8 @@ def _data_keys(entries):
 def _rows(queryset):
     entries = list(queryset)
     data_keys = _data_keys(entries)
-    header = ["numero", "date", "registre", "type"] + data_keys + ["document"]
+    # EX-G-07 : en-têtes fixes dans la langue de la requête (les clés de données libres restent telles quelles).
+    header = [tr(h) for h in ("numero", "date", "registre", "type")] + data_keys + [tr("document")]
     rows = []
     for entry in entries:
         row = [
@@ -45,7 +48,7 @@ def _write_csv(header, rows):
 def _write_xlsx(header, rows):
     workbook = Workbook()
     sheet = workbook.active
-    sheet.title = "Registres"
+    sheet.title = tr("Registres")
     sheet.append(header)
     for cell in sheet[1]:
         cell.font = Font(bold=True)

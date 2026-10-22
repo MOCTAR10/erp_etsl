@@ -10,6 +10,7 @@ from decimal import Decimal, InvalidOperation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from config.i18n import tr
 
 
 def date_input(raw, field, default=None):
@@ -27,7 +28,7 @@ def choice_input(raw, choices, field, default=None):
     if raw in (None, ""):
         return default
     if raw not in choices.values:
-        raise ValidationError({field: f"Valeur inconnue : {raw!r}."})
+        raise ValidationError({field: tr("Valeur inconnue : %(raw)s.") % {"raw": repr(raw)}})
     return raw
 
 

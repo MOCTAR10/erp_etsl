@@ -14,6 +14,7 @@ Les anomalies (solde incohérent, ligne illisible, doublon, date hors période) 
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from config.i18n import tr
 
 ZERO = Decimal("0")
 
@@ -65,7 +66,7 @@ def _montant_mt940(s):
     try:
         return Decimal(s.replace(",", "."))
     except InvalidOperation:
-        raise ValueError(f"montant illisible : {s!r}")
+        raise ValueError(tr("montant illisible : %(s)s") % {"s": repr(s)})
 
 
 def parse_mt940(texte):
@@ -158,9 +159,9 @@ def _montant_cfonb(champ, decimales):
     elif dernier.isdigit():
         signe = 1
     else:
-        raise ValueError(f"montant illisible : {champ!r}")
+        raise ValueError(tr("montant illisible : %(champ)s") % {"champ": repr(champ)})
     if not champ.isdigit():
-        raise ValueError(f"montant illisible : {champ!r}")
+        raise ValueError(tr("montant illisible : %(champ)s") % {"champ": repr(champ)})
     return Decimal(int(champ)).scaleb(-decimales) * signe
 
 
@@ -237,4 +238,4 @@ def parse(texte, format_="auto"):
         return parse_mt940(texte)
     if format_ in ("cfonb", "cfonb120"):
         return parse_cfonb120(texte)
-    raise FichierBancaireInvalide(f"Format inconnu : {format_}")
+    raise FichierBancaireInvalide(tr("Format inconnu : %(format)s") % {"format": format_})

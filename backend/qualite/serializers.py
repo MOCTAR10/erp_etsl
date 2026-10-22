@@ -35,6 +35,7 @@ from .models import (
     Soudeur,
     WpsWpqr,
 )
+from config.i18n import tr
 
 
 class SoudeurSerializer(serializers.ModelSerializer):
@@ -295,7 +296,7 @@ class ActionCorrectiveSerializer(serializers.ModelSerializer):
         limite = timezone.localdate() + timedelta(days=delai)
         if value and value > limite:
             raise serializers.ValidationError(
-                f"Échéance au plus tard le {limite:%d/%m/%Y} : les CAPA se clôturent sous {delai} jours (CDC M6)."
+                tr("Échéance au plus tard le %(limite)s : les CAPA se clôturent sous %(delai)s jours (CDC M6).") % {"limite": format(limite, '%d/%m/%Y'), "delai": delai}
             )
         return value
 
@@ -412,20 +413,19 @@ class JointSoudeSerializer(serializers.ModelSerializer):
         if wps is None:
             raise serializers.ValidationError({"wps": "WPS obligatoire : un joint se soude selon une procédure qualifiée."})
         if wps.statut != WpsWpqr.Statut.VALIDE or wps.type != WpsWpqr.Type.WPS:
-            raise serializers.ValidationError({"wps": f"WPS {wps.code} non validé ou obsolète : soudage interdit."})
+            raise serializers.ValidationError({"wps": tr("WPS %(wps_code)s non validé ou obsolète : soudage interdit.") % {"wps_code": wps.code}})
         from .ecarts import controle_wps_profil
 
         if erreur := controle_wps_profil(wps, attrs["ordre"].affaire):
             raise serializers.ValidationError({"wps": erreur})
         if not DiffusionWps.objects.filter(wps=wps, ordre=attrs["ordre"]).exists():
-            raise serializers.ValidationError({"wps": f"WPS {wps.code} non diffusé sur l'OF {attrs['ordre'].code}."})
+            raise serializers.ValidationError({"wps": tr("WPS %(wps_code)s non diffusé sur l'OF %(code)s.") % {"wps_code": wps.code, "code": attrs['ordre'].code}})
         poste = attrs.get("poste")
         if poste and (poste.type_equipement != "poste_souder" or not poste.utilisable):
-            raise serializers.ValidationError({"poste": f"Poste {poste.code} non vérifié, bloqué ou pas un poste à souder."})
+            raise serializers.ValidationError({"poste": tr("Poste %(poste_code)s non vérifié, bloqué ou pas un poste à souder.") % {"poste_code": poste.code}})
         if qualification_couvrante(attrs["soudeur"], wps) is None:
             raise serializers.ValidationError({"soudeur": (
-                f"Qualification du soudeur hors domaine du WPS {wps.code} "
-                f"(procédé {wps.get_procede_display()}, position {wps.position or '—'})."
+                tr("Qualification du soudeur hors domaine du WPS %(wps_code)s (procédé %(procede)s, position %(valeur)s).") % {"wps_code": wps.code, "procede": wps.get_procede_display(), "valeur": wps.position or '—'}
             )})
         from .ecarts_a3 import controler_lot_joint
 

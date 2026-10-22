@@ -19,6 +19,7 @@ from .models import (
     RevueCommande,
     TenderReview,
 )
+from config.i18n import tr
 
 
 class AmountMaskMixin:
@@ -254,15 +255,15 @@ class TenderReviewSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Liste de critères attendue : [{libelle, poids, note}].")
         for i, critere in enumerate(value, start=1):
             if not isinstance(critere, dict) or not str(critere.get("libelle", "")).strip():
-                raise serializers.ValidationError(f"Critère {i} : libellé requis.")
+                raise serializers.ValidationError(tr("Critère %(i)s : libellé requis.") % {"i": i})
             try:
                 poids, note = float(critere.get("poids")), float(critere.get("note"))
             except (TypeError, ValueError):
-                raise serializers.ValidationError(f"Critère {i} : poids et note numériques requis.")
+                raise serializers.ValidationError(tr("Critère %(i)s : poids et note numériques requis.") % {"i": i})
             if poids <= 0:
-                raise serializers.ValidationError(f"Critère {i} : poids strictement positif requis.")
+                raise serializers.ValidationError(tr("Critère %(i)s : poids strictement positif requis.") % {"i": i})
             if not 0 <= note <= 100:
-                raise serializers.ValidationError(f"Critère {i} : note entre 0 et 100 requise.")
+                raise serializers.ValidationError(tr("Critère %(i)s : note entre 0 et 100 requise.") % {"i": i})
         return value
 
 

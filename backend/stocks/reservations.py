@@ -11,6 +11,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
+from config.i18n import tr
 
 ZERO = Decimal("0")
 
@@ -121,8 +122,7 @@ def controler_sortie(mouvement):
     libre = stock_physique(mouvement.article_id) - reserve_autres
     if mouvement.quantite > libre:
         raise ValueError(
-            f"Stock réservé par d'autres OF ({reserve_autres}) : {max(libre, ZERO)} seulement consommable(s) "
-            f"pour {mouvement.quantite} demandé(s). Libérez une réservation ou consommez depuis l'OF réservataire."
+            tr("Stock réservé par d'autres OF (%(reserve_autres)s) : %(max)s seulement consommable(s) pour %(mouvement_quantite)s demandé(s). Libérez une réservation ou consommez depuis l'OF réservataire.") % {"reserve_autres": reserve_autres, "max": max(libre, ZERO), "mouvement_quantite": mouvement.quantite}
         )
 
 

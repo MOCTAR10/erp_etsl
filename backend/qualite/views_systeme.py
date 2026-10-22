@@ -19,6 +19,7 @@ from .systeme import (
     approuver_document, bilan_pdf, bilan_qualite, cloturer_audit, competences, engage_direction, nc_constat,
     rapport_audit_pdf, reviser_document,
 )
+from config.i18n import en_francais, tr
 
 
 def _pdf_response(contenu, nom):
@@ -188,7 +189,7 @@ class AuditQualiteViewSet(viewsets.ModelViewSet):
         if audit.statut != AuditQualite.Statut.REALISE:
             return _refus("Seul un audit réalisé peut être clôturé.")
         if n := audit.nc_ouvertes.count():
-            return _refus(f"{n} NC d'audit non clôturée(s) : clôture impossible.")
+            return _refus(tr("%(n)s NC d'audit non clôturée(s) : clôture impossible.") % {"n": n})
         return Response(self.get_serializer(cloturer_audit(audit, request.user)).data)
 
     @action(detail=True, methods=["get"], url_path="rapport")
@@ -270,7 +271,7 @@ class RevueDirectionQualiteViewSet(viewsets.ModelViewSet):
         revue.statut = RevueDirectionQualite.Statut.VALIDEE
         revue.validee_par, revue.validee_le = request.user, timezone.now()
         titre = f"Revue de direction qualité {revue.annee}"
-        revue.document = archiver(bilan_pdf(revue.bilan, titre, revue), f"{revue.code}.pdf", titre, revue.code,
+        revue.document = archiver(en_francais(bilan_pdf, revue.bilan, titre, revue), f"{revue.code}.pdf", titre, revue.code,
                                   "qualite.revuedirectionqualite", revue.pk, request.user, ("revue de direction", "ISO 9001"),
                                   "Revue de direction qualité validée")
         revue.save(update_fields=["statut", "validee_par", "validee_le", "document"])

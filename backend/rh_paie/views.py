@@ -75,6 +75,7 @@ from .services import (
     reviser_valeur,
     tracer_changement,
 )
+from config.i18n import tr
 
 
 class EmployeViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
@@ -116,7 +117,7 @@ class EmployeViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
     def sortir(self, request, pk=None):
         e = self.get_object()
         if e.statut == Employe.Statut.SORTI:
-            return Response({"detail": f"Salarié déjà sorti (le {e.date_sortie})."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": tr("Salarié déjà sorti (le %(e_date_sortie)s).") % {"e_date_sortie": e.date_sortie}}, status=status.HTTP_400_BAD_REQUEST)
         e.statut = Employe.Statut.SORTI
         date_sortie = request.data.get("date_sortie")
         if date_sortie:
@@ -337,7 +338,7 @@ class DemandeCongeViewSet(viewsets.ModelViewSet):
         solde = dc.employe.solde_conges
         if dc.type == DemandesConge.Type.ANNUEL and dc.nb_jours > solde:
             raise serializers.ValidationError(
-                {"detail": f"Solde insuffisant : {solde} jour(s) restant(s), {dc.nb_jours} demande(s)."}
+                {"detail": tr("Solde insuffisant : %(solde)s jour(s) restant(s), %(dc_nb_jours)s demande(s).") % {"solde": solde, "dc_nb_jours": dc.nb_jours}}
             )
 
     @classmethod
@@ -629,7 +630,7 @@ class BulletinViewSet(viewsets.ModelViewSet):
             )
         if bulletin.disponible_le:
             return Response(
-                {"detail": f"Déjà mis à disposition le {bulletin.disponible_le:%d/%m/%Y %H:%M}."},
+                {"detail": tr("Déjà mis à disposition le %(bulletin_disponible_le)s.") % {"bulletin_disponible_le": format(bulletin.disponible_le, '%d/%m/%Y %H:%M')}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if not bulletin.document_id:  # la copie du salarié est la copie archivée

@@ -41,6 +41,7 @@ from .services import (
     compute_variance,
     detecter_ecarts,
 )
+from config.i18n import tr
 
 
 class DjangoValidationMixin:
@@ -62,7 +63,7 @@ def _apposer_visa(obj, request):
         raise DRFValidationError({"visa": "Préciser le visa apposé : « daf » ou « cg »."})
     champ, autre = (("visa_daf_par", "visa_cg_par") if visa == "daf" else ("visa_cg_par", "visa_daf_par"))
     if getattr(obj, f"{champ}_id"):
-        raise DRFValidationError({"visa": f"Visa {visa.upper()} déjà apposé."})
+        raise DRFValidationError({"visa": tr("Visa %(visa)s déjà apposé.") % {"visa": visa.upper()}})
     if getattr(obj, f"{autre}_id") == request.user.id:
         raise DRFValidationError({"visa": "Double visa : le second visa doit être apposé par une autre personne."})
     setattr(obj, champ, request.user)
@@ -236,8 +237,7 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         # écraserait silencieusement la précédente. Il faut la refaire sur le montant en vigueur.
         if revision.ancien_montant is not None and revision.ancien_montant != budget.montant:
             raise DRFValidationError(
-                f"Le budget a changé depuis la préparation de {revision.code} "
-                f"({revision.ancien_montant} → {budget.montant}) : préparez une nouvelle révision."
+                tr("Le budget a changé depuis la préparation de %(revision_code)s (%(revision_ancien_montant)s → %(budget_montant)s) : préparez une nouvelle révision.") % {"revision_code": revision.code, "revision_ancien_montant": revision.ancien_montant, "budget_montant": budget.montant}
             )
         lignes = list(revision.lignes.select_related("period"))
         actuelles = {l.period_id: l for l in budget.lignes.all()}
@@ -245,7 +245,7 @@ class BudgetRevisionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
             courant = actuelles[l.period_id].montant if l.period_id in actuelles else 0
             if courant != l.ancien_montant:
                 raise DRFValidationError(
-                    f"La ligne {l.period} a changé depuis la préparation de {revision.code} : préparez une nouvelle révision."
+                    tr("La ligne %(l_period)s a changé depuis la préparation de %(revision_code)s : préparez une nouvelle révision.") % {"l_period": l.period, "revision_code": revision.code}
                 )
         if not _apposer_visa(revision, request):
             return Response(self.get_serializer(revision).data)

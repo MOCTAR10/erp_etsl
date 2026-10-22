@@ -14,6 +14,7 @@ from .models import (
     RegleInspectionReception,
 )
 from .serializers import AmountMaskMixin
+from config.i18n import tr
 
 
 class ParametreAchatsSerializer(serializers.ModelSerializer):
@@ -119,5 +120,5 @@ class AvoirFournisseurSerializer(AmountMaskMixin, serializers.ModelSerializer):
             autres = facture.avoirs.exclude(pk=self.instance.pk if self.instance else None)
             cumul = sum((a.montant_ht for a in autres), montant)
             if cumul > facture.total:
-                raise serializers.ValidationError({"montant_ht": f"Avoirs cumulés ({cumul:.2f}) supérieurs au HT de la facture ({facture.total:.2f})."})
+                raise serializers.ValidationError({"montant_ht": tr("Avoirs cumulés (%(cumul)s) supérieurs au HT de la facture (%(facture_total)s).") % {"cumul": format(cumul, '.2f'), "facture_total": format(facture.total, '.2f')}})
         return attrs

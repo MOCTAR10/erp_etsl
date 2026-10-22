@@ -29,6 +29,7 @@ from .services import (
     can_see_amount,
     is_admin_or_staff,
 )
+from config.i18n import tr
 
 
 def _drf(exc):
@@ -125,7 +126,7 @@ class AgrementFournisseurViewSet(_LectureAchats, viewsets.ModelViewSet):
         roles = AGREMENT_QUALITE_VALIDATION_ROLES if agrement.domaine == AgrementFournisseur.Domaine.QUALITE else AGREMENT_HSE_VALIDATION_ROLES
         if not (is_admin_or_staff(request.user) or request.user.role in roles):
             service = "QA/QC (M6)" if agrement.domaine == AgrementFournisseur.Domaine.QUALITE else "HSE (M7)"
-            raise PermissionDenied(f"Décision réservée au service {service} et à la Direction.")
+            raise PermissionDenied(tr("Décision réservée au service %(service)s et à la Direction.") % {"service": service})
         if agrement.statut != AgrementFournisseur.Statut.DEMANDE:
             raise ValidationError({"detail": "Agrément déjà décidé."})
         return agrement

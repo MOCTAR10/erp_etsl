@@ -16,6 +16,7 @@ from django.utils import timezone
 from users import mfa
 
 from .models import SignatureRequest, Signer, Version
+from config.i18n import tr
 
 OTP_TTL_MINUTES = 10
 OTP_RESEND_SECONDS = 20
@@ -157,7 +158,7 @@ def send_otp(req: SignatureRequest, user):
         raise ValidationError("Signature verrouillée après trop d'essais : contactez l'émetteur de la demande.")
     now = timezone.now()
     if signer.otp_sent_at and (now - signer.otp_sent_at).total_seconds() < OTP_RESEND_SECONDS:
-        raise ValidationError(f"Patientez {OTP_RESEND_SECONDS} secondes avant de redemander un code.")
+        raise ValidationError(tr("Patientez %(otp_resend_seconds)s secondes avant de redemander un code.") % {"otp_resend_seconds": OTP_RESEND_SECONDS})
     code = f"{secrets.randbelow(10**6):06d}"
     signer.otp_hash = _otp_digest(signer, code)
     signer.otp_sent_at = now
@@ -195,7 +196,7 @@ def sign(req: SignatureRequest, user, otp: str, password: str, ip=None, user_age
     except _AuthFailure as failure:
         Signer.objects.filter(pk=failure.signer_pk).update(otp_attempts=F("otp_attempts") + 1)
         attempts = Signer.objects.get(pk=failure.signer_pk).otp_attempts
-        raise ValidationError(f"Code ou mot de passe invalide ({attempts}/{MAX_ATTEMPTS} essais).")
+        raise ValidationError(tr("Code ou mot de passe invalide (%(attempts)s/%(max_attempts)s essais).") % {"attempts": attempts, "max_attempts": MAX_ATTEMPTS})
 
 
 def _resoudre_methode(signer: Signer, user, methode: str) -> str:

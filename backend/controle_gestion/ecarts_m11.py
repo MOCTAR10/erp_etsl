@@ -18,6 +18,7 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 
 from .services import ZERO, _net, _posted_lines_qs, get_param_gestion, parametres_gestion_provisoires
+from config.i18n import en_francais, tr
 
 CENT = Decimal("0.01")
 
@@ -417,11 +418,10 @@ def reporting_pdf(cloture, type_reporting):
     from hse.services import _pdf
 
     d = donnees_reporting(cloture, type_reporting)
-    titre = (f"Reporting de gestion {d['period_label']} — "
-             f"{'réalisé' if type_reporting == 'j4' else 'prévision'} {d['horizon']} mois (J+{4 if type_reporting == 'j4' else 6})")
-    blocs = [("Clôture", d["cloture"]), ("Échéance de publication", d["echeance"]),
-             ("Avertissement", "Horizons et jours de publication provisoires, à confirmer par ETSL." if d["provisoire"] else "—")]
-    tableau = [["Période", "Budget produits", "Produits", "Budget charges", "Charges", "Coût GR", "Marge"]] + [
+    titre = (tr("Reporting de gestion %(period_label)s — %(valeur)s %(horizon)s mois (J+%(valeur2)s)") % {"period_label": d['period_label'], "valeur": 'réalisé' if type_reporting == 'j4' else 'prévision', "horizon": d['horizon'], "valeur2": 4 if type_reporting == 'j4' else 6})
+    blocs = [(tr("Clôture"), d["cloture"]), (tr("Échéance de publication"), d["echeance"]),
+             (tr("Avertissement"), tr("Horizons et jours de publication provisoires, à confirmer par ETSL.") if d["provisoire"] else "—")]
+    tableau = [[tr("Période"), tr("Budget produits"), tr("Produits"), tr("Budget charges"), tr("Charges"), tr("Coût GR"), tr("Marge")]] + [
         [r["period_label"], r["budget_produits"], r["produits"], r["budget_charges"], r["charges"], r["cout_gr"], r["marge"]]
         for r in d["rows"]
     ]
@@ -436,7 +436,7 @@ def archiver_reporting(cloture, type_reporting, user=None):
         raise ValidationError("La clôture de gestion doit être réalisée avant d'archiver le reporting.")
     if ReportingArchive.objects.select_for_update().filter(cloture=cloture, type_reporting=type_reporting).exists():
         raise ValidationError("Reporting déjà archivé pour ce mois et cet horizon.")
-    contenu, titre = reporting_pdf(cloture, type_reporting)
+    contenu, titre = en_francais(reporting_pdf, cloture, type_reporting)  # archive : français
     echeance = cloture.echeance_j4 if type_reporting == "j4" else cloture.echeance_j6
     document = _archiver(contenu, f"REPORTING-{cloture.code}-{type_reporting.upper()}.pdf", titre, "REPORTING_GESTION",
                          "Reporting de gestion", cloture.code, "controle_gestion.cloturegestion", cloture.pk, user,
@@ -637,7 +637,7 @@ def provisionner_fnp(date_arrete, user=None):
         raise ValidationError("Provision déjà passée à cette date d'arrêté.")
     ouverte = ProvisionFnp.objects.filter(statut=ProvisionFnp.Statut.COMPTABILISEE).first()
     if ouverte:
-        raise ValidationError(f"Extournez d'abord la provision {ouverte.code} ({ouverte.date_arrete:%d/%m/%Y}).")
+        raise ValidationError(tr("Extournez d'abord la provision %(ouverte_code)s (%(ouverte_date_arrete)s).") % {"ouverte_code": ouverte.code, "ouverte_date_arrete": format(ouverte.date_arrete, '%d/%m/%Y')})
     lignes = calculer_fnp(date_arrete)
     total = sum((Decimal(x["montant"]) for x in lignes), ZERO)
     if not total:

@@ -12,6 +12,7 @@ from rest_framework.permissions import BasePermission
 
 from users.models import User
 from users.rbac import can_read_app
+from config.i18n import tr
 
 HSE_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -153,23 +154,23 @@ def rapport_incident_pdf(incident):
     """Rapport d'accident / d'incident (CDC M7-01) : faits, causes, conséquences, enquête, REX, plan d'action."""
     tz = timezone.get_current_timezone()
     blocs = [
-        ("Type", incident.get_type_incident_display()), ("Gravité", incident.get_gravite_display()),
-        ("Date", f"{incident.date_evenement.astimezone(tz):%d/%m/%Y %H:%M}"), ("Lieu", incident.lieu),
-        ("Zone", incident.get_zone_display() if incident.zone else "—"), ("Description", incident.description),
-        ("Personnes impliquées", incident.personnes_impliquees), ("Cause immédiate", incident.cause_immediate),
-        ("Cause profonde", incident.cause_profonde), ("Conséquences", incident.consequences),
-        ("Conséquence humaine", incident.get_consequence_humaine_display()), ("Jours d'arrêt", incident.jours_arret),
-        ("Déclaré par", incident.declared_by), ("Enquêteur", incident.enqueteur),
-        ("Escalade DG", f"{incident.escalade_dg_le:%d/%m/%Y}" if incident.escalade_dg_le else "—"),
-        ("Rapport d'enquête", incident.rapport), ("Retour d'expérience", incident.retour_experience),
-        ("Statut", incident.get_statut_display()),
+        (tr("Type"), incident.get_type_incident_display()), (tr("Gravité"), incident.get_gravite_display()),
+        (tr("Date"), f"{incident.date_evenement.astimezone(tz):%d/%m/%Y %H:%M}"), (tr("Lieu"), incident.lieu),
+        (tr("Zone"), incident.get_zone_display() if incident.zone else "—"), (tr("Description"), incident.description),
+        (tr("Personnes impliquées"), incident.personnes_impliquees), (tr("Cause immédiate"), incident.cause_immediate),
+        (tr("Cause profonde"), incident.cause_profonde), (tr("Conséquences"), incident.consequences),
+        (tr("Conséquence humaine"), incident.get_consequence_humaine_display()), (tr("Jours d'arrêt"), incident.jours_arret),
+        (tr("Déclaré par"), incident.declared_by), (tr("Enquêteur"), incident.enqueteur),
+        (tr("Escalade DG"), f"{incident.escalade_dg_le:%d/%m/%Y}" if incident.escalade_dg_le else "—"),
+        (tr("Rapport d'enquête"), incident.rapport), (tr("Retour d'expérience"), incident.retour_experience),
+        (tr("Statut"), incident.get_statut_display()),
     ]
-    actions = [["Action", "Type", "Responsable", "Échéance", "Statut"]] + [
+    actions = [[tr("Action"), tr("Type"), tr("Responsable"), tr("Échéance"), tr("Statut")]] + [
         [a.code, a.get_type_display(), str(a.responsable or "—"), f"{a.echeance:%d/%m/%Y}" if a.echeance else "—",
          a.get_statut_display()]
         for a in incident.actions.select_related("responsable")
     ]
-    return _pdf(f"Rapport d'incident {incident.code}", blocs, actions if len(actions) > 1 else None)
+    return _pdf(tr("Rapport d'incident %(incident_code)s") % {"incident_code": incident.code}, blocs, actions if len(actions) > 1 else None)
 
 
 def archiver_ged(contenu, nom, titre, type_code, type_label, reference, objet_type, objet_id, user=None, mots=(),
@@ -323,18 +324,18 @@ def passeport_securite(employe, jour=None):
 
 def passeport_pdf(employe):
     p = passeport_securite(employe)
-    blocs = [("Salarié", p["employe"]), ("Matricule", p["matricule"])]
+    blocs = [(tr("Salarié"), p["employe"]), (tr("Matricule"), p["matricule"])]
     if p["aptitude"]:
         a = p["aptitude"]
-        blocs.append(("Aptitude médicale", f"{a['resultat']} — visite du {a['visite']:%d/%m/%Y}"
-                      + (f", valable jusqu'au {a['validite']:%d/%m/%Y}" if a["validite"] else "")))
-    tableau = [["Formation / habilitation", "Obtention", "Validité"]] + [
+        blocs.append((tr("Aptitude médicale"), tr("%(resultat)s — visite du %(visite)s") % {"resultat": a['resultat'], "visite": format(a['visite'], '%d/%m/%Y')}
+                      + (tr(", valable jusqu'au %(validite)s") % {"validite": format(a['validite'], '%d/%m/%Y')} if a["validite"] else "")))
+    tableau = [[tr("Formation / habilitation"), tr("Obtention"), tr("Validité")]] + [
         [q["intitule"], f"{q['obtention']:%d/%m/%Y}" if q["obtention"] else "—",
-         (f"{q['validite']:%d/%m/%Y}" if q["validite"] else "sans échéance") + ("" if q["valide"] else " (expirée)")]
+         (f"{q['validite']:%d/%m/%Y}" if q["validite"] else tr("sans échéance")) + ("" if q["valide"] else tr(" (expirée)"))]
         for q in p["qualifications"]
-    ] + [[f"EPI : {e['type']} — {e['designation']}", f"{e['dotation']:%d/%m/%Y}",
+    ] + [[tr("EPI : %(type)s — %(designation)s") % {"type": e["type"], "designation": e["designation"]}, f"{e['dotation']:%d/%m/%Y}",
           f"{e['renouvellement']:%d/%m/%Y}" if e["renouvellement"] else "—"] for e in p["epi"]]
-    return _pdf(f"Passeport sécurité — {p['employe']}", blocs, tableau if len(tableau) > 1 else None)
+    return _pdf(tr("Passeport sécurité — %(employe)s") % {"employe": p['employe']}, blocs, tableau if len(tableau) > 1 else None)
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -481,27 +482,27 @@ def bilan_pdf(bilan, titre, revue=None):
     f, i = bilan["frequence"], bilan["indicateurs"]
     nd = lambda v, s="": "—" if v is None else f"{v}{s}"  # noqa: E731
     blocs = [
-        ("Heures travaillées", f["heures"]), ("TRIR / LTIR / LTIFR", f"{nd(f['trir'])} / {nd(f['ltir'])} / {nd(f['ltifr'])}"),
-        ("Cas enregistrables / avec arrêt", f"{f['enregistrables']} / {f['avec_arret']} ({f['jours_perdus']} jours perdus)"),
-        ("Incidents (clôturés)", f"{bilan['incidents']['total']} ({bilan['incidents']['clotures']})"),
-        ("Par type", ", ".join(f"{k} : {v}" for k, v in bilan["incidents"]["par_type"].items()) or "—"),
-        ("Taux de formation", nd(i["taux_formation"], " %")), ("Taux de recyclage à jour", nd(i["taux_recyclage"], " %")),
-        ("Conformité ISO (score moyen des audits)", nd(i["conformite_iso"], " %")),
-        ("Incidents environnementaux", f"{i['incidents_environnement']} (taux {nd(i['taux_incidents_environnement'])})"),
-        ("Permis / formations / audits", f"{bilan['permis']} / {bilan['formations']} / {bilan['audits']}"),
-        ("Actions HSE ouvertes", bilan["actions_ouvertes"]),
-        ("Émissions", f"{bilan['environnement']['emissions_t_co2e']} t CO2e"),
-        ("Déchets", ", ".join(f"{d['type']} : {d['quantite']} {d['unite']}" for d in bilan["dechets"]) or "—"),
-        ("Plans de réduction", "; ".join(
+        (tr("Heures travaillées"), f["heures"]), (tr("TRIR / LTIR / LTIFR"), f"{nd(f['trir'])} / {nd(f['ltir'])} / {nd(f['ltifr'])}"),
+        (tr("Cas enregistrables / avec arrêt"), tr("%(enregistrables)s / %(avec_arret)s (%(jours_perdus)s jours perdus)") % {"enregistrables": f['enregistrables'], "avec_arret": f['avec_arret'], "jours_perdus": f['jours_perdus']}),
+        (tr("Incidents (clôturés)"), f"{bilan['incidents']['total']} ({bilan['incidents']['clotures']})"),
+        (tr("Par type"), ", ".join(f"{k} : {v}" for k, v in bilan["incidents"]["par_type"].items()) or "—"),
+        (tr("Taux de formation"), nd(i["taux_formation"], " %")), (tr("Taux de recyclage à jour"), nd(i["taux_recyclage"], " %")),
+        (tr("Conformité ISO (score moyen des audits)"), nd(i["conformite_iso"], " %")),
+        (tr("Incidents environnementaux"), tr("%(incidents_environnement)s (taux %(nd)s)") % {"incidents_environnement": i['incidents_environnement'], "nd": nd(i['taux_incidents_environnement'])}),
+        (tr("Permis / formations / audits"), f"{bilan['permis']} / {bilan['formations']} / {bilan['audits']}"),
+        (tr("Actions HSE ouvertes"), bilan["actions_ouvertes"]),
+        (tr("Émissions"), f"{bilan['environnement']['emissions_t_co2e']} t CO2e"),
+        (tr("Déchets"), ", ".join(f"{d['type']} : {d['quantite']} {d['unite']}" for d in bilan["dechets"]) or "—"),
+        (tr("Plans de réduction"), "; ".join(
             f"{p['code']} {p['objectif']} ({p['statut']}"
-            + (f", réalisé {p['avancement']['realise_pct']} % / {p['cible_pct']} %" if p["avancement"] and p["avancement"]["realise_pct"] else "")
+            + (tr(", réalisé %(realise_pct)s %% / %(cible_pct)s %%") % {"realise_pct": p['avancement']['realise_pct'], "cible_pct": p['cible_pct']} if p["avancement"] and p["avancement"]["realise_pct"] else "")
             + ")" for p in bilan["plans_reduction"]) or "—"),
     ]
     if revue is not None:
-        blocs += [("Date de la revue", f"{revue.date_revue:%d/%m/%Y}"), ("Participants", revue.participants),
-                  ("Conclusions", revue.conclusions), ("Décisions", revue.decisions),
-                  ("Validée par", revue.validee_par), ("Validée le", f"{revue.validee_le:%d/%m/%Y}" if revue.validee_le else "—")]
-    tableau = [["Ressource", "Quantité", "Unité", "kg CO2e"]] + [
+        blocs += [(tr("Date de la revue"), f"{revue.date_revue:%d/%m/%Y}"), (tr("Participants"), revue.participants),
+                  (tr("Conclusions"), revue.conclusions), (tr("Décisions"), revue.decisions),
+                  (tr("Validée par"), revue.validee_par), (tr("Validée le"), f"{revue.validee_le:%d/%m/%Y}" if revue.validee_le else "—")]
+    tableau = [[tr("Ressource"), tr("Quantité"), tr("Unité"), tr("kg CO2e")]] + [
         [lg["libelle"], lg["quantite"], lg["unite"], lg["emissions_kg_co2e"] or "—"] for lg in bilan["environnement"]["lignes"]
     ]
     return _pdf(titre, blocs, tableau)

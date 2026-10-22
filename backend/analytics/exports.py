@@ -16,6 +16,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from config.i18n import tr
+
 FORMATS = ("xlsx", "pdf")
 TYPES = {
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -27,7 +29,7 @@ def _texte(v):
     if v is None:
         return "—"
     if isinstance(v, bool):
-        return "oui" if v else "non"
+        return tr("oui") if v else tr("non")
     return str(v)
 
 
@@ -82,7 +84,7 @@ def _pdf(titre, sections):
     styles = getSampleStyleSheet()
     story = [
         Paragraph(titre, styles["Title"]),
-        Paragraph(f"ETSL — édité le {timezone.localtime():%d/%m/%Y %H:%M}", styles["Normal"]),
+        Paragraph(tr("ETSL — édité le %(date)s") % {"date": f"{timezone.localtime():%d/%m/%Y %H:%M}"}, styles["Normal"]),
         Spacer(1, 4 * mm),
     ]
     for nom, colonnes, lignes in sections:
@@ -101,7 +103,15 @@ def _pdf(titre, sections):
     return buf.getvalue()
 
 
+def _traduire_sections(sections):
+    """EX-G-07 : noms de section, en-têtes et libellés de 1re colonne dans la langue de la requête."""
+    return [(tr(nom), [tr(c) for c in colonnes], [[tr(l[0]) if isinstance(l[0], str) else l[0], *l[1:]] if l else l
+                                                   for l in lignes])
+            for nom, colonnes, lignes in sections]
+
+
 def reponse_export(fmt, titre, nom_fichier, sections):
+    titre, sections = tr(titre), _traduire_sections(sections)
     contenu = _xlsx(titre, sections) if fmt == "xlsx" else _pdf(titre, sections)
     resp = HttpResponse(contenu, content_type=TYPES[fmt])
     resp["Content-Disposition"] = f'attachment; filename="{nom_fichier}.{fmt}"'

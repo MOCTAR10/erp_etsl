@@ -16,6 +16,7 @@ from .models import (
     PointageChantier,
     SituationTravaux,
 )
+from config.i18n import tr
 
 
 class AmountMaskMixin:
@@ -318,7 +319,7 @@ def controler_habilitation_chantier(worker, jour, ordre=None):
     nom = worker.get_full_name() or worker.email
     if fiche is None:
         raise serializers.ValidationError(
-            {"worker": f"{nom} n'est rattaché à aucune fiche salarié : habilitation chantier invérifiable."}
+            {"worker": tr("%(nom)s n'est rattaché à aucune fiche salarié : habilitation chantier invérifiable.") % {"nom": nom}}
         )
     _controler_fiche(fiche, nom, jour, ordre)
 
@@ -335,14 +336,14 @@ def _controler_fiche(fiche, nom, jour, ordre=None):
     ).exists()
     if not habilite:
         raise serializers.ValidationError(
-            {"worker": f"{nom} n'a aucune habilitation valide au {jour:%d/%m/%Y} : affectation chantier interdite (CDC M9 §10.8)."}
+            {"worker": tr("%(nom)s n'a aucune habilitation valide au %(jour)s : affectation chantier interdite (CDC M9 §10.8).") % {"nom": nom, "jour": format(jour, '%d/%m/%Y')}}
         )
     from rh_paie.formation_m9c import habilitations_manquantes
 
     manquantes = habilitations_manquantes(fiche, ordre, jour)
     if manquantes:  # matrice habilitation ↔ poste (CDC M9.4)
         raise serializers.ValidationError(
-            {"worker": f"{nom} n'a pas l'habilitation exigée par le poste ({', '.join(manquantes)}) : affectation chantier interdite."}
+            {"worker": tr("%(nom)s n'a pas l'habilitation exigée par le poste (%(liste)s) : affectation chantier interdite.") % {"nom": nom, "liste": ', '.join(manquantes)}}
         )
 
 
@@ -443,7 +444,7 @@ class PresenceChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
 
             motif_m9 = indisponibilite(employe, jour)
             if motif_m9:  # croisement avec les absences / congés validés en M9
-                raise serializers.ValidationError({"statut": f"Salarié indisponible en M9 ({motif_m9}) : présence incohérente."})
+                raise serializers.ValidationError({"statut": tr("Salarié indisponible en M9 (%(motif_m9)s) : présence incohérente.") % {"motif_m9": motif_m9}})
         return attrs
 
 
@@ -688,7 +689,7 @@ class RepartitionAffaireOFSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"affaire": "Affaire déjà répartie sur cet OF."})
         total = sum((r.part_pct for r in autres), Decimal("0")) + part
         if total > 100:
-            raise serializers.ValidationError({"part_pct": f"Total des parts {total} % > 100 %."})
+            raise serializers.ValidationError({"part_pct": tr("Total des parts %(total)s %% > 100 %%.") % {"total": total}})
         return attrs
 
 

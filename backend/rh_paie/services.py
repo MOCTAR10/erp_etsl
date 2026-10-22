@@ -18,6 +18,7 @@ from rest_framework.permissions import BasePermission
 
 from users.models import User
 from users.rbac import can_read_app
+from config.i18n import en_francais, tr
 
 RH_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -304,7 +305,7 @@ def _compte(code):
     try:
         return Account.objects.get(code=code)
     except Account.DoesNotExist:
-        raise ValidationError(f"Compte {code} absent du plan comptable (seed_referentiels).")
+        raise ValidationError(tr("Compte %(code)s absent du plan comptable (seed_referentiels).") % {"code": code})
 
 
 @transaction.atomic
@@ -360,6 +361,16 @@ TYPE_GED_BULLETIN = "bulletins_de_paie"
 
 
 def bulletin_pdf(bulletin):
+    """PDF du bulletin : en français par défaut (document légal gabonais), langue de l'utilisateur si ETSL l'ouvre."""
+    from django.utils import translation
+
+    from comptabilite.services import langue_documents_legaux
+
+    with translation.override(langue_documents_legaux()):
+        return _bulletin_pdf(bulletin)
+
+
+def _bulletin_pdf(bulletin):
     """PDF du bulletin (reportlab) — l'avertissement « taux provisoires » y figure tant qu'un barème l'est."""
     import io
 
@@ -375,18 +386,18 @@ def bulletin_pdf(bulletin):
     e = bulletin.employe
     fm = lambda v: f"{v:,.0f}".replace(",", " ")  # noqa: E731
     story = [
-        Paragraph(f"Bulletin de paie — {bulletin.periode:%m/%Y}", styles["Title"]),
-        Paragraph(f"{bulletin.code} · {e.nom_complet} · matricule {e.code} · {e.fonction or e.categorie}", styles["Normal"]),
-        Paragraph(f"N° CNSS : {e.numero_securite_sociale or '—'} · CNAMGS : {e.matricule_cnps or '—'} · parts fiscales : {e.parts_fiscales}", styles["Normal"]),
+        Paragraph(tr("Bulletin de paie — %(bulletin_periode)s") % {"bulletin_periode": format(bulletin.periode, '%m/%Y')}, styles["Title"]),
+        Paragraph(tr("%(bulletin_code)s · %(e_nom_complet)s · matricule %(e_code)s · %(valeur)s") % {"bulletin_code": bulletin.code, "e_nom_complet": e.nom_complet, "e_code": e.code, "valeur": e.fonction or e.categorie}, styles["Normal"]),
+        Paragraph(tr("N° CNSS : %(valeur)s · CNAMGS : %(valeur2)s · parts fiscales : %(e_parts_fiscales)s") % {"valeur": e.numero_securite_sociale or '—', "valeur2": e.matricule_cnps or '—', "e_parts_fiscales": e.parts_fiscales}, styles["Normal"]),
         Spacer(1, 6 * mm),
     ]
-    rows = [["Rubrique", "Gains", "Retenues"]]
+    rows = [[tr("Rubrique"), tr("Gains"), tr("Retenues")]]
     for l in bulletin.lignes.select_related("rubrique").order_by("rubrique__nature", "rubrique__ordre"):
         gain = l.rubrique.nature == "gain"
         rows.append([l.libelle, fm(l.montant) if gain else "", "" if gain else fm(l.montant)])
-    rows.append(["Brut", fm(bulletin.brut), ""])
-    rows.append(["Charges patronales (information)", "", fm(bulletin.charges_patronales)])
-    rows.append(["NET À PAYER (FCFA)", fm(bulletin.net), ""])
+    rows.append([tr("Brut"), fm(bulletin.brut), ""])
+    rows.append([tr("Charges patronales (information)"), "", fm(bulletin.charges_patronales)])
+    rows.append([tr("NET À PAYER (FCFA)"), fm(bulletin.net), ""])
     table = Table(rows, colWidths=[110 * mm, 35 * mm, 35 * mm])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12308f")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -396,8 +407,8 @@ def bulletin_pdf(bulletin):
     story.append(table)
     avertissement = avertissement_provisoire(bulletin.baremes_provisoires)
     if avertissement:
-        story += [Spacer(1, 6 * mm), Paragraph(f"<font color='#d4142a'><b>AVERTISSEMENT</b> — {avertissement}</font>", styles["Normal"])]
-    story += [Spacer(1, 6 * mm), Paragraph("Document à conserver sans limitation de durée (archivage ETSL : 10 ans minimum).", styles["Italic"])]
+        story += [Spacer(1, 6 * mm), Paragraph(tr("<font color='#d4142a'><b>AVERTISSEMENT</b> — %(avertissement)s</font>") % {"avertissement": avertissement}, styles["Normal"])]
+    story += [Spacer(1, 6 * mm), Paragraph(tr("Document à conserver sans limitation de durée (archivage ETSL : 10 ans minimum)."), styles["Italic"])]
     doc.build(story)
     return buf.getvalue()
 
@@ -426,7 +437,7 @@ def archiver_bulletin(bulletin, user=None):
         type_doc.retention_years = max(type_doc.retention_years or 0, RETENTION_BULLETIN_ANS)
         type_doc.is_restricted_rh = True
         type_doc.save(update_fields=["retention_years", "is_restricted_rh"])
-    contenu = bulletin_pdf(bulletin)
+    contenu = en_francais(bulletin_pdf, bulletin)  # pièce archivée : français
     sha = hashlib.sha256(contenu).hexdigest()
     nom = f"{bulletin.code}_{bulletin.periode:%Y-%m}.pdf"
     document = Document.objects.create(
@@ -507,7 +518,7 @@ def generer_virement(periode, compte, date_execution, user=None):
         raise ValidationError("Aucun bulletin validé à virer pour cette période (ou déjà viré).")
     sans_rib = [b.employe.nom_complet for b in bulletins if not b.employe.rib_complet]
     if sans_rib:
-        raise ValidationError("RIB incomplet pour : " + ", ".join(sans_rib) + ".")
+        raise ValidationError(tr("RIB incomplet pour : %(liste)s.") % {"liste": ", ".join(sans_rib)})
     contenu, total = cfonb160(compte, date_execution, [
         (b.code, b.employe.nom_complet, b.employe.banque_nom, b.employe.rib_banque, b.employe.rib_guichet,
          b.employe.rib_compte, b.net, f"SALAIRE {periode:%m/%Y}")
@@ -549,7 +560,7 @@ def parametre(code, periode):
         .first()
     )
     if p is None:
-        raise ValidationError(f"Paramètre de paie « {code} » absent : à saisir dans le paramétrage de la paie.")
+        raise ValidationError(tr("Paramètre de paie « %(code)s » absent : à saisir dans le paramétrage de la paie.") % {"code": code})
     return p
 
 
