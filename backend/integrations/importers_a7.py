@@ -259,7 +259,40 @@ def _solde(row):
     return solde
 
 
-def _ventiler(ctx, nature, numero, partner, solde, libelle):
+def _conversion(row, ctx, solde):
+    """(solde XAF, info devise) : une facture en devise est reprise pour sa contre-valeur XAF au cours connu à la date
+    de bascule (`comptabilite.devises.contre_valeur`) ; ligne rejetée si la devise n'a pas de cours à cette date."""
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    from comptabilite.devises import XAF, contre_valeur
+
+    code = _txt(row, "devise").upper()
+    if not code or code == XAF:
+        return solde, None
+    devise = _currency(code)
+    jour = _date_bascule(ctx)
+    try:
+        xaf, taux, provisoire = contre_valeur(solde, devise, jour)
+    except DjangoValidationError as exc:
+        raise LigneErreur(tr("devise %(code)s sans cours utilisable au %(jour)s (date de bascule) : %(motif)s")
+                          % {"code": code, "jour": f"{jour:%d/%m/%Y}", "motif": " ".join(exc.messages)})
+    return xaf, {"devise": devise, "montant": solde, "taux": taux, "provisoire": provisoire}
+
+
+def _mention_devise(info):
+    if not info:
+        return ""
+    return (f" — reste dû {info['montant']} {info['devise'].code} au cours {info['taux']}"
+            + (" (provisoire)" if info["provisoire"] else ""))
+
+
+def _xaf():
+    from referentiels.models import Currency
+
+    return Currency.objects.filter(code="XAF").first()
+
+
+def _ventiler(ctx, nature, numero, partner, solde, libelle, info=None):
     """Écriture OD de ventilation du solde repris : Dr 411 tiers / Cr 411 (client) ; Dr 401 / Cr 401 tiers
     (fournisseur). Le compte collectif sans tiers porte le total de la balance d'ouverture : l'écriture est neutre
     sur le solde du compte, elle rattache la créance / dette au tiers (balance âgée, lettrage, relances)."""
@@ -278,17 +311,24 @@ def _ventiler(ctx, nature, numero, partner, solde, libelle):
         label=libelle[:200], source="integrations", source_ref=f"reprise/{nature}/{numero}"[:60], created_by=ctx.user,
     )
     tiers_debit = nature == "client"
+    # Facture en devise : la ligne du tiers porte la devise, le reste dû en devise et le cours (réévaluation, lettrage).
+    extra = ({"currency": info["devise"], "amount_currency": info["montant"], "exchange_rate": info["taux"]}
+             if info else {})
     AccountMoveLine.objects.create(move=move, account=cpt, partner=partner, order=0, label=libelle[:200],
-                                   debit=solde if tiers_debit else ZERO, credit=ZERO if tiers_debit else solde)
+                                   debit=solde if tiers_debit else ZERO, credit=ZERO if tiers_debit else solde, **extra)
     AccountMoveLine.objects.create(move=move, account=cpt, partner=None, order=1, label=libelle[:200],
                                    debit=ZERO if tiers_debit else solde, credit=solde if tiers_debit else ZERO)
     return post_move(move, user=ctx.user)
 
 
-def _deja_reprise(move, solde, numero):
+def _deja_reprise(move, solde, numero, info=None):
     if move is None or not (move.source_ref or "").startswith("reprise/"):
         raise LigneErreur(tr("facture %(numero)s déjà saisie dans l'ERP : non reprise.") % {"numero": numero})
-    total = sum((l.debit for l in move.lines.all()), ZERO)
+    if info:  # rejeu d'une facture en devise : on compare le reste dû en devise (le cours a pu être corrigé)
+        solde = info["montant"]
+        total = sum((l.amount_currency or ZERO for l in move.lines.all() if l.currency_id), ZERO)
+    else:
+        total = sum((l.debit for l in move.lines.all()), ZERO)
     if total != solde:
         raise LigneErreur(tr("facture %(numero)s déjà reprise avec un solde de %(total)s : extournez la reprise avant de la recharger.") % {"numero": numero, "total": total})
     return "doublon"
@@ -300,21 +340,22 @@ def _factures_clients(row, ctx):
 
     numero = _req(row, "numero", 20)
     client = _partner(_req(row, "client"))
-    solde = _solde(row)
+    solde, info = _conversion(row, ctx, _solde(row))
     jour, echeance = _date(row, "date", obligatoire=True), _date(row, "echeance")
     existante = FactureClient.objects.filter(code=numero).select_related("move").first()
     if existante is not None:
         if existante.client_id != client.pk:
             raise LigneErreur(tr("facture %(numero)s déjà reprise pour un autre client.") % {"numero": numero})
-        return _deja_reprise(existante.move, solde, numero), numero
+        return _deja_reprise(existante.move, solde, numero, info), numero
     affaire = None
     if _txt(row, "affaire"):
         affaire = Affaire.objects.filter(code=_txt(row, "affaire")).first()
         if affaire is None:
             raise LigneErreur(tr("affaire inconnue : %(txt)s.") % {"txt": _txt(row, 'affaire')})
     origine = _dec(row, "montant_ttc")
-    objet = f"{NOTE_REPRISE} {_txt(row, 'objet')}".strip() + (f" (TTC d'origine {origine})" if origine else "")
-    move = _ventiler(ctx, "client", numero, client, solde, f"Reprise facture client {numero} — {client.name}")
+    objet = (f"{NOTE_REPRISE} {_txt(row, 'objet')}".strip() + (f" (TTC d'origine {origine})" if origine else "")
+             + _mention_devise(info))
+    move = _ventiler(ctx, "client", numero, client, solde, f"Reprise facture client {numero} — {client.name}", info)
     FactureClient.objects.create(
         code=numero, nature=FactureClient.Nature.FACTURE, statut=FactureClient.Statut.EMISE, client=client,
         affaire=affaire, objet=objet[:250], date=jour, echeance=echeance, montant_ht=solde, montant_tva=ZERO,
@@ -337,20 +378,24 @@ def _factures_fournisseurs(row, ctx):
 
     numero = _req(row, "numero", 100)
     fournisseur = _partner(_req(row, "fournisseur"))
-    solde = _solde(row)
+    solde, info = _conversion(row, ctx, _solde(row))
     jour = _date(row, "date", obligatoire=True)
     existante = PurchaseInvoice.objects.filter(supplier=fournisseur, invoice_ref=numero).select_related("move").first()
     cle = f"{fournisseur.code}/{numero}"
     if existante is not None:
-        return _deja_reprise(existante.move, solde, numero), cle
+        return _deja_reprise(existante.move, solde, numero, info), cle
     commande = _txt(row, "commande", 40)
-    move = _ventiler(ctx, "fournisseur", numero, fournisseur, solde, f"Reprise facture fournisseur {numero} — {fournisseur.name}")
+    move = _ventiler(ctx, "fournisseur", numero, fournisseur, solde,
+                     f"Reprise facture fournisseur {numero} — {fournisseur.name}", info)
     # BC technique (une facture fournisseur est toujours rattachée à un BC) : clôturé, reçu et facturé à 1.
     code_bc = "RPF-" + hashlib.sha1(cle.encode("utf-8")).hexdigest()[:12].upper()
     bc = PurchaseOrder.objects.create(
         code=code_bc, supplier=fournisseur, order_date=jour, status=PurchaseOrder.Status.CLOTUREE,
-        is_global_rental=fournisseur.is_global_rental, currency=_currency(_txt(row, "devise")), created_by=ctx.user,
-        notes=f"{NOTE_REPRISE} support technique de la facture {numero}" + (f" (commande d'origine {commande})" if commande else ""),
+        # Montants en XAF (contre-valeur à la date de bascule) : la devise d'origine figure dans les notes et l'écriture.
+        is_global_rental=fournisseur.is_global_rental, currency=_xaf() if info else _currency(_txt(row, "devise")),
+        created_by=ctx.user,
+        notes=(f"{NOTE_REPRISE} support technique de la facture {numero}"
+               + (f" (commande d'origine {commande})" if commande else "") + _mention_devise(info)),
     )
     ligne_bc = PurchaseOrderLine.objects.create(purchase_order=bc, label=f"Solde repris — facture {numero}"[:200],
                                                 quantity=1, unit_price=solde, received_qty=1)
@@ -365,7 +410,7 @@ def _factures_fournisseurs(row, ctx):
 
 # --------------------------------------------------------------------------------------------- catalogue
 GABARITS_A7 = [
-    Gabarit("habilitations_hse", "Habilitations HSE du personnel", "D09", "matricule + intitule", [
+    Gabarit("habilitations_hse", "Habilitations HSE du personnel", "D14", "matricule + intitule", [
         C("matricule", True, "Salarié déjà chargé", "EMP-0042"),
         C("intitule", True, "Doit contenir le mot-clé exigé par le type de permis", "Habilitation travail en hauteur"),
         C("type", False, "habilitation / permis / certificat / diplome", "habilitation"),
@@ -374,7 +419,7 @@ GABARITS_A7 = [
         C("notes"),
     ], _habilitations_hse, cercle="hse",
         note="Lues par le contrôle des permis de travail (aucun départ sans habilitation valide) ; échues = bloquantes."),
-    Gabarit("equipements_parc", "Équipements du parc (M4) et compteur initial", "D07", "code", [
+    Gabarit("equipements_parc", "Équipements du parc (M4) et compteur initial", "D15", "code", [
         C("code", True, "Code équipement (20 car.)", "PAR-GRUE-01"), C("libelle", True, "", "Grue mobile 50 t"),
         C("immatriculation", False, "Immatriculation / n° série", "GA-1234-AB"),
         C("categorie", False, "engin / levage / transport / atelier / materiel", "levage"),
@@ -385,11 +430,11 @@ GABARITS_A7 = [
         C("signe_618", False, "oui / non (défaut = global_rental)", ""),
     ], _equipements_parc, cercle="parc",
         note="Le compteur est historisé (jamais à la baisse) ; un équipement GR exige un propriétaire GLOBAL RENTAL (618)."),
-    Gabarit("releves_compteurs", "Historique des compteurs du parc", "D07", "equipement + date + valeur", [
+    Gabarit("releves_compteurs", "Historique des compteurs du parc", "D15", "equipement + date + valeur", [
         C("equipement", True, "Code équipement du parc", "PAR-GRUE-01"), C("date", True, "AAAA-MM-JJ", "2026-11-30"),
         C("valeur", True, "Heures / km", "1180"), C("commentaire"),
     ], _releves_compteurs, cercle="parc", note="Lignes dans l'ordre chronologique : un relevé plus ancien ou plus bas est refusé."),
-    Gabarit("actifs_maintenance", "Actifs de maintenance (machines, engins) et compteurs", "D07", "code", [
+    Gabarit("actifs_maintenance", "Actifs de maintenance (machines, engins) et compteurs", "D15", "code", [
         C("code", True, "Code actif (20 car.)", "EQ-POSTE-07"), C("designation", True, "", "Poste de soudage TIG"),
         C("categorie", False, "machine / engin / levage / atelier / chantier / outillage", "machine"),
         C("statut", False, "operationnel / en_panne / hors_service (création)", "operationnel"),
@@ -398,7 +443,7 @@ GABARITS_A7 = [
         C("compteur_type", False, "heures / km / aucun", "heures"), C("compteur", False, "Valeur actuelle", "830"),
         C("equipement_gr", False, "Code équipement du parc GR lié", ""),
     ], _actifs_maintenance, cercle="parc", note="Compteur jamais à la baisse ; un actif lié à un équipement GR lit son compteur en logistique."),
-    Gabarit("commandes_ouvertes", "Commandes d'achat ouvertes (BC non soldés)", "D12", "numero + designation", [
+    Gabarit("commandes_ouvertes", "Commandes d'achat ouvertes (BC non soldés)", "D07", "numero + designation", [
         C("numero", True, "N° BC source (20 car.)", "BC-SAGE-0193"), C("fournisseur", True, "Code tiers", "FRS-001"),
         C("date", True, "AAAA-MM-JJ", "2026-11-15"), C("livraison_prevue", False, "AAAA-MM-JJ", ""),
         C("devise", False, "", "XAF"), C("affaire", False, "Code affaire (imputation M11)", ""),
@@ -408,17 +453,23 @@ GABARITS_A7 = [
         C("prix_unitaire", False, "", "125000"), C("quantite_recue", False, "Déjà reçue dans le système source", "10"),
     ], _commandes_ouvertes,
         note="BC confirmé (réception partielle si quantité reçue) ; les réceptions suivantes se font dans l'ERP."),
-    Gabarit("factures_clients_ouvertes", "Factures clients ouvertes (créances non soldées)", "D11", "numero", [
+    Gabarit("factures_clients_ouvertes", "Factures clients ouvertes (créances non soldées)", "D12", "numero", [
         C("numero", True, "N° facture (20 car.)", "FA-2026-0412"), C("client", True, "Code tiers", "CLI-001"),
         C("date", True, "Date de facture AAAA-MM-JJ", "2026-10-20"), C("echeance", False, "AAAA-MM-JJ", "2026-12-19"),
-        C("solde", True, "Reste dû TTC (FCFA)", "2360000"), C("montant_ttc", False, "TTC d'origine (information)", "2360000"),
-        C("affaire", False, "Code affaire", ""), C("objet"),
+        C("solde", True, "Reste dû TTC, dans la devise de la facture", "2360000"),
+        C("montant_ttc", False, "TTC d'origine (information)", "2360000"),
+        C("affaire", False, "Code affaire", ""), C("objet"), C("devise", False, "Code devise (vide = XAF)", "XAF"),
     ], _factures_clients, options=("date",),
-        note="Date = date de bascule. Solde ventilé 411 sans tiers → 411 du client (neutre sur la balance d'ouverture)."),
-    Gabarit("factures_fournisseurs_ouvertes", "Factures fournisseurs ouvertes (dettes non soldées)", "D11", "fournisseur + numero", [
+        note="Date = date de bascule. Solde ventilé 411 sans tiers → 411 du client (neutre sur la balance d'ouverture). "
+             "Facture en devise : contre-valeur XAF au cours connu à la date de bascule (Comptabilité → cours de "
+             "change) ; ligne rejetée sans cours."),
+    Gabarit("factures_fournisseurs_ouvertes", "Factures fournisseurs ouvertes (dettes non soldées)", "D12", "fournisseur + numero", [
         C("numero", True, "N° facture du fournisseur", "F-88213"), C("fournisseur", True, "Code tiers", "FRS-001"),
-        C("date", True, "Date de facture AAAA-MM-JJ", "2026-11-02"), C("solde", True, "Reste dû TTC (FCFA)", "1180000"),
-        C("commande", False, "N° de commande d'origine (information)", ""), C("devise", False, "", "XAF"),
+        C("date", True, "Date de facture AAAA-MM-JJ", "2026-11-02"),
+        C("solde", True, "Reste dû TTC, dans la devise de la facture", "1180000"),
+        C("commande", False, "N° de commande d'origine (information)", ""),
+        C("devise", False, "Code devise (vide = XAF)", "XAF"),
     ], _factures_fournisseurs, options=("date",),
-        note="Date = date de bascule. Solde ventilé 401 → 401 du fournisseur ; facture comptabilisée prête au paiement."),
+        note="Date = date de bascule. Solde ventilé 401 → 401 du fournisseur ; facture comptabilisée prête au paiement. "
+             "Facture en devise : contre-valeur XAF au cours connu à la date de bascule ; ligne rejetée sans cours."),
 ]

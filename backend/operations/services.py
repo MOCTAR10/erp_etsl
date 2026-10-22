@@ -43,6 +43,7 @@ OPERATION_AMOUNT_ROLES = (
     User.Role.FINANCE,
     User.Role.COMPTABLE,
     User.Role.DIRECTION,
+    User.Role.CHARGE_AFFAIRES,  # lot a9 : montants des OF / situations de ses affaires
 )
 
 

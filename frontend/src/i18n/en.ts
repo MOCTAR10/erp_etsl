@@ -515,6 +515,12 @@ export const en = {
       confirmConfirmer: "Confirm this value for ETSL?",
     },
   },
+  ecarts_a9: {
+    c2Tiers: "C2 source by third party (SAGE aged balance)",
+    c2TiersAide: "One line per third party: code;balance, as debit − credit (customer positive, supplier negative). Without a C2 total, the source total is the sum of third parties; a gap on a single third party flags C2.",
+    c2Titre: "C2 — 401 + 411 balance by third party",
+    tiers: "Third party",
+  },
   securite: {
     title: "Security & delegations",
     mfa: "Two-step verification",
@@ -824,7 +830,7 @@ export const en = {
     provision: {
       title: "Provisions for unrealised exchange losses (697 / 499)",
       subtitle:
-        "Booked by “Revalue all” when translation differences show a net loss; reversed at the next run. Parameter DEVISE_PROVISION_PERTE (1 = enabled).",
+        "Booked by “Revalue all open documents” when translation differences show a net loss; reversed at the next run. Parameter DEVISE_PROVISION_PERTE (1 = enabled).",
       vide: "No provision booked.",
       date: "Closing",
       pertes: "Unrealised losses",

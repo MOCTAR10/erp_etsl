@@ -6236,3 +6236,125 @@ msgstr "created_on"
 
 msgid "retention_fin"
 msgstr "retention_end"
+
+# ── Lot a8 : messages du lot a9 (reprise : devise sans cours, contrôles C1-C10, export CSV) ──
+#, python-format
+msgid "devise %(code)s sans cours utilisable au %(jour)s (date de bascule) : %(motif)s"
+msgstr "currency %(code)s has no usable exchange rate on %(jour)s (cut-over date): %(motif)s"
+
+#, python-format
+msgid "Solde 411 (clients) %(s411)s ; solde 401 (fournisseurs) %(s401)s (débit − crédit). %(nb_tiers)s tiers porteurs d'un solde ; part non ventilée par tiers (compte collectif) %(non_ventile)s."
+msgstr "Balance 411 (customers) %(s411)s; balance 401 (suppliers) %(s401)s (debit − credit). %(nb_tiers)s third parties with a balance; part not broken down by third party (control account) %(non_ventile)s."
+
+#, python-format
+msgid " Comparaison par tiers : %(nb_ecarts)s tiers en écart."
+msgstr " Comparison by third party: %(nb_ecarts)s third party(ies) with a discrepancy."
+
+#, python-format
+msgid "%(n)s lignes de stock (dépôt × article × lot)."
+msgstr "%(n)s stock lines (warehouse × item × batch)."
+
+#, python-format
+msgid "Valorisation stock %(valeur)s ; solde comptes de stock (classe 3) %(compta)s ; écart %(valeur2)s."
+msgstr "Stock valuation %(valeur)s; stock accounts balance (class 3) %(compta)s; difference %(valeur2)s."
+
+#, python-format
+msgid "Par catégorie : %(valeur)s."
+msgstr "By category: %(valeur)s."
+
+#, python-format
+msgid "%(nb_par_salarie)s salariés repris, %(incomplets)s avec moins de %(profondeur)s mois d'historique."
+msgstr "%(nb_par_salarie)s employees migrated, %(incomplets)s with less than %(profondeur)s months of history."
+
+#, python-format
+msgid "%(tiers)s tiers, %(articles)s articles."
+msgstr "%(tiers)s third parties, %(articles)s items."
+
+#, python-format
+msgid "%(wps)s WPS / WPQR, %(count)s soudeurs, %(qualifs)s qualifications (dont %(expirees)s échues)."
+msgstr "%(wps)s WPS / WPQR, %(count)s welders, %(qualifs)s qualifications (of which %(expirees)s expired)."
+
+#, python-format
+msgid "%(nb)s documents repris ; %(alterees)s sans version intègre."
+msgstr "%(nb)s documents migrated; %(alterees)s without an intact version."
+
+#, python-format
+msgid "Contrôle"
+msgstr "Check"
+
+#, python-format
+msgid "Valeur ERP"
+msgstr "ERP value"
+
+#, python-format
+msgid "Valeur source"
+msgstr "Source value"
+
+#, python-format
+msgid "Valideur"
+msgstr "Approver"
+
+#, python-format
+msgid "Visa"
+msgstr "Approval"
+
+# ── Lot a8 : libellés des contrôles de reprise et statuts ──
+msgid "Balance d'ouverture = balance SAGE (total débit)"
+msgstr "Opening balance = SAGE trial balance (total debit)"
+
+msgid "Pièces ouvertes : solde net 401 + 411, total et par tiers"
+msgstr "Open items: net balance 401 + 411, total and by third party"
+
+msgid "Quantités de stock (toutes lignes dépôt × article × lot)"
+msgstr "Stock quantities (all warehouse × item × batch lines)"
+
+msgid "Valeur de stock = comptes de stock (classe 3) en balance"
+msgstr "Stock value = stock accounts (class 3) in the trial balance"
+
+msgid "Effectifs actifs (en poste + congé / rotation)"
+msgstr "Active headcount (on duty + leave / rotation)"
+
+msgid "Paie : nombre de salariés-mois repris"
+msgstr "Payroll: number of employee-months migrated"
+
+msgid "Référentiels : tiers + articles chargés"
+msgstr "Master data: third parties + items loaded"
+
+msgid "Qualité : WPS / WPQR + qualifications soudeurs"
+msgstr "Quality: WPS / WPQR + welder qualifications"
+
+msgid "GED : documents repris (empreinte SHA-256 vérifiée)"
+msgstr "EDMS: documents migrated (SHA-256 fingerprint checked)"
+
+msgid "Échantillonnage aléatoire par objet"
+msgstr "Random sampling by object"
+
+msgid "DAF + commissaire aux comptes"
+msgstr "CFO + statutory auditor"
+
+msgid "DAF"
+msgstr "CFO"
+
+msgid "Responsable magasin"
+msgstr "Store manager"
+
+msgid "DRH"
+msgstr "HR Director"
+
+msgid "Référent du domaine"
+msgstr "Domain lead"
+
+msgid "QA/QC"
+msgstr "QA/QC"
+
+msgid "Juridique"
+msgstr "Legal"
+
+msgid "Conforme"
+msgstr "Compliant"
+
+msgid "Valeur source à saisir"
+msgstr "Source value to enter"
+
+msgid "À contrôler"
+msgstr "To be checked"

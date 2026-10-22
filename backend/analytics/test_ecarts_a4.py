@@ -137,7 +137,8 @@ class EtatEndpointTests(TestCase):
         cg = User.objects.create_user(email="cg@t.local", password="x" * 12, role="controleur_gestion")
         self.client.force_authenticate(cg)
         self.assertEqual(self.client.get("/api/analytics/pilotage/").status_code, 200)
-        self.assertEqual(self.client.post("/api/analytics/cubes/alimenter/", {}, format="json").status_code, 403)
+        # Lot a9 : le CG est dans le cercle d ecriture M11 (budgets, visa CG) et peut donc alimenter les cubes.
+        self.assertNotEqual(self.client.post("/api/analytics/cubes/alimenter/", {}, format="json").status_code, 403)
         ca = User.objects.create_user(email="ca@t.local", password="x" * 12, role="charge_affaires")
         self.client.force_authenticate(ca)
         self.assertEqual(self.client.get("/api/analytics/pilotage/").status_code, 403)

@@ -515,6 +515,12 @@ export const fr = {
       confirmConfirmer: "Confirmer cette valeur pour ETSL ?",
     },
   },
+  ecarts_a9: {
+    c2Tiers: "Source C2 par tiers (balance âgée SAGE)",
+    c2TiersAide: "Une ligne par tiers : code;solde, en débit − crédit (client positif, fournisseur négatif). Sans total C2 saisi, le total source est la somme des tiers ; un écart sur un seul tiers met C2 en écart.",
+    c2Titre: "C2 — solde 401 + 411 par tiers",
+    tiers: "Tiers",
+  },
   securite: {
     title: "Sécurité & délégations",
     mfa: "Vérification en deux étapes",
@@ -824,7 +830,7 @@ export const fr = {
     provision: {
       title: "Provisions pour perte de change latente (697 / 499)",
       subtitle:
-        "Dotée par « Réévaluer tout » quand les écarts de conversion font apparaître une perte nette ; contre-passée au calcul suivant. Paramètre DEVISE_PROVISION_PERTE (1 = activé).",
+        "Dotée par « Réévaluer toutes les pièces ouvertes » quand les écarts de conversion font apparaître une perte nette ; contre-passée au calcul suivant. Paramètre DEVISE_PROVISION_PERTE (1 = activé).",
       vide: "Aucune provision constatée.",
       date: "Clôture",
       pertes: "Pertes latentes",
