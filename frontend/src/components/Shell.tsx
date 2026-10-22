@@ -5,6 +5,7 @@ import {
   Calculator,
   CircleUser,
   FileSignature,
+  FileUp,
   Filter,
   GitBranch,
   HardHat,
@@ -60,7 +61,11 @@ const PILOT_NAV: NavItem[] = [
   { to: "/terrain", key: "nav.terrain", Icon: Smartphone },
   { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
   { to: "/securite", key: "nav.securite", Icon: KeyRound },
+  { to: "/reprise", key: "ecarts_import.nav", Icon: FileUp },
 ];
+
+/** Reprise de données (CDC §10) : cercle de l'API d'import + RH (salariés, paie) + QA/QC (qualité) + cercle paie. */
+const REPRISE_ROLES = new Set(["admin", "comptable", "finance", "direction", "rh", "qaqc", "pdg", "dga"]);
 
 const MODULE_NAV: ModuleNavItem[] = [
   { to: "/pipeline", key: "nav.pipeline", Icon: Filter, app: ROUTE_APP["/pipeline"] },
@@ -108,6 +113,11 @@ export function Shell() {
     navigate("/login", { replace: true });
   };
 
+  const pilotNav = useMemo(
+    () => PILOT_NAV.filter(({ to }) => to !== "/reprise" || REPRISE_ROLES.has(user?.role ?? "")),
+    [user?.role],
+  );
+
   const visibleModules = useMemo(
     () => MODULE_NAV.filter(({ app }) => canSeeApp(user?.modules, app)),
     [user?.modules],
@@ -124,7 +134,7 @@ export function Shell() {
   // Palette de commandes : pages (déjà filtrées par rôle) + actions rapides.
   const paletteItems = useMemo<PaletteItem[]>(
     () => [
-      ...[...PILOT_NAV, ...visibleModules].map(({ to, key, Icon }) => ({
+      ...[...pilotNav, ...visibleModules].map(({ to, key, Icon }) => ({
         id: `go${to === "/" ? "-home" : to.replace(/\//g, "-")}`,
         label: t(key),
         group: t("palette.pages"),
@@ -180,7 +190,7 @@ export function Shell() {
           <nav className="sidebar-scroll" aria-label={t("common.mainNav")}>
             <div className="nav-group">
               <span className="nav-group-label">{t("nav.groupPilotage")}</span>
-              {renderNav(PILOT_NAV)}
+              {renderNav(pilotNav)}
             </div>
             <div className="nav-group">
               <span className="nav-group-label">{t("nav.groupModules")}</span>
