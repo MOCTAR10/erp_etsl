@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { CoutMainOeuvreSection } from "../components/rhpaie/EcartsM9bSection";
 import { EcartsM3Section } from "../components/operations/EcartsM3Section";
+import { ConsommationOfSection } from "../components/operations/ConsommationOfSection";
 import { FluxM4Section } from "../components/suivi/SuiviSections";
 import { useState } from "react";
 import { Clock3, Construction, Factory, HardHat } from "lucide-react";
@@ -379,6 +380,7 @@ export function OperationsPage() {
         </SectionCard>
       <CoutMainOeuvreSection />
       <EcartsM3Section />
+      <ConsommationOfSection />
       <FluxM4Section />
     </>
   );

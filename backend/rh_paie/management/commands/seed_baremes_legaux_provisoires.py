@@ -78,6 +78,11 @@ PARAMETRES = [
      "Valeur par défaut ERP (alerte dès le dépassement)", "Seuil de tolérance ETSL à confirmer"),
     ("MAJ_NUIT", "Majoration des heures de nuit (à saisir par ETSL)", "0", "%", "Aucune référence légale gabonaise trouvée (Code du travail, convention collective) — taux à saisir par ETSL", "0 % = prime non valorisée tant qu'ETSL n'a pas saisi le taux (convention collective à fournir)"),
     ("MAJ_ASTREINTE", "Majoration des heures d'astreinte (à saisir par ETSL)", "0", "%", "Aucune référence légale gabonaise trouvée (Code du travail, convention collective) — taux à saisir par ETSL", "0 % = prime non valorisée tant qu'ETSL n'a pas saisi le taux (convention collective à fournir)"),
+    ("PRIME_CHANTIER_JOUR", "Prime de chantier par jour pointé sur un OF de chantier (à saisir par ETSL)", "0", "FCFA",
+     "Aucune référence : règle interne ETSL (convention collective / accord d'entreprise) à fournir",
+     "0 = prime non versée tant qu'ETSL n'a pas saisi le montant journalier"),
+    ("PRIME_CHANTIER_SEUIL_H", "Prime de chantier : heures minimales pointées dans la journée", "4", "h",
+     "Valeur par défaut ERP (demi-journée)", "Règle d'ouverture du droit à la prime de chantier à confirmer"),
     ("CNAMGS_PENALITE_DEFAUT", "CNAMGS — majoration pour défaut de déclaration", "25", "%", CNAMGS, CNAMGS_REF),
     ("CNAMGS_PENALITE_RETARD", "CNAMGS — majoration pour paiement tardif", "2", "%", CNAMGS, CNAMGS_REF),
 ]

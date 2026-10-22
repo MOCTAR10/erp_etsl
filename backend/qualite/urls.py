@@ -32,6 +32,7 @@ from .views_systeme import (
 )
 
 from .views_m6m7 import OrganismeAgreeViewSet, WpsRequisViewSet
+from .ecarts_a3 import CoutNonQualiteViewSet
 
 router = DefaultRouter()
 router.register("soudeurs", SoudeurViewSet, basename="soudeurs")
@@ -62,6 +63,7 @@ router.register("competences", CompetencesQualiteViewSet, basename="competences-
 # Écarts M6 (lot ecarts-m6m7)
 router.register("organismes-agrees", OrganismeAgreeViewSet, basename="organismes-agrees")
 router.register("wps-requis", WpsRequisViewSet, basename="wps-requis")
+router.register("couts-non-qualite", CoutNonQualiteViewSet, basename="couts-non-qualite")
 
 urlpatterns = [
     path("", include(router.urls)),

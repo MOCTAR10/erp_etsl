@@ -8,7 +8,13 @@
  * Règles de synchronisation :
  * - succès → retiré de la file ;
  * - erreur réseau, 401 (session expirée), 5xx → on s'arrête, tout est conservé (on réessaiera) ;
+ * - 409 (conflit : saisie trop ancienne, doublon, mesure plus récente au serveur) → marqué « conflit » ; l'utilisateur
+ *   choisit « Forcer » (renvoi avec `forcer`) ou « Abandonner » ;
  * - autre 4xx (validation, droits) → marqué « échec » avec le message du serveur, la suite continue.
+ *
+ * Une saisie peut dépendre d'une autre (`dependsOn`, ex. photo d'un permis créé hors ligne) : elle attend l'envoi de
+ * sa parente, puis `{ref}` (chemin et corps) est remplacé par l'identifiant renvoyé par le serveur.
+ * Les pièces (photos) sont gardées sur l'appareil (Blob en IndexedDB) et envoyées en multipart.
  *
  * Chaque saisie appartient à l'utilisateur qui l'a faite (`owner`) : après une déconnexion, les saisies en
  * attente restent sur l'appareil mais ne sont synchronisées que par leur auteur (jamais sous l'identité du
@@ -22,10 +28,33 @@ export interface QueuedRequest {
   path: string;
   body: unknown;
   label: string;
-  createdAt: string;
-  status: "pending" | "failed";
+  createdAt: string; // horodatage de la saisie sur l'appareil (transmis au serveur : `saisi_le`)
+  status: "pending" | "failed" | "conflict";
   attempts: number;
   error?: string;
+  files?: QueuedFile[];
+  dependsOn?: string; // clé d'idempotence de la saisie parente
+  force?: boolean; // conflit levé par l'utilisateur : renvoi avec `forcer`
+}
+
+export interface QueuedFile {
+  field: string;
+  name: string;
+  type: string;
+  blob: Blob;
+}
+
+export const REF = "{ref}";
+
+/** Remplace `{ref}` (chemin et valeurs texte du corps) par l'identifiant de la saisie parente. */
+export function resolveRef(item: QueuedRequest, ref: string): QueuedRequest {
+  const body =
+    item.body && typeof item.body === "object"
+      ? Object.fromEntries(
+          Object.entries(item.body as Record<string, unknown>).map(([k, v]) => [k, v === REF ? ref : v]),
+        )
+      : item.body;
+  return { ...item, path: item.path.split(REF).join(ref), body, dependsOn: undefined };
 }
 
 export interface QueueStorage {
@@ -38,6 +67,7 @@ export interface QueueStorage {
 export interface FlushResult {
   sent: number;
   failed: number;
+  conflicts?: number;
   remaining: number;
   stopped: boolean;
 }
@@ -107,9 +137,10 @@ export function idbStorage(dbName = "etls-offline"): QueueStorage {
   };
 }
 
-export function createQueue(storage: QueueStorage, send: (item: QueuedRequest) => Promise<void>) {
+export function createQueue(storage: QueueStorage, send: (item: QueuedRequest) => Promise<unknown>) {
   const listeners = new Set<() => void>();
   let flushing: Promise<FlushResult> | null = null;
+  let lastSync: string | null = null;
   const notify = () => listeners.forEach((l) => l());
 
   const list = async (owner?: string) =>
@@ -120,6 +151,8 @@ export function createQueue(storage: QueueStorage, send: (item: QueuedRequest) =
     path: string;
     body: unknown;
     label: string;
+    files?: QueuedFile[];
+    dependsOn?: string;
   }): Promise<QueuedRequest> {
     const item = await storage.add({
       owner: input.owner,
@@ -130,6 +163,8 @@ export function createQueue(storage: QueueStorage, send: (item: QueuedRequest) =
       createdAt: new Date().toISOString(),
       status: "pending",
       attempts: 0,
+      ...(input.files?.length ? { files: input.files } : {}),
+      ...(input.dependsOn ? { dependsOn: input.dependsOn } : {}),
     });
     notify();
     return item;
@@ -138,12 +173,27 @@ export function createQueue(storage: QueueStorage, send: (item: QueuedRequest) =
   async function run(owner: string): Promise<FlushResult> {
     let sent = 0;
     let failed = 0;
+    let conflicts = 0;
     let stopped = false;
-    for (const item of await list(owner)) {
+    const snapshot = await list(owner);
+    const waiting = new Set(snapshot.map((i) => i.key));
+    const resolved = new Map<string, string>();
+    for (let item of snapshot) {
       if (item.status !== "pending") continue;
+      if (item.dependsOn) {
+        const ref = resolved.get(item.dependsOn);
+        if (ref === undefined && waiting.has(item.dependsOn)) continue; // la parente n'est pas encore au serveur
+        if (ref !== undefined) {
+          item = resolveRef(item, ref);
+          await storage.update(item);
+        }
+      }
       try {
-        await send(item);
+        const res = await send(item);
         await storage.remove(item.id);
+        waiting.delete(item.key);
+        const id = (res as { id?: unknown } | null | undefined)?.id;
+        if (id !== undefined && id !== null) resolved.set(item.key, String(id));
         sent++;
       } catch (err) {
         const status = (err as { status?: number } | null)?.status;
@@ -151,19 +201,21 @@ export function createQueue(storage: QueueStorage, send: (item: QueuedRequest) =
         await storage.update({
           ...item,
           attempts: item.attempts + 1,
-          status: retryable ? "pending" : "failed",
+          status: retryable ? "pending" : status === 409 ? "conflict" : "failed",
           error: retryable ? undefined : describeError(err),
         });
         if (retryable) {
           stopped = true;
           break;
         }
-        failed++;
+        if (status === 409) conflicts++;
+        else failed++;
       }
     }
     const remaining = (await list(owner)).length;
+    if (!stopped) lastSync = new Date().toISOString();
     notify();
-    return { sent, failed, remaining, stopped };
+    return { sent, failed, conflicts, remaining, stopped };
   }
 
   const flush = (owner: string) => {
@@ -182,10 +234,21 @@ export function createQueue(storage: QueueStorage, send: (item: QueuedRequest) =
       if (item) await storage.update({ ...item, status: "pending", error: undefined });
       notify();
     },
-    async discard(id: number) {
-      await storage.remove(id);
+    /** Conflit : l'utilisateur confirme sa saisie (renvoyée avec `forcer`, même clé d'idempotence). */
+    async force(id: number) {
+      const item = (await storage.getAll()).find((i) => i.id === id);
+      if (item) await storage.update({ ...item, status: "pending", error: undefined, force: true });
       notify();
     },
+    /** Abandon d'une saisie : ses saisies dépendantes (photos) sont abandonnées avec elle. */
+    async discard(id: number) {
+      const all = await storage.getAll();
+      const item = all.find((i) => i.id === id);
+      await storage.remove(id);
+      if (item) for (const child of all.filter((i) => i.dependsOn === item.key)) await storage.remove(child.id);
+      notify();
+    },
+    lastSyncAt: () => lastSync,
     subscribe(cb: () => void) {
       listeners.add(cb);
       return () => void listeners.delete(cb);

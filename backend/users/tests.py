@@ -155,6 +155,8 @@ class SeedDemoUsersTests(TestCase):
                 "logistique@etls.local",
                 "maintenance@etls.local",
                 "atelier@etls.local",
+                "affaires@etls.local",
+                "cg@etls.local",
                 "direction@etls.local",
                 "service@etls.local",
                 "compta@etls.local",

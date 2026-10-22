@@ -9,6 +9,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
+from config.filtres_vues import FiltresMulticriteresMixin
+
 from .audit import log_audit, request_ip
 from .signatures import document_officiel_signe
 from .models import (
@@ -203,25 +205,26 @@ class DossierViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_200_OK)
 
 
-class DocumentViewSet(viewsets.ModelViewSet):
+class DocumentViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
     queryset = Document.objects.select_related(
         "current_version", "type", "dossier", "created_by"
     )
     permission_classes = [DocumentPermission]
     http_method_names = ["get", "post", "patch", "delete"]
+    # EX-G-09 : critères combinables (`config/filtres.py`) ; jamais `amount` (montant masqué RF-59).
+    champs_filtrables = (
+        "status", "type", "dossier", "document_date", "created_at", "archived_at",
+        "counterparty", "project", "reference",
+    )
+    libelles_filtres = {"created_at": "Créé le"}
 
     def get_queryset(self):
         queryset = visible_documents(self.request.user)
 
-        # Filtres facettes (RF-23/26) : type, statut, dossier, année.
+        # Filtres facettes (RF-23/26) : type, statut, dossier = filtre multicritère (`champs_filtrables`, valeurs
+        # validées : 400 au lieu de 500) ; année ici.
         params = self.request.query_params
-        if doc_type := params.get("type"):
-            queryset = queryset.filter(type_id=doc_type)
-        if doc_status := params.get("status"):
-            queryset = queryset.filter(status=doc_status)
-        if dossier := params.get("dossier"):
-            queryset = queryset.filter(dossier_id=dossier)
-        if year := params.get("year"):
+        if (year := params.get("year", "")).isdigit():
             queryset = queryset.filter(document_date__year=year)
 
         # Recherche full-text (RF-23/26/27) : classée par pertinence.
@@ -236,8 +239,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def facets(self, request):
-        """Compteurs par statut, type et année sur la sélection (RF-23/26)."""
-        base = self.get_queryset()
+        """Compteurs par statut, type et année sur la sélection (RF-23/26) — mêmes critères que la liste."""
+        base = self.filter_queryset(self.get_queryset())
         return Response(
             {
                 "total": base.count(),
@@ -444,9 +447,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 "Document verrouillé (check-out) par un autre utilisateur (RF-44)."
             )
 
-        uploaded = serializer.validated_data["file"]
+        from .parametres import preparer_fichier
         from .serializers import compute_sha256
 
+        uploaded, pdfa_statut, pdfa_norme = preparer_fichier(serializer.validated_data["file"])
         sha256 = compute_sha256(uploaded)
         last = document.versions.order_by("-number").first()
         version = Version.objects.create(
@@ -458,6 +462,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
             original_filename=uploaded.name,
             note=serializer.validated_data.get("note", ""),
             created_by=request.user,
+            pdfa_statut=pdfa_statut,
+            pdfa_norme=pdfa_norme,
         )
         document.current_version = version
         document.sha256 = sha256

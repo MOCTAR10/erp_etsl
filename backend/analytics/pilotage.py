@@ -313,7 +313,7 @@ def controler_seuils_budgetaires():
 # ---------------------------------------------------------------------------------------------------------------------
 DBT_MODELS = Path(__file__).resolve().parents[2] / "dbt" / "models"
 # Date d'exécution recalculée à chaque passage : exclue de l'empreinte (sinon une version par jour).
-COLONNES_VOLATILES = {"as_of_date"}
+COLONNES_VOLATILES = {"as_of_date", "rafraichi_le"}
 MARTS_FINANCIERS = {"dm_couts_m10", "dm_marges_m11", "dm_pipe_affaires"}
 _SOURCE = re.compile(r'\{\{\s*source\(\s*["\']etls_replica["\']\s*,\s*["\'](\w+)["\']\s*\)\s*\}\}')
 _REF = re.compile(r'\{\{\s*ref\(\s*["\'](\w+)["\']\s*\)\s*\}\}')

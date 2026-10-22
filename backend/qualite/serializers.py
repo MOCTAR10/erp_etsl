@@ -139,6 +139,7 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
             "notes", "created_by", "created_by_name", "created_at", "updated_at",
             "points", "points_arret_restants", "methode_cnd", "instrument", "instrument_code",
             "approuve_par", "approuve_le", "images_count", "mesures", "organisme_agree", "organisme_agree_nom",
+            "saisi_le",
         ]
         read_only_fields = [
             "code", "created_by", "points", "points_arret_restants", "approuve_par", "approuve_le", "images_count",
@@ -148,6 +149,11 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
     instrument_code = serializers.CharField(source="instrument.code", read_only=True, default=None)
     organisme_agree_nom = serializers.CharField(source="organisme_agree.nom", read_only=True, default=None)
     images_count = serializers.SerializerMethodField()
+
+    def validate_saisi_le(self, value):
+        from operations.terrain_a3 import verifier_saisi_le
+
+        return verifier_saisi_le(value)
     mesures = serializers.SerializerMethodField()
     points = serializers.SerializerMethodField()
     points_arret_restants = serializers.SerializerMethodField()
@@ -377,14 +383,21 @@ class JointSoudeSerializer(serializers.ModelSerializer):
     ordre_code = serializers.CharField(source="ordre.code", read_only=True, default=None)
     soudeur_nom = serializers.CharField(source="soudeur.display_name", read_only=True)
     wps_code = serializers.CharField(source="wps.code", read_only=True, default=None)
+    lot_code = serializers.CharField(source="lot.code", read_only=True, default=None)
+    certificats = serializers.SerializerMethodField()
 
     class Meta:
         model = JointSoude
         fields = [
             "id", "code", "ordre", "ordre_code", "repere", "soudeur", "soudeur_nom", "wps", "wps_code",
-            "numero_coulee", "consommable", "poste", "date_soudage", "created_at",
+            "numero_coulee", "lot", "lot_code", "certificats", "consommable", "poste", "date_soudage", "created_at",
         ]
         read_only_fields = ["code"]
+
+    def get_certificats(self, obj):
+        from .ecarts_a3 import certificats_lot
+
+        return certificats_lot(obj.lot)
 
     def validate(self, attrs):
         # ITP approuvé avant soudage ; soudeur qualifié (CDC §8.11).
@@ -414,7 +427,9 @@ class JointSoudeSerializer(serializers.ModelSerializer):
                 f"Qualification du soudeur hors domaine du WPS {wps.code} "
                 f"(procédé {wps.get_procede_display()}, position {wps.position or '—'})."
             )})
-        return attrs
+        from .ecarts_a3 import controler_lot_joint
+
+        return controler_lot_joint(attrs)  # M5 → M6 : lot / coulée / certificats (règle provisoire)
 
 
 class ImageControleSerializer(serializers.ModelSerializer):

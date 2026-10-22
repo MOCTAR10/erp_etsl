@@ -92,6 +92,8 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    # EX-G-07 : messages des réponses API traduits en anglais si la requête est en anglais (catalogue `locale/`).
+    "config.i18n.TraductionReponsesMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -167,7 +169,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardPagination",
     "PAGE_SIZE": 20,
-    "DEFAULT_FILTER_BACKENDS": ["rest_framework.filters.SearchFilter"],
+    # EX-G-09 : filtre multicritère générique, inerte tant qu'une vue ne déclare pas `champs_filtrables`.
+    "DEFAULT_FILTER_BACKENDS": ["rest_framework.filters.SearchFilter", "config.filtres.FiltreMulticritere"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "config.exceptions.drf_exception_handler",
     # Protection brute-force / abus : limites par IP (anonyme) et par utilisateur.
@@ -212,6 +215,18 @@ LANGUAGE_CODE = "fr-fr"
 LANGUAGES = [("fr", "Français"), ("en", "English")]
 TIME_ZONE = "Africa/Libreville"
 USE_I18N = True
+# Catalogue des traductions du serveur (msgid = texte français) : `python manage.py compiler_traductions`.
+LOCALE_PATHS = [BASE_DIR / "locale"]
+
+# ── PDF/A (EX-G-08) : post-traitement Ghostscript des PDF versés en GED et des exports ──
+PDFA_ACTIF = env.bool("PDFA_ACTIF", default=True)
+GHOSTSCRIPT_BIN = env("GHOSTSCRIPT_BIN", default="gs")
+PDFA_ICC_PROFILE = env("PDFA_ICC_PROFILE", default="")
+PDFA_TIMEOUT_S = env.int("PDFA_TIMEOUT_S", default=120)
+
+# ── Sonde /api/health/ : dépendances vérifiées en plus de la base (503 si l'une est en échec) ──
+HEALTH_CHECK_S3 = env.bool("HEALTH_CHECK_S3", default=False)
+HEALTH_CHECK_REDIS = env.bool("HEALTH_CHECK_REDIS", default=False)
 USE_TZ = True
 
 # ── Static / media ──

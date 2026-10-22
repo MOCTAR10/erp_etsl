@@ -24,10 +24,16 @@ from .services import can_read_document, can_write_document, is_admin_or_staff
 class SignerSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     email = serializers.EmailField(source="user.email", read_only=True)
+    verrouille = serializers.SerializerMethodField()
 
     class Meta:
         model = Signer
-        fields = ["id", "user", "name", "email", "order", "status", "signed_at", "refusal_reason", "methode"]
+        fields = ["id", "user", "name", "email", "order", "status", "signed_at", "refusal_reason", "methode",
+                  "verrouille"]
+
+    def get_verrouille(self, obj):
+        """Bloqué après trop d'essais (déblocage par l'émetteur ou l'administration, bouton de l'écran)."""
+        return obj.status == Signer.Status.PENDING and obj.otp_attempts >= signatures.MAX_ATTEMPTS
 
     def get_name(self, obj):
         return obj.user.get_full_name() or obj.user.email
@@ -41,6 +47,7 @@ class SignatureRequestSerializer(serializers.ModelSerializer):
     document_title = serializers.CharField(source="version.document.title", read_only=True)
     version_number = serializers.IntegerField(source="version.number", read_only=True)
     a_mon_tour = serializers.SerializerMethodField()
+    peut_debloquer = serializers.SerializerMethodField()
     expired = serializers.BooleanField(source="is_expired", read_only=True)
 
     class Meta:
@@ -48,7 +55,7 @@ class SignatureRequestSerializer(serializers.ModelSerializer):
         fields = [
             "id", "version", "version_number", "document_title", "title", "message", "status", "expired",
             "document_sha256", "created_by", "created_at", "expires_at", "completed_at",
-            "signers", "expires_in_days", "signataires", "a_mon_tour",
+            "signers", "expires_in_days", "signataires", "a_mon_tour", "peut_debloquer",
         ]
         read_only_fields = ["id", "status", "document_sha256", "created_by", "created_at", "expires_at", "completed_at"]
 
@@ -56,6 +63,26 @@ class SignatureRequestSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         cur = signatures.current_signer(obj) if obj.status == SignatureRequest.Status.PENDING else None
         return bool(cur and cur.user_id == user.id and not obj.is_expired)
+
+    def get_peut_debloquer(self, obj):
+        """Demande en cours avec un signataire bloqué, et lecteur = émetteur ou administration (action `unlock`)."""
+        user = self.context["request"].user
+        if obj.status != SignatureRequest.Status.PENDING:
+            return False
+        if not (is_admin_or_staff(user) or obj.created_by_id == user.id):
+            return False
+        return any(
+            s.status == Signer.Status.PENDING and s.otp_attempts >= signatures.MAX_ATTEMPTS for s in obj.signers.all()
+        )
+
+
+def qr_svg_data_uri(texte):
+    """QR code SVG (data URI) du lien otpauth, scanné par l'application d'authentification ; vide si indisponible."""
+    try:
+        import segno
+    except ImportError:  # dépendance absente : l'écran garde la clé et le lien
+        return ""
+    return segno.make(texte, error="m").svg_data_uri(scale=4, border=2)
 
 
 def _bad_request(exc: DjangoValidationError):
@@ -137,7 +164,8 @@ class SignatureRequestViewSet(
             user.mfa_secret = mfa.generer_secret()
             user.save(update_fields=["mfa_secret"])
         journaliser(request, JournalAcces.Evenement.MFA_ENROLEMENT, user=user, details={"origine": "signatures"})
-        return Response({"secret": user.mfa_secret, "otpauth_uri": mfa.uri_otpauth(user.mfa_secret, user.email)})
+        uri = mfa.uri_otpauth(user.mfa_secret, user.email)
+        return Response({"secret": user.mfa_secret, "otpauth_uri": uri, "qr_svg": qr_svg_data_uri(uri)})
 
     @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
     @action(detail=False, methods=["post"], url_path="activation-totp")

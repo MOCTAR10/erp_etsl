@@ -1,0 +1,320 @@
+# Catalogue anglais du serveur ETSL ERP (EX-G-07).
+# msgid = texte français tel qu'écrit dans le code ; msgstr = traduction anglaise.
+# Après modification : `python manage.py compiler_traductions` (compile django.mo, sans msgfmt).
+# Socle (config, GED, signatures, exports) : lot a1. Messages des applications métier : lot a5.
+msgid ""
+msgstr ""
+"Project-Id-Version: ETSL ERP\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# ── config : erreurs génériques ──
+msgid "Suppression impossible : des éléments sont encore rattachés à cet objet."
+msgstr "Deletion not possible: other records are still linked to this object."
+
+msgid "Conflit de données : doublon détecté sur une valeur unique."
+msgstr "Data conflict: duplicate detected on a unique value."
+
+msgid "Valeur positive attendue."
+msgstr "Positive value expected."
+
+msgid "Référence inconnue."
+msgstr "Unknown reference."
+
+msgid "Nombre attendu."
+msgstr "Number expected."
+
+# ── config : filtres multicritères (EX-G-09) ──
+msgid "Valeur de filtre invalide."
+msgstr "Invalid filter value."
+
+msgid "Date invalide (format attendu AAAA-MM-JJ)."
+msgstr "Invalid date (expected format YYYY-MM-DD)."
+
+msgid "Choix invalide."
+msgstr "Invalid choice."
+
+# ── config : exports CSV / XLSX / PDF ──
+msgid "Oui"
+msgstr "Yes"
+
+msgid "Non"
+msgstr "No"
+
+msgid "ETSL ERP — %(titre)s — généré le %(date)s"
+msgstr "ETSL ERP — %(titre)s — generated on %(date)s"
+
+msgid "Page %(numero)s"
+msgstr "Page %(numero)s"
+
+msgid "Paramètres ETSL"
+msgstr "ETSL settings"
+
+msgid "Module"
+msgstr "Module"
+
+msgid "Code"
+msgstr "Code"
+
+msgid "Libellé"
+msgstr "Label"
+
+msgid "Table / groupe"
+msgstr "Table / group"
+
+msgid "Valeur"
+msgstr "Value"
+
+msgid "Unité"
+msgstr "Unit"
+
+msgid "Statut"
+msgstr "Status"
+
+msgid "Confirmé par"
+msgstr "Confirmed by"
+
+msgid "Confirmé le"
+msgstr "Confirmed on"
+
+msgid "Valeur retenue par ETSL (à remplir)"
+msgstr "Value adopted by ETSL (to be filled in)"
+
+msgid "Provisoire — à confirmer ou modifier par ETSL"
+msgstr "Provisional — to be confirmed or changed by ETSL"
+
+msgid "Confirmé"
+msgstr "Confirmed"
+
+msgid "Provisoire"
+msgstr "Provisional"
+
+# ── GED : champs et statuts (filtres, exports) ──
+msgid "Statut (RF-41)"
+msgstr "Status (RF-41)"
+
+msgid "Brouillon"
+msgstr "Draft"
+
+msgid "En validation"
+msgstr "In validation"
+
+msgid "Rejeté"
+msgstr "Rejected"
+
+msgid "Archivé"
+msgstr "Archived"
+
+msgid "Type de document"
+msgstr "Document type"
+
+msgid "Dossier"
+msgstr "Folder"
+
+msgid "Date du document"
+msgstr "Document date"
+
+msgid "Créé le"
+msgstr "Created on"
+
+msgid "Archivé le"
+msgstr "Archived on"
+
+msgid "Fournisseur / client"
+msgstr "Supplier / customer"
+
+msgid "Projet / affaire"
+msgstr "Project / job"
+
+msgid "N° facture / contrat"
+msgstr "Invoice / contract no."
+
+msgid "Titre"
+msgstr "Title"
+
+msgid "Conversion PDF/A"
+msgstr "PDF/A conversion"
+
+msgid "Norme PDF/A"
+msgstr "PDF/A standard"
+
+# ── GED : paramètres PDF/A (EX-G-08) ──
+msgid "Paramètres GED : modification réservée à l'administrateur et à la Direction Générale."
+msgstr "Document management settings: changes are restricted to the administrator and General Management."
+
+msgid "Norme PDF/A des PDF versés en GED (1b, 2b, 3b ou aucune)"
+msgstr "PDF/A standard for PDFs filed in document management (1b, 2b, 3b or none)"
+
+msgid "Exports PDF convertis en PDF/A (1 = oui, 0 = non)"
+msgstr "PDF exports converted to PDF/A (1 = yes, 0 = no)"
+
+msgid "Paramètres prédéfinis : modification seulement."
+msgstr "Predefined settings: modification only."
+
+msgid "Norme PDF/A attendue : 1b, 2b, 3b ou aucune."
+msgstr "Expected PDF/A standard: 1b, 2b, 3b or none."
+
+msgid "0 (non) ou 1 (oui)."
+msgstr "0 (no) or 1 (yes)."
+
+# ── GED : documents, dossiers, versions, droits ──
+msgid "Réservé à la Direction Générale (liste des types officiels, CDC M12)."
+msgstr "Restricted to General Management (list of official document types, CDC M12)."
+
+msgid "Votre rôle ne permet pas de créer de dossier (matrice §3.3)."
+msgstr "Your role does not allow creating a folder (matrix §3.3)."
+
+msgid "Seul l'admin ou le créateur du dossier gère ses droits."
+msgstr "Only the administrator or the folder's creator can manage its permissions."
+
+msgid "Votre rôle ne permet pas de créer de document (matrice §3.3)."
+msgstr "Your role does not allow creating a document (matrix §3.3)."
+
+msgid "Les documents de type restreint (paie) sont réservés à l'administration (RF-33)."
+msgstr "Restricted documents (payroll) are reserved to the administration (RF-33)."
+
+msgid "Document archivé ou en validation : contenu non modifiable (les validateurs et la rétention légale s'appuient sur la version soumise)."
+msgstr "Document archived or in validation: content cannot be changed (approvers and legal retention rely on the submitted version)."
+
+msgid "Document officiel signé : contenu scellé (une nouvelle version invaliderait la signature)."
+msgstr "Signed official document: content is sealed (a new version would invalidate the signature)."
+
+msgid "Suppression interdite : document archivé (rétention légale) ou en validation."
+msgstr "Deletion forbidden: document archived (legal retention) or in validation."
+
+msgid "Suppression interdite : document officiel signé (scellé)."
+msgstr "Deletion forbidden: signed official document (sealed)."
+
+msgid "Seul l'admin ou le créateur du document gère ses droits."
+msgstr "Only the administrator or the document's creator can manage its permissions."
+
+msgid "Document verrouillé (check-out) par un autre utilisateur (RF-44)."
+msgstr "Document checked out by another user (RF-44)."
+
+msgid "Seul le titulaire du verrou peut faire le check-in."
+msgstr "Only the user holding the lock can check the document in."
+
+msgid "Le document n'a pas de version courante."
+msgstr "The document has no current version."
+
+msgid "Version introuvable pour ce document."
+msgstr "Version not found for this document."
+
+msgid "Document déjà verrouillé."
+msgstr "Document already checked out."
+
+msgid "Le document n'est pas verrouillé."
+msgstr "The document is not checked out."
+
+msgid "Durée de conservation invalide (au moins 1 an)."
+msgstr "Invalid retention period (at least 1 year)."
+
+msgid "Durée attendue entre 1 et 100 ans."
+msgstr "Expected period between 1 and 100 years."
+
+msgid "Nombre d'années entier attendu."
+msgstr "Whole number of years expected."
+
+msgid "Archivage seulement avec une signature avancée achevée sur la version courante (CDC M12)."
+msgstr "Archiving only allowed with a completed advanced signature on the current version (CDC M12)."
+
+msgid "Piste d'audit inaltérable : aucune suppression unitaire."
+msgstr "Tamper-proof audit trail: no individual deletion."
+
+msgid "Piste d'audit inaltérable : aucune modification."
+msgstr "Tamper-proof audit trail: no modification."
+
+msgid "Droit insuffisant sur ce document."
+msgstr "Insufficient permission on this document."
+
+msgid "Document obligatoire."
+msgstr "Document is required."
+
+msgid "Document introuvable."
+msgstr "Document not found."
+
+# ── GED : purge en fin de rétention ──
+msgid "Purge réservée au Secrétariat Général et à la Direction Générale."
+msgstr "Purge restricted to the General Secretariat and General Management."
+
+msgid "Seul un document archivé soumis à rétention est purgeable."
+msgstr "Only an archived document subject to retention can be purged."
+
+msgid "Une demande de purge est déjà en cours."
+msgstr "A purge request is already pending."
+
+msgid "Demande déjà traitée."
+msgstr "Request already processed."
+
+msgid "Document plus soumis à rétention archivée : purge refusée."
+msgstr "Document no longer under archived retention: purge refused."
+
+# ── Signatures électroniques ──
+msgid "Code envoyé par e-mail."
+msgstr "Code sent by e-mail."
+
+msgid "Signataires déverrouillés."
+msgstr "Signers unlocked."
+
+msgid "Signataire inconnu."
+msgstr "Unknown signer."
+
+msgid "Double authentification déjà activée."
+msgstr "Two-factor authentication already enabled."
+
+msgid "Code invalide ou expiré."
+msgstr "Invalid or expired code."
+
+msgid "Réservé à l'émetteur."
+msgstr "Restricted to the requester."
+
+msgid "La messagerie n'est pas encore configurée : activez la double authentification (application d'authentification) pour signer."
+msgstr "E-mail is not configured yet: enable two-factor authentication (authenticator app) to sign."
+
+msgid "La messagerie n'est pas encore configurée : signez avec le code de votre application d'authentification."
+msgstr "E-mail is not configured yet: sign with the code from your authenticator app."
+
+msgid "Au moins un signataire est requis."
+msgstr "At least one signer is required."
+
+msgid "Un signataire ne peut figurer qu'une fois."
+msgstr "A signer can only appear once."
+
+msgid "Signataire inactif."
+msgstr "Inactive signer."
+
+msgid "Cette demande n'est plus en cours."
+msgstr "This request is no longer pending."
+
+msgid "Demande expirée : relancez une nouvelle demande de signature."
+msgstr "Request expired: start a new signature request."
+
+msgid "Vous n'êtes pas signataire de cette demande."
+msgstr "You are not a signer of this request."
+
+msgid "Vous avez déjà répondu à cette demande."
+msgstr "You have already answered this request."
+
+msgid "Ce n'est pas encore votre tour : les signataires précédents doivent signer d'abord."
+msgstr "It is not your turn yet: previous signers must sign first."
+
+msgid "Signature verrouillée après trop d'essais : contactez l'émetteur de la demande."
+msgstr "Signature locked after too many attempts: contact the requester."
+
+msgid "Méthode de signature inconnue (email ou totp)."
+msgstr "Unknown signature method (email or totp)."
+
+msgid "Intégrité du document non garantie : il a été modifié depuis la demande."
+msgstr "Document integrity not guaranteed: it was modified after the request."
+
+msgid "Le motif de refus est obligatoire."
+msgstr "A reason for refusal is required."
+
+msgid "Double authentification non activée : signez avec le code reçu par e-mail."
+msgstr "Two-factor authentication not enabled: sign with the code received by e-mail."
+
+msgid "Aucun code valide : demandez un nouveau code."
+msgstr "No valid code: request a new code."

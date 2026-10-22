@@ -68,6 +68,8 @@ class VersionSerializer(serializers.ModelSerializer):
             "size",
             "original_filename",
             "note",
+            "pdfa_statut",
+            "pdfa_norme",
             "created_at",
         ]
         read_only_fields = ["id", "number", "url", "sha256", "size", "created_at"]
@@ -148,7 +150,10 @@ class DocumentSerializer(serializers.ModelSerializer):
         if not can_see_amount(user):
             # RF-59 : un rôle non autorisé ne peut pas non plus renseigner le montant.
             validated_data["amount"] = None
-        uploaded = validated_data.pop("file")
+        from .parametres import preparer_fichier
+
+        # EX-G-08 : PDF converti en PDF/A avant archivage (empreinte calculée sur le fichier archivé).
+        uploaded, pdfa_statut, pdfa_norme = preparer_fichier(validated_data.pop("file"))
         sha256 = compute_sha256(uploaded)
 
         document = Document.objects.create(
@@ -164,6 +169,8 @@ class DocumentSerializer(serializers.ModelSerializer):
             size=uploaded.size,
             original_filename=uploaded.name,
             created_by=user,
+            pdfa_statut=pdfa_statut,
+            pdfa_norme=pdfa_norme,
         )
         document.current_version = version
         document.save(update_fields=["current_version"])
@@ -189,6 +196,9 @@ class DocumentListSerializer(serializers.ModelSerializer):
 
     type_label = serializers.CharField(source="type.label", read_only=True)
     dossier_path = serializers.CharField(source="dossier.path", read_only=True)
+    # EX-G-08 : résultat du post-traitement PDF/A de la version courante (badge « PDF/A » à l'écran).
+    pdfa_statut = serializers.CharField(source="current_version.pdfa_statut", read_only=True, default="")
+    pdfa_norme = serializers.CharField(source="current_version.pdfa_norme", read_only=True, default="")
 
     class Meta:
         model = Document
@@ -196,6 +206,8 @@ class DocumentListSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "status",
+            "pdfa_statut",
+            "pdfa_norme",
             "type",
             "type_label",
             "dossier",

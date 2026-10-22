@@ -77,7 +77,7 @@ class PermisTravailSerializer(serializers.ModelSerializer):
             "date_validation", "date_cloture", "notes", "created_at", "updated_at",
             "gaz_obligatoire", "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date",
             "test_gaz_par", "test_gaz_valide", "intervenants", "intervenants_noms", "photo", "plan",
-            "site_gr", "plan_prevention", "plan_prevention_code",
+            "site_gr", "plan_prevention", "plan_prevention_code", "saisi_le",
         ]
         read_only_fields = [
             "visa_superviseur_par", "visa_superviseur_le", "visa_hse_par", "visa_hse_le", "visa_dg_par", "visa_dg_le", "prochain_niveau","validateur", "demandeur", 
@@ -88,6 +88,11 @@ class PermisTravailSerializer(serializers.ModelSerializer):
 
     def get_intervenants_noms(self, obj):
         return [str(e) for e in obj.intervenants.all()]
+
+    def validate_saisi_le(self, value):
+        from operations.terrain_a3 import verifier_saisi_le
+
+        return verifier_saisi_le(value)
 
     def validate_type_permis(self, value):
         from .ecarts_m6m7 import valider_code
@@ -169,13 +174,18 @@ class IncidentSerializer(serializers.ModelSerializer):
             "consequence_humaine_label", "jours_arret", "rapport", "zone", "retour_experience",
             "statut", "statut_label", "archive", "declared_by", "declared_by_name",
             "enqueteur", "enqueteur_name", "date_ouverture_enquete", "date_rapport", "plan_action_le",
-            "document", "document_titre", "ncr_hse", "actions_count", "created_at", "updated_at",
+            "document", "document_titre", "ncr_hse", "actions_count", "created_at", "updated_at", "saisi_le",
         ]
         read_only_fields = ["declared_by", "code", "actions_count", "date_ouverture_enquete", "statut", "archive",
                             "plan_action_le", "document"]
 
     def get_actions_count(self, obj):
         return obj.actions.count()
+
+    def validate_saisi_le(self, value):
+        from operations.terrain_a3 import verifier_saisi_le
+
+        return verifier_saisi_le(value)
 
     def get_ncr_hse(self, obj):
         return [f"{nc.code} ({nc.get_statut_display()})" for nc in obj.ncr_hse.all()]

@@ -138,6 +138,17 @@ class LotMatiereViewSet(viewsets.ModelViewSet):
         lot.lever_quarantaine()
         return Response(self.get_serializer(lot).data)
 
+    @action(detail=True, methods=["get"], url_path="joints")
+    def joints(self, request, pk=None):
+        """Traçabilité aval M5 → M6 : joints soudés réalisés avec ce lot (OF, repère, soudeur, WPS, coulée)."""
+        lot = self.get_object()
+        return Response([
+            {"id": str(j.pk), "code": j.code, "repere": j.repere, "ordre_code": j.ordre.code,
+             "soudeur_nom": j.soudeur.display_name, "wps_code": j.wps.code if j.wps_id else None,
+             "numero_coulee": j.numero_coulee, "date_soudage": j.date_soudage.isoformat()}
+            for j in lot.joints.select_related("ordre", "soudeur", "wps").order_by("ordre__code", "repere")
+        ])
+
     def get_queryset(self):
         qs = super().get_queryset()
         if article := self.request.query_params.get("article"):
@@ -228,6 +239,8 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
             qs = qs.filter(source_id=depot) | qs.filter(destination_id=depot)
         if type_mouvement := params.get("type"):
             qs = qs.filter(type_mouvement=type_mouvement)
+        if ordre := params.get("ordre"):  # sorties liées à un OF (M3 → M5)
+            qs = qs.filter(ordre_id=ordre)
         return qs.distinct()
 
     @transaction.atomic

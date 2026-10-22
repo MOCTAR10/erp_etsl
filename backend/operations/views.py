@@ -38,6 +38,7 @@ from .serializers import (
 from users.permissions import can_read_module
 from .cloture import figer_dossier, transferer_paie, valider_pointage
 from .services import CanManageOperations, can_see_amount, charge_stats
+from .terrain_a3 import ConsommationOfMixin, controler_synchro
 
 
 def _pdf_reponse(contenu, nom, type_mime="application/pdf"):
@@ -93,7 +94,7 @@ class GammeOperationViewSet(_CommonViewSet):
         return qs
 
 
-class OrdreFabricationViewSet(_CommonViewSet):
+class OrdreFabricationViewSet(ConsommationOfMixin, _CommonViewSet):
     serializer_class = OrdreFabricationSerializer
     search_fields = ("code", "label",)
 
@@ -466,6 +467,16 @@ class PointageChantierViewSet(_CommonViewSet):
         return qs
 
     def perform_create(self, serializer):
+        d = serializer.validated_data
+        if d.get("saisi_le"):  # saisie terrain synchronisée : conflits (délai, doublon) avant enregistrement
+            doublons = PointageChantier.objects.filter(ordre=d["ordre"], date=d["date"], hours=d["hours"])
+            if d.get("employe"):
+                doublons = doublons.filter(employe=d["employe"])
+            elif d.get("worker"):
+                doublons = doublons.filter(worker=d["worker"])
+            else:
+                doublons = doublons.filter(worker_name__iexact=d.get("worker_name", ""))
+            controler_synchro(d["saisi_le"], self.request, doublons, "Pointage")
         serializer.save(created_by=self.request.user)
 
     @idempotent
