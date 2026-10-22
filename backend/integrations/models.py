@@ -9,6 +9,8 @@ import uuid
 from django.conf import settings
 from django.db import models
 
+from .models_migration import HistoriquePaie, LigneReprise, LotReprise, ParametreReprise  # noqa: F401 — reprise CDC §10
+
 
 class ImportBatch(models.Model):
     """Lot d'import — journal de bord : idempotence par empreinte + compteurs."""
@@ -20,7 +22,6 @@ class ImportBatch(models.Model):
         MT940 = "mt940", "Relevé bancaire SWIFT MT940"
         CNSSG = "cnssg", "Cotisations CNSSG"
         CNAMGS = "cnamgs", "Cotisations CNAMGS"
-        GENERIC = "generic", "Table générique"
 
     class Status(models.TextChoices):
         PENDING = "pending", "En attente"
