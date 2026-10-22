@@ -9,6 +9,7 @@ Dérivé du schéma `Architecture ERP ETSL.png` §2.1 (M6).
 """
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -361,6 +362,10 @@ class ControleQualite(models.Model):
         related_name="itp_approuves", verbose_name="ITP approuvé par",
     )
     approuve_le = models.DateTimeField(null=True, blank=True, verbose_name="ITP approuvé le")
+    saisi_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Saisi sur l'appareil le",
+        help_text="Horodatage de la saisie terrain (hors ligne) ; vide pour une saisie au bureau.",
+    )
     notes = models.TextField(blank=True, verbose_name="Notes / observations")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -820,6 +825,10 @@ class JointSoude(models.Model):
     soudeur = models.ForeignKey(Soudeur, on_delete=models.PROTECT, related_name="joints")
     wps = models.ForeignKey(WpsWpqr, null=True, blank=True, on_delete=models.PROTECT, related_name="joints")
     numero_coulee = models.CharField(max_length=60, blank=True, verbose_name="N° de coulée (heat number)")
+    lot = models.ForeignKey(
+        "stocks.LotMatiere", null=True, blank=True, on_delete=models.PROTECT, related_name="joints",
+        verbose_name="Lot matière (M5)", help_text="Lot de stock du métal de base : la coulée et les certificats en sont repris.",
+    )
     consommable = models.CharField(max_length=120, blank=True, verbose_name="Consommable (lot de fil / électrode)")
     poste = models.ForeignKey(
         InstrumentMesure, null=True, blank=True, on_delete=models.PROTECT, related_name="joints",
@@ -1373,3 +1382,69 @@ class WpsRequis(models.Model):
             raise ValidationError({"profile": "Profil contractuel inconnu."})
         if self.wps_id and self.wps.type != WpsWpqr.Type.WPS:
             raise ValidationError({"wps": "Seul un WPS (procédure) peut être exigé."})
+
+
+class CoutNonQualite(models.Model):
+    """Coût de non-qualité d'une NC (M6 → M10) : rebut de matière, reprise / réparation, frais externes ;
+    valorisé puis transmis à la comptabilité (écriture de reclassement, comptes en paramètres provisoires)."""
+
+    class Nature(models.TextChoices):
+        REBUT = "rebut", "Rebut"
+        REPRISE = "reprise", "Reprise"
+        REPARATION = "reparation", "Réparation"
+        AUTRE = "autre", "Autre (frais externes)"
+
+    class Statut(models.TextChoices):
+        SAISI = "saisi", "Saisi"
+        COMPTABILISE = "comptabilise", "Comptabilisé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    non_conformite = models.ForeignKey(
+        NonConformite, on_delete=models.PROTECT, related_name="couts", verbose_name="Non-conformité"
+    )
+    nature = models.CharField(max_length=12, choices=Nature.choices, default=Nature.REPRISE, verbose_name="Nature")
+    date = models.DateField(default=timezone.localdate, verbose_name="Date")
+    heures = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Heures de reprise")
+    taux_horaire = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Taux horaire (FCFA)")
+    quantite = models.DecimalField(max_digits=14, decimal_places=3, default=0, verbose_name="Quantité rebutée")
+    cout_unitaire = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Coût unitaire matière")
+    frais_externes = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Frais externes")
+    montant = models.DecimalField(max_digits=16, decimal_places=2, default=0, editable=False, verbose_name="Montant")
+    description = models.CharField(max_length=300, blank=True, verbose_name="Description")
+    statut = models.CharField(max_length=14, choices=Statut.choices, default=Statut.SAISI, verbose_name="Statut")
+    ecriture = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture comptable",
+    )
+    comptabilise_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    comptabilise_le = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Coût de non-qualité"
+        verbose_name_plural = "Coûts de non-qualité"
+
+    def __str__(self):
+        return f"{self.code} — {self.get_nature_display()} {self.montant}"
+
+    @property
+    def part_matiere(self):
+        return self.quantite * self.cout_unitaire + self.frais_externes
+
+    @property
+    def part_main_oeuvre(self):
+        return self.heures * self.taux_horaire
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = QualiteSequence.next_for("CNQ", "CNQ-")
+        self.montant = (self.part_matiere + self.part_main_oeuvre).quantize(Decimal("1"))
+        return super().save(*args, **kwargs)

@@ -3,19 +3,49 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { postIdempotent } from "../api/client";
 import { useAuth } from "../store/auth";
-import { createQueue, idbStorage, memoryStorage, type QueuedRequest } from "./offlineQueue";
+import { createQueue, idbStorage, memoryStorage, type QueuedFile, type QueuedRequest } from "./offlineQueue";
 
 const storage = typeof indexedDB !== "undefined" ? idbStorage() : memoryStorage();
 
+/** Corps envoyé : saisie + horodatage de saisie de l'appareil (`saisi_le`) + `forcer` si un conflit a été levé. */
+export function corpsSynchro(item: QueuedRequest): Record<string, unknown> {
+  const base = item.body && typeof item.body === "object" ? (item.body as Record<string, unknown>) : {};
+  return { ...base, saisi_le: item.createdAt, ...(item.force ? { forcer: true } : {}) };
+}
+
 /** File unique de l'application : chaque envoi rejoue la saisie avec SA clé d'idempotence. */
 export const offlineQueue = createQueue(storage, async (item: QueuedRequest) => {
-  await postIdempotent(item.path, item.body, item.key);
+  const corps = corpsSynchro(item);
+  if (!item.files?.length) return postIdempotent(item.path, corps, item.key);
+  const form = new FormData();
+  for (const [k, v] of Object.entries(corps)) if (v !== undefined && v !== null && v !== "") form.append(k, String(v));
+  for (const f of item.files) form.append(f.field, new File([f.blob], f.name, { type: f.type }));
+  return postIdempotent(item.path, form, item.key);
 });
 
 const owner = () => useAuth.getState().user?.id ?? "";
 
 /** Met en file puis tente une synchronisation immédiate (sans effet si hors-ligne). */
-export async function submitOffline(input: { path: string; body: unknown; label: string }) {
+interface OfflineInput {
+  path: string;
+  body: unknown;
+  label: string;
+  files?: QueuedFile[];
+}
+
+/**
+ * Saisie + saisies dépendantes (ex. photo jointe au permis créé hors ligne) mises en file ENSEMBLE, puis une seule
+ * synchronisation : chaque dépendante attend sa parente et reçoit son identifiant (`{ref}`).
+ */
+export async function submitOfflineChain(parent: OfflineInput, children: OfflineInput[] = []) {
+  const who = owner();
+  const item = await offlineQueue.enqueue({ owner: who, ...parent });
+  for (const child of children) await offlineQueue.enqueue({ owner: who, ...child, dependsOn: item.key });
+  void syncNow();
+  return item;
+}
+
+export async function submitOffline(input: OfflineInput) {
   const item = await offlineQueue.enqueue({ owner: owner(), ...input });
   void syncNow();
   return item;

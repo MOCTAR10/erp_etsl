@@ -132,6 +132,10 @@ class PermisTravail(models.Model):
     visa_dg_le = models.DateTimeField(null=True, blank=True, verbose_name="Date du visa Direction Générale")
     date_validation = models.DateTimeField(null=True, blank=True, verbose_name="Validation le")
     date_cloture = models.DateTimeField(null=True, blank=True, verbose_name="Clôture le")
+    saisi_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Saisi sur l'appareil le",
+        help_text="Horodatage de la saisie terrain (hors ligne) ; vide pour une saisie au bureau.",
+    )
     # Test d'atmosphère (CL-OM-07) : obligatoire avant démarrage pour les types à risque gaz.
     test_gaz_resultat = models.CharField(
         max_length=12, blank=True, choices=[("conforme", "Conforme"), ("non_conforme", "Non conforme")],
@@ -460,6 +464,10 @@ class Incident(models.Model):
         help_text="CDC M7 §9.8 : escalade DG obligatoire pour les accidents graves.",
     )
     date_rapport = models.DateField(null=True, blank=True, verbose_name="Date du rapport")
+    saisi_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Saisi sur l'appareil le",
+        help_text="Horodatage de la saisie terrain (hors ligne) ; vide pour une saisie au bureau.",
+    )
     plan_action_le = models.DateTimeField(null=True, blank=True, verbose_name="Plan d'action arrêté le")
     document = models.ForeignKey(
         "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",

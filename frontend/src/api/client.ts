@@ -128,7 +128,7 @@ async function authenticatedMe(access: string): Promise<Me> {
 export const postIdempotent = (path: string, body: unknown, key: string) =>
   raw<unknown>(path, {
     method: "POST",
-    body: JSON.stringify(body),
+    body: body instanceof FormData ? body : JSON.stringify(body), // FormData : photo prise hors ligne
     headers: { "Idempotency-Key": key },
   });
 
