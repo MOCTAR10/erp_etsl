@@ -16,6 +16,7 @@ interface Parametre {
   label: string;
   valeur: string;
   unite: string;
+  texte?: string;
   statut_valeur: string;
   est_provisoire: boolean;
 }
@@ -163,13 +164,15 @@ function ParametresM1() {
   const qc = useQueryClient();
   const params = useQuery({ queryKey: ["m1", "parametres"], queryFn: liste<Parametre>("/api/commercial/parametres/"), retry: 0 });
   const [saisie, setSaisie] = useState<Record<string, string>>({});
+  const [saisieTexte, setSaisieTexte] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
   const done = () => {
     setErreur(null);
     void qc.invalidateQueries({ queryKey: ["m1"] });
   };
   const enregistrer = useMutation({
-    mutationFn: (v: { id: string; valeur: string }) => api.patch(`/api/commercial/parametres/${v.id}/`, { valeur: v.valeur }),
+    mutationFn: (v: { id: string; valeur?: string; texte?: string }) =>
+      api.patch(`/api/commercial/parametres/${v.id}/`, v.texte !== undefined ? { texte: v.texte, ...(v.valeur !== undefined ? { valeur: v.valeur } : {}) } : { valeur: v.valeur }),
     onSuccess: done,
     onError: () => setErreur(t("ecarts_m1.params.erreur")),
   });
@@ -205,22 +208,45 @@ function ParametresM1() {
                   {p.label} <span className="muted">({p.code})</span>
                 </td>
                 <td>
-                  <input
-                    className="field"
-                    style={{ width: "7rem" }}
-                    aria-label={p.label}
-                    value={saisie[p.id] ?? p.valeur}
-                    onChange={(e) => setSaisie({ ...saisie, [p.id]: e.target.value })}
-                  />{" "}
-                  {p.unite}
+                  {p.unite !== "texte" && (
+                    <>
+                      <input
+                        className="field"
+                        style={{ width: "7rem" }}
+                        aria-label={p.label}
+                        value={saisie[p.id] ?? p.valeur}
+                        onChange={(e) => setSaisie({ ...saisie, [p.id]: e.target.value })}
+                      />{" "}
+                      {p.unite}
+                    </>
+                  )}
+                  {p.texte !== undefined && p.texte !== "" && (
+                    <textarea
+                      className="field"
+                      rows={2}
+                      aria-label={`${p.label} — ${t("ecarts_suivi.texte")}`}
+                      value={saisieTexte[p.id] ?? p.texte}
+                      onChange={(e) => setSaisieTexte({ ...saisieTexte, [p.id]: e.target.value })}
+                    />
+                  )}
                 </td>
                 <td>
                   <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`ecarts_m1.params.${p.statut_valeur}`)}</Badge>
                 </td>
                 <td>
                   <div className="action-bar-buttons">
-                    {saisie[p.id] !== undefined && saisie[p.id] !== p.valeur && (
-                      <button type="button" className="btn" onClick={() => enregistrer.mutate({ id: p.id, valeur: saisie[p.id] })}>
+                    {((saisie[p.id] !== undefined && saisie[p.id] !== p.valeur) || (saisieTexte[p.id] !== undefined && saisieTexte[p.id] !== p.texte)) && (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() =>
+                          enregistrer.mutate({
+                            id: p.id,
+                            ...(saisie[p.id] !== undefined && saisie[p.id] !== p.valeur ? { valeur: saisie[p.id] } : {}),
+                            ...(saisieTexte[p.id] !== undefined && saisieTexte[p.id] !== p.texte ? { texte: saisieTexte[p.id] } : {}),
+                          })
+                        }
+                      >
                         {t("ecarts_m1.params.enregistrer")}
                       </button>
                     )}

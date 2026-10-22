@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from . import views_m11 as m11
+from . import views_suivi as suivi
 from .views import (
     AnalyseEcartViewSet,
     BudgetLigneViewSet,
@@ -50,6 +51,9 @@ router.register("plans-sous-activite", m11.PlanActionViewSet, basename="cg-plans
 router.register("reportings", m11.ReportingViewSet, basename="cg-reportings")
 router.register("revues-performance", m11.RevuePerformanceViewSet, basename="cg-revues-performance")
 router.register("provisions-fnp", m11.ProvisionFnpViewSet, basename="cg-provisions-fnp")
+# Suivi inter-modules (M3 → M11, M10 → M11)
+router.register("marges-terminaison", suivi.MargesTerminaisonView, basename="cg-marges-terminaison")
+router.register("balance-agee", suivi.BalanceAgeeGestionView, basename="cg-balance-agee")
 
 urlpatterns = [
     path("", include(router.urls)),

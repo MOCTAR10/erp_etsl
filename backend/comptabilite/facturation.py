@@ -175,11 +175,21 @@ def emettre_facture(facture, user):
         source="M10", source_ref=facture.code, created_by=user,
     )
     sens_client, sens_produit = ("credit", "debit") if avoir else ("debit", "credit")
+    from . import retenues
+
+    facture.taux_retenue, facture.montant_retenue = retenues.calculer(facture)  # M1 → M10 : retenue de garantie
     ordre = 0
     AccountMoveLine.objects.create(
         move=move, account=_compte("411000"), partner=facture.client, order=ordre, label=facture.code,
-        **{sens_client: facture.montant_ttc},
+        **{sens_client: facture.montant_ttc - facture.montant_retenue},
     )
+    if facture.montant_retenue > 0:
+        ordre += 1
+        AccountMoveLine.objects.create(
+            move=move, account=retenues.compte_retenue(), partner=facture.client, order=ordre,
+            label=f"Retenue de garantie {facture.taux_retenue:g} % {facture.code}",
+            **{sens_client: facture.montant_retenue},
+        )
     par_compte = {}
     for l in lignes:
         par_compte[l.compte_produit_id] = par_compte.get(l.compte_produit_id, Decimal("0")) + l.montant
@@ -255,6 +265,9 @@ def facture_pdf(facture):
     taux = facture.taux_tva.taux if facture.taux_tva_id else 0
     rows += [["", "", "Total HT", fm(facture.montant_ht)], ["", "", f"TVA {taux:g} %", fm(facture.montant_tva)],
              ["", "", "TOTAL TTC (FCFA)", fm(facture.montant_ttc)]]
+    if facture.montant_retenue:
+        rows += [["", "", f"Retenue de garantie {facture.taux_retenue:g} %", f"- {fm(facture.montant_retenue)}"],
+                 ["", "", "NET À PAYER (FCFA)", fm(facture.net_a_payer)]]
     table = Table(rows, colWidths=[100 * mm, 20 * mm, 35 * mm, 30 * mm])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12308f")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),

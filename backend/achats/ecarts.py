@@ -390,8 +390,14 @@ def bc_depuis_location_gr(location, user):
         raise ValidationError({"location": "Location GR annulée."})
     if not location.partenaire.is_global_rental:
         raise ValidationError({"location": "Partenaire de la location non marqué GLOBAL RENTAL."})
-    if PurchaseOrder.objects.filter(location_gr=location).exclude(status=PurchaseOrder.Status.ANNULEE).exists():
+    from comptabilite.gr import bc_lie, controler_liaison_bc
+
+    if bc_lie(location):
         raise ValidationError({"location": f"Un BC achats est déjà lié à la location {location.code}."})
+    try:
+        controler_liaison_bc(location, None)
+    except ValidationError as exc:
+        raise ValidationError({"location": exc.messages})
     analytic = None
     if location.affaire_id:
         analytic = location.affaire.analytic or location.affaire.assurer_compte_analytique()
@@ -405,4 +411,6 @@ def bc_depuis_location_gr(location, user):
         purchase_order=bc, label=f"Location GR {location.code} — {location.equipement.label}"[:200],
         quantity=1, unit_price=location.montant_estime or 0,
     )
+    # Lien unique : la location porte aussi le BC (lu par M4 et par M10 pour l'exclusion anti-double 618).
+    type(location).objects.filter(pk=location.pk, bon_commande_achat__isnull=True).update(bon_commande_achat=bc)
     return bc

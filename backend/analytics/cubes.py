@@ -39,17 +39,58 @@ PARAMETRES_DEFAUT = {
     "BUDGET_SEUIL_ATTEINT": ("Seuil budgétaire : budget atteint", Decimal("100"), "%"),
     "BUDGET_SEUIL_DEPASSE": ("Seuil budgétaire : dépassement (analyse obligatoire)", Decimal("110"), "%"),
 }
+# Destinataires des 4 familles d'alertes calendaires (liste de rôles dans `texte`, valeur inutilisée = 0).
+DESTINATAIRES_DEFAUT = {
+    "DEST_GARANTIE": ("Destinataires des alertes de garantie équipement (rôles)", "maintenance,directeur_operations"),
+    "DEST_AGREMENT_FOURNISSEUR": ("Destinataires des alertes d'agrément fournisseur / matière (rôles)", "qaqc,hse"),
+    "DEST_AUDIT_INTERNE": ("Destinataires des alertes d'audit interne (rôles)", "qaqc"),
+    "DEST_REVUE_DIRECTION": ("Destinataires des alertes de revue de direction (rôles)", "qaqc,pdg,dga"),
+}
+for _code, (_label, _roles) in DESTINATAIRES_DEFAUT.items():
+    PARAMETRES_DEFAUT[_code] = (_label, Decimal("0"), "rôles")
+FAMILLE_DESTINATAIRES = {
+    "garantie": "DEST_GARANTIE", "agrement_fournisseur": "DEST_AGREMENT_FOURNISSEUR",
+    "audit_interne": "DEST_AUDIT_INTERNE", "revue_direction": "DEST_REVUE_DIRECTION",
+}
 # Paramètres pouvant valoir 0 (interrupteur ou palier désactivé).
-PARAMETRES_ZERO_AUTORISE = ("BLOCAGE_AVANT_CLOTURE", "PALIER_ALERTE_J60")
+PARAMETRES_ZERO_AUTORISE = ("BLOCAGE_AVANT_CLOTURE", "PALIER_ALERTE_J60", *DESTINATAIRES_DEFAUT)
 TYPE_GED_CUBE = "archive-cube-bi"
 DOSSIER_GED_CUBE = "Archives BI (Couche D)"
 
 
 def get_param_cube(code):
     """Valeur du paramètre `code` ; crée le défaut provisoire si absent."""
+    return _param_obj(code).valeur
+
+
+def _param_obj(code):
     label, valeur, unite = PARAMETRES_DEFAUT[code]
-    obj, _ = ParametreCube.objects.get_or_create(code=code, defaults={"label": label, "valeur": valeur, "unite": unite})
-    return obj.valeur
+    defaults = {"label": label, "valeur": valeur, "unite": unite}
+    if code in DESTINATAIRES_DEFAUT:
+        defaults["texte"] = DESTINATAIRES_DEFAUT[code][1]
+    return ParametreCube.objects.get_or_create(code=code, defaults=defaults)[0]
+
+
+def roles_valides(texte):
+    """Liste de rôles (séparés par des virgules) ; lève ValueError sur un rôle inconnu."""
+    from users.models import User
+
+    roles = [r.strip().lower() for r in (texte or "").split(",") if r.strip()]
+    inconnus = [r for r in roles if r not in User.Role.values]
+    if inconnus:
+        raise ValueError(f"Rôle(s) inconnu(s) : {', '.join(inconnus)}.")
+    return tuple(dict.fromkeys(roles))
+
+
+def destinataires_famille(famille):
+    """Rôles destinataires d'une famille d'alertes calendaires (paramètre provisoire `DEST_*`), ou None."""
+    code = FAMILLE_DESTINATAIRES.get(famille)
+    if code is None:
+        return None
+    try:
+        return roles_valides(_param_obj(code).texte)
+    except ValueError:
+        return roles_valides(DESTINATAIRES_DEFAUT[code][1])
 
 
 def param_provisoire(code):

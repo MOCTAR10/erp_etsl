@@ -305,8 +305,10 @@ class TenderReviewViewSet(_CommonViewSet):
     @action(detail=False, methods=["get"], url_path="criteres-defaut")
     def criteres_defaut(self, request):
         """Critères du formulaire ENG-PR1-01 (provisoires) et seuils Go / Go sous réserve paramétrables."""
-        return Response({"criteres": ecarts_m1.CRITERES_RAO_DEFAUT, "seuil_go": str(ecarts_m1.get_param("RAO_SEUIL_GO")),
-                         "seuil_reserve": str(ecarts_m1.get_param("RAO_SEUIL_RESERVE")), "provisoire": True})
+        codes = (*ecarts_m1.CODES_CRITERES_RAO, "RAO_SEUIL_GO", "RAO_SEUIL_RESERVE")
+        return Response({"criteres": ecarts_m1.criteres_rao(), "seuil_go": str(ecarts_m1.get_param("RAO_SEUIL_GO")),
+                         "seuil_reserve": str(ecarts_m1.get_param("RAO_SEUIL_RESERVE")),
+                         "provisoire": ecarts_m1.provisoires(codes)})
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -414,7 +416,7 @@ class AffaireViewSet(_CommonViewSet):
         affaire = self.get_object()
         data = ecarts_m1.achats_affaire(affaire, can_see_amount(request.user))
         data["bons_sortie"] = ecarts_m1.bons_sortie(affaire)
-        data["definition_bs"] = ecarts_m1.DEFINITION_BS
+        data["definition_bs"] = ecarts_m1.get_texte("DEFINITION_BS")
         return Response(data)
 
     @action(detail=True, methods=["get"], url_path="plan-charge")

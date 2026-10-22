@@ -684,3 +684,35 @@ class AxeAnalytiqueM11(models.Model):
     class Meta:
         verbose_name = "Axe analytique M11 (activité / profil)"
         verbose_name_plural = "Axes analytiques M11 (activité / profil)"
+
+
+class MargeTerminaisonAffaire(models.Model):
+    """Dernière marge à terminaison d'une affaire publiée par M3 (événement outbox `operations.marge_terminaison`)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    affaire = models.OneToOneField(
+        "commercial.Affaire", on_delete=models.CASCADE, related_name="marge_terminaison_m3", verbose_name="Affaire"
+    )
+    avancement_pct = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, verbose_name="Avancement (%)")
+    chiffre_affaires = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True, verbose_name="Chiffre d'affaires")
+    couts_engages = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True, verbose_name="Coûts engagés")
+    cout_a_terminaison = models.DecimalField(
+        max_digits=16, decimal_places=2, null=True, blank=True, verbose_name="Coût à terminaison"
+    )
+    marge_a_terminaison = models.DecimalField(
+        max_digits=16, decimal_places=2, null=True, blank=True, verbose_name="Marge à terminaison"
+    )
+    marge_pct = models.DecimalField(max_digits=9, decimal_places=2, null=True, blank=True, verbose_name="Marge (%)")
+    ordres = models.JSONField(default=list, blank=True, verbose_name="OF de l'affaire")
+    publie_le = models.DateTimeField(null=True, blank=True, verbose_name="Publiée par M3 le")
+    publie_par = models.CharField(max_length=254, blank=True, verbose_name="Publiée par")
+    evenement = models.UUIDField(null=True, blank=True, verbose_name="Événement outbox")
+    recu_le = models.DateTimeField(auto_now=True, verbose_name="Reçue le")
+
+    class Meta:
+        ordering = ["affaire__code"]
+        verbose_name = "Marge à terminaison (M3)"
+        verbose_name_plural = "Marges à terminaison (M3)"
+
+    def __str__(self):
+        return f"{self.affaire_id} — {self.marge_a_terminaison}"

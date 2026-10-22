@@ -205,6 +205,12 @@ def verifier_besoins(of, user=None):
                 besoin.demande_achat = _demande_achat(besoin, manque, user)
             ruptures.append(f"{besoin.article.code} (manque {_q(manque)})")
         besoin.save(update_fields=["statut", "disponible", "verifie_le", "demande_achat"])
+        from stocks.reservations import liberer_besoin, reserver_besoin
+
+        if besoin.statut == BesoinMatiere.Statut.RESERVE:
+            reserver_besoin(besoin, user)  # réservation PHYSIQUE en stock (M5)
+        else:
+            liberer_besoin(besoin.pk, "Rupture constatée au contrôle de disponibilité")
         resultat.append(besoin)
     if ruptures:
         _notifier(

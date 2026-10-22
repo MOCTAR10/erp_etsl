@@ -707,3 +707,45 @@ class ParametreStock(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class ReservationStock(models.Model):
+    """Réservation physique d'un besoin matière M3 (préparation atelier validée / OF lancé) — voir `reservations.py`."""
+
+    class Statut(models.TextChoices):
+        ACTIVE = "active", "Active"
+        CONSOMMEE = "consommee", "Consommée"
+        LIBEREE = "liberee", "Libérée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    article = models.ForeignKey(
+        "referentiels.Article", on_delete=models.PROTECT, related_name="reservations_stock", verbose_name="Article"
+    )
+    ordre = models.ForeignKey(
+        "operations.OrdreFabrication", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="reservations_stock", verbose_name="OF réservataire",
+    )
+    besoin_id = models.UUIDField(null=True, blank=True, db_index=True, verbose_name="Besoin matière (M3)")
+    quantite = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Quantité réservée")
+    quantite_consommee = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Quantité consommée")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.ACTIVE, db_index=True, verbose_name="Statut")
+    motif = models.CharField(max_length=250, blank=True, verbose_name="Motif (libération / consommation)")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Créée par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    cloturee_le = models.DateTimeField(null=True, blank=True, verbose_name="Soldée / libérée le")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Réservation de stock"
+        verbose_name_plural = "Réservations de stock"
+        indexes = [models.Index(fields=["article", "statut"])]
+
+    def __str__(self):
+        return f"{self.article_id} × {self.quantite} [{self.statut}]"
+
+    @property
+    def reste(self):
+        return self.quantite - self.quantite_consommee

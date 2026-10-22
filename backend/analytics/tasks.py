@@ -24,7 +24,8 @@ DESTINATAIRES = {
     "inspection_reglementaire": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
     "qualification_soudeur": (User.Role.QAQC, User.Role.DIRECTEUR_OPERATIONS),
     "etalonnage": (User.Role.QAQC,),
-    # Familles calendaires de la Couche D (destinataires provisoires, à confirmer par ETSL).
+    # Familles calendaires de la Couche D : défauts ; la valeur effective est le paramètre provisoire `DEST_*`
+    # (ParametreCube, modifiable à l'écran) lu par `cubes.destinataires_famille`.
     "garantie": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
     "agrement_fournisseur": (User.Role.QAQC, User.Role.HSE),
     "audit_interne": (User.Role.QAQC,),
@@ -61,7 +62,9 @@ def notifier_echeances():
     for item in _items(alertes_agregees()):
         if item.get("jours") not in paliers:
             continue
-        roles = DESTINATAIRES.get(item["type"])
+        from .cubes import destinataires_famille
+
+        roles = destinataires_famille(item["type"]) or DESTINATAIRES.get(item["type"])
         if not roles:
             continue
         sujet = f"Échéance J-{item['jours']} : {item['code']} — {item['libelle']}"[:255]
