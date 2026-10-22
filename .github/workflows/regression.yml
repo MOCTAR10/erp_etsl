@@ -7,6 +7,7 @@
 #              (matrix) + couverture par shard (report-only) : ~10 min au lieu de ~40
 #   frontend → typecheck + build + vitest
 #   e2e      → Playwright (chromium et firefox en parallèle) contre une base dédiée seedée
+#   perf     → campagne de performance (Locust + volumétrie), nuit et manuel, non bloquant
 #   (aussi déclenché sur pull request vers master)
 #
 # Infra = containers éphémères par job (Postgres / MinIO / Redis) : base neuve à
@@ -306,3 +307,72 @@ jobs:
             frontend/test-results
             frontend/playwright-report
           retention-days: 14
+  perf:
+    # Campagne de performance (CDC §8.2, CL-OM-01) : jeu volumétrique (bornes hautes du CDC) + 25 utilisateurs Locust
+    # + chronométrage paie / bulletins / traitements lourds, rapport comparé aux seuils provisoires (backend/perf/).
+    # Nocturne et manuel seulement, NON BLOQUANT (continue-on-error) : le rapport est l'artefact `rapport-perf`.
+    name: Performance (Locust + volumétrie, non bloquant)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: etls_perf
+          POSTGRES_USER: etls
+          POSTGRES_PASSWORD: etls_dev_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U etls -d etls_perf"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      POSTGRES_DB: etls_perf
+      STORAGE_BACKEND: local
+      MEDIA_ROOT: /tmp/etls_media
+      MFA_ROLES: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.lock
+            backend/perf/requirements-perf.txt
+      - name: Install backend + Locust (requirements-perf.txt, hors image)
+        run: pip install -r backend/requirements.lock -r backend/perf/requirements-perf.txt
+      - name: Migrate + seed démo + jeu volumétrique
+        working-directory: backend
+        run: |
+          python manage.py migrate
+          python manage.py seed_all_demo
+          python manage.py seed_volumetrie
+      - name: Start backend (gunicorn 4 workers, comme la production)
+        working-directory: backend
+        run: |
+          gunicorn config.wsgi:application -b 127.0.0.1:8000 -w 4 --timeout 120 > /tmp/gunicorn.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/api/health/ >/dev/null && break; sleep 2; done
+          curl -sf http://127.0.0.1:8000/api/health/ || { cat /tmp/gunicorn.log; exit 1; }
+      - name: Charge Locust (25 utilisateurs, 5 min)
+        working-directory: backend
+        run: locust -f perf/locustfile.py --headless -u 25 -r 5 -t 5m --host http://127.0.0.1:8000 --csv perf/resultats/locust --only-summary || true
+      - name: Chronométrage paie, bulletins PDF, traitements lourds
+        working-directory: backend
+        run: python perf/chrono_traitements.py --sortie perf/resultats/chrono.json
+      - name: Rapport (seuils provisoires)
+        if: always()
+        working-directory: backend
+        run: |
+          python perf/rapport.py --resultats perf/resultats | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload rapport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-perf
+          path: backend/perf/resultats
+          retention-days: 30

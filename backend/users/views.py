@@ -202,7 +202,9 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="reinitialiser-mfa")
     def reinitialiser_mfa(self, request, pk=None):
-        """Perte du téléphone : l'admin efface le secret ; le compte se réenrôle à la prochaine connexion."""
+        """Perte du téléphone : l'admin efface le secret. Un rôle de `MFA_ROLES` est relancé en enrôlement à la
+        prochaine connexion ; les autres réactivent la MFA eux-mêmes depuis /signatures (facultative pour eux).
+        Le bouton n'est proposé que si la MFA est active : sans secret, il n'y a rien à effacer."""
         user = self.get_object()
         user.mfa_secret, user.mfa_active, user.mfa_active_le, user.mfa_dernier_pas = "", False, None, None
         user.save(update_fields=["mfa_secret", "mfa_active", "mfa_active_le", "mfa_dernier_pas"])

@@ -57,6 +57,23 @@ x-backend: &backend
     redis:
       condition: service_healthy
 
+x-superset: &superset
+  image: apache/superset:4.1.1
+  environment:
+    SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:?set SUPERSET_SECRET_KEY}
+    SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${SUPERSET_DB_USER:-superset}:${SUPERSET_DB_PASSWORD:?set SUPERSET_DB_PASSWORD}@${POSTGRES_HOST:?set POSTGRES_HOST}:${POSTGRES_PORT:-5432}/${SUPERSET_DB_NAME:-superset}
+    SERVER_WORKER_AMOUNT: ${SUPERSET_WORKERS:-4}
+    SUPERSET_ADMIN_USER: ${SUPERSET_ADMIN_USER:-admin}
+    SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-bi@etsl.ga}
+    SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:?set SUPERSET_ADMIN_PASSWORD}
+    # Base des datamarts = RÉPLICA (compte de lecture conseillé : SUPERSET_MARTS_USER).
+    ETSL_MARTS_URI: postgresql+psycopg2://${SUPERSET_MARTS_USER:-etls}:${SUPERSET_MARTS_PASSWORD:?set SUPERSET_MARTS_PASSWORD}@${POSTGRES_REPLICA_HOST:?set POSTGRES_REPLICA_HOST}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-etls}
+    ETSL_MARTS_SCHEMA: marts
+    ETSL_DBT_MARTS: /app/etsl_dbt/marts
+  volumes:
+    - ./infra/superset/provision_superset.py:/app/etsl_provision/provision_superset.py:ro
+    - ./dbt/models/marts:/app/etsl_dbt/marts:ro
+
 services:
   web:
     <<: *backend
@@ -85,21 +102,35 @@ services:
       timeout: 5s
       retries: 10
 
-  # BI — Couche D (datamarts, reporting pétrolier, alertes J-90/J-60/J-30).
-  # Lire le réplica PostgreSQL (jamais le primaire).
-  # Init unique :
-  #   docker compose -f docker-compose.prod.yml exec superset superset db upgrade
-  #   docker compose -f docker-compose.prod.yml exec superset superset fab create-admin
-  #   docker compose -f docker-compose.prod.yml exec superset superset init
+  # BI — Couche D (datamarts, reporting pétrolier, alertes J-90/J-60/J-30), outil open source (CL-OM-12).
+  # Lire le réplica PostgreSQL (jamais le primaire). Provisionnement AUTOMATIQUE à chaque `up` (service
+  # `superset-init`, idempotent) : schéma de métadonnées, compte administrateur, rôles, base « ETSL — datamarts »
+  # (réplica, schéma `marts`) et un jeu de données par mart dbt (infra/superset/provision_superset.py).
+  # Dimensionnement : 25 utilisateurs BI (CL-OM-12) -> 4 workers gunicorn (SUPERSET_WORKERS).
+  superset-init:
+    <<: *superset
+    container_name: etls_superset_init
+    restart: "no"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        superset db upgrade
+        superset fab create-admin --username "$${SUPERSET_ADMIN_USER}" --firstname Admin --lastname BI \
+          --email "$${SUPERSET_ADMIN_EMAIL}" --password "$${SUPERSET_ADMIN_PASSWORD}" || true
+        superset init
+        python /app/etsl_provision/provision_superset.py
+
   superset:
-    image: apache/superset:4.1.1
+    <<: *superset
     container_name: etls_superset
     restart: unless-stopped
-    environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:?set SUPERSET_SECRET_KEY}
-      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${SUPERSET_DB_USER:-superset}:${SUPERSET_DB_PASSWORD:?set SUPERSET_DB_PASSWORD}@${POSTGRES_HOST:?set POSTGRES_HOST}:${POSTGRES_PORT:-5432}/${SUPERSET_DB_NAME:-superset}
     ports:
       - "${SUPERSET_PORT:-8088}:8088"
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
 
   # Reverse proxy HTTPS (CDC §8.2) : TLS 1.2 minimum, redirection 80 -> 443, HSTS. Configuration : infra/caddy/Caddyfile.
   # Certificat : ACME automatique (ETSL_TLS = e-mail), fourni par ETSL (ETSL_TLS = "/certs/fullchain.pem /certs/privkey.pem",
@@ -144,11 +175,11 @@ services:
     command: ["build"]
 
   # Rafraîchissement BI planifié (CL-OM-12 : datamarts à jour toutes les heures, extensible au temps réel).
-  # Boucle `dbt build` sur le RÉPLICA (jamais le primaire) toutes les DBT_REFRESH_SECONDS (3600 par défaut).
-  # Usage : docker compose -f docker-compose.prod.yml --profile bi --env-file .env up -d dbt-scheduler
+  # DÉMARRÉ PAR DÉFAUT avec la pile (`up -d`) : boucle `dbt build` + `dbt source freshness` sur le RÉPLICA (jamais
+  # le primaire) toutes les DBT_REFRESH_SECONDS (3600 par défaut). Chaque build réécrit `marts.dm_fraicheur_bi` :
+  # l'écran Direction / BI signale des datamarts plus vieux que le paramètre BI_FRAICHEUR_MAX_MIN (120 min, provisoire).
   dbt-scheduler:
     image: ghcr.io/dbt-labs/dbt-postgres:1.8.2
-    profiles: ["bi"]
     restart: unless-stopped
     working_dir: /usr/app
     volumes:
@@ -168,6 +199,7 @@ services:
         while true; do
           echo "[$(date -u +%FT%TZ)] dbt build"
           dbt build || echo "dbt build en echec (nouvelle tentative au prochain cycle)"
+          dbt source freshness || echo "fraicheur du replica : avertissement (voir les logs)"
           sleep "$${DBT_REFRESH_SECONDS}"
         done
 
