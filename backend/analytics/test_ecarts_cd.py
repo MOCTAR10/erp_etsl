@@ -196,7 +196,11 @@ class AlertesCalendairesTests(_Base):
 
     def test_palier_j60_desactivable_et_droits(self):
         Actif.objects.create(designation="Pompe", garanti_jusqu=self.today + timedelta(days=60))
-        _param("PALIER_ALERTE_J60", "0")
+        from juridique.ecarts import parametre_obj
+        from juridique.models import ParametreJuridique
+
+        parametre_obj("paliers_notification")  # paramètre central des paliers (harmonisation) : J-60 retiré
+        ParametreJuridique.objects.filter(cle="paliers_notification").update(valeur=[90, 30, 15, 0])
         notifier_echeances()
         self.assertFalse(Notification.objects.filter(user=self.maint).exists())
         self.client.force_authenticate(self.maint)

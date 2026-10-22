@@ -27,7 +27,7 @@ PARAMETRES_DEFAUT = {
     "MAINTENANCE_RESPONSABLE": ("Responsable de l'exploitation et signataire de l'exercice de reprise", Decimal("0"), "", "DSI ETSL (à désigner)"),
     "RESTAURATION_PERIODICITE_JOURS": ("Périodicité de l'exercice de restauration des sauvegardes", Decimal("90"), "jours", ""),
     "RPO_HEURES": ("Perte de données maximale admissible (RPO)", Decimal("24"), "h", ""),
-    "RTO_HEURES": ("Durée maximale de reprise (RTO)", Decimal("4"), "h", ""),
+    "RTO_HEURES": ("Durée maximale de reprise (RTO) — objectif interne du PRA ; engagement contractuel CDC : 48 h ; objectif interne : à confirmer par ETSL", Decimal("8"), "h", ""),
     # Mot de passe oublié : durée de validité du lien à usage unique envoyé par courriel.
     "MDP_LIEN_VALIDITE_MIN": ("Validité du lien « mot de passe oublié »", Decimal("60"), "min", ""),
     # §8.2 Performance : seuil de temps de réponse au-delà duquel une requête est journalisée comme lente.

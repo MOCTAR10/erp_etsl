@@ -30,7 +30,6 @@ PARAMETRES_DEFAUT = {
     "RETENTION_SCELLE_ANS": ("Durée de garde des scellés de marts opérationnels", Decimal("5"), "ans"),
     "BLOCAGE_AVANT_CLOTURE": ("Données financières réservées aux producteurs avant clôture M11 (1 = oui, 0 = non)",
                               Decimal("1"), "0/1"),
-    "PALIER_ALERTE_J60": ("Palier d'alerte supplémentaire avant échéance (0 = aucun)", Decimal("60"), "jours"),
     "REVUE_DIRECTION_MOIS": ("Périodicité de la revue de direction", Decimal("12"), "mois"),
     "TRESO_DELAI_ENCAISSEMENT": ("Cash-flow : délai d'encaissement d'une facture sans échéance", Decimal("30"), "jours"),
     "TRESO_DELAI_DECAISSEMENT": ("Cash-flow : délai de décaissement (facture fournisseur, engagement)",
@@ -53,7 +52,7 @@ FAMILLE_DESTINATAIRES = {
     "audit_interne": "DEST_AUDIT_INTERNE", "revue_direction": "DEST_REVUE_DIRECTION",
 }
 # Paramètres pouvant valoir 0 (interrupteur ou palier désactivé).
-PARAMETRES_ZERO_AUTORISE = ("BLOCAGE_AVANT_CLOTURE", "PALIER_ALERTE_J60", *DESTINATAIRES_DEFAUT)
+PARAMETRES_ZERO_AUTORISE = ("BLOCAGE_AVANT_CLOTURE", *DESTINATAIRES_DEFAUT)
 TYPE_GED_CUBE = "archive-cube-bi"
 DOSSIER_GED_CUBE = "Archives BI (Couche D)"
 

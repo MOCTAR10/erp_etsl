@@ -120,6 +120,20 @@ class CanReadCube(BasePermission):
         return can_manage_gestion(user)
 
 
+#: Confirmation des paramètres de la Couche D : Direction (admin, PDG, DGA, Direction) ; la modification reste au
+#: cercle de gestion (`CanReadCube`).
+CUBE_PARAM_CONFIRM_ROLES = ("admin", "pdg", "dga", "direction")
+
+
+class CanConfirmerParametreCube(BasePermission):
+    message = "Confirmation des paramètres de la Couche D réservée à la Direction."
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser
+                                                        or user.role in CUBE_PARAM_CONFIRM_ROLES))
+
+
 def _erreur(exc):
     return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -195,6 +209,11 @@ class ParametreCubeViewSet(viewsets.ModelViewSet):
     serializer_class = ParametreCubeSerializer
     permission_classes = [CanReadCube]
     http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_permissions(self):
+        if getattr(self, "action", None) == "confirmer":
+            return [CanReadCube(), CanConfirmerParametreCube()]
+        return super().get_permissions()
 
     def get_queryset(self):
         for code in cubes.PARAMETRES_DEFAUT:

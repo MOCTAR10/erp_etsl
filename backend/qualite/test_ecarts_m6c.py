@@ -126,7 +126,8 @@ class AuditsQualiteTests(Base):
         r = self.post(f"/api/qualite/audits/{a['id']}/cloturer/", code=200).data
         self.assertTrue(r["agrement_accorde"])
         f.refresh_from_db()
-        self.assertGreater(f.agree_qualite_jusqu, self.today + timedelta(days=1000))
+        # Durée unique d'agrément : paramètre M2 AGREMENT_DUREE_MOIS (12 mois provisoires).
+        self.assertTrue(self.today + timedelta(days=330) < f.agree_qualite_jusqu <= self.today + timedelta(days=366))
         b = self.audit(type_audit="fournisseur", fournisseur=str(f.pk))
         self.post(f"/api/qualite/audits/{b['id']}/realiser/", {"score": 60}, 200)
         self.assertFalse(self.post(f"/api/qualite/audits/{b['id']}/cloturer/", code=200).data["agrement_accorde"])

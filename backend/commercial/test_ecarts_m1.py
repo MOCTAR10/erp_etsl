@@ -186,7 +186,7 @@ class EcheancesTests(BaseM1):
         Contract.objects.create(client=self.cli, profile="maintenance", start_date=today - timedelta(days=700),
                                 end_date=today + timedelta(days=30), status=Contract.Status.ACTIF)
         r = self.client.get("/api/commercial/pilotage/echeances/")
-        self.assertEqual(r.data["paliers"], [90, 60, 30, 0])
+        self.assertEqual(r.data["paliers"], [90, 60, 30, 15, 0])  # paramètre central (harmonisation)
         paliers = {x["type"]: x["palier"] for x in r.data["lignes"]}
         self.assertEqual(paliers, {"offre": "j60", "contrat": "j30"})
         self.assertTrue(r.data["provisoire"])
