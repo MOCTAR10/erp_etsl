@@ -769,30 +769,11 @@ def controle_habilitations_affaire(affaire):
 # --------------------------------------------------------------------------------------------- aval M2 : achats
 @transaction.atomic
 def generer_besoins_achat(affaire, user):
-    """DA brouillon (M2) depuis les lignes achetables de l'offre gagnée, imputée au compte analytique de l'affaire."""
-    from achats.models import PurchaseRequest, PurchaseRequestLine
+    """DA brouillon (M2) depuis la fiche affaire : délègue à la règle UNIQUE des Achats (`achats.ecarts.da_depuis_affaire`,
+    affaire liée + imputation analytique), en exigeant une offre gagnée et au moins une ligne achetable."""
+    from achats.ecarts import da_depuis_affaire
 
-    from .models import Affaire
-
-    if affaire.status not in (Affaire.Status.CONFIRMEE, Affaire.Status.EN_COURS):
-        raise ValidationError({"detail": "Seule une affaire confirmée ou en cours génère ses besoins d'achat."})
-    offre = offre_retenue(affaire)
-    if offre is None:
-        raise ValidationError({"detail": "Aucune offre gagnée liée à l'affaire (via son opportunité)."})
-    lignes = list(offre.lines.filter(nature__in=NATURES_ACHAT))
-    if not lignes:
-        raise ValidationError({"detail": "L'offre gagnée n'a aucune ligne achetable (fourniture, sous-traitance, équipement)."})
-    titre = f"Besoins d'achat affaire {affaire.code}"
-    if PurchaseRequest.objects.filter(title=titre).exists():
-        raise ValidationError({"detail": "Besoins d'achat déjà générés pour cette affaire."})
-    analytic = affaire.assurer_compte_analytique()
-    da = PurchaseRequest.objects.create(
-        title=titre, requester=user, analytic=analytic, expected_date=affaire.start_date,
-        notes=f"Générée depuis l'offre {offre.code} v{offre.version} (affaire {affaire.code}).",
-    )
-    for ligne in lignes:
-        PurchaseRequestLine.objects.create(request=da, article=ligne.article, label=ligne.label, quantity=ligne.quantity,
-                                           unit=ligne.unit, estimated_price=ligne.cout_unitaire or ligne.unit_price)
+    da, _n = da_depuis_affaire(affaire, user, exiger_lignes=True)
     return da
 
 

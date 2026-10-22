@@ -75,7 +75,8 @@ class ParcMaintenanceTests(RepriseA7Base):
         from logistique.models import EquipementParc
 
         codes = {g["code"] for g in self.client.get(URL + "catalogue/").data}
-        self.assertEqual(codes, {"equipements_parc", "releves_compteurs", "actifs_maintenance"})
+        self.assertEqual(codes, {"equipements_parc", "releves_compteurs", "actifs_maintenance",
+                                 "gr_lectures_compteurs", "gr_bl"})  # + échanges GR récurrents (D25)
         contenu = "code,libelle,categorie,compteur_type,compteur,date_releve\nPAR-1,Grue 50 t,levage,heures,1250,2026-01-31\n"
         r = self.charger("equipements_parc", contenu, mode="blanc")
         self.assertEqual((r.data["statut"], r.data["creees"]), ("valide", 1))

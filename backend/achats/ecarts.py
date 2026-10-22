@@ -346,10 +346,26 @@ def comptabiliser_avoir(avoir, user):
 TYPES_ACHETABLES = ("matiere", "consommable", "produit")
 
 
+def ligne_offre_achetable(ligne):
+    """Règle unique (INT-02) : nature de coût achetée (fourniture, sous-traitance, équipement) ; une fourniture
+    portant un article n'est achetée que si l'article est matière / consommable / produit (pas une prestation)."""
+    from commercial.ecarts_m1 import NATURES_ACHAT
+
+    if ligne.nature not in NATURES_ACHAT:
+        return False
+    if ligne.nature == "fourniture" and ligne.article_id is not None:
+        return ligne.article.article_type in TYPES_ACHETABLES
+    return True
+
+
 @transaction.atomic
-def da_depuis_affaire(affaire, user):
-    """DA brouillon pré-remplie : imputation analytique de l'affaire, lignes = articles achetables de l'offre gagnée."""
-    from commercial.models import Affaire, Estimate
+def da_depuis_affaire(affaire, user, exiger_lignes=False):
+    """DA brouillon pré-remplie depuis une affaire validée : affaire liée, imputation analytique de l'affaire,
+    lignes achetables de l'offre gagnée (`ligne_offre_achetable`). Point d'entrée UNIQUE, appelé par les Achats
+    (`/api/achats/requests/depuis-affaire/`) et par la fiche affaire M1 (`/besoins-achat/`, `exiger_lignes=True` :
+    refus s'il n'y a ni offre gagnée ni ligne achetable)."""
+    from commercial.ecarts_m1 import offre_retenue
+    from commercial.models import Affaire
 
     from .models import PurchaseRequest, PurchaseRequestLine
 
@@ -357,27 +373,33 @@ def da_depuis_affaire(affaire, user):
         raise ValidationError({"affaire": tr("Affaire %(affaire_code)s %(status)s : seule une affaire validée (confirmée / en cours) génère ses besoins d'achat.") % {"affaire_code": affaire.code, "status": affaire.get_status_display().lower()}})
     if PurchaseRequest.objects.filter(affaire=affaire, status=PurchaseRequest.Status.BROUILLON).exists():
         raise ValidationError({"affaire": "Une DA brouillon existe déjà pour cette affaire : complétez-la."})
+    offre = offre_retenue(affaire)
+    lignes = []
+    if offre is not None:
+        lignes = [ligne for ligne in offre.lines.select_related("article", "unit", "article__unit").order_by("pk")
+                  if ligne_offre_achetable(ligne)]
+    if exiger_lignes and offre is None:
+        raise ValidationError({"detail": "Aucune offre gagnée liée à l'affaire (via son opportunité)."})
+    if exiger_lignes and not lignes:
+        raise ValidationError({"detail": "L'offre gagnée n'a aucune ligne achetable (fourniture, sous-traitance, équipement)."})
     analytic = affaire.analytic or affaire.assurer_compte_analytique()
+    origine = f"l'offre {offre.code} v{offre.version}" if offre is not None else f"l'affaire {affaire.code}"
     da = PurchaseRequest.objects.create(
         title=f"Besoins d'achat — affaire {affaire.code}"[:200], requester=user, affaire=affaire, analytic=analytic,
         expected_date=affaire.start_date, department="Affaire",
-        notes=f"DA générée depuis l'affaire {affaire.code} ({affaire.title}).",
+        notes=f"DA générée depuis {origine} (affaire {affaire.code} — {affaire.title}).",
     )
-    offre = None
-    if affaire.opportunity_id:
-        offre = Estimate.objects.filter(opportunity_id=affaire.opportunity_id, status=Estimate.Status.GAGNEE).order_by("-version").first()
-    n = 0
-    if offre is not None:
-        for ligne in offre.lines.select_related("article").filter(article__isnull=False, article__article_type__in=TYPES_ACHETABLES):
-            PurchaseRequestLine.objects.create(
-                request=da, article=ligne.article, label=ligne.label, quantity=ligne.quantity, unit=ligne.unit or ligne.article.unit,
-                estimated_price=ligne.article.purchase_price or 0,
-            )
-            n += 1
-    if n == 0:
-        da.notes += " Aucune ligne d'offre gagnée dérivable (article matière / consommable / produit) : lignes à saisir."
+    for ligne in lignes:
+        article = ligne.article
+        prix = ligne.cout_unitaire or (article.purchase_price if article is not None else None) or ligne.unit_price or 0
+        PurchaseRequestLine.objects.create(
+            request=da, article=article, label=ligne.label, quantity=ligne.quantity,
+            unit=ligne.unit or (article.unit if article is not None else None), estimated_price=prix,
+        )
+    if not lignes:
+        da.notes += " Aucune ligne d'offre gagnée dérivable (nature fourniture / sous-traitance / équipement) : lignes à saisir."
         da.save(update_fields=["notes", "updated_at"])
-    return da, n
+    return da, len(lignes)
 
 
 @transaction.atomic

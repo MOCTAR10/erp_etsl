@@ -53,6 +53,9 @@ x-backend: &backend
     SMS_GATEWAY_TOKEN: ${SMS_GATEWAY_TOKEN:-}
     SMS_SENDER: ${SMS_SENDER:-ETSL}
     FRONTEND_URL: ${FRONTEND_URL:-https://erp.etsl.local}
+    # Sonde /api/health/ : S3 et Redis vérifiés seulement si activés (503 si en échec) ; base toujours vérifiée.
+    HEALTH_CHECK_S3: ${HEALTH_CHECK_S3:-false}
+    HEALTH_CHECK_REDIS: ${HEALTH_CHECK_REDIS:-false}
   depends_on:
     redis:
       condition: service_healthy

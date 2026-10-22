@@ -105,6 +105,9 @@ class PurchaseRequestViewSet(_CommonViewSet):
             qs = qs.filter(status=status_)
         if self.request.query_params.get("requester"):
             qs = qs.filter(requester_id=self.request.query_params["requester"])
+        affaire = _uuid_or_none(self.request.query_params.get("affaire"))
+        if affaire:
+            qs = qs.filter(affaire_id=affaire)
         return qs
 
     def perform_create(self, serializer):

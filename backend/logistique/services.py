@@ -23,6 +23,7 @@ from .models import (
     DemandeMobilisation,
     EquipementParc,
     HistoriqueEquipement,
+    LectureCompteur,
     LocationGR,
     LogistiqueSequence,
     ParametreLogistique,
@@ -181,6 +182,29 @@ def calculer_penalite(location, date_retour):
     location.jours_retard = max(retard, 0)
     penalite_jour = location.tarif_gr.penalite_jour if location.tarif_gr_id else 0
     location.penalite = location.jours_retard * penalite_jour
+
+
+def enregistrer_lecture_gr(location, jour, valeur, type_lecture="periodique", user=None):
+    """Relevé de compteur reçu de GLOBAL RENTAL (API ou fichier) : prestation active, date non future, jamais en
+    baisse ; met à jour le compteur du parc et évalue les seuils préventifs M8. Lève `ValidationError`."""
+    if location.statut != LocationGR.Statut.ACTIVE:
+        raise ValidationError({"location": "La prestation n'est pas active."})
+    if jour > date.today():
+        raise ValidationError({"date": "Date de relevé dans le futur."})
+    dernier = location.lectures.order_by("-valeur").values_list("valeur", flat=True).first()
+    connus = [x for x in (dernier, location.lecture_initiale) if x is not None]
+    plancher = max(connus) if connus else None
+    if plancher is not None and valeur < plancher:
+        raise ValidationError(
+            {"valeur": tr("Compteur en baisse : %(valeur)s < dernier relevé connu %(plancher)s.") % {"valeur": valeur, "plancher": plancher}}
+        )
+    lecture = LectureCompteur.objects.create(
+        location=location, date=jour, valeur=valeur, type_lecture=type_lecture, source=LectureCompteur.Source.GR,
+        releve_par=user,
+    )
+    # Compteur du parc mis à jour (jamais à la baisse) et seuils préventifs M8 évalués (CDC M4 §12.7 / §12.11).
+    reporter_compteur(location.equipement, lecture.valeur)
+    return lecture
 
 
 def reporter_compteur(equipement, valeur, jour=None, user=None):

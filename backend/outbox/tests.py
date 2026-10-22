@@ -22,13 +22,42 @@ class OutboxDispatchTests(TestCase):
         )
 
     def test_publish_and_dispatch_notifies_admins(self):
-        event = publish("accounting.move.posted", {"number": "VTE00001"})
-        result = dispatch_outbox.run()
+        def notifier(event):
+            Notification.objects.create(user=self.admin, subject="Test", message=event.payload["number"], kind="info")
+
+        SUBSCRIBERS["test.notify"] = [notifier]
+        try:
+            event = publish("test.notify", {"number": "VTE00001"})
+            result = dispatch_outbox.run()
+        finally:
+            del SUBSCRIBERS["test.notify"]
         self.assertEqual(result["delivered"], 1)
         event.refresh_from_db()
         self.assertEqual(event.status, OutboxEvent.Status.DELIVERED)
         self.assertIsNotNone(event.delivered_at)
         self.assertEqual(Notification.objects.filter(user=self.admin).count(), 1)
+
+    def test_chaque_sujet_publie_a_un_abonne_ou_est_documente(self):
+        """Écart E3 (ETSL-ERP-INT) : pas d'abonné mort, pas de sujet publié sans abonné non documenté."""
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+
+        from .subscribers import SUJETS_SANS_ABONNE_INTERNE
+
+        racine = Path(settings.BASE_DIR)
+        publies = set()
+        for fichier in racine.glob("*/**/*.py"):
+            if ".venv" in fichier.parts or fichier.name.startswith("test"):
+                continue
+            publies |= set(re.findall(r"publish\(\s*\"([a-z0-9_.]+)\"", fichier.read_text(encoding="utf-8")))
+        self.assertIn("operations.marge_terminaison", publies)
+        for sujet in publies:
+            self.assertTrue(sujet in SUBSCRIBERS or sujet in SUJETS_SANS_ABONNE_INTERNE, sujet)
+        for sujet in SUBSCRIBERS:
+            self.assertTrue(sujet == "*" or sujet.startswith("test") or sujet in publies, f"abonné sans publication : {sujet}")
+        self.assertNotIn("accounting.move.posted", SUBSCRIBERS)
 
     def test_delivered_events_are_not_reprocessed(self):
         publish("noop.topic", {})
@@ -90,7 +119,7 @@ class OutboxAPITests(APITestCase):
         self.assertEqual(self.client.get("/api/outbox/events/").status_code, status.HTTP_403_FORBIDDEN)
 
     def test_list_filters_by_status(self):
-        publish("accounting.move.posted", {"number": "VTE00001"})
+        publish("test.topic", {"number": "VTE00001"})
         self.client.force_authenticate(self.admin)
         resp = self.client.get("/api/outbox/events/?status=pending")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)

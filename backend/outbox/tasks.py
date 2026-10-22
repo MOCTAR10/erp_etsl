@@ -4,26 +4,15 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
-from users.models import User
-from workflow.models import Notification
-
 from .models import OutboxEvent
-from .subscribers import SUBSCRIBERS, subscriber
+from .subscribers import SUBSCRIBERS
 
 MAX_ATTEMPTS = 3
 
 
-@subscriber("accounting.move.posted")
-def notify_admins_move_posted(event):
-    """Exemple de souscripteur : alerte aux admins après une écriture importée."""
-    number = (event.payload or {}).get("number")
-    for admin in User.objects.filter(role=User.Role.ADMIN, is_active=True):
-        Notification.objects.create(
-            user=admin,
-            subject="Écriture comptabilisée",
-            message=f"L'écriture {number} a été comptabilisée (import).",
-            kind="info",
-        )
+# Abonné d'exemple `accounting.move.posted` retiré (écart E3 de ETSL-ERP-INT) : aucun module ne publiait ce sujet.
+# Les abonnés réels sont déclarés dans les apps (`@subscriber`) ; les sujets publiés sans abonné interne sont
+# listés dans `subscribers.SUJETS_SANS_ABONNE_INTERNE`.
 
 
 def _mark(event, status, **extra):
