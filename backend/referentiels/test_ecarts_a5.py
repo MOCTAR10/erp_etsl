@@ -1,6 +1,7 @@
 """Lot a5 : multi-sites (EX-G-03) et suites des rôles a4 (CG : montants M11 ; chargé d'affaires : saisie M1)."""
 
 from decimal import Decimal
+from importlib import import_module
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -21,6 +22,10 @@ from .sites import meilleur_site, mots_cles, site_pour_texte
 class _Base(TestCase):
     def setUp(self):
         self.client = APIClient()
+        # Sites provisoires de la migration (recréés : une base réutilisée a pu être vidée par un TransactionTestCase).
+        defauts = import_module("referentiels.migrations.0005_ecarts_a5").SITES_DEFAUT
+        for code, libelle, type_site, ville, alias in defauts:
+            Site.objects.get_or_create(code=code, defaults={"libelle": libelle, "type_site": type_site, "ville": ville, "alias": alias})
         self.pog = Site.objects.get(code="POG-ATELIER")
         self.pog_depot = Site.objects.get(code="POG-DEPOT")
         self.lbv_base = Site.objects.get(code="LBV-BASE")
