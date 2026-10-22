@@ -91,9 +91,9 @@ export function TerrainPage() {
       <PageHeader title={t("terrain.title")} subtitle={t("terrain.subtitle")} />
 
       <div className={`terrain-status ${online ? "on" : "off"}`} role="status">
-        <span className="terrain-status-icon" aria-hidden="true">
+        <div className="terrain-status-icon" aria-hidden="true">
           {online ? <Wifi size={18} /> : <CloudOff size={18} />}
-        </span>
+        </div>
         <div className="terrain-status-text">
           <strong>{online ? t("terrain.online") : t("terrain.offline")}</strong>
           <span>
