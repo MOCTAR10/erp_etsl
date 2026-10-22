@@ -252,6 +252,11 @@ PARAMETRES_DEFAUT = {
     "RETENUE_GARANTIE_ACTIVE": (
         "Retenue de garantie portée sur les factures clients (1 = oui, 0 = non)", Decimal("1"), "0/1"),
     "RETENUE_GARANTIE_COMPTE": ("Compte des retenues de garantie clients (SYSCOHADA 4117)", Decimal("411700"), "compte"),
+    "DEVISE_ANCIENNETE_MAX_JOURS": (
+        "Ancienneté maximale du cours de change appliqué (0 = sans limite)", Decimal("31"), "jours"),
+    "REVENU_METHODE": (
+        "Méthode du % d'avancement (1 = coûts engagés / budget M11, 2 = situations de travaux M3)",
+        Decimal("2"), "1/2"),
 }
 
 

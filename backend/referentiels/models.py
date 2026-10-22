@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -300,3 +301,49 @@ class AnalyticAccount(models.Model):
 
     def __str__(self):
         return f"{self.axis.code}:{self.code}"
+
+
+class TauxChange(models.Model):
+    """Cours d'une devise en XAF à une date (EX-G-04) : table paramétrable, saisie manuelle ou import CSV.
+
+    `taux` = nombre de XAF pour 1 unité de la devise. Un cours reste PROVISOIRE tant qu'ETSL ne l'a pas confirmé
+    (source officielle — BEAC, banque — et fréquence à arrêter par ETSL). Le cours applicable à une date est le
+    dernier cours connu à cette date (voir `comptabilite.devises.taux_du`).
+    """
+
+    class Source(models.TextChoices):
+        MANUEL = "manuel", "Saisie manuelle"
+        IMPORT = "import", "Import de fichier"
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    devise = models.ForeignKey(Currency, on_delete=models.PROTECT, related_name="taux", verbose_name="Devise")
+    date = models.DateField(verbose_name="Date du cours", db_index=True)
+    taux = models.DecimalField(max_digits=18, decimal_places=6, verbose_name="Cours (XAF pour 1 unité)")
+    source = models.CharField(max_length=10, choices=Source.choices, default=Source.MANUEL, verbose_name="Source")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut"
+    )
+    saisi_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Saisi par"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Confirmé par"
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "devise__code"]
+        verbose_name = "Cours de change"
+        verbose_name_plural = "Cours de change"
+        constraints = [models.UniqueConstraint(fields=["devise", "date"], name="uniq_taux_change_devise_date")]
+
+    def __str__(self):
+        return f"{self.devise_id} {self.date} = {self.taux} XAF"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME

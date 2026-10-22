@@ -126,10 +126,12 @@ class GabaritImportViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "patch", "post", "head", "options"]
 
     def get_queryset(self):
+        from .export_sage import gabarit_export_sage
         from .gabarits import gabarit_sage
         from .models import GabaritImport
 
         gabarit_sage()
+        gabarit_export_sage()
         return GabaritImport.objects.all()
 
     @action(detail=True, methods=["post"])

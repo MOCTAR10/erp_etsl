@@ -135,7 +135,11 @@ def export_selection(user, format, params=None):
 
 
 def export_sage(queryset):
-    """Export SAGE I7 — écritures validées/archivées (RF-68/80)."""
+    """Export des PIÈCES GED (métadonnées) au format délimité SAGE (RF-68/80).
+
+    Ce n'est PAS l'export des écritures comptables : celui-ci est `integrations.export_sage` (écritures
+    comptabilisées, gabarit `SAGE_EXPORT`, API `/api/integrations/exports-sage/`).
+    """
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")
     writer.writerow(["type", "date_piece", "libelle", "tiers", "montant", "reference", "projet"])

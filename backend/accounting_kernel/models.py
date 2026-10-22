@@ -284,6 +284,18 @@ class AccountMoveLine(models.Model):
         max_digits=16, decimal_places=2, default=0, verbose_name="Crédit"
     )
     order = models.PositiveSmallIntegerField(default=0, verbose_name="Ordre")
+    # Multi-devises (EX-G-04) : débit / crédit restent en XAF (contre-valeur) ; la devise de la pièce, son montant
+    # et le cours appliqué sont portés pour la traçabilité et la réévaluation.
+    currency = models.ForeignKey(
+        "referentiels.Currency", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Devise de la pièce",
+    )
+    amount_currency = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True, verbose_name="Montant en devise"
+    )
+    exchange_rate = models.DecimalField(
+        max_digits=18, decimal_places=6, null=True, blank=True, verbose_name="Cours appliqué (XAF pour 1 unité)"
+    )
 
     class Meta:
         ordering = ["move", "order"]
