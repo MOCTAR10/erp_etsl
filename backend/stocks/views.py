@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -54,6 +54,7 @@ from .services import (
     bon_de_sortie_pdf,
     get_param_stock,
     cloturer_inventaire,
+    peut_valider_ecarts,
     traceabilite,
     valuation,
 )
@@ -350,6 +351,61 @@ class InventaireViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    @action(detail=True, methods=["get"], url_path="ecarts")
+    def ecarts(self, request, pk=None):
+        """Écarts du comptage valorisés (CUMP), tolérance et seuil de validation de la régularisation MAD."""
+        from .ecarts_m5m8 import en_texte, synthese_ecarts
+
+        data = synthese_ecarts(self.get_object())
+        if not can_see_amount(request.user):
+            for ligne in data["lignes"]:
+                ligne["cout_unitaire"] = ligne["valeur_ecart"] = None
+            data["valeur_nette"] = data["valeur_absolue"] = None
+        data["peut_valider"] = peut_valider_ecarts(request.user)
+        return Response(en_texte(data))
+
+    @action(detail=True, methods=["post"], url_path="compter")
+    @transaction.atomic
+    def compter(self, request, pk=None):
+        """Saisie du comptage : `lignes = [{id, quantite_reelle}]` ; l'inventaire passe « en cours »."""
+        inv = Inventaire.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if inv.statut in (Inventaire.Statut.CLOTURE, Inventaire.Statut.ANNULE):
+            raise ValidationError({"detail": "Inventaire clôturé ou annulé : comptage impossible."})
+        lignes = request.data.get("lignes")
+        if not isinstance(lignes, list) or not lignes:
+            raise ValidationError({"lignes": "Liste des lignes comptées attendue."})
+        for item in lignes:
+            try:
+                ligne = inv.lignes.get(pk=item.get("id"))
+            except (InventaireLigne.DoesNotExist, DjangoValidationError, AttributeError, ValueError):
+                raise ValidationError({"lignes": f"Ligne inconnue : {item!r}."})
+            qte = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=0).run_validation(
+                item.get("quantite_reelle"))
+            ligne.quantite_reelle = qte
+            ligne.comptee = True
+            ligne.save(update_fields=["quantite_reelle", "comptee", "updated_at"])
+        if inv.statut == Inventaire.Statut.BROUILLON:
+            inv.statut = Inventaire.Statut.EN_COURS
+            inv.save(update_fields=["statut", "updated_at"])
+        return Response(self.get_serializer(inv).data)
+
+    @action(detail=True, methods=["post"], url_path="valider-ecarts")
+    @transaction.atomic
+    def valider_ecarts(self, request, pk=None):
+        """Validation hiérarchique de la régularisation MAD (écarts valorisés au-delà du seuil)."""
+        if not peut_valider_ecarts(request.user):
+            return Response({"detail": "Validation réservée à la direction des opérations, à la finance et au-dessus."},
+                            status=status.HTTP_403_FORBIDDEN)
+        inv = Inventaire.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if inv.statut in (Inventaire.Statut.CLOTURE, Inventaire.Statut.ANNULE):
+            raise ValidationError({"detail": "Inventaire clôturé ou annulé."})
+        if inv.lignes.filter(comptee=False).exists():
+            raise ValidationError({"detail": "Comptage incomplet : validation impossible."})
+        inv.ecarts_valides_par = request.user
+        inv.ecarts_valides_le = timezone.now()
+        inv.save(update_fields=["ecarts_valides_par", "ecarts_valides_le", "updated_at"])
+        return Response(self.get_serializer(inv).data)
+
     @action(detail=True, methods=["post"], url_path="cloturer")
     def cloturer(self, request, pk=None):
         inventaire = self.get_object()
@@ -398,6 +454,49 @@ class PlanInventaireTournantViewSet(viewsets.ModelViewSet):
         if inventaire is None:
             return Response({"detail": "Aucun article en stock dans ce dépôt."}, status=status.HTTP_400_BAD_REQUEST)
         return Response(InventaireSerializer(inventaire, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+    def _annee(self, request):
+        raw = request.query_params.get("annee") or str(timezone.localdate().year)
+        if not raw.isdigit() or not 2000 <= int(raw) <= 2100:
+            raise ValidationError({"annee": "Année sur 4 chiffres attendue."})
+        return int(raw)
+
+    @action(detail=True, methods=["get"], url_path="plan-annuel")
+    def plan_annuel(self, request, pk=None):
+        """Plan d'inventaire annuel : passages de l'année, capacité vs cycles attendus, réalisés, couverture."""
+        from .ecarts_m5m8 import en_texte, plan_annuel
+
+        return Response(en_texte(plan_annuel(self.get_object(), self._annee(request))))
+
+    @action(detail=True, methods=["get"], url_path="etat-ecarts")
+    def etat_ecarts(self, request, pk=None):
+        """État des écarts du plan pour l'année (JSON, `?export=xlsx|pdf`) ; valeurs masquées hors rôles montants."""
+        from .ecarts_m5m8 import en_texte, etat_ecarts, reponse_export
+
+        plan = self.get_object()
+        data = etat_ecarts(plan, self._annee(request))
+        montants = can_see_amount(request.user)
+        if not montants:
+            for r in data["rows"]:
+                r["cout_unitaire"] = r["valeur_ecart"] = None
+            data["valeur_nette"] = data["valeur_absolue"] = None
+        fmt = request.query_params.get("export")
+        if fmt:
+            if fmt not in ("xlsx", "pdf"):
+                raise ValidationError({"export": "Formats acceptés : xlsx, pdf."})
+            entetes = ["Inventaire", "Date", "Article", "Lot", "Qté système", "Qté réelle", "Écart", "Écart %",
+                       "Hors tolérance", "Valeur écart (FCFA)"]
+            lignes = [[r["inventaire"], r["date"], f"{r['article']} {r['article_label']}", r["lot"] or "",
+                       r["quantite_systeme"], r["quantite_reelle"], r["ecart"], r["ecart_pct"],
+                       "oui" if r["hors_tolerance"] else "non", r["valeur_ecart"] if montants else "—"]
+                      for r in data["rows"]]
+            sous = (f"Dépôt {data['depot']} — année {data['annee']} — {len(lignes)} écart(s), "
+                    f"{data['hors_tolerance']} hors tolérance")
+            if montants:
+                sous += f" — valeur nette {data['valeur_nette']} FCFA"
+            return reponse_export(fmt, f"ecarts-{plan.code}-{data['annee']}", f"État des écarts d'inventaire {plan.code}",
+                                  entetes, lignes, sous)
+        return Response(en_texte(data))
 
 
 class ValorisationMensuelleViewSet(viewsets.ReadOnlyModelViewSet):

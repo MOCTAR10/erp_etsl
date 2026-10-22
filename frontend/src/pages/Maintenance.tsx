@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import { ActionBar, type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
 import { ExigencesHabilitationSection, OtDetails, PlansPreventifsSection } from "../components/workflow/MaintenancePlansSection";
+import { CoutsMaintenanceSection } from "../components/maintenance/EcartsM5m8Section";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
@@ -303,6 +304,7 @@ export function MaintenancePage() {
       <FiabiliteSection />
       <PiecesRechangeSection />
       <ExigencesHabilitationSection />
+      <CoutsMaintenanceSection />
       <ParametresMaintenanceSection />
 
       <QuickForm

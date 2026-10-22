@@ -113,6 +113,11 @@ class Actif(models.Model):
         verbose_name="Refacturation compte 618",
         help_text="Coût/Gain GR isolé au compte 618 (SYSCOHADA).",
     )
+    centre_analytique = models.ForeignKey(
+        "referentiels.AnalyticAccount", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Centre analytique maintenance",
+        help_text="Vide : centre déduit de la catégorie (atelier, parc, GLOBAL RENTAL).",
+    )
     notes = models.TextField(blank=True, verbose_name="Notes")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -263,6 +268,11 @@ class OrdreTravail(models.Model):
         "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
         verbose_name="Rapport archivé en GED",
     )
+    ecriture = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture du coût (clôture)",
+    )
+    motif_ecriture = models.CharField(max_length=255, blank=True, verbose_name="Écriture non passée : motif")
     qualifie_le = models.DateTimeField(null=True, blank=True, verbose_name="Qualifié le")
     qualifie_par = models.ForeignKey(
         settings.AUTH_USER_MODEL,
