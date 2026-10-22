@@ -33,10 +33,7 @@ PARAMETRES_DEFAUT = {
     "CHIFFRAGE_ALEAS_PCT": ("Chiffrage : aléas (% du déboursé sec)", Decimal("5"), "%"),
     "CHIFFRAGE_MARGE_CIBLE_PCT": ("Chiffrage : marge cible (% du prix de revient)", Decimal("15"), "%"),
     "CHIFFRAGE_DERIVE_SEUIL_PCT": ("Dérive : écart coût réel / prévu déclenchant l'alerte", Decimal("10"), "%"),
-    # Échéances (CDC : J-90 / J-60 / J-30, plus J-0).
-    "ECHEANCE_PALIER_1": ("Échéances : premier palier d'alerte", Decimal("90"), "jours"),
-    "ECHEANCE_PALIER_2": ("Échéances : deuxième palier d'alerte", Decimal("60"), "jours"),
-    "ECHEANCE_PALIER_3": ("Échéances : troisième palier d'alerte", Decimal("30"), "jours"),
+    # Échéances : paliers communs à tous les modules (`config.echeances.paliers`, paramètre central).
     # Revue d'appel d'offres (Go / No-Go).
     "RAO_SEUIL_GO": ("RAO : note pondérée minimale pour un Go", Decimal("75"), "%"),
     "RAO_SEUIL_RESERVE": ("RAO : note pondérée minimale pour un Go sous réserve", Decimal("50"), "%"),
@@ -238,7 +235,7 @@ def signaux_client(client, score=None, today=None):
         signaux.append({"code": "pertes", "libelle": "Deux dernières offres perdues"})
     if score is not None and score < get_param("SCORE_SEUIL_ALERTE"):
         signaux.append({"code": "score_bas", "libelle": "Score client sous le seuil d'alerte"})
-    horizon = today + timedelta(days=int(get_param("ECHEANCE_PALIER_1")))
+    horizon = today + timedelta(days=max(paliers(), default=0))
     if Contract.objects.filter(client=client, status=Contract.Status.ACTIF, end_date__isnull=False,
                                end_date__lte=horizon).exists():
         signaux.append({"code": "contrat_echeance", "libelle": "Contrat arrivant à échéance (renouvellement)"})
@@ -499,8 +496,10 @@ def derives_affaires(voir, affaires=None):
 
 # --------------------------------------------------------------------------------------------- échéances
 def paliers():
-    return sorted({int(get_param(c)) for c in ("ECHEANCE_PALIER_1", "ECHEANCE_PALIER_2", "ECHEANCE_PALIER_3")} | {0},
-                  reverse=True)
+    """Paliers communs (paramètre central `paliers_notification`, cf. `config.echeances`)."""
+    from config.echeances import paliers as paliers_communs
+
+    return list(paliers_communs())
 
 
 def palier_de(jours, liste):

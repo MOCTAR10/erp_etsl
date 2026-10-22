@@ -45,7 +45,10 @@ from .services import (
     fiabilite_actifs,
     habilitations_technicien_manquantes,
     get_param_maintenance,
+    can_see_amount,
+    parametres_maintenance_provisoires,
 )
+from .ecarts_m5m8 import comptabiliser_ot
 
 
 def _montant_positif(raw, field):
@@ -83,6 +86,13 @@ class ActifViewSet(viewsets.ModelViewSet):
         if params.get("global_rental") == "1":
             qs = qs.filter(is_global_rental=True)
         return qs
+
+    @action(detail=False, methods=["get"], url_path="centres")
+    def centres(self, request):
+        """Centres analytiques maintenance (axe Centre de coût), créés au besoin."""
+        from .ecarts_m5m8 import centres_maintenance
+
+        return Response([{"id": c.pk, "code": c.code, "label": c.label} for c in centres_maintenance()])
 
     @action(detail=False, methods=["get"], url_path="fiabilite")
     def fiabilite(self, request):
@@ -278,6 +288,8 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
             ot.cout_pieces = _montant_positif(cout_pieces, "cout_pieces")
         if request.data.get("decision"):
             ot.decision = _choix(request.data.get("decision"), OrdreTravail.Decision, "decision")
+        if ot.heures_mo > 0 and ot.tarif_horaire == 0:  # taux par défaut provisoire (paramètre ETSL)
+            ot.tarif_horaire = get_param_maintenance("TAUX_HORAIRE_DEFAUT")
         ot.statut = OrdreTravail.Statut.TERMINE
         ot.date_fin = timezone.now()
         if request.data.get("rapport"):
@@ -304,9 +316,43 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         elif ot.actif.statut == Actif.Statut.EN_MAINTENANCE:
             ot.actif.statut = Actif.Statut.OPERATIONNEL
         ot.actif.save(update_fields=["statut", "updated_at"])
+        if ot.heures_mo > 0 and ot.tarif_horaire == 0:
+            ot.tarif_horaire = get_param_maintenance("TAUX_HORAIRE_DEFAUT")
         ot.save()
         rearmer_plan(ot)
+        comptabiliser_ot(ot, request.user)  # coût → 624 / 618 sur le centre analytique (non bloquant)
         return Response(self.get_serializer(ot).data)
+
+    @action(detail=False, methods=["get"], url_path="couts-annuels")
+    def couts_annuels(self, request):
+        """Coût consolidé de maintenance par an, mois, machine et centre analytique (`?annee=`, `?export=xlsx|pdf`)."""
+        from stocks.ecarts_m5m8 import en_texte, reponse_export
+
+        from .ecarts_m5m8 import couts_annuels
+
+        if not can_see_amount(request.user):
+            return Response({"detail": "Coûts de maintenance réservés aux rôles habilités aux montants."},
+                            status=status.HTTP_403_FORBIDDEN)
+        raw = request.query_params.get("annee") or str(timezone.localdate().year)
+        if not raw.isdigit() or not 2000 <= int(raw) <= 2100:
+            raise ValidationError({"annee": "Année sur 4 chiffres attendue."})
+        data = couts_annuels(int(raw))
+        data["provisoire"] = parametres_maintenance_provisoires(
+            ("COMPTE_ENTRETIEN", "COMPTE_CONTREPARTIE_MO", "COMPTE_CONTREPARTIE_PIECES", "TAUX_HORAIRE_DEFAUT"))
+        fmt = request.query_params.get("export")
+        if fmt:
+            if fmt not in ("xlsx", "pdf"):
+                raise ValidationError({"export": "Formats acceptés : xlsx, pdf."})
+            mois = ["Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."]
+            entetes = ["Machine", "Centre", "Compte", "OT"] + mois + ["Total"]
+            lignes = [[f"{m['actif']} {m['designation']}", m["centre"], m["compte"], m["nb_ot"], *m["mois"], m["total"]]
+                      for m in data["machines"]]
+            lignes += [[f"Centre {c['centre']}", c["libelle"], "", c["nb_ot"], *c["mois"], c["total"]]
+                       for c in data["centres"]]
+            lignes.append(["Cumul", "", "", "", *data["cumul"], data["total"]])
+            return reponse_export(fmt, f"couts-maintenance-{data['annee']}", f"Coûts de maintenance {data['annee']} (XAF)",
+                                  entetes, lignes, "Par machine, par centre analytique et cumul mensuel")
+        return Response(en_texte(data))
 
     @action(detail=True, methods=["post"], url_path="archiver")
     @transaction.atomic

@@ -30,6 +30,15 @@ const DirectionPage = lazy(() => import("./pages/Direction").then((m) => ({ defa
 const CircuitsPage = lazy(() => import("./pages/Circuits").then((m) => ({ default: m.CircuitsPage })));
 const NotificationsPage = lazy(() => import("./pages/Notifications").then((m) => ({ default: m.NotificationsPage })));
 const SecuritePage = lazy(() => import("./pages/Securite").then((m) => ({ default: m.SecuritePage })));
+const DocumentsPage = lazy(() => import("./pages/Documents").then((m) => ({ default: m.DocumentsPage })));
+const ParametresPage = lazy(() => import("./pages/Parametres").then((m) => ({ default: m.ParametresPage })));
+const MonMotDePassePage = lazy(() => import("./pages/MotDePasse").then((m) => ({ default: m.MonMotDePassePage })));
+const MotDePasseOubliePage = lazy(() => import("./pages/MotDePasse").then((m) => ({ default: m.MotDePasseOubliePage })));
+const ReinitialiserMotDePassePage = lazy(() =>
+  import("./pages/MotDePasse").then((m) => ({ default: m.ReinitialiserMotDePassePage })),
+);
+const AdministrationPage = lazy(() => import("./pages/Administration").then((m) => ({ default: m.AdministrationPage })));
+const ReprisePage = lazy(() => import("./pages/Reprise").then((m) => ({ default: m.ReprisePage })));
 
 function pilotPage(children: ReactNode) {
   return withPilot(<Suspense fallback={<KpiGridSkeleton count={6} />}>{children}</Suspense>);
@@ -37,9 +46,14 @@ function pilotPage(children: ReactNode) {
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const access = useAuth((s) => s.access);
+  const doitChanger = useAuth((s) => Boolean((s.user as { doit_changer_mdp?: boolean } | null)?.doit_changer_mdp));
   const location = useLocation();
   if (!access) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  // Mot de passe réinitialisé par l'admin : changement imposé avant tout autre écran (le serveur bloque aussi).
+  if (doitChanger && location.pathname !== "/mon-mot-de-passe") {
+    return <Navigate to="/mon-mot-de-passe" replace />;
   }
   return <>{children}</>;
 }
@@ -60,6 +74,22 @@ export default function App() {
           <GuestOnly>
             <LoginPage />
           </GuestOnly>
+        }
+      />
+      <Route
+        path="/mot-de-passe-oublie"
+        element={
+          <Suspense fallback={null}>
+            <MotDePasseOubliePage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/reinitialiser-mot-de-passe"
+        element={
+          <Suspense fallback={null}>
+            <ReinitialiserMotDePassePage />
+          </Suspense>
         }
       />
       <Route
@@ -91,6 +121,11 @@ export default function App() {
         <Route path="circuits" element={pilotPage(<CircuitsPage />)} />
         <Route path="notifications" element={pilotPage(<NotificationsPage />)} />
         <Route path="securite" element={pilotPage(<SecuritePage />)} />
+        <Route path="documents" element={pilotPage(<DocumentsPage />)} />
+        <Route path="parametres" element={pilotPage(<ParametresPage />)} />
+        <Route path="administration" element={pilotPage(<AdministrationPage />)} />
+        <Route path="mon-mot-de-passe" element={pilotPage(<MonMotDePassePage />)} />
+        <Route path="reprise" element={pilotPage(<ReprisePage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -43,6 +43,17 @@ class ActifSerializer(serializers.ModelSerializer):
         source="equipement_gr.code", read_only=True, default=None
     )
     en_arret = serializers.BooleanField(read_only=True)
+    centre_code = serializers.SerializerMethodField()
+
+    def get_centre_code(self, obj):
+        from .ecarts_m5m8 import centre_actif
+
+        return centre_actif(obj).code
+
+    def validate_centre_analytique(self, value):
+        if value is not None and value.axis.code != "AX-CC":
+            raise serializers.ValidationError("Centre de coût attendu (axe AX-CC).")
+        return value
 
     class Meta:
         model = Actif
@@ -52,7 +63,7 @@ class ActifSerializer(serializers.ModelSerializer):
             "date_mise_en_service", "garanti_jusqu", "compteur_type",
             "compteur_type_label", "compteur_value", "compteur_lecture",
             "is_global_rental", "equipement_gr", "equipe_gr_code", "signe_618",
-            "notes", "created_at", "updated_at",
+            "centre_analytique", "centre_code", "notes", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "compteur_lecture"]
 
@@ -79,6 +90,13 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
     plan_code = serializers.CharField(source="plan.code", read_only=True, default=None)
     qualifie_par_name = serializers.CharField(source="qualifie_par.get_full_name", read_only=True, default=None)
     document_titre = serializers.CharField(source="document.title", read_only=True, default=None)
+    ecriture_numero = serializers.CharField(source="ecriture.number", read_only=True, default=None)
+    centre_code = serializers.SerializerMethodField()
+
+    def get_centre_code(self, obj):
+        from .ecarts_m5m8 import centre_actif
+
+        return centre_actif(obj.actif).code
 
     class Meta:
         model = OrdreTravail
@@ -91,11 +109,13 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
             "has_amount_access", "decision", "decision_label", "rapport", "statut",
             "statut_label", "plan", "plan_code", "archive_le", "archive_par",
             "qualifie_le", "qualifie_par", "qualifie_par_name", "document", "document_titre",
+            "centre_code", "ecriture", "ecriture_numero", "motif_ecriture",
             "created_by", "created_at", "updated_at",
         ]
         read_only_fields = ["created_by", "demandeur",
             "code", "cout_main_oeuvre", "cout_total", "date_debut", "date_fin",
-            "decision", "rapport", "statut", "plan", "archive_le", "archive_par", "qualifie_le", "qualifie_par", "document"]
+            "decision", "rapport", "statut", "plan", "archive_le", "archive_par", "qualifie_le", "qualifie_par", "document",
+            "ecriture", "motif_ecriture"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context.get("request").user)

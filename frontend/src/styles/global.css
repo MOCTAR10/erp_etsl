@@ -2148,3 +2148,48 @@ kbd {
 .search-field input {
   min-width: min(100%, 260px);
 }
+
+/* Écarts transverses (EX-G-08) : impression des écrans — sans navigation ni commandes, tableaux complets. */
+@media print {
+  .sidebar,
+  .topbar,
+  .nav-backdrop,
+  .skip-link,
+  .action-bar,
+  .quick-form,
+  .btn,
+  .icon-btn,
+  .pagination {
+    display: none !important;
+  }
+  .app-shell,
+  .main-col,
+  .main {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  .table-wrap,
+  .main .table {
+    overflow: visible !important;
+  }
+  .table thead {
+    display: table-header-group;
+  }
+  .table tr {
+    break-inside: avoid;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+}

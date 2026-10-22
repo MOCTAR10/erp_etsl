@@ -8,6 +8,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from .parametres_etsl import ParametresEtslResumeView, ParametresEtslView
 from .views import health
 
 urlpatterns = [
@@ -25,6 +26,9 @@ urlpatterns = [
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
     ),
+    # Écarts transverses : registre central des paramètres provisoires de tous les modules.
+    path("api/parametres-etsl/", ParametresEtslView.as_view(), name="parametres-etsl"),
+    path("api/parametres-etsl/resume/", ParametresEtslResumeView.as_view(), name="parametres-etsl-resume"),
     path("api/users/", include("users.urls")),
     path("api/documents/", include("documents.urls")),
     path("api/workflow/", include("workflow.urls")),

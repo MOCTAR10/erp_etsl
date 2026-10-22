@@ -503,7 +503,9 @@ class ParametreGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
             return [can_read_module("controle_gestion")()]
         if getattr(self, "action", None) == "confirmer":
-            return [CanApproveBudget()]
+            from .services import CanConfirmerParametreGestion
+
+            return [CanConfirmerParametreGestion()]
         return [CanManageGestion()]
 
     def create(self, request, *args, **kwargs):

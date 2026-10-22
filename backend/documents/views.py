@@ -558,16 +558,26 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
-    """Piste d'audit (RF-63 à 65) — consultation réservée à l'administration."""
+    """Piste d'audit (RF-63 à 65, EX-G-06) — consultation, export intégral et purge réservés à l'administration."""
 
     serializer_class = AuditLogSerializer
     permission_classes = [IsAdminOrStaff]
 
     def get_queryset(self):
+        from config.inputs import date_input
+
         params = self.request.query_params
         queryset = AuditLog.objects.select_related("user").all()
         if object_type := params.get("object_type"):
             queryset = queryset.filter(object_type=object_type)
+        if module := params.get("module"):
+            queryset = queryset.filter(object_type__startswith=f"{module}.")
+        if email := params.get("email"):
+            queryset = queryset.filter(user__email__icontains=email)
+        if du := date_input(params.get("du"), "du"):
+            queryset = queryset.filter(created_at__date__gte=du)
+        if au := date_input(params.get("au"), "au"):
+            queryset = queryset.filter(created_at__date__lte=au)
         if object_id := params.get("object_id"):
             queryset = queryset.filter(object_id=object_id)
         if action := params.get("action"):
@@ -575,3 +585,60 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         if user_id := params.get("user"):
             queryset = queryset.filter(user_id=user_id)
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        fmt = request.query_params.get("export")
+        if fmt not in ("csv", "xlsx", "pdf"):
+            return super().list(request, *args, **kwargs)
+        from config.exports import export_response
+
+        colonnes = [("created_at", "Horodatage"), ("user", "Utilisateur"), ("action", "Action"), ("object_type", "Objet"),
+                    ("object_id", "Identifiant"), ("ip", "Adresse IP"), ("detail", "Détail (avant / après)")]
+        qs = self.get_queryset()
+        if fmt == "pdf":
+            qs = qs[:5000]  # PDF lisible ; l'export intégral se fait en CSV / XLSX
+        import json
+
+        lignes = ({
+            "created_at": a.created_at, "user": a.user.email if a.user_id else "", "action": a.get_action_display(),
+            "object_type": a.object_type, "object_id": a.object_id, "ip": a.ip_address or "",
+            "detail": json.dumps(a.detail, ensure_ascii=False)[:2000],
+        } for a in qs.iterator())
+        return export_response(lignes, colonnes, fmt, "Piste d'audit ETSL", "piste_audit")
+
+    @action(detail=False, methods=["get"])
+    def retention(self, request):
+        """Durée de conservation (paramètre provisoire) et volume des entrées purgeables."""
+        from datetime import timedelta
+
+        from users.models import JournalAcces
+        from users.parametres import get_param_transverse
+
+        p = get_param_transverse("AUDIT_RETENTION_ANS")
+        limite = timezone.now() - timedelta(days=365 * int(p.valeur))
+        return Response({
+            "retention_ans": int(p.valeur), "provisoire": p.est_provisoire, "limite": limite.isoformat(),
+            "total": AuditLog.objects.count(),
+            "purgeables": AuditLog.objects.filter(created_at__lt=limite).count(),
+            "journal_acces_purgeables": JournalAcces.objects.filter(cree_le__lt=limite).count(),
+        })
+
+    @action(detail=False, methods=["post"])
+    def purger(self, request):
+        """Purge des entrées plus anciennes que la durée de conservation (piste d'audit + journal des accès).
+        Rien d'autre n'est jamais supprimé ; la purge est elle-même tracée."""
+        from datetime import timedelta
+
+        from users.models import JournalAcces
+        from users.parametres import get_param_transverse
+
+        annees = int(get_param_transverse("AUDIT_RETENTION_ANS").valeur)
+        if annees < 1:
+            raise DRFValidationError({"detail": "Durée de conservation invalide (au moins 1 an)."})
+        limite = timezone.now() - timedelta(days=365 * annees)
+        audit = AuditLog.objects.filter(created_at__lt=limite)._raw_delete(AuditLog.objects.db)
+        journal = JournalAcces.objects.filter(cree_le__lt=limite)._raw_delete(JournalAcces.objects.db)
+        log_audit(request.user, AuditLog.Action.DELETE, "purge_audit", "-", {
+            "retention_ans": annees, "limite": limite.isoformat(), "audit": audit, "journal_acces": journal,
+        }, request_ip(request))
+        return Response({"retention_ans": annees, "audit_supprimees": audit, "journal_acces_supprimees": journal})

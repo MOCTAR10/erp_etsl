@@ -76,6 +76,8 @@ PARAMETRES = [
      "Convention collective / calendrier ETSL à confirmer"),
     ("ALERTE_MO_SEUIL", "Tolérance avant alerte de dépassement de main-d'œuvre (% des heures prévues)", "0", "%",
      "Valeur par défaut ERP (alerte dès le dépassement)", "Seuil de tolérance ETSL à confirmer"),
+    ("MAJ_NUIT", "Majoration des heures de nuit (à saisir par ETSL)", "0", "%", "Aucune référence légale gabonaise trouvée (Code du travail, convention collective) — taux à saisir par ETSL", "0 % = prime non valorisée tant qu'ETSL n'a pas saisi le taux (convention collective à fournir)"),
+    ("MAJ_ASTREINTE", "Majoration des heures d'astreinte (à saisir par ETSL)", "0", "%", "Aucune référence légale gabonaise trouvée (Code du travail, convention collective) — taux à saisir par ETSL", "0 % = prime non valorisée tant qu'ETSL n'a pas saisi le taux (convention collective à fournir)"),
     ("CNAMGS_PENALITE_DEFAUT", "CNAMGS — majoration pour défaut de déclaration", "25", "%", CNAMGS, CNAMGS_REF),
     ("CNAMGS_PENALITE_RETARD", "CNAMGS — majoration pour paiement tardif", "2", "%", CNAMGS, CNAMGS_REF),
 ]

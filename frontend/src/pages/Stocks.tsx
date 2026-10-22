@@ -9,6 +9,7 @@ import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { AlertesStockSection, AuditValorisationSection, CertificatActions, ConfigArticlesSection, ParametresStockSection, TracabiliteSection, lotActions } from "../components/workflow/StocksEcartsSection";
 import { ReservationsStockSection } from "../components/suivi/SuiviSections";
+import { InventaireAnnuelSection } from "../components/stocks/EcartsM5m8Section";
 import type {
   CertificatMatiere,
   Depot,
@@ -426,6 +427,7 @@ export function StocksPage() {
       <ConfigArticlesSection articles={articles.data ?? []} />
       <ParametresStockSection />
       <ReservationsStockSection />
+      <InventaireAnnuelSection />
 
       {certificats.count > 0 && (
         <SectionCard title={t("stocks.certificats")}>

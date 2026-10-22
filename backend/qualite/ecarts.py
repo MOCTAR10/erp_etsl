@@ -15,7 +15,6 @@ PARAMETRES_QUALITE_DEFAUT = {
     "QUALIF_ALERTE_JOURS": ("Qualification soudeur : alerte avant péremption", "90", "jours"),
     "METRO_ALERTE_JOURS": ("Métrologie : alerte avant échéance d'étalonnage", "30", "jours"),
     "AGREMENT_SCORE_MIN": ("Audit fournisseur : score minimal d'agrément", "70", "%"),
-    "AGREMENT_DUREE_MOIS": ("Audit fournisseur : durée de l'agrément qualité", "36", "mois"),
     "DOC_REVUE_ALERTE_JOURS": ("Document qualité : alerte avant la date de revue", "30", "jours"),
     # Écarts M6 (lot ecarts-m6m7)
     "CND_ORGANISME_REFERENTIEL": ("CND tiers : organisme agréé du référentiel exigé (1 = oui, 0 = non)", "1", "0/1"),

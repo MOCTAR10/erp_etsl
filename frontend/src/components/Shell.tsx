@@ -5,7 +5,9 @@ import {
   Calculator,
   CircleUser,
   FileSignature,
+  FileUp,
   Filter,
+  FolderOpen,
   GitBranch,
   HardHat,
   Languages,
@@ -20,10 +22,12 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShoppingCart,
+  SlidersHorizontal,
   Smartphone,
   SquareKanban,
   Sun,
   Truck,
+  UserCog,
   UserRound,
   Users,
   Wrench,
@@ -57,10 +61,18 @@ const PILOT_NAV: NavItem[] = [
   { to: "/circuits", key: "nav.circuits", Icon: GitBranch },
   { to: "/notifications", key: "nav.notifications", Icon: Bell },
   { to: "/signatures", key: "nav.signatures", Icon: FileSignature },
+  { to: "/documents", key: "ecarts_tr.nav.ged", Icon: FolderOpen },
+  { to: "/parametres", key: "ecarts_tr.nav.parametres", Icon: SlidersHorizontal },
   { to: "/terrain", key: "nav.terrain", Icon: Smartphone },
   { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
   { to: "/securite", key: "nav.securite", Icon: KeyRound },
+  { to: "/reprise", key: "ecarts_import.nav", Icon: FileUp },
 ];
+
+/** Administration (EX-G-01) : comptes, matrice des droits, référentiels, piste d'audit — rôle admin seulement. */
+const ADMIN_NAV: NavItem[] = [{ to: "/administration", key: "ecarts_tr.nav.administration", Icon: UserCog }];
+/** Reprise de données (CDC §10) : cercle de l'API d'import + RH (salariés, paie) + QA/QC (qualité) + cercle paie. */
+const REPRISE_ROLES = new Set(["admin", "comptable", "finance", "direction", "rh", "qaqc", "pdg", "dga"]);
 
 const MODULE_NAV: ModuleNavItem[] = [
   { to: "/pipeline", key: "nav.pipeline", Icon: Filter, app: ROUTE_APP["/pipeline"] },
@@ -108,6 +120,12 @@ export function Shell() {
     navigate("/login", { replace: true });
   };
 
+  const pilotNav = useMemo(() => {
+    const base = PILOT_NAV.filter(({ to }) => to !== "/reprise" || REPRISE_ROLES.has(user?.role ?? ""));
+    // Administration (EX-G-01) : rôle admin seulement.
+    return user?.role === "admin" ? [...base, ...ADMIN_NAV] : base;
+  }, [user?.role]);
+
   const visibleModules = useMemo(
     () => MODULE_NAV.filter(({ app }) => canSeeApp(user?.modules, app)),
     [user?.modules],
@@ -124,7 +142,7 @@ export function Shell() {
   // Palette de commandes : pages (déjà filtrées par rôle) + actions rapides.
   const paletteItems = useMemo<PaletteItem[]>(
     () => [
-      ...[...PILOT_NAV, ...visibleModules].map(({ to, key, Icon }) => ({
+      ...[...pilotNav, ...visibleModules].map(({ to, key, Icon }) => ({
         id: `go${to === "/" ? "-home" : to.replace(/\//g, "-")}`,
         label: t(key),
         group: t("palette.pages"),
@@ -137,7 +155,7 @@ export function Shell() {
       { id: "act-logout", label: t("common.logout"), group: t("palette.actions"), Icon: LogOut, run: logout },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, visibleModules, isDark, i18n.language],
+    [t, pilotNav, visibleModules, isDark, i18n.language],
   );
 
   useEffect(() => {
@@ -180,7 +198,7 @@ export function Shell() {
           <nav className="sidebar-scroll" aria-label={t("common.mainNav")}>
             <div className="nav-group">
               <span className="nav-group-label">{t("nav.groupPilotage")}</span>
-              {renderNav(PILOT_NAV)}
+              {renderNav(pilotNav)}
             </div>
             <div className="nav-group">
               <span className="nav-group-label">{t("nav.groupModules")}</span>
@@ -247,6 +265,9 @@ export function Shell() {
                   <span className="user-name">{displayName}</span>
                   <span className="user-role">{user?.role ?? ""}</span>
                 </span>
+                <NavLink to="/mon-mot-de-passe" className="icon-btn" title={t("ecarts_tr.mdp.menu")} aria-label={t("ecarts_tr.mdp.menu")}>
+                  <KeyRound size={15} />
+                </NavLink>
                 <button className="btn ghost" onClick={logout}>
                   <LogOut size={15} />
                   {t("common.logout")}

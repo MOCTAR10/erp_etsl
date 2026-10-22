@@ -28,3 +28,6 @@ urlpatterns = [
     path("gr/documents/", GrDocumentsView.as_view(), name="gr-documents"),
     path("", include(router.urls)),
 ]
+
+# Reprise de données (CDC §10) : gabarits CSV / XML / ZIP GED, à blanc, rapprochements C1-C10.
+urlpatterns += [path("migration/", include("integrations.urls_migration"))]

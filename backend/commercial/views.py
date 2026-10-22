@@ -44,6 +44,7 @@ from .serializers import (
 )
 from users.models import User
 from users.permissions import can_read_module
+from config.echeances import paliers_provisoires
 from config.inputs import fk_input
 from documents.models import Document
 
@@ -734,7 +735,7 @@ class PilotageM1ViewSet(viewsets.ViewSet):
     def echeances(self, request):
         lignes = [{k: v for k, v in e.items() if k != "destinataire_id"} for e in ecarts_m1.echeances_m1()]
         return Response({"paliers": ecarts_m1.paliers(), "lignes": lignes,
-                         "provisoire": ecarts_m1.provisoires(("ECHEANCE_PALIER_1", "ECHEANCE_PALIER_2", "ECHEANCE_PALIER_3"))})
+                         "provisoire": paliers_provisoires()})
 
     @action(detail=False, methods=["post"])
     @transaction.atomic

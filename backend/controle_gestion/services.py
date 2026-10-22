@@ -67,6 +67,20 @@ class CanManageGestion(BasePermission):
         return can_manage_gestion(getattr(request, "user", None))
 
 
+#: Confirmation des paramètres provisoires M11 : DAF (Finance) et Direction ; le comptable modifie sans confirmer.
+GESTION_PARAM_CONFIRM_ROLES = (User.Role.ADMIN, User.Role.PDG, User.Role.DGA, User.Role.FINANCE, User.Role.DIRECTION)
+
+
+class CanConfirmerParametreGestion(BasePermission):
+    message = "Confirmation des paramètres de contrôle de gestion réservée au DAF (Finance) et à la Direction."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        return is_admin_or_staff(user) or user.role in GESTION_PARAM_CONFIRM_ROLES
+
+
 class CanApproveBudget(BasePermission):
     """Approbation des budgets / révisions / clôtures : cercle montants."""
 
