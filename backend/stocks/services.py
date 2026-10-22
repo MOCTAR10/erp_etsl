@@ -316,6 +316,9 @@ def cloturer_inventaire(inventaire, user):
         return inventaire
     if InventaireLigne.objects.filter(inventaire=inventaire, comptee=False).exists():
         raise ValueError("Des lignes de l'inventaire n'ont pas encore été comptées : clôture impossible.")
+    from .ecarts_m5m8 import LIBELLE_MAD, controler_regularisation
+
+    controler_regularisation(inventaire)
     for ligne in InventaireLigne.objects.filter(inventaire=inventaire).select_related(
         "article", "lot", "inventaire__depot"
     ):
@@ -332,6 +335,7 @@ def cloturer_inventaire(inventaire, user):
             document_reference=inventaire.code,
             date=inventaire.date,
             created_by=user,
+            notes=f"{LIBELLE_MAD} — {inventaire.code}",
         )
         apply_move(mouvement)
     inventaire.statut = Inventaire.Statut.CLOTURE
@@ -413,7 +417,24 @@ PARAMETRES_STOCK_DEFAUT = {
     "CERTIFICAT_RETENTION_ANS": ("Conservation des certificats matière en GED", "10", "ans"),
     "RESERVATION_BLOQUANTE": (
         "Réservation des besoins M3 : 1 = stock réservé non consommable par un autre OF, 0 = simple alerte", "1", "0/1"),
+    "INVENTAIRE_CYCLES_AN": ("Inventaire tournant : comptages complets de chaque article par an", "1", "cycles/an"),
+    "ECART_TOLERANCE_PCT": ("Inventaire : tolérance d'écart en quantité (ligne signalée au-delà)", "2", "%"),
+    "SEUIL_VALIDATION_ECART": (
+        "Régularisation MAD : écarts valorisés (valeur absolue) au-delà desquels une validation est exigée", "500000", "FCFA"),
 }
+# Validation de la régularisation MAD d'un inventaire (écarts au-delà du seuil) : hiérarchie et finance.
+STOCK_VALIDATION_ROLES = (
+    User.Role.ADMIN,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.DIRECTEUR_OPERATIONS,
+    User.Role.FINANCE,
+    User.Role.DIRECTION,
+)
+
+
+def peut_valider_ecarts(user):
+    return bool(user and user.is_authenticated and (user.is_staff or user.role in STOCK_VALIDATION_ROLES))
 TYPE_GED_CERTIFICAT = "certificats-matiere"
 TYPE_GED_PIECE_STOCK = "pieces-stock"
 

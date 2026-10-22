@@ -81,6 +81,14 @@ PARAMETRES_DEFAUT = {
     "PREVENTIF_PREALERTE_PCT": ("Préventif : pré-alerte avant le seuil compteur (part de l'intervalle)", Decimal("10"), "%"),
     "SEUIL_DISPONIBILITE_PCT": ("Fiabilité : disponibilité minimale attendue par machine", Decimal("90"), "%"),
     "SEUIL_MTBF_H": ("Fiabilité : MTBF minimal attendu par machine", Decimal("500"), "heures"),
+    "TAUX_HORAIRE_DEFAUT": ("Coût OT : taux horaire de main-d'œuvre par défaut (OT sans taux saisi)", Decimal("15000"),
+                            "FCFA/h"),
+    "COMPTE_ENTRETIEN": ("Coût OT : compte de charge d'entretien (hors GLOBAL RENTAL, 618 sinon)", Decimal("624000"),
+                         "compte"),
+    "COMPTE_CONTREPARTIE_MO": ("Coût OT : compte crédité pour la main-d'œuvre interne (transfert)", Decimal("661000"),
+                               "compte"),
+    "COMPTE_CONTREPARTIE_PIECES": ("Coût OT : compte crédité pour les pièces sorties du stock", Decimal("603300"),
+                                   "compte"),
 }
 CODES_FIABILITE = ("OBSERVATION_JOURS", "HEURES_PAR_JOUR", "SEUIL_DISPONIBILITE_PCT", "SEUIL_MTBF_H")
 ROLES_ALERTE_MAINTENANCE = (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS)
@@ -202,8 +210,11 @@ def couts_maintenance(periode):
     ).select_related("actif").order_by("actif__code")
     for ot in ots:
         gr = ot.actif.is_global_rental or ot.actif.signe_618
+        from .ecarts_m5m8 import centre_actif
+
         ligne = par_actif.setdefault(ot.actif_id, {
             "actif": ot.actif.code, "designation": ot.actif.designation, "gr": gr,
+            "centre": centre_actif(ot.actif).code,
             "compte": COMPTE_GR if gr else COMPTE_ENTRETIEN, "nb_ot": 0,
             "main_oeuvre": Decimal("0"), "pieces": Decimal("0"), "total": Decimal("0"),
         })
