@@ -79,7 +79,7 @@ def _equipements_parc(row, ctx):
     proprietaire = _partner(_txt(row, "proprietaire"))
     gr = _bool(row, "global_rental", False)
     if gr and (proprietaire is None or not proprietaire.is_global_rental):
-        raise LigneErreur("équipement GLOBAL RENTAL : le propriétaire doit être un tiers is_global_rental (compte 618).")
+        raise LigneErreur("équipement GLOBAL RENTAL : le propriétaire doit être un tiers marqué GLOBAL RENTAL (compte 618).")
     valeurs = {
         "label": _req(row, "libelle", 200),
         "registration": _txt(row, "immatriculation", 40),

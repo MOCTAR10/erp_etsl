@@ -505,7 +505,7 @@ def _affaires(row, ctx):
     partner = _partner(_txt(row, "client"))
     gr = _bool(row, "global_rental", False)
     if gr and partner is not None and not partner.is_global_rental:
-        raise LigneErreur("affaire GLOBAL RENTAL : le client doit être un tiers is_global_rental (compte 618).")
+        raise LigneErreur("affaire GLOBAL RENTAL : le client doit être un tiers marqué GLOBAL RENTAL (compte 618).")
     statut = _choix(row, "statut", [c for c in Affaire.Status.choices if c[0] in ("brouillon", "confirmee", "en_cours")],
                     defaut=Affaire.Status.EN_COURS)
     valeurs = {
@@ -546,7 +546,7 @@ def _contrats(row, ctx):
     partner = _partner(_txt(row, "client"))
     gr = _bool(row, "global_rental", False)
     if gr and partner is not None and not partner.is_global_rental:
-        raise LigneErreur("contrat GLOBAL RENTAL : le client doit être un tiers is_global_rental (compte 618).")
+        raise LigneErreur("contrat GLOBAL RENTAL : le client doit être un tiers marqué GLOBAL RENTAL (compte 618).")
     mois = _dec(row, "mois")
     valeurs = {
         "affaire": affaire,
