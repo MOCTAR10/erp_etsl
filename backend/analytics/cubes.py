@@ -37,6 +37,7 @@ PARAMETRES_DEFAUT = {
     "BUDGET_SEUIL_ALERTE": ("Seuil budgétaire : alerte", Decimal("90"), "%"),
     "BUDGET_SEUIL_ATTEINT": ("Seuil budgétaire : budget atteint", Decimal("100"), "%"),
     "BUDGET_SEUIL_DEPASSE": ("Seuil budgétaire : dépassement (analyse obligatoire)", Decimal("110"), "%"),
+    "BI_FRAICHEUR_MAX_MIN": ("Couche D : âge maximal des datamarts avant alerte (ETL horaire)", Decimal("120"), "min"),
 }
 # Destinataires des 4 familles d'alertes calendaires (liste de rôles dans `texte`, valeur inutilisée = 0).
 DESTINATAIRES_DEFAUT = {

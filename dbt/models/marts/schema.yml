@@ -91,5 +91,17 @@ models:
       - name: objet
         tests:
           - not_null
+  - name: dm_capa
+    description: "CAPA qualité (M6) et HSE (M7) : ouvertes, échues, clôturées, délai moyen de clôture, taux d'efficacité ; même règle que analytics.bi_etat.indicateurs_capa."
+    columns:
+      - name: origine
+        tests:
+          - not_null
+          - unique
+  - name: dm_fraicheur_bi
+    description: "Horodatage du dernier dbt build (ETL horaire, CL-OM-12) ; lu par l'écran Direction / BI (seuil BI_FRAICHEUR_MAX_MIN)."
+    tests:
+      - not_null:
+          column_name: rafraichi_le
   - name: dm_qualite_itp_cnd
     description: "Indicateurs qualite ITP / CND du reporting client petrolier (Couche D)."

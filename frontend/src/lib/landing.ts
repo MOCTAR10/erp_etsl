@@ -24,6 +24,9 @@ const LANDING_BY_ROLE: Record<string, string> = {
   logistique: "/logistique",
   maintenance: "/maintenance",
   chef_atelier: "/operations",
+  // Consommateurs de la Couche D (écarts a4).
+  charge_affaires: "/pipeline",
+  controleur_gestion: "/controle-gestion",
 };
 
 export function landingForRole(role: string | null | undefined): string {
