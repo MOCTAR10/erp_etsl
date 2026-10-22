@@ -46,6 +46,10 @@ type DemoAccount = { email: string; roleKey: string; icon: LucideIcon };
 /** Mot de passe commun aux 6 comptes de démonstration (cf. `seed_all_demo`). */
 const DEMO_PASSWORD = "Etls#Demo2026";
 
+/** Encadré des comptes de démonstration : masqué au build par `VITE_DEMO_COMPTES=false` (instance remise à un client,
+ *  dont les mots de passe ont été changés). Affiché par défaut (développement, e2e). */
+const SHOW_DEMO_ACCOUNTS = import.meta.env.VITE_DEMO_COMPTES !== "false";
+
 const MODULES: LoginModule[] = [
   { code: "M01", labelKey: "login.modules.m01", icon: GitBranch },
   { code: "M02", labelKey: "login.modules.m02", icon: ShoppingCart },
@@ -339,6 +343,7 @@ export function LoginPage() {
           </form>
           )}
 
+          {SHOW_DEMO_ACCOUNTS && (
           <section className="login-demo">
             <div className="login-demo-head">
               <b>{t("login.demoTitle")}</b>
@@ -364,6 +369,7 @@ export function LoginPage() {
               {t("login.demoPassword")} <code>{DEMO_PASSWORD}</code>
             </p>
           </section>
+          )}
         </motion.div>
       </main>
     </div>
