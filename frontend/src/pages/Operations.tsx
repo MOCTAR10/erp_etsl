@@ -98,13 +98,13 @@ function Charge({ stats }: { stats: ChargeStats }) {
                 <strong>{t(`operations.${a.scope}`)}</strong>
                 <span className="cell-sub">{t("listes.operations.surchargeHint", { date: formatDate(a.week) })}</span>
               </span>
-              <span className={`overload-bar${a.overload_pct >= 25 ? " err" : ""}`} aria-hidden>
+              <span className={`overload-bar${a.overload_pct >= 100 ? " err" : ""}`} aria-hidden>
                 <span style={{ width: `${Math.round(ratio * 100)}%` }} />
               </span>
               <span className="overload-hours">
                 {formatNumber(a.planned_hours)} h / {formatNumber(a.capacity)} h
               </span>
-              <Badge tone={a.overload_pct >= 25 ? "err" : "warn"}>+{formatPercent(a.overload_pct)}</Badge>
+              <Badge tone={a.overload_pct >= 100 ? "err" : "warn"}>+{formatPercent(a.overload_pct)}</Badge>
             </li>
           );
         })}

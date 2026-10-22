@@ -329,9 +329,23 @@ td .card-actions--choice {
   color: var(--text-muted);
 }
 .cell-mono {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
+}
+/* Un seul bouton primaire par écran (en-tête de page) : les créations de section sont secondaires */
+.card-header > .btn.primary,
+.section-actions > .btn.primary,
+.list-toolbar-end > .btn.primary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+.card-header > .btn.primary:hover:not(:disabled),
+.section-actions > .btn.primary:hover:not(:disabled),
+.list-toolbar-end > .btn.primary:hover:not(:disabled) {
+  background: var(--surface-2);
 }
 
 /* ── Surcharge de capacité (Opérations, P2-10) ── */

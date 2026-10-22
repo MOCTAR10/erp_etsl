@@ -101,7 +101,7 @@ function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
       <div className="meta">{[ot.actif_code, ot.actif_designation].filter(Boolean).join(" · ") || "—"}</div>
       <div className="card-foot">
         <span>{[formatDate(ot.date_demande), ot.technicien_name].filter(Boolean).join(" · ")}</span>
-        {ot.has_amount_access && ot.cout_total !== null ? <span className="amount">{formatMoney(ot.cout_total)}</span> : null}
+        {ot.has_amount_access && ot.cout_total !== null && Number(ot.cout_total) > 0 ? <span className="amount">{formatMoney(ot.cout_total)}</span> : null}
       </div>
       <OtDetails ot={ot} />
       <CardActions actions={otActions(ot, t)} />
