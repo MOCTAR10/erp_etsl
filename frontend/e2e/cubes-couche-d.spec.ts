@@ -8,6 +8,8 @@ test.describe("Couche D : cubes à 6 axes et archive 10 ans", () => {
   test("lecture par axe, alimentation, archive scellée et durée de conservation paramétrable", async ({ page }) => {
     await loginAs(page, DEMO_USERS.admin);
     await page.goto("/direction");
+    // Les cubes sont rangés dans l'onglet « Cubes 6 axes » du pilotage financier.
+    await page.getByRole("tab", { name: "Cubes 6 axes" }).click();
     const section = page.getByTestId("cube-olap");
     await expect(section).toContainText("grand livre");
 
@@ -55,6 +57,8 @@ test.describe("Couche D : cubes à 6 axes et archive 10 ans", () => {
   test("un rôle hors du cercle des montants ne voit pas les cubes", async ({ page }) => {
     await loginAs(page, DEMO_USERS.logistique);
     await page.goto("/direction");
+    await expect(page.getByRole("heading", { name: "Indicateurs par module" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Cubes 6 axes" })).toHaveCount(0);
     await expect(page.getByTestId("cube-olap")).toHaveCount(0);
   });
 });

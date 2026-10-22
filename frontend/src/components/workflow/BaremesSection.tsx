@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { BaremeCotisation, HistoriqueBareme, ParametrePaie } from "../../types";
 import { Badge, SectionCard } from "../ui";
@@ -137,7 +137,7 @@ export function BaremesSection() {
                 ) : (
                   <>
                     <td>{b.taux} %</td>
-                    <td>{b.plafond ? `${formatNumber(b.plafond)} F` : "—"}</td>
+                    <td>{b.plafond ? formatMoney(b.plafond) : "—"}</td>
                   </>
                 )}
                 <td>

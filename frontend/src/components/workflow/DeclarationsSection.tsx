@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionCard } from "../ui";
 
@@ -114,7 +114,7 @@ export function DeclarationsSection() {
                   )}
                 </td>
                 <td>
-                  {formatNumber(d.total_brut)} F · {formatNumber(d.total_salarial)} / {formatNumber(d.total_patronal)}
+                  {formatMoney(d.total_brut)} · {formatMoney(d.total_salarial)} / {formatMoney(d.total_patronal)}
                 </td>
                 <td>
                   <button type="button" className="btn" onClick={() => void api.download(`/api/rh-paie/declarations/${d.id}/fichier/`, `${d.code}_${d.type}.csv`)}>

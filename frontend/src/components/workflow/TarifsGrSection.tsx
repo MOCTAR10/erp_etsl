@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { EquipementParc, TarifGR } from "../../types";
 import { QuickForm, SectionCard } from "../ui";
@@ -17,7 +17,7 @@ interface PartnerRef {
 
 const CATEGORIES = ["engin", "levage", "transport", "atelier", "materiel"] as const;
 const PERIODICITES = ["heure", "jour", "mois", "forfait"] as const;
-const montant = (v: string | null) => (v === null ? "••••••" : `${formatNumber(Number(v))} F`);
+const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 
 /**
  * Grille tarifaire GLOBAL RENTAL (M4 §12.4 / §12.11) : versions datées, jamais réécrites. Un changement de tarif

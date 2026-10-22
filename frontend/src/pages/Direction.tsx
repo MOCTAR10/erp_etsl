@@ -3,59 +3,44 @@ import {
   AlertTriangle,
   Award,
   Boxes,
-  CalendarDays,
-  CheckCircle2,
+  CalendarClock,
+  CalendarX2,
+  Factory,
   Flame,
-  FolderOpen,
-  Gauge,
   Scale,
   ShieldAlert,
-  ShieldCheck,
+  ShoppingCart,
   TrendingUp,
   UserCheck,
   Users,
   Wrench,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { api } from "../api/client";
-import { EcartsA4Section } from "../components/direction/EcartsA4Section";
-import { EcartsCdSection } from "../components/direction/EcartsCdSection";
-import { CubesSection } from "../components/workflow/CubesSection";
-import { ChartCard, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, ProgressBar, SectionTitle, Sparkline } from "../components/ui";
-import { formatNumber } from "../lib/format";
-import { useThemeMode } from "../lib/useThemeMode";
-import { motionTokens, paletteFor } from "../theme/tokens";
-import type { AlerteEcheanceItem, AlertesAgregees, DashboardDirection, ReportingPetrolier, Tendances } from "../types";
+import { AttentionList } from "../components/direction/AttentionList";
+import type { AttentionItem } from "../components/direction/AttentionList";
+import { DirectionExports } from "../components/direction/DirectionExports";
+import { EcheancesSection } from "../components/direction/Echeances";
+import { HeroStat, toneFor } from "../components/direction/HeroStat";
+import { PilotageSection } from "../components/direction/Pilotage";
+import { ReportingSection } from "../components/direction/Reporting";
+import { TrendPanel } from "../components/direction/TrendPanel";
+import type { IndicateursCommerciaux, Pilotage } from "../components/direction/types";
+import { ErrorState, Kpi, KpiGridSkeleton, PageHeader, Skeleton } from "../components/ui";
+import { formatMoney, formatNumber, formatPercent } from "../lib/format";
+import type { AlertesAgregees, DashboardDirection, ReportingPetrolier, Tendances } from "../types";
 
-const BANDE_ORDER = ["j90", "j60", "j30", "j15", "j0", "expiree"] as const;
-const BANDE_TONE: Record<string, "ok" | "warn" | "err" | "brand"> = {
-  j90: "ok",
-  j60: "warn",
-  j30: "warn",
-  j15: "err",
-  j0: "err",
-  expiree: "err",
+/** Objectifs de pilotage affichés sur les chiffres héros (seuils vert / orange, en %). */
+const OBJECTIF_DISPO = { ok: 90, warn: 70 };
+const OBJECTIF_CLOTURE = { ok: 90, warn: 70 };
+
+type DashboardDirectionPlus = DashboardDirection & {
+  commercial: DashboardDirection["commercial"] & { pipe_pondere?: number | null; indicateurs?: IndicateursCommerciaux };
 };
 
-type Tone = "err" | "warn";
-interface Urgent {
-  key: string;
-  count: number;
-  tone: Tone;
-  to: string;
-  Icon: LucideIcon;
-}
-
-export function DirectionPage() {
-  return <DirectionInner />;
-}
-
-/** Tuile KPI cliquable vers le module concerné (accessible : un seul lien, focus visible). */
+/** Tuile KPI cliquable vers le module concerné (un seul lien, focus visible). */
 function KpiLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <Link to={to} className="kpi-link">
@@ -64,299 +49,229 @@ function KpiLink({ to, children }: { to: string; children: React.ReactNode }) {
   );
 }
 
-function DirectionInner() {
+/** Montant masqué (hors cercle des montants) : « •••••• », sinon montant exact. */
+const montant = (v: number | null | undefined) => (v === null || v === undefined ? "••••••" : formatMoney(v));
+
+/** Sépare « 210 000 000 FCFA » en nombre + unité (affichée plus petite) sans jamais abréger. */
+function splitMoney(v: number | null | undefined): { value: string; unit?: string } {
+  const text = montant(v);
+  const m = /^(.*)\s(FCFA)$/u.exec(text);
+  return m ? { value: m[1], unit: m[2] } : { value: text };
+}
+
+function DirectionSkeleton() {
+  return (
+    <>
+      <div className="dir-heroes">
+        {[0, 1, 2, 3].map((i) => (
+          <div className="card dir-hero" key={i} aria-hidden>
+            <Skeleton style={{ height: 14, width: "60%" }} />
+            <Skeleton style={{ height: 40, width: "45%" }} />
+            <Skeleton style={{ height: 8, width: "100%" }} />
+            <Skeleton style={{ height: 12, width: "70%" }} />
+          </div>
+        ))}
+      </div>
+      <KpiGridSkeleton count={8} />
+    </>
+  );
+}
+
+export function DirectionPage() {
   const { t } = useTranslation();
-  const mode = useThemeMode();
-  const c = paletteFor(mode);
-  const chart = { axis: c.textMuted, grid: c.border, tooltipBg: c.surface, tooltipBorder: c.border, tooltipText: c.text };
 
   const direction = useQuery({ queryKey: ["direction"], queryFn: () => api.dashboardDirection() });
   const petrolier = useQuery({ queryKey: ["petrolier"], queryFn: () => api.reportingPetrolier() });
   const alertes = useQuery({ queryKey: ["alertes-agregees"], queryFn: () => api.alertesAgregees() });
   const tendances = useQuery({ queryKey: ["tendances"], queryFn: () => api.tendances(), retry: 0 });
+  // Exports financiers proposés seulement si le pilotage financier est lisible (cercle des montants).
+  const pilotage = useQuery({ queryKey: ["cd", "pilotage"], queryFn: () => api.get<Pilotage>("/api/analytics/pilotage/"), retry: 0 });
+
+  const header = (
+    <PageHeader title={t("direction.title")} subtitle={t("direction.subtitle")} actions={<DirectionExports financier={pilotage.isSuccess} />} />
+  );
 
   if (direction.isPending || petrolier.isPending || alertes.isPending) {
-    return <KpiGridSkeleton count={8} />;
+    return (
+      <>
+        {header}
+        <DirectionSkeleton />
+      </>
+    );
   }
   if (direction.isError || petrolier.isError || alertes.isError) {
     return (
-      <ErrorState
-        message={t("common.error")}
-        onRetry={() => {
-          void direction.refetch();
-          void petrolier.refetch();
-          void alertes.refetch();
-        }}
-        retryLabel={t("common.retry")}
-      />
+      <>
+        {header}
+        <ErrorState
+          message={t("common.error")}
+          onRetry={() => {
+            void direction.refetch();
+            void petrolier.refetch();
+            void alertes.refetch();
+          }}
+          retryLabel={t("common.retry")}
+        />
+      </>
     );
   }
 
-  const d = direction.data as DashboardDirection;
+  const d = direction.data as DashboardDirectionPlus;
   const p = petrolier.data as ReportingPetrolier;
   const a = alertes.data as AlertesAgregees;
   const tr = tendances.data as Tendances | undefined;
-  const taux = (p.asmr.taux_disponibilite * 100).toFixed(1);
+
+  // Héros 1 — chiffre d'affaires signé (montant exact, masqué hors cercle des montants).
+  const ca = splitMoney(d.commercial.ca_gagne);
+  // Héros 2 — disponibilité du matériel.
+  const dispo = p.asmr.taux_disponibilite * 100;
+  const dispoTone = toneFor(dispo, OBJECTIF_DISPO.ok, OBJECTIF_DISPO.warn);
+  const dispoEcart = Math.round(dispo - OBJECTIF_DISPO.ok);
+  // Héros 3 — sécurité.
+  const jsa = p.hse.jours_sans_accident;
+  const securiteTone = p.hse.accidents > 0 && (jsa ?? 0) < 30 ? "err" : p.hse.incidents_ouverts > 0 ? "warn" : "ok";
+  // Héros 4 — clôtures mensuelles dans les délais.
   const j4 = d.controle_gestion.conformite_j4;
-  const j4Taux = Math.round(j4.taux * 100);
+  const clotureTaux = j4.taux * 100;
+  const clotureTone = toneFor(clotureTaux, OBJECTIF_CLOTURE.ok, OBJECTIF_CLOTURE.warn);
 
-  const delay = (i: number) => Math.min(i * 0.05, 0.8);
+  const statut = (tone: string) => t(`direction2.statut.${tone}`);
+  const ecart = (n: number) =>
+    n >= 0 ? t("direction2.ecart.dessus", { n: formatNumber(n) }) : t("direction2.ecart.dessous", { n: formatNumber(Math.abs(n)) });
 
-  // « À traiter maintenant » : uniquement ce qui est non nul, le plus grave d'abord.
-  const urgents: Urgent[] = (
+  // « À traiter maintenant » : uniquement les points non nuls ; le tri par gravité est fait par la liste.
+  const urgents: AttentionItem[] = (
     [
-      { key: "expirees", count: a.compteurs.expiree ?? 0, tone: "err", to: "#echeances", Icon: CalendarDays },
-      { key: "j15", count: (a.compteurs.j0 ?? 0) + (a.compteurs.j15 ?? 0), tone: "err", to: "#echeances", Icon: CalendarDays },
+      { key: "expirees", count: a.compteurs.expiree ?? 0, tone: "err", to: "#echeances", Icon: CalendarX2 },
+      { key: "j15", count: (a.compteurs.j0 ?? 0) + (a.compteurs.j15 ?? 0), tone: "err", to: "#echeances", Icon: CalendarClock },
       { key: "ncCritiques", count: p.qualite.nc_critiques, tone: "err", to: "/qualite", Icon: AlertTriangle },
       { key: "incidents", count: d.hse.incidents_ouverts, tone: "err", to: "/hse", Icon: ShieldAlert },
       { key: "atex", count: p.hse.equipements_atex_quarantaine, tone: "err", to: "/hse", Icon: Flame },
       { key: "panne", count: p.asmr.en_panne, tone: "err", to: "/maintenance", Icon: Wrench },
-      { key: "j30", count: a.compteurs.j30 ?? 0, tone: "warn", to: "#echeances", Icon: CalendarDays },
+      { key: "j30", count: a.compteurs.j30 ?? 0, tone: "warn", to: "#echeances", Icon: CalendarClock },
       { key: "soudeurs", count: p.qualite.soudeurs_expires, tone: "warn", to: "/qualite", Icon: Award },
       { key: "epi", count: p.hse.epi_a_renouveler, tone: "warn", to: "/hse", Icon: UserCheck },
-    ] as Urgent[]
-  ).filter((u) => u.count > 0);
+    ] as Omit<AttentionItem, "label">[]
+  )
+    .filter((u) => u.count > 0)
+    .map((u) => ({ ...u, label: t(`direction2.attention.items.${u.key}`, { count: u.count }) }));
 
-  const flotte = [
-    { name: t("direction.operationnels"), value: p.asmr.operationnels, color: c.ok },
-    { name: t("direction.enPanne"), value: p.asmr.en_panne, color: c.err },
-    { name: t("direction.enMaintenance"), value: p.asmr.en_maintenance, color: c.warn },
-    { name: t("direction.horsService"), value: p.asmr.hors_service, color: c.textMuted },
-  ].filter((f) => f.value > 0);
-
-  const statutData = d.documents.par_statut.map((s) => ({ status: s.status, count: s.count }));
-
-  const echeances: AlerteEcheanceItem[] = [
-    ...a.documents,
-    ...(a.juridique.conventions ?? []),
-    ...(a.juridique.cautions ?? []),
-    ...(a.juridique.assurances ?? []),
-    ...a.rh,
-    ...(a.qualite ?? []),
-    ...((a as { calendrier?: AlerteEcheanceItem[] }).calendrier ?? []),
-  ]
-    .filter((e) => e.jours !== null)
-    .sort((x, y) => (x.jours ?? 0) - (y.jours ?? 0))
-    .slice(0, 8);
-
-  const tooltipStyle = {
-    background: chart.tooltipBg,
-    border: `1px solid ${chart.tooltipBorder}`,
-    borderRadius: "10px",
-    color: chart.tooltipText,
-    fontSize: 13,
-  };
-
-  const trends: { key: keyof Tendances["series"]; label: string; color: string }[] = [
-    { key: "documents", label: t("direction.trend.documents"), color: c.brand },
-    { key: "incidents", label: t("direction.trend.incidents"), color: c.accent },
-    { key: "ordres_travail", label: t("direction.trend.ordres"), color: c.warn },
-  ];
+  const delay = (i: number) => Math.min(i * 0.04, 0.3);
 
   return (
     <>
-      <PageHeader title={t("direction.title")} subtitle={t("direction.subtitle")} />
+      {header}
 
-      {/* À traiter maintenant */}
-      <section className="urgent" aria-label={t("direction.urgent")}>
-        <h3 className="urgent-title">{t("direction.urgent")}</h3>
-        {urgents.length === 0 ? (
-          <p className="urgent-none">
-            <CheckCircle2 size={18} /> {t("direction.urgentNone")}
-          </p>
-        ) : (
-          <div className="urgent-chips">
-            {urgents.map(({ key, count, tone, to, Icon }, i) => {
-              const inner = (
-                <motion.span
-                  className={`urgent-chip ${tone}`}
-                  initial={{ opacity: 0, y: motionTokens.distance.xs }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: motionTokens.duration.base, delay: delay(i) }}
-                >
-                  <Icon size={16} aria-hidden="true" />
-                  <strong>{count}</strong> {t(`direction.urgentItems.${key}`)}
-                </motion.span>
-              );
-              return to.startsWith("#") ? (
-                <a key={key} href={to} className="kpi-link">
-                  {inner}
-                </a>
-              ) : (
-                <Link key={key} to={to} className="kpi-link">
-                  {inner}
-                </Link>
-              );
-            })}
-          </div>
-        )}
+      {/* 1. Chiffres héros : cible, écart, état */}
+      <section className="dir-heroes" aria-label={t("direction2.heros")}>
+        <HeroStat
+          label={t("direction2.ca.label")}
+          value={ca.value}
+          unit={ca.unit}
+          compact
+          hint={
+            <>
+              {t("direction2.ca.pipe")} <strong className="num">{montant(d.commercial.pipe_pondere)}</strong>
+            </>
+          }
+          foot={t("direction2.ca.affaires", { count: d.commercial.affaires_actives })}
+          delay={0}
+        />
+        <HeroStat
+          label={t("direction.heroDispo")}
+          value={formatNumber(dispo, { decimals: dispo % 1 ? 1 : 0 })}
+          unit="%"
+          tone={dispoTone}
+          status={statut(dispoTone)}
+          gauge={{ value: dispo, target: OBJECTIF_DISPO.ok, ok: OBJECTIF_DISPO.ok, warn: OBJECTIF_DISPO.warn, label: t("direction.heroDispo") }}
+          foot={
+            <>
+              <span>{t("direction2.objectif", { n: OBJECTIF_DISPO.ok })}</span>
+              <span className={`dir-delta tone-${dispoTone}`}>{ecart(dispoEcart)}</span>
+            </>
+          }
+          hint={t("direction2.dispo.hint", { ok: p.asmr.operationnels, total: p.asmr.equipements })}
+          delay={delay(1)}
+        />
+        <HeroStat
+          label={t("direction.heroSecurite")}
+          value={jsa === null ? formatNumber(p.hse.accidents) : formatNumber(jsa)}
+          unit={jsa === null ? t("direction2.securite.accidents", { count: p.hse.accidents }) : t("direction2.securite.jours", { count: jsa })}
+          tone={securiteTone}
+          status={statut(securiteTone)}
+          foot={<span>{t("direction2.securite.objectif")}</span>}
+          hint={
+            jsa === null
+              ? t("direction2.securite.aucunAccident", { count: d.hse.incidents_ouverts })
+              : t("direction2.securite.incidents", { count: d.hse.incidents_ouverts })
+          }
+          delay={delay(2)}
+        />
+        <HeroStat
+          label={t("direction2.cloture.label")}
+          value={formatNumber(clotureTaux)}
+          unit="%"
+          tone={clotureTone}
+          status={statut(clotureTone)}
+          gauge={{ value: clotureTaux, target: OBJECTIF_CLOTURE.ok, ok: OBJECTIF_CLOTURE.ok, warn: OBJECTIF_CLOTURE.warn, label: t("direction2.cloture.label") }}
+          foot={
+            <>
+              <span>{t("direction2.objectif", { n: OBJECTIF_CLOTURE.ok })}</span>
+              <span className={`dir-delta tone-${clotureTone}`}>{ecart(Math.round(clotureTaux - OBJECTIF_CLOTURE.ok))}</span>
+            </>
+          }
+          hint={t("direction2.cloture.hint", { n: j4.conformes, total: j4.periodes })}
+          delay={delay(3)}
+        />
       </section>
 
-      {/* Indicateurs de pilotage */}
-      <div className="hero-grid">
-        <div className="card hero">
-          <span className="hero-label">{t("direction.heroDispo")}</span>
-          <span className="hero-value">{taux} %</span>
-          <ProgressBar label={t("direction.heroDispo")} value={Number(taux)} tone={Number(taux) >= 85 ? "ok" : Number(taux) >= 60 ? "warn" : "err"} />
-          <span className="hero-hint">
-            {p.asmr.operationnels}/{p.asmr.equipements} {t("direction.operationnels").toLowerCase()}
-          </span>
+      {/* 2. Tendances + « À traiter maintenant » (colonne latérale) */}
+      <div className="dir-split">
+        <TrendPanel data={tr} loading={tendances.isPending} />
+        <AttentionList items={urgents} />
+      </div>
+
+      {/* 3. Indicateurs par module : 2 rangées de 4 */}
+      <section className="dir-section" aria-labelledby="dir-modules-title">
+        <h3 id="dir-modules-title" className="section-title">
+          {t("direction.directionKPIs")}
+        </h3>
+        <div className="kpi-grid dir-modules">
+          <KpiLink to="/pipeline">
+            <Kpi label={t("direction2.modules.commercial")} value={d.commercial.opportunites_ouvertes} hint={t("direction2.modules.commercialHint", { taux: d.commercial.taux_conversion === null ? "—" : formatPercent(d.commercial.taux_conversion * 100) })} icon={TrendingUp} tone="brand" delay={delay(0)} />
+          </KpiLink>
+          <KpiLink to="/purchases">
+            <Kpi label={t("direction2.modules.achats")} value={d.achats.bc_en_cours} hint={<>{t("direction2.modules.achatsHint")} <span className="num">{montant(d.achats.montant_bc)}</span></>} icon={ShoppingCart} tone="brand" delay={delay(1)} />
+          </KpiLink>
+          <KpiLink to="/operations">
+            <Kpi label={t("direction2.modules.operations")} value={d.operations.of_en_cours} hint={t("direction2.modules.operationsHint", { count: d.commercial.affaires_actives })} icon={Factory} tone="brand" delay={delay(2)} />
+          </KpiLink>
+          <KpiLink to="/maintenance">
+            <Kpi label={t("direction2.modules.maintenance")} value={d.maintenance.ot_ouverts} hint={t("direction2.modules.maintenanceHint", { count: d.maintenance.en_arret })} icon={Wrench} tone={d.maintenance.en_arret ? "warn" : "brand"} delay={delay(3)} />
+          </KpiLink>
+          <KpiLink to="/stocks">
+            <Kpi label={t("direction2.modules.stocks")} value={d.stocks.valorisation === null ? "••••••" : d.stocks.valorisation} kind="money" hint={t("direction2.modules.stocksHint", { count: d.stocks.lots_non_dispo })} icon={Boxes} tone="brand" delay={delay(4)} />
+          </KpiLink>
+          <KpiLink to="/hse">
+            <Kpi label={t("direction2.modules.hse")} value={d.hse.incidents_ouverts} hint={t("direction2.modules.hseHint", { count: d.hse.actions_ouvertes })} icon={ShieldAlert} tone={d.hse.incidents_ouverts ? "warn" : "ok"} delay={delay(5)} />
+          </KpiLink>
+          <KpiLink to="/rh-paie">
+            <Kpi label={t("direction2.modules.rh")} value={d.rh_paie.effectif} hint={t("direction2.modules.rhHint", { count: d.rh_paie.conges_en_attente })} icon={Users} tone="brand" delay={delay(6)} />
+          </KpiLink>
+          <KpiLink to="/juridique">
+            <Kpi label={t("direction2.modules.juridique")} value={d.juridique.contentieux_ouverts} hint={t("direction2.modules.juridiqueHint", { count: d.juridique.cautions_en_cours })} icon={Scale} tone={d.juridique.contentieux_ouverts ? "warn" : "brand"} delay={delay(7)} />
+          </KpiLink>
         </div>
-        <div className="card hero">
-          <span className="hero-label">{t("direction.heroSecurite")}</span>
-          <span className="hero-value">{p.hse.jours_sans_accident ?? "—"}</span>
-          <span className="hero-hint">
-            {p.hse.jours_sans_accident === null
-              ? t("direction.noAccident")
-              : `${t("direction.joursSansAccident")} · ${t("direction.u.accidents", { count: p.hse.accidents })}`}
-          </span>
-        </div>
-        <div className="card hero">
-          <span className="hero-label">{t("direction.heroCloture")}</span>
-          <span className="hero-value">
-            {j4.conformes}/{j4.periodes}
-          </span>
-          <ProgressBar label={t("direction.heroCloture")} value={j4Taux} tone={j4Taux >= 80 ? "ok" : j4Taux >= 50 ? "warn" : "err"} />
-          <span className="hero-hint">{j4Taux} % J+4</span>
-        </div>
-      </div>
-
-      {/* Tendances */}
-      <SectionTitle>{t("direction.tendances")}</SectionTitle>
-      <div className="trend-grid">
-        {trends.map(({ key, label, color }) => {
-          const values = tr?.series[key];
-          return (
-            <div className="card trend" key={key}>
-              <span className="kpi-label">{label}</span>
-              {values ? (
-                <>
-                  <span className="trend-value">{values[values.length - 1]}</span>
-                  <Sparkline values={values} color={color} label={label} />
-                  <span className="trend-axis">
-                    {tr!.mois[0]} → {tr!.mois[tr!.mois.length - 1]}
-                  </span>
-                </>
-              ) : (
-                <span className="muted">{t("direction.noData")}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <SectionTitle>{t("direction.directionKPIs")}</SectionTitle>
-      <div className="kpi-grid">
-        <KpiLink to="/">
-          <Kpi label={t("direction.documentsRetention")} value={d.documents.total} hint={t("direction.u.dossiers", { count: d.documents.dossiers })} icon={FolderOpen} tone="brand" delay={delay(0)} />
-        </KpiLink>
-        <KpiLink to="/pipeline">
-          <Kpi label={t("nav.pipeline")} value={d.commercial.opportunites_ouvertes} hint={d.commercial.ca_gagne !== null ? `${formatNumber(d.commercial.ca_gagne)} F` : "••••••"} icon={TrendingUp} tone="accent" delay={delay(1)} />
-        </KpiLink>
-        <KpiLink to="/stocks">
-          <Kpi label={t("nav.stocks")} value={d.stocks.lots} hint={d.stocks.valorisation !== null ? `${formatNumber(d.stocks.valorisation)} F` : "••••••"} icon={Boxes} tone="brand" delay={delay(2)} />
-        </KpiLink>
-        <KpiLink to="/hse">
-          <Kpi label={t("nav.hse")} value={d.hse.incidents_ouverts} hint={`${d.hse.jours_sans_accident ?? "—"} ${t("direction.joursSansAccident")}`} icon={ShieldAlert} tone="err" delay={delay(3)} />
-        </KpiLink>
-        <KpiLink to="/rh-paie">
-          <Kpi label={t("nav.rhPaie")} value={d.rh_paie.effectif} hint={t("direction.u.bulletins", { count: d.rh_paie.bulletins_mois })} icon={Users} tone="brand" delay={delay(4)} />
-        </KpiLink>
-        <KpiLink to="/controle-gestion">
-          <Kpi label={t("direction.annuel")} value={`${j4.conformes}/${j4.periodes}`} hint={`${j4Taux}% J+4`} icon={CalendarDays} tone="ok" delay={delay(5)} />
-        </KpiLink>
-        <KpiLink to="/juridique">
-          <Kpi label={t("nav.juridique")} value={d.juridique.contentieux_ouverts} hint={t("direction.u.courriers", { count: d.juridique.courriers })} icon={Scale} tone="err" delay={delay(6)} />
-        </KpiLink>
-        <KpiLink to="/controle-gestion">
-          <Kpi label={t("nav.controleGestion")} value={d.controle_gestion.clotures_realisees} hint={t("direction.u.budgets", { count: d.controle_gestion.budgets_approuves })} icon={CheckCircle2} tone="brand" delay={delay(7)} />
-        </KpiLink>
-      </div>
-
-      <div className="chart-grid">
-        <ChartCard title={t("direction.asmr")} subtitle={`${taux} % · ${p.asmr.operationnels}/${p.asmr.equipements}`} height={230}>
-          {flotte.length === 0 ? (
-            <EmptyState label={t("direction.noData")} />
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={flotte} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" paddingAngle={2} strokeWidth={0}>
-                  {flotte.map((f) => (
-                    <Cell key={f.name} fill={f.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <ChartCard title={t("dashboard.byType") ?? "Documents par statut"} height={230}>
-          {statutData.length === 0 ? (
-            <EmptyState label={t("direction.noData")} />
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={statutData} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
-                <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="status" stroke={chart.axis} fontSize={12} tickLine={false} axisLine={false} angle={-18} textAnchor="end" height={42} />
-                <YAxis stroke={chart.axis} fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Bar dataKey="count" fill={c.brand} radius={[6, 6, 0, 0]} maxBarSize={42} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-
-      <SectionTitle>{t("direction.reportPetrolier")}</SectionTitle>
-      <div className="kpi-grid">
-        <Kpi label={t("direction.tauxDisponibilite")} value={`${taux} %`} hint={`${p.asmr.operationnels}/${p.asmr.equipements}`} icon={Gauge} tone="ok" delay={delay(0)} />
-        <Kpi label={t("direction.joursSansAccident")} value={p.hse.jours_sans_accident ?? "—"} hint={t("direction.u.accidents", { count: p.hse.accidents })} icon={ShieldCheck} tone="ok" delay={delay(1)} />
-        <Kpi label={t("direction.ncOuvertes")} value={p.qualite.nc_ouvertes} hint={t("direction.u.critiques", { count: p.qualite.nc_critiques })} icon={AlertTriangle} tone="warn" delay={delay(2)} />
-        <Kpi label={t("direction.soudeursQualifies")} value={p.qualite.soudeurs_qualifies} hint={t("direction.u.expires", { count: p.qualite.soudeurs_expires })} icon={Award} tone="brand" delay={delay(3)} />
-        <Kpi label={t("direction.permisAtex")} value={p.hse.permis_atex} hint={t("direction.u.quarantaine", { count: p.hse.equipements_atex_quarantaine })} icon={Flame} tone="warn" delay={delay(4)} />
-        <Kpi label={t("direction.epiRenouveler")} value={p.hse.epi_a_renouveler} hint={t("direction.u.permisActifs", { count: p.hse.permis_actifs })} icon={UserCheck} tone="accent" delay={delay(5)} />
-      </div>
-
-      <CubesSection />
-
-      <EcartsCdSection />
-      <EcartsA4Section />
-
-      <section id="echeances">
-        <SectionTitle>{`${t("direction.alertes")} · ${a.total}`}</SectionTitle>
-        <div className="kpi-grid">
-          {BANDE_ORDER.map((bande, i) => (
-            <Kpi key={bande} label={t(`juridique.bande.${bande}`)} value={a.compteurs[bande] ?? 0} tone={BANDE_TONE[bande]} delay={delay(i)} />
-          ))}
-        </div>
-
-        <h4 className="subtitle">{t("direction.echeances")}</h4>
-        {echeances.length === 0 ? (
-          <p className="muted">{t("direction.aucuneEcheance")}</p>
-        ) : (
-          <ol className="timeline">
-            {echeances.map((el, i) => (
-              <motion.li
-                key={`${el.type}-${el.code ?? i}-${i}`}
-                className={`timeline-item ${BANDE_TONE[el.bande] ?? "ok"}`}
-                initial={{ opacity: 0, x: -motionTokens.distance.sm }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: motionTokens.duration.base, delay: Math.min(i * 0.03, 0.3) }}
-              >
-                <span className="timeline-days">{(el.jours ?? 0) < 0 ? `${Math.abs(el.jours ?? 0)} j de retard` : `J-${el.jours}`}</span>
-                <span className="timeline-body">
-                  <strong>{el.libelle}</strong>
-                  <span className="muted">
-                    {el.type} · {el.code ?? "—"} · {el.date_echeance ?? "—"}
-                  </span>
-                </span>
-                <span className={`badge ${BANDE_TONE[el.bande] ?? "ok"}`}>{t(`juridique.bande.${el.bande}`) ?? el.bande}</span>
-              </motion.li>
-            ))}
-          </ol>
-        )}
       </section>
+
+      {/* 4. Reporting client pétrolier */}
+      <ReportingSection p={p} />
+
+      {/* 5. Échéances */}
+      <EcheancesSection a={a} />
+
+      {/* 6. Pilotage financier et cubes (onglets) */}
+      <PilotageSection commercial={d.commercial.indicateurs} />
     </>
   );
 }
