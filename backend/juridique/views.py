@@ -52,6 +52,7 @@ from .services import (
     compute_stats,
 )
 from . import ecarts
+from config.i18n import tr
 
 
 def _verrou(viewset):
@@ -457,7 +458,7 @@ class DossierGlobalRentalViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
             if ecarts.parametre("bloquer_dossier_incomplet"):
                 manquantes = ecarts.completude("gr", dossier)["manquantes"]
                 if manquantes:
-                    raise ValueError("Dossier GR incomplet : pièces manquantes " + ", ".join(manquantes) + ".")
+                    raise ValueError(tr("Dossier GR incomplet : pièces manquantes %(liste)s.") % {"liste": ", ".join(manquantes)})
             dossier.ouvrir()
         except ValueError as exc:
             raise DRFValidationError(str(exc))
@@ -562,7 +563,7 @@ class RechercheJuridiqueView(viewsets.ViewSet):
     def list(self, request):
         q = (request.query_params.get("q") or "").strip()
         if len(q) < RECHERCHE_MIN:
-            raise DRFValidationError(f"Saisissez au moins {RECHERCHE_MIN} caractères.")
+            raise DRFValidationError(tr("Saisissez au moins %(recherche_min)s caractères.") % {"recherche_min": RECHERCHE_MIN})
         module = request.query_params.get("module") or None
         docs = rechercher_documents(request.user, q, module)
         return Response({

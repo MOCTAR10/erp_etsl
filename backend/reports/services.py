@@ -15,6 +15,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
+from config.i18n import tr
 from documents.services import visible_documents
 from workflow.models import Task
 
@@ -52,7 +53,7 @@ def _retention_end(doc):
 def _write_csv(rows, columns):
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=columns)
-    writer.writeheader()
+    writer.writerow({c: tr(c) for c in columns})  # EX-G-07 : en-têtes dans la langue de la requête
     writer.writerows(rows)
     return buffer.getvalue().encode("utf-8-sig")
 
@@ -61,8 +62,8 @@ def _write_xlsx(rows, columns):
     buffer = io.BytesIO()
     wb = Workbook()
     ws = wb.active
-    ws.title = "Documents"
-    ws.append(columns)
+    ws.title = tr("Documents")
+    ws.append([tr(c) for c in columns])
     for cell in ws[1]:
         cell.font = Font(bold=True)
     for row in rows:
@@ -81,8 +82,8 @@ def _write_pdf(rows, columns):
         topMargin=10 * mm, bottomMargin=10 * mm,
     )
     styles = getSampleStyleSheet()
-    elements = [Paragraph("Rapport documents — ETSL (RF-98)", styles["Title"]), Spacer(1, 6 * mm)]
-    data = [columns] + [[str(row.get(col, "")) for col in columns] for row in rows]
+    elements = [Paragraph(tr("Rapport documents — ETSL (RF-98)"), styles["Title"]), Spacer(1, 6 * mm)]
+    data = [[tr(c) for c in columns]] + [[str(row.get(col, "")) for col in columns] for row in rows]
     table = Table(data, repeatRows=1)
     table.setStyle(
         TableStyle(

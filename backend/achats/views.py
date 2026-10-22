@@ -55,6 +55,7 @@ from .ecarts import (
     declencher_inspections,
     get_param,
 )
+from config.i18n import tr
 
 
 def _uuid_or_none(valeur):
@@ -113,7 +114,7 @@ class PurchaseRequestViewSet(_CommonViewSet):
         da = PurchaseRequest.objects.select_for_update().get(pk=self.get_object().pk)
         if da.status != frm:
             return Response(
-                {"detail": f"DA {da.get_status_display().lower()} : action impossible."},
+                {"detail": tr("DA %(status)s : action impossible.") % {"status": da.get_status_display().lower()}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if controle_budget:
@@ -291,7 +292,7 @@ class PurchaseOrderViewSet(FiltresMulticriteresMixin, _CommonViewSet):
         """Engagement du BC : contrôles CDC M2 avant émission vers le fournisseur."""
         order = PurchaseOrder.objects.select_for_update(of=("self",)).select_related("supplier").get(pk=self.get_object().pk)
         if order.status != PurchaseOrder.Status.BROUILLON:
-            return Response({"detail": f"BC {order.get_status_display().lower()} : confirmation impossible."},
+            return Response({"detail": tr("BC %(status)s : confirmation impossible.") % {"status": order.get_status_display().lower()}},
                             status=status.HTTP_400_BAD_REQUEST)
         if not order.lines.exists():
             return Response({"detail": "BC sans ligne : rien à engager."}, status=status.HTTP_400_BAD_REQUEST)
@@ -299,7 +300,7 @@ class PurchaseOrderViewSet(FiltresMulticriteresMixin, _CommonViewSet):
         # M2 §5.8 : aucun BC émis vers un fournisseur non agréé qualité / HSE.
         if order.supplier is None or not order.supplier.agrement_valide(jour):
             nom = order.supplier.name if order.supplier else "non renseigné"
-            return Response({"supplier": f"Fournisseur {nom} non agréé qualité / HSE (ou agrément expiré) : BC non émis."},
+            return Response({"supplier": tr("Fournisseur %(nom)s non agréé qualité / HSE (ou agrément expiré) : BC non émis.") % {"nom": nom}},
                             status=status.HTTP_400_BAD_REQUEST)
         # RG-M2.08 : > 110 % du budget consommé → aucun engagement (sauf visa exceptionnel DG).
         blocage = budget_control.controler(
@@ -440,8 +441,7 @@ class GoodsReceiptViewSet(_CommonViewSet):
         # Aval M6 : ITP / CND exigés par les règles d'inspection (catégorie d'article) — créés s'ils manquent.
         crees = declencher_inspections(receipt, request.user)
         if crees:
-            return Response({"detail": f"Inspection exigée à réception : {', '.join(c.code for c in crees)} créé(s) en M6, "
-                                       "à valider avant la réception."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": tr("Inspection exigée à réception : %(liste)s créé(s) en M6, à valider avant la réception.") % {"liste": ', '.join(c.code for c in crees)}}, status=status.HTTP_400_BAD_REQUEST)
         blocage = controles_bloquants(receipt)
         if blocage:
             return Response({"detail": blocage}, status=status.HTTP_400_BAD_REQUEST)
@@ -577,8 +577,7 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
         controler_synchro(saisi_le, self.request, doublons, "Réception")
         if not as_bool(self.request.data.get("forcer")) and ligne_bc.received_qty + data.get("quantity", 0) > ligne_bc.quantity:
             raise ConflitSaisie(
-                f"Réception hors ligne de {data.get('quantity', 0)} sur « {ligne_bc.label} » : déjà reçu {ligne_bc.received_qty} "
-                f"pour {ligne_bc.quantity} commandé(s) entre-temps. Forcer (sur-réception) ou abandonner."
+                tr("Réception hors ligne de %(get)s sur « %(ligne_bc_label)s » : déjà reçu %(ligne_bc_received_qty)s pour %(ligne_bc_quantity)s commandé(s) entre-temps. Forcer (sur-réception) ou abandonner.") % {"get": data.get('quantity', 0), "ligne_bc_label": ligne_bc.label, "ligne_bc_received_qty": ligne_bc.received_qty, "ligne_bc_quantity": ligne_bc.quantity}
             )
 
     def perform_update(self, serializer):
@@ -617,7 +616,7 @@ class PurchaseInvoiceViewSet(FiltresMulticriteresMixin, _CommonViewSet):
         """Rapprochement 3-way BR / BC / facture (CDC M2 §5.8) : préalable obligatoire à la comptabilisation."""
         invoice = PurchaseInvoice.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if invoice.status != PurchaseInvoice.Status.EN_ATTENTE:
-            return Response({"detail": f"Facture {invoice.get_status_display().lower()} : rapprochement impossible."},
+            return Response({"detail": tr("Facture %(status)s : rapprochement impossible.") % {"status": invoice.get_status_display().lower()}},
                             status=status.HTTP_400_BAD_REQUEST)
         lignes = list(invoice.lines.select_related("purchase_order_line"))
         if not lignes:
@@ -654,7 +653,7 @@ class PurchaseInvoiceLineViewSet(_CommonViewSet):
     def _garde_facture_ouverte(invoice):
         # Facture rapprochée ou comptabilisée = pièce scellée : plus d'ajout, de modification ni de suppression de ligne.
         if invoice.status != PurchaseInvoice.Status.EN_ATTENTE:
-            raise ValidationError({"detail": f"Facture {invoice.get_status_display().lower()} : lignes non modifiables."})
+            raise ValidationError({"detail": tr("Facture %(status)s : lignes non modifiables.") % {"status": invoice.get_status_display().lower()}})
 
     def perform_create(self, serializer):
         self._garde_facture_ouverte(serializer.validated_data["invoice"])

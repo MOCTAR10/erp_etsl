@@ -19,6 +19,7 @@ from config.echeances import BANDES as EXPIRY_LABELS  # noqa: F401 (réexport)
 from config.echeances import bande as _band
 from users.models import User
 from users.rbac import can_read_app
+from config.i18n import tr
 
 JURIDIQUE_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -261,7 +262,7 @@ def resoudre_objet(objet_type, objet_id):
     from django.core.exceptions import ValidationError as DjangoValidationError
 
     if objet_type not in OBJETS_LIEABLES:
-        raise ValueError(f"Type d'objet non liable : {objet_type}.")
+        raise ValueError(tr("Type d'objet non liable : %(objet_type)s.") % {"objet_type": objet_type})
     app_label, model_name = objet_type.split(".")
     modele = apps.get_model(app_label, model_name)
     try:

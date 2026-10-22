@@ -32,6 +32,7 @@ from .models import (
 )
 from .services import CanApproveBudget, CanManageGestion, can_see_amount, get_param_gestion
 from .views import DjangoValidationMixin, _fiscal_year_requis
+from config.i18n import tr
 
 
 def _money(voir, v):
@@ -223,7 +224,7 @@ class TableauBordView(viewsets.ViewSet):
 
         par = request.query_params.get("par") or "profil"
         if par not in MARGE_AXES:
-            raise DRFValidationError({"par": f"Valeurs possibles : {', '.join(MARGE_AXES)}."})
+            raise DRFValidationError({"par": tr("Valeurs possibles : %(liste)s.") % {"liste": ', '.join(MARGE_AXES)}})
         return Response(marges_affaires(par, can_see_amount(request.user)))
 
 

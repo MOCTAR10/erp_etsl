@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from accounting_kernel.models import AccountMove, AccountMoveLine, FiscalYear
 from referentiels.models import Account
+from config.i18n import tr
 
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
@@ -97,6 +98,10 @@ def _gabarit_provisoire(code):
 # --------------------------------------------------------------------------------------------------
 # Balance générale et grand livre
 # --------------------------------------------------------------------------------------------------
+def _du_au(date_from, date_to):
+    return tr("Du %(debut)s au %(fin)s") % {"debut": f"{date_from:%d/%m/%Y}", "fin": f"{date_to:%d/%m/%Y}"}
+
+
 def balance(date_from=None, date_to=None, classe=None):
     date_from, date_to = bornes(date_from, date_to)
     base = lignes_comptabilisees()
@@ -118,19 +123,19 @@ def balance(date_from=None, date_to=None, classe=None):
         for k in tot:
             tot[k] += row[k]
         lignes.append(row)
-    lignes.append({"compte": "", "libelle": "TOTAL", "classe": "", **{k: _q(v) for k, v in tot.items()}, "total": True})
+    lignes.append({"compte": "", "libelle": tr("TOTAL"), "classe": "", **{k: _q(v) for k, v in tot.items()}, "total": True})
     return {
-        "code": "balance", "titre": "Balance générale",
-        "sous_titre": f"Du {date_from:%d/%m/%Y} au {date_to:%d/%m/%Y}",
+        "code": "balance", "titre": tr("Balance générale"),
+        "sous_titre": _du_au(date_from, date_to),
         "provisoire": False, "avertissement": "",
         "equilibre": tot["mvt_d"] == tot["mvt_c"] and tot["sol_d"] == tot["sol_c"],
         "tableaux": [{
-            "titre": "Balance générale",
+            "titre": tr("Balance générale"),
             "colonnes": [
-                _col("compte", "Compte"), _col("libelle", "Intitulé"),
-                _col("ouv_d", "Ouverture débit", True), _col("ouv_c", "Ouverture crédit", True),
-                _col("mvt_d", "Mouvements débit", True), _col("mvt_c", "Mouvements crédit", True),
-                _col("sol_d", "Solde débiteur", True), _col("sol_c", "Solde créditeur", True),
+                _col("compte", tr("Compte")), _col("libelle", tr("Intitulé")),
+                _col("ouv_d", tr("Ouverture débit"), True), _col("ouv_c", tr("Ouverture crédit"), True),
+                _col("mvt_d", tr("Mouvements débit"), True), _col("mvt_c", tr("Mouvements crédit"), True),
+                _col("sol_d", tr("Solde débiteur"), True), _col("sol_c", tr("Solde créditeur"), True),
             ],
             "lignes": lignes,
         }],
@@ -161,7 +166,7 @@ def grand_livre(date_from=None, date_to=None, compte=None, limite=5000):
         solde = od - oc
         lignes.append({
             "date": "", "journal": "", "piece": "", "compte": compte_obj.code,
-            "libelle": f"{compte_obj.label} — solde à nouveau", "tiers": "", "analytique": "",
+            "libelle": tr("%(compte_obj_label)s — solde à nouveau") % {"compte_obj_label": compte_obj.label}, "tiers": "", "analytique": "",
             "debit": _q(max(solde, ZERO)), "credit": _q(max(-solde, ZERO)), "solde": _q(solde), "entete": True,
         })
         sd = sc = ZERO
@@ -176,25 +181,25 @@ def grand_livre(date_from=None, date_to=None, compte=None, limite=5000):
                 "debit": _q(l.debit), "credit": _q(l.credit), "solde": _q(solde),
             })
         lignes.append({
-            "date": "", "journal": "", "piece": "", "compte": compte_obj.code, "libelle": f"Total {compte_obj.code}",
+            "date": "", "journal": "", "piece": "", "compte": compte_obj.code, "libelle": tr("Total %(compte_obj_code)s") % {"compte_obj_code": compte_obj.code},
             "tiers": "", "analytique": "", "debit": _q(sd), "credit": _q(sc), "solde": _q(solde), "total": True,
         })
         tot_d += sd
         tot_c += sc
     lignes.append({
-        "date": "", "journal": "", "piece": "", "compte": "", "libelle": "TOTAL GÉNÉRAL", "tiers": "", "analytique": "",
+        "date": "", "journal": "", "piece": "", "compte": "", "libelle": tr("TOTAL GÉNÉRAL"), "tiers": "", "analytique": "",
         "debit": _q(tot_d), "credit": _q(tot_c), "solde": "", "total": True,
     })
     return {
-        "code": "grand_livre", "titre": "Grand livre",
-        "sous_titre": f"Du {date_from:%d/%m/%Y} au {date_to:%d/%m/%Y}" + (f" — comptes {compte}*" if compte else ""),
+        "code": "grand_livre", "titre": tr("Grand livre"),
+        "sous_titre": _du_au(date_from, date_to) + (tr(" — comptes %(compte)s*") % {"compte": compte} if compte else ""),
         "provisoire": False, "avertissement": "",
         "tableaux": [{
-            "titre": "Grand livre",
+            "titre": tr("Grand livre"),
             "colonnes": [
-                _col("date", "Date"), _col("journal", "Journal"), _col("piece", "Pièce"), _col("compte", "Compte"),
-                _col("libelle", "Libellé"), _col("tiers", "Tiers"), _col("analytique", "Analytique"),
-                _col("debit", "Débit", True), _col("credit", "Crédit", True), _col("solde", "Solde", True),
+                _col("date", tr("Date")), _col("journal", tr("Journal")), _col("piece", tr("Pièce")), _col("compte", tr("Compte")),
+                _col("libelle", tr("Libellé")), _col("tiers", tr("Tiers")), _col("analytique", tr("Analytique")),
+                _col("debit", tr("Débit"), True), _col("credit", tr("Crédit"), True), _col("solde", tr("Solde"), True),
             ],
             "lignes": lignes,
         }],
@@ -230,23 +235,23 @@ def compte_resultat(date_from=None, date_to=None):
     def section(titre, donnees):
         rows = [{"rubrique": k, "libelle": COMPTES_PRINCIPAUX.get(k, f"Comptes {k}"), "montant": _q(v)} for k, v in sorted(donnees.items())]
         total = sum(donnees.values(), ZERO)
-        rows.append({"rubrique": "", "libelle": f"Total {titre.lower()}", "montant": _q(total), "total": True})
+        rows.append({"rubrique": "", "libelle": tr("Total %(titre)s") % {"titre": titre.lower()}, "montant": _q(total), "total": True})
         return rows, total
 
-    lignes_p, total_p = section("Produits", produits)
-    lignes_c, total_c = section("Charges", charges)
+    lignes_p, total_p = section(tr("Produits"), produits)
+    lignes_c, total_c = section(tr("Charges"), charges)
     resultat = total_p - total_c
-    cols = [_col("rubrique", "Rubrique"), _col("libelle", "Libellé"), _col("montant", "Montant", True)]
+    cols = [_col("rubrique", tr("Rubrique")), _col("libelle", tr("Libellé")), _col("montant", tr("Montant"), True)]
     return {
-        "code": "compte_resultat", "titre": "Compte de résultat",
-        "sous_titre": f"Du {date_from:%d/%m/%Y} au {date_to:%d/%m/%Y}",
+        "code": "compte_resultat", "titre": tr("Compte de résultat"),
+        "sous_titre": _du_au(date_from, date_to),
         "provisoire": _gabarit_provisoire("RESULTAT"), "avertissement": AVERTISSEMENT_GABARIT,
         "resultat": _q(resultat),
         "tableaux": [
-            {"titre": "Produits", "colonnes": cols, "lignes": lignes_p},
-            {"titre": "Charges", "colonnes": cols, "lignes": lignes_c},
-            {"titre": "Résultat", "colonnes": cols, "lignes": [{
-                "rubrique": "13", "libelle": "Résultat net (bénéfice si positif, perte si négatif)",
+            {"titre": tr("Produits"), "colonnes": cols, "lignes": lignes_p},
+            {"titre": tr("Charges"), "colonnes": cols, "lignes": lignes_c},
+            {"titre": tr("Résultat"), "colonnes": cols, "lignes": [{
+                "rubrique": "13", "libelle": tr("Résultat net (bénéfice si positif, perte si négatif)"),
                 "montant": _q(resultat), "total": True,
             }]},
         ],
@@ -288,32 +293,32 @@ def bilan(date_to=None):
     treso_d = sum((s for code, s in soldes.items() if code[0] == "5" and s > 0), ZERO)
     treso_c = sum((-s for code, s in soldes.items() if code[0] == "5" and s < 0), ZERO)
     actif += [
-        {"rubrique": "BH", "libelle": "Créances et emplois assimilés (comptes de tiers débiteurs)", "montant": _q(tiers_d)},
-        {"rubrique": "BT", "libelle": "Trésorerie-Actif", "montant": _q(treso_d)},
+        {"rubrique": "BH", "libelle": tr("Créances et emplois assimilés (comptes de tiers débiteurs)"), "montant": _q(tiers_d)},
+        {"rubrique": "BT", "libelle": tr("Trésorerie-Actif"), "montant": _q(treso_d)},
     ]
     for code, libelle, prefixes in BILAN_PASSIF:
         passif.append({"rubrique": code, "libelle": libelle, "montant": _q(somme(prefixes, -1))})
     resultat = _resultat(qs)
     passif += [
-        {"rubrique": "CJ", "libelle": "Résultat net de l'exercice (non affecté)", "montant": _q(resultat)},
-        {"rubrique": "DP", "libelle": "Passif circulant (comptes de tiers créditeurs)", "montant": _q(tiers_c)},
-        {"rubrique": "DT", "libelle": "Trésorerie-Passif", "montant": _q(treso_c)},
+        {"rubrique": "CJ", "libelle": tr("Résultat net de l'exercice (non affecté)"), "montant": _q(resultat)},
+        {"rubrique": "DP", "libelle": tr("Passif circulant (comptes de tiers créditeurs)"), "montant": _q(tiers_c)},
+        {"rubrique": "DT", "libelle": tr("Trésorerie-Passif"), "montant": _q(treso_c)},
     ]
     # Compte 13 (résultat porté au bilan par une écriture) : rubrique distincte s'il est mouvementé.
     if somme(("13",), -1):
-        passif.insert(len(BILAN_PASSIF), {"rubrique": "CH", "libelle": "Résultat affecté (compte 13)", "montant": _q(somme(("13",), -1))})
+        passif.insert(len(BILAN_PASSIF), {"rubrique": "CH", "libelle": tr("Résultat affecté (compte 13)"), "montant": _q(somme(("13",), -1))})
     total_actif = sum((r["montant"] for r in actif), ZERO)
     total_passif = sum((r["montant"] for r in passif), ZERO)
-    actif.append({"rubrique": "BZ", "libelle": "TOTAL ACTIF", "montant": _q(total_actif), "total": True})
-    passif.append({"rubrique": "DZ", "libelle": "TOTAL PASSIF", "montant": _q(total_passif), "total": True})
-    cols = [_col("rubrique", "Réf."), _col("libelle", "Rubrique"), _col("montant", "Montant net", True)]
+    actif.append({"rubrique": "BZ", "libelle": tr("TOTAL ACTIF"), "montant": _q(total_actif), "total": True})
+    passif.append({"rubrique": "DZ", "libelle": tr("TOTAL PASSIF"), "montant": _q(total_passif), "total": True})
+    cols = [_col("rubrique", tr("Réf.")), _col("libelle", tr("Rubrique")), _col("montant", tr("Montant net"), True)]
     return {
-        "code": "bilan", "titre": "Bilan", "sous_titre": f"Au {date_to:%d/%m/%Y}",
+        "code": "bilan", "titre": tr("Bilan"), "sous_titre": tr("Au %(date)s") % {"date": f"{date_to:%d/%m/%Y}"},
         "provisoire": _gabarit_provisoire("BILAN"), "avertissement": AVERTISSEMENT_GABARIT,
         "equilibre": total_actif == total_passif,
         "tableaux": [
-            {"titre": "Actif", "colonnes": cols, "lignes": actif},
-            {"titre": "Passif", "colonnes": cols, "lignes": passif},
+            {"titre": tr("Actif"), "colonnes": cols, "lignes": actif},
+            {"titre": tr("Passif"), "colonnes": cols, "lignes": passif},
         ],
     }
 
@@ -339,7 +344,7 @@ def balance_agee(nature="clients", date_to=None):
     for l in qs:
         cle = l.partner_id
         row = par_tiers.setdefault(cle, {
-            "tiers": l.partner.name if l.partner_id else "(sans tiers)", "code": l.partner.code if l.partner_id else "",
+            "tiers": l.partner.name if l.partner_id else tr("(sans tiers)"), "code": l.partner.code if l.partner_id else "",
             **{k: ZERO for k, *_ in tranches}, "total": ZERO,
         })
         montant = (l.debit - l.credit) * signe
@@ -354,18 +359,18 @@ def balance_agee(nature="clients", date_to=None):
         for r in sorted(par_tiers.values(), key=lambda r: r["tiers"]) if r["total"]
     ]
     totaux = {k: _q(sum((r[k] for r in lignes), ZERO)) for k, *_ in tranches}
-    lignes.append({"tiers": "TOTAL", "code": "", **totaux, "total": _q(sum(totaux.values(), ZERO)), "total_ligne": True})
+    lignes.append({"tiers": tr("TOTAL"), "code": "", **totaux, "total": _q(sum(totaux.values(), ZERO)), "total_ligne": True})
     from .services import parametres_provisoires
 
     return {
-        "code": "balance_agee", "titre": f"Balance âgée {'clients (411)' if nature == 'clients' else 'fournisseurs (401)'}",
-        "sous_titre": f"Au {date_to:%d/%m/%Y} — lignes non lettrées, ancienneté depuis la date de pièce",
+        "code": "balance_agee", "titre": tr("Balance âgée %(valeur)s") % {"valeur": 'clients (411)' if nature == 'clients' else 'fournisseurs (401)'},
+        "sous_titre": tr("Au %(date_to)s — lignes non lettrées, ancienneté depuis la date de pièce") % {"date_to": format(date_to, '%d/%m/%Y')},
         "provisoire": parametres_provisoires(["BAL_AGEE_TRANCHE_1", "BAL_AGEE_TRANCHE_2", "BAL_AGEE_TRANCHE_3"]),
-        "avertissement": "Tranches d'ancienneté provisoires — à confirmer ou modifier par ETSL (Paramètres).",
+        "avertissement": tr("Tranches d'ancienneté provisoires — à confirmer ou modifier par ETSL (Paramètres)."),
         "tableaux": [{
-            "titre": "Balance âgée",
-            "colonnes": [_col("code", "Code"), _col("tiers", "Tiers")]
-            + [_col(k, label, True) for k, label, *_ in tranches] + [_col("total", "Solde", True)],
+            "titre": tr("Balance âgée"),
+            "colonnes": [_col("code", tr("Code")), _col("tiers", tr("Tiers"))]
+            + [_col(k, label, True) for k, label, *_ in tranches] + [_col("total", tr("Solde"), True)],
             "lignes": lignes,
         }],
     }
@@ -407,13 +412,13 @@ def plan_comptable():
         for enfant in sorted((c for c in comptes if parents[c.pk] == a.pk), key=lambda c: c.code):
             lignes.append({"niveau": 4, "code": enfant.code, "libelle": enfant.label, "parent": a.code})
     return {
-        "code": "plan_comptable", "titre": "Plan comptable SYSCOHADA (multi-niveaux)",
-        "sous_titre": f"{len(comptes)} comptes — classe › compte principal › compte › sous-compte",
+        "code": "plan_comptable", "titre": tr("Plan comptable SYSCOHADA (multi-niveaux)"),
+        "sous_titre": tr("%(nb_comptes)s comptes — classe › compte principal › compte › sous-compte") % {"nb_comptes": len(comptes)},
         "provisoire": True,
-        "avertissement": "Plan provisoire : comptes détaillés et nombre de niveaux à confirmer par ETSL.",
+        "avertissement": tr("Plan provisoire : comptes détaillés et nombre de niveaux à confirmer par ETSL."),
         "tableaux": [{
-            "titre": "Plan comptable",
-            "colonnes": [_col("niveau", "Niveau"), _col("code", "Compte"), _col("libelle", "Intitulé"), _col("parent", "Rattaché à")],
+            "titre": tr("Plan comptable"),
+            "colonnes": [_col("niveau", tr("Niveau")), _col("code", tr("Compte")), _col("libelle", tr("Intitulé")), _col("parent", tr("Rattaché à"))],
             "lignes": lignes,
         }],
     }
@@ -441,16 +446,16 @@ def conservation():
     from .services import parametres_provisoires
 
     return {
-        "code": "conservation", "titre": "Piste d'audit et conservation des écritures",
-        "sous_titre": f"Écritures comptabilisées immuables (correction par extourne), conservées {ans} ans après la clôture",
+        "code": "conservation", "titre": tr("Piste d'audit et conservation des écritures"),
+        "sous_titre": tr("Écritures comptabilisées immuables (correction par extourne), conservées %(ans)s ans après la clôture") % {"ans": ans},
         "provisoire": parametres_provisoires(["CONSERVATION_ANS"]),
-        "avertissement": "Durée de conservation provisoire — à confirmer par ETSL.",
+        "avertissement": tr("Durée de conservation provisoire — à confirmer par ETSL."),
         "tableaux": [{
-            "titre": "Conservation par exercice",
+            "titre": tr("Conservation par exercice"),
             "colonnes": [
-                _col("exercice", "Exercice"), _col("statut", "Statut"), _col("ecritures", "Écritures"),
-                _col("extournees", "Extournées"), _col("manuelles", "Saisies manuelles"),
-                _col("pieces_ged", "Pièces fiscales en GED"), _col("conserver_jusqu_au", "Conserver jusqu'au"),
+                _col("exercice", tr("Exercice")), _col("statut", tr("Statut")), _col("ecritures", tr("Écritures")),
+                _col("extournees", tr("Extournées")), _col("manuelles", tr("Saisies manuelles")),
+                _col("pieces_ged", tr("Pièces fiscales en GED")), _col("conserver_jusqu_au", tr("Conserver jusqu'au")),
             ],
             "lignes": lignes,
         }],
@@ -494,7 +499,7 @@ def to_xlsx(etat):
         ws["A1"].font = Font(bold=True, size=13)
         ws.append([etat.get("sous_titre", "")])
         if etat.get("provisoire"):
-            ws.append([f"PROVISOIRE — {etat.get('avertissement', '')}"])
+            ws.append([tr("PROVISOIRE — %(get)s") % {"get": etat.get('avertissement', '')}])
         ws.append([])
         ws.append([c["label"] for c in tab["colonnes"]])
         for cell in ws[ws.max_row]:
@@ -527,9 +532,9 @@ def to_pdf(etat):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=10 * mm, rightMargin=10 * mm,
                             topMargin=10 * mm, bottomMargin=10 * mm, title=etat["titre"])
-    story = [Paragraph(f"ETSL — {etat['titre']}", styles["Title"]), Paragraph(etat.get("sous_titre", ""), styles["Normal"])]
+    story = [Paragraph(tr("ETSL — %(titre)s") % {"titre": etat['titre']}, styles["Title"]), Paragraph(etat.get("sous_titre", ""), styles["Normal"])]
     if etat.get("provisoire"):
-        story.append(Paragraph(f"<font color='#d4142a'><b>PROVISOIRE</b> — {etat.get('avertissement', '')}</font>", styles["Normal"]))
+        story.append(Paragraph(tr("<font color='#d4142a'><b>PROVISOIRE</b> — %(get)s</font>") % {"get": etat.get('avertissement', '')}, styles["Normal"]))
     for tab in etat["tableaux"]:
         story += [Spacer(1, 4 * mm), Paragraph(f"<b>{tab['titre']}</b>", styles["Heading3"])]
         data = [[c["label"] for c in tab["colonnes"]]]
@@ -551,7 +556,7 @@ def to_pdf(etat):
             style += [("FONTNAME", (0, i), (-1, i), "Helvetica-Bold"), ("BACKGROUND", (0, i), (-1, i), colors.whitesmoke)]
         table.setStyle(TableStyle(style))
         story.append(table)
-    story += [Spacer(1, 4 * mm), Paragraph(f"Édité le {timezone.localtime():%d/%m/%Y %H:%M} — ERP ETSL", styles["Italic"])]
+    story += [Spacer(1, 4 * mm), Paragraph(tr("Édité le %(localtime)s — ERP ETSL") % {"localtime": format(timezone.localtime(), '%d/%m/%Y %H:%M')}, styles["Italic"])]
     doc.build(story)
     return buf.getvalue()
 

@@ -49,14 +49,14 @@ def _convertir(field, brut, nom):
     try:
         return field.to_python(brut)
     except (DjangoValidationError, ValueError, TypeError):
-        raise ValidationError({nom: tr("Valeur de filtre invalide.") + f" ({brut})"})
+        raise ValidationError({nom: tr("Valeur de filtre invalide. (%(brut)s)") % {"brut": brut}})
 
 
 def _date(brut, nom):
     try:
         return models.DateField().to_python(brut)
     except DjangoValidationError:
-        raise ValidationError({nom: tr("Date invalide (format attendu AAAA-MM-JJ).") + f" ({brut})"})
+        raise ValidationError({nom: tr("Date invalide (format attendu AAAA-MM-JJ). (%(brut)s)") % {"brut": brut}})
 
 
 def _valeurs(brut):
@@ -76,7 +76,7 @@ def appliquer_filtres(queryset, params, champs):
                 admis = {str(c[0]) for c in field.flatchoices}
                 inconnus = [v for v in valeurs if v not in admis]
                 if inconnus:
-                    raise ValidationError({nom: tr("Choix invalide.") + f" ({', '.join(inconnus)})"})
+                    raise ValidationError({nom: tr("Choix invalide. (%(liste)s)") % {"liste": ', '.join(inconnus)}})
                 queryset = queryset.filter(**{f"{nom}__in": valeurs})
             else:
                 cible = field.target_field
@@ -85,7 +85,7 @@ def appliquer_filtres(queryset, params, champs):
         elif genre == "bool" and brut:
             v = str(brut).strip().lower()
             if v not in VRAI | FAUX:
-                raise ValidationError({nom: tr("Valeur de filtre invalide.") + f" ({brut})"})
+                raise ValidationError({nom: tr("Valeur de filtre invalide. (%(brut)s)") % {"brut": brut}})
             queryset = queryset.filter(**{nom: v in VRAI})
         elif genre == "texte" and brut:
             queryset = queryset.filter(**{f"{nom}__icontains": str(brut).strip()})

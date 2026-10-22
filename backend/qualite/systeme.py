@@ -8,6 +8,7 @@ from django.utils import timezone
 from users.models import User
 
 from .ecarts import RETENTION_QUALITE_ANS, TYPE_GED_QUALITE, get_param_qualite, indicateurs
+from config.i18n import en_francais, tr
 
 #: L'approbation de la politique qualité engage la direction (ISO 9001 §5.1-5.2).
 ROLES_DIRECTION = (User.Role.ADMIN, User.Role.PDG, User.Role.DGA, User.Role.DIRECTION)
@@ -103,19 +104,19 @@ def rapport_audit_pdf(audit):
     from hse.services import _pdf
 
     blocs = [
-        ("Audit", f"{audit.code} — {audit.get_type_audit_display()}"), ("Référentiel", audit.referentiel),
-        ("Périmètre", audit.perimetre), ("Fournisseur", audit.fournisseur.name if audit.fournisseur_id else "—"),
-        ("Organisme / auditeurs", f"{audit.organisme or 'ETSL'} · {audit.auditeur or '—'}"),
-        ("Réalisé le", f"{audit.date_realisation:%d/%m/%Y}" if audit.date_realisation else "—"),
-        ("Score", f"{audit.score} %" if audit.score is not None else "—"), ("Conclusion", audit.conclusion or "—"),
+        (tr("Audit"), f"{audit.code} — {audit.get_type_audit_display()}"), (tr("Référentiel"), audit.referentiel),
+        (tr("Périmètre"), audit.perimetre), (tr("Fournisseur"), audit.fournisseur.name if audit.fournisseur_id else "—"),
+        (tr("Organisme / auditeurs"), f"{audit.organisme or 'ETSL'} · {audit.auditeur or '—'}"),
+        (tr("Réalisé le"), f"{audit.date_realisation:%d/%m/%Y}" if audit.date_realisation else "—"),
+        (tr("Score"), f"{audit.score} %" if audit.score is not None else "—"), (tr("Conclusion"), audit.conclusion or "—"),
     ]
     if audit.agrement_accorde is not None:
-        blocs.append(("Agrément qualité", "Accordé" if audit.agrement_accorde else "Refusé"))
-    tableau = [["Constat", "Exigence", "Description", "NC"]] + [
+        blocs.append((tr("Agrément qualité"), tr("Accordé") if audit.agrement_accorde else tr("Refusé")))
+    tableau = [[tr("Constat"), tr("Exigence"), tr("Description"), "NC"]] + [
         [c.get_type_constat_display(), c.exigence or "—", c.description[:90], c.nc.code if c.nc_id else "—"]
         for c in audit.constats.select_related("nc")
     ]
-    return _pdf(f"Rapport d'audit {audit.code}", blocs, tableau if len(tableau) > 1 else None)
+    return _pdf(tr("Rapport d'audit %(audit_code)s") % {"audit_code": audit.code}, blocs, tableau if len(tableau) > 1 else None)
 
 
 def cloturer_audit(audit, user):
@@ -135,7 +136,7 @@ def cloturer_audit(audit, user):
         partenaire.save(update_fields=["agree_qualite_jusqu"])
     audit.statut = AuditQualite.Statut.CLOTURE
     audit.cloture_par, audit.cloture_le = user, timezone.now()
-    audit.rapport = archiver(rapport_audit_pdf(audit), f"rapport-{audit.code}.pdf", f"Rapport d'audit {audit.code}", audit.code,
+    audit.rapport = archiver(en_francais(rapport_audit_pdf, audit), f"rapport-{audit.code}.pdf", f"Rapport d'audit {audit.code}", audit.code,
                              "qualite.auditqualite", audit.pk, user, ("audit", audit.referentiel), "Rapport d'audit clôturé")
     audit.save()
     return audit
@@ -211,12 +212,12 @@ def bilan_pdf(bilan, titre, revue=None):
 
     from .ecarts import LIBELLES_INDICATEURS
 
-    blocs = [("Année", str(bilan["annee"])), ("Politique qualité en vigueur", "Oui" if bilan.get("politique_en_vigueur") else "Non")]
+    blocs = [(tr("Année"), str(bilan["annee"])), (tr("Politique qualité en vigueur"), tr("Oui") if bilan.get("politique_en_vigueur") else tr("Non"))]
     if revue:
-        blocs += [("Date de la revue", f"{revue.date_revue:%d/%m/%Y}"), ("Participants", revue.participants or "—"),
-                  ("Conclusions", revue.conclusions or "—"), ("Décisions", revue.decisions or "—")]
+        blocs += [(tr("Date de la revue"), f"{revue.date_revue:%d/%m/%Y}"), (tr("Participants"), revue.participants or "—"),
+                  (tr("Conclusions"), revue.conclusions or "—"), (tr("Décisions"), revue.decisions or "—")]
     ind = bilan.get("indicateurs", {})
-    tableau = [["Donnée d'entrée", "Valeur"]]
+    tableau = [[tr("Donnée d'entrée"), tr("Valeur")]]
     tableau += [[lib, "—" if ind.get(cle) is None else f"{ind[cle]}{(' ' + u) if u else ''}"] for cle, lib, u in LIBELLES_INDICATEURS]
     tableau += [[lib, "—" if bilan.get(cle) is None else str(bilan[cle])] for cle, lib in LIBELLES_BILAN]
     return _pdf(titre, blocs, tableau)

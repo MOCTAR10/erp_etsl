@@ -59,6 +59,7 @@ from .services import (
     traceabilite,
     valuation,
 )
+from config.i18n import tr
 
 
 class DepotViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
@@ -138,7 +139,7 @@ class LotMatiereViewSet(viewsets.ModelViewSet):
         if lot.statut != LotMatiere.Statut.BLOQUE:
             raise ValidationError({"detail": "Le lot n'est pas en quarantaine."})
         if lot.nc_blocage_id and lot.nc_blocage.statut != "cloturee":
-            raise ValidationError({"detail": f"NC {lot.nc_blocage.code} ouverte : clôturer la NC (CAPA) avant de lever la quarantaine."})
+            raise ValidationError({"detail": tr("NC %(nc_blocage_code)s ouverte : clôturer la NC (CAPA) avant de lever la quarantaine.") % {"nc_blocage_code": lot.nc_blocage.code}})
         lot.lever_quarantaine()
         return Response(self.get_serializer(lot).data)
 
@@ -395,7 +396,7 @@ class InventaireViewSet(viewsets.ModelViewSet):
             try:
                 ligne = inv.lignes.get(pk=item.get("id"))
             except (InventaireLigne.DoesNotExist, DjangoValidationError, AttributeError, ValueError):
-                raise ValidationError({"lignes": f"Ligne inconnue : {item!r}."})
+                raise ValidationError({"lignes": tr("Ligne inconnue : %(item)s.") % {"item": repr(item)}})
             qte = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=0).run_validation(
                 item.get("quantite_reelle"))
             ligne.quantite_reelle = qte
@@ -505,13 +506,14 @@ class PlanInventaireTournantViewSet(viewsets.ModelViewSet):
                        "Hors tolérance", "Valeur écart (FCFA)"]
             lignes = [[r["inventaire"], r["date"], f"{r['article']} {r['article_label']}", r["lot"] or "",
                        r["quantite_systeme"], r["quantite_reelle"], r["ecart"], r["ecart_pct"],
-                       "oui" if r["hors_tolerance"] else "non", r["valeur_ecart"] if montants else "—"]
+                       tr("oui") if r["hors_tolerance"] else tr("non"), r["valeur_ecart"] if montants else "—"]
                       for r in data["rows"]]
-            sous = (f"Dépôt {data['depot']} — année {data['annee']} — {len(lignes)} écart(s), "
-                    f"{data['hors_tolerance']} hors tolérance")
+            sous = tr("Dépôt %(depot)s — année %(annee)s — %(nb)s écart(s), %(hors)s hors tolérance") % {
+                "depot": data["depot"], "annee": data["annee"], "nb": len(lignes), "hors": data["hors_tolerance"]}
             if montants:
-                sous += f" — valeur nette {data['valeur_nette']} FCFA"
-            return reponse_export(fmt, f"ecarts-{plan.code}-{data['annee']}", f"État des écarts d'inventaire {plan.code}",
+                sous += tr(" — valeur nette %(valeur)s FCFA") % {"valeur": data["valeur_nette"]}
+            return reponse_export(fmt, f"ecarts-{plan.code}-{data['annee']}",
+                                  tr("État des écarts d'inventaire %(code)s") % {"code": plan.code},
                                   entetes, lignes, sous)
         return Response(en_texte(data))
 

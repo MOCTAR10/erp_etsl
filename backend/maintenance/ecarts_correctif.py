@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .ecarts_m5m8 import est_gr
+from config.i18n import tr
 
 
 def bc_gr_candidats():
@@ -39,11 +40,11 @@ def lier_bc_gr(ot, bc_id, user=None):
     if bc is None:
         raise ValidationError("BC introuvable.")
     if not bc.is_global_rental:
-        raise ValidationError(f"Le BC {bc.code} n'est pas un BC GLOBAL RENTAL (compte 618).")
+        raise ValidationError(tr("Le BC %(bc_code)s n'est pas un BC GLOBAL RENTAL (compte 618).") % {"bc_code": bc.code})
     if bc.status == PurchaseOrder.Status.ANNULEE:
-        raise ValidationError(f"Le BC {bc.code} est annulé.")
+        raise ValidationError(tr("Le BC %(bc_code)s est annulé.") % {"bc_code": bc.code})
     if ot.bc_gr_id:
-        raise ValidationError(f"OT déjà rattaché au BC {ot.bc_gr.code}.")
+        raise ValidationError(tr("OT déjà rattaché au BC %(bc_gr_code)s.") % {"bc_gr_code": ot.bc_gr.code})
     ot.bc_gr = bc
     champs = ["bc_gr", "updated_at"]
     if ot.ecriture_id and ot.ecriture.status == AccountMove.Status.POSTED:

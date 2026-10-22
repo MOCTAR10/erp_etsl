@@ -68,6 +68,7 @@ from .services import (
     lettrer_lignes,
     parametres_provisoires,
 )
+from config.i18n import tr
 
 
 def _est_uuid(valeur):
@@ -221,10 +222,10 @@ class RapprochementBancaireViewSet(DjangoValidationMixin, viewsets.ModelViewSet)
         for ligne_pk in ligne_ids:
             ligne = LigneReleve.objects.filter(pk=ligne_pk).first()
             if ligne is None:
-                raise DRFValidationError(f"Ligne de relevé introuvable : {ligne_pk}")
+                raise DRFValidationError(tr("Ligne de relevé introuvable : %(ligne_pk)s") % {"ligne_pk": ligne_pk})
             if ligne.releve.compte_bancaire_id != rapprochement.compte_bancaire_id:
                 raise DRFValidationError(
-                    f"Ligne {ligne_pk} rattachée à un autre compte bancaire."
+                    tr("Ligne %(ligne_pk)s rattachée à un autre compte bancaire.") % {"ligne_pk": ligne_pk}
                 )
             LigneRapprochement.objects.get_or_create(
                 rapprochement=rapprochement, ligne_releve=ligne
@@ -367,11 +368,11 @@ class PaiementViewSet(FiltresMulticriteresMixin, LockedAfterMixin, DjangoValidat
         # CDC M2 §5.8 : rapprochement 3-way (BR / BC / facture) obligatoire avant comptabilisation.
         if paiement.facture_id and paiement.facture.status == paiement.facture.Status.RAPPROCHEE:
             raise DRFValidationError(
-                f"Facture {paiement.facture.code} rapprochée mais non comptabilisée : comptabilisez-la (Achats) avant le paiement."
+                tr("Facture %(facture_code)s rapprochée mais non comptabilisée : comptabilisez-la (Achats) avant le paiement.") % {"facture_code": paiement.facture.code}
             )
         if paiement.facture_id and paiement.facture.status != paiement.facture.Status.COMPTABILISEE:
             raise DRFValidationError(
-                f"Facture {paiement.facture.code} non rapprochée (3-way BR / BC / facture) : comptabilisation impossible."
+                tr("Facture %(facture_code)s non rapprochée (3-way BR / BC / facture) : comptabilisation impossible.") % {"facture_code": paiement.facture.code}
             )
         try:
             move = build_paiement_move(paiement, user=request.user)

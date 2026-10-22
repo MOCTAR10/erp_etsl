@@ -19,6 +19,7 @@ from django.db import transaction
 from accounting_kernel.models import AccountMove, AccountMoveLine, Journal
 from accounting_kernel.services import period_for_date, post_move
 from referentiels.models import Account
+from config.i18n import tr
 
 CENT = Decimal("0.01")
 SOURCE_GR = "M4"
@@ -46,7 +47,7 @@ def _compte(code):
     try:
         return Account.objects.get(code=code)
     except Account.DoesNotExist:
-        raise ValidationError(f"Compte {code} absent du plan comptable (seed_referentiels).")
+        raise ValidationError(tr("Compte %(code)s absent du plan comptable (seed_referentiels).") % {"code": code})
 
 
 @transaction.atomic
@@ -136,8 +137,7 @@ def controler_liaison_bc(location, bc):
     pas de BC déjà rattaché à une autre location."""
     if ecriture_location(location):
         raise ValidationError(
-            f"Location {location.code} déjà comptabilisée au 618 (écriture M10) : la lier à un BC GR créerait une "
-            "double charge. Extournez d'abord l'écriture."
+            tr("Location %(location_code)s déjà comptabilisée au 618 (écriture M10) : la lier à un BC GR créerait une double charge. Extournez d'abord l'écriture.") % {"location_code": location.code}
         )
     if bc is not None and bc.location_gr_id and bc.location_gr_id != location.pk:
-        raise ValidationError(f"Le BC {bc.code} est déjà rattaché à une autre location GR.")
+        raise ValidationError(tr("Le BC %(bc_code)s est déjà rattaché à une autre location GR.") % {"bc_code": bc.code})

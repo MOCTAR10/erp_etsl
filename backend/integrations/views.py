@@ -12,6 +12,7 @@ from .importers import ImportError, run_import
 from .models import ImportBatch
 from accounting_kernel.permissions import CanPostAccounting
 from .serializers import GabaritImportSerializer, ImportBatchSerializer
+from config.i18n import tr
 
 
 @extend_schema(
@@ -47,7 +48,7 @@ class ImportFileView(APIView):
         connector = request.data.get("connector")
         if connector not in ImportBatch.Connector.values:
             return Response(
-                {"detail": f"connecteur inconnu : {connector}"}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": tr("connecteur inconnu : %(connector)s") % {"connector": connector}}, status=status.HTTP_400_BAD_REQUEST
             )
         upload = request.FILES.get("file")
         if upload is None:

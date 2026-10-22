@@ -40,6 +40,7 @@ from users.permissions import can_read_module
 from .cloture import figer_dossier, transferer_paie, valider_pointage
 from .services import CanManageOperations, can_see_amount, charge_stats
 from .terrain_a3 import ConsommationOfMixin, controler_synchro
+from config.i18n import tr
 
 
 def _pdf_reponse(contenu, nom, type_mime="application/pdf"):
@@ -156,7 +157,7 @@ class OrdreFabricationViewSet(FiltresMulticriteresMixin, ConsommationOfMixin, _C
     def _transition(self, depuis, vers, controle=None):
         of = OrdreFabrication.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if of.status not in depuis:
-            return Response({"detail": f"OF {of.get_status_display().lower()} : action impossible."},
+            return Response({"detail": tr("OF %(status)s : action impossible.") % {"status": of.get_status_display().lower()}},
                             status=status.HTTP_400_BAD_REQUEST)
         if controle:
             blocage = controle(of)
@@ -387,7 +388,7 @@ class AffectationEquipeViewSet(_CommonViewSet):
         if aff.statut != AffectationEquipe.Statut.PLANIFIEE:
             raise DRFValidationError("Seule une affectation planifiée peut être mobilisée.")
         if aff.ordre.status in (OrdreFabrication.Status.CLOTURE, OrdreFabrication.Status.ANNULE):
-            raise DRFValidationError(f"OF {aff.ordre.code} clos ou annulé : mobilisation impossible.")
+            raise DRFValidationError(tr("OF %(ordre_code)s clos ou annulé : mobilisation impossible.") % {"ordre_code": aff.ordre.code})
         from .ecarts import controler_mobilisation
 
         blocage = controler_mobilisation(aff)  # absences / congés M9 des membres sur la période
@@ -833,7 +834,7 @@ class FichePreparationViewSet(_PdfMixin, _CommonViewSet):
         ruptures = [b for b in besoins if b.statut == BesoinMatiere.Statut.RUPTURE]
         if ruptures:
             raise DRFValidationError(
-                f"Rupture matière sur {len(ruptures)} article(s) : DA générée(s), préparation non validable."
+                tr("Rupture matière sur %(nb_ruptures)s article(s) : DA générée(s), préparation non validable.") % {"nb_ruptures": len(ruptures)}
             )
         fiche.statut = FichePreparation.Statut.VALIDEE
         fiche.valide_par = request.user

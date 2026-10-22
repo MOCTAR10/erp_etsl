@@ -22,6 +22,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from config.i18n import tr
 
 XAF = "XAF"
 ZERO = Decimal("0")
@@ -48,7 +49,7 @@ def compte(code, label=None, classe=None, type_=None):
     if obj is None:
         defaut = COMPTES.get(code)
         if defaut is None and label is None:
-            raise ValidationError(f"Compte {code} absent du plan comptable.")
+            raise ValidationError(tr("Compte %(code)s absent du plan comptable.") % {"code": code})
         label, classe, type_ = (label, classe, type_) if label else defaut
         obj = Account.objects.create(code=code, label=label, account_class=classe, account_type=type_,
                                      reconcile=classe == 4)
@@ -78,12 +79,11 @@ def taux_du(devise, jour):
         return None
     cours = TauxChange.objects.filter(devise=devise, date__lte=jour).order_by("-date").first()
     if cours is None:
-        raise ValidationError(f"Aucun cours {devise.code} connu au {jour:%d/%m/%Y} : saisissez-le (Comptabilité → cours de change).")
+        raise ValidationError(tr("Aucun cours %(devise_code)s connu au %(jour)s : saisissez-le (Comptabilité → cours de change).") % {"devise_code": devise.code, "jour": format(jour, '%d/%m/%Y')})
     max_jours = int(_param("DEVISE_ANCIENNETE_MAX_JOURS"))
     if max_jours and (jour - cours.date).days > max_jours:
         raise ValidationError(
-            f"Dernier cours {devise.code} du {cours.date:%d/%m/%Y} : plus de {max_jours} jours avant le "
-            f"{jour:%d/%m/%Y}. Saisissez le cours du jour."
+            tr("Dernier cours %(devise_code)s du %(cours_date)s : plus de %(max_jours)s jours avant le %(jour)s. Saisissez le cours du jour.") % {"devise_code": devise.code, "cours_date": format(cours.date, '%d/%m/%Y'), "max_jours": max_jours, "jour": format(jour, '%d/%m/%Y')}
         )
     return cours
 
@@ -101,7 +101,7 @@ def _decimal(texte, champ):
     try:
         valeur = Decimal(str(texte).strip().replace(" ", "").replace(",", "."))
     except (InvalidOperation, ValueError):
-        raise ValidationError({champ: f"Nombre invalide : {texte!r}."})
+        raise ValidationError({champ: tr("Nombre invalide : %(texte)s.") % {"texte": repr(texte)}})
     return valeur
 
 
@@ -112,7 +112,7 @@ def enregistrer_taux(devise_code, jour, taux, user, source="manuel"):
 
     devise = Currency.objects.filter(code=(devise_code or "").strip().upper()).first()
     if devise is None:
-        raise ValidationError({"devise": f"Devise inconnue : {devise_code!r}."})
+        raise ValidationError({"devise": tr("Devise inconnue : %(devise_code)s.") % {"devise_code": repr(devise_code)}})
     if devise.code == XAF:
         raise ValidationError({"devise": "Le XAF est la devise de tenue : pas de cours."})
     taux = _decimal(taux, "taux")
@@ -121,7 +121,7 @@ def enregistrer_taux(devise_code, jour, taux, user, source="manuel"):
     existant = TauxChange.objects.select_for_update().filter(devise=devise, date=jour).first()
     if existant:
         if not existant.est_provisoire:
-            raise ValidationError(f"Cours {devise.code} du {jour:%d/%m/%Y} déjà confirmé : non modifiable.")
+            raise ValidationError(tr("Cours %(devise_code)s du %(jour)s déjà confirmé : non modifiable.") % {"devise_code": devise.code, "jour": format(jour, '%d/%m/%Y')})
         existant.taux, existant.source, existant.saisi_par = taux, source, user
         existant.save(update_fields=["taux", "source", "saisi_par"])
         return existant, False
@@ -129,7 +129,7 @@ def enregistrer_taux(devise_code, jour, taux, user, source="manuel"):
         with transaction.atomic():
             return TauxChange.objects.create(devise=devise, date=jour, taux=taux, source=source, saisi_par=user), True
     except IntegrityError:
-        raise ValidationError(f"Cours {devise.code} du {jour:%d/%m/%Y} déjà saisi.")
+        raise ValidationError(tr("Cours %(devise_code)s du %(jour)s déjà saisi.") % {"devise_code": devise.code, "jour": format(jour, '%d/%m/%Y')})
 
 
 def importer_taux(texte, user):
@@ -304,8 +304,7 @@ def reevaluer_tout(jour, user):
     derniere = ProvisionChange.objects.filter(statut=ProvisionChange.Statut.ACTIVE).order_by("-date_cloture").first()
     if derniere is not None and jour < derniere.date_cloture:
         raise ValidationError(
-            f"Une provision pour perte de change existe au {derniere.date_cloture:%d/%m/%Y} : la réévaluation de clôture "
-            "ne peut pas être antérieure."
+            tr("Une provision pour perte de change existe au %(derniere_date_cloture)s : la réévaluation de clôture ne peut pas être antérieure.") % {"derniere_date_cloture": format(derniere.date_cloture, '%d/%m/%Y')}
         )
     faites, erreurs = 0, []
     for op in OperationDevise.objects.filter(statut=OperationDevise.Statut.COMPTABILISEE, date__lte=jour):

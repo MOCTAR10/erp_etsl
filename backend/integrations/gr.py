@@ -23,6 +23,7 @@ from django.utils import timezone
 from outbox.subscribers import subscriber
 
 from .models import WebhookDelivery, WebhookEndpoint
+from config.i18n import tr
 
 MAX_DELIVERY_ATTEMPTS = 5
 TIMEOUT_SECONDS = 5
@@ -48,13 +49,13 @@ def validate_webhook_url(url, debug=None):
     try:
         addresses = _resolve(parsed.hostname)
     except OSError as exc:
-        raise ValueError(f"Nom d'hôte introuvable : {exc}")
+        raise ValueError(tr("Nom d'hôte introuvable : %(exc)s") % {"exc": exc})
     if not addresses:
         raise ValueError("Nom d'hôte introuvable.")
     for raw in addresses:
         ip = ipaddress.ip_address(raw.split("%")[0])
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
-            raise ValueError(f"Adresse interne interdite ({ip}).")
+            raise ValueError(tr("Adresse interne interdite (%(ip)s).") % {"ip": ip})
 
 
 def sign(secret, body):

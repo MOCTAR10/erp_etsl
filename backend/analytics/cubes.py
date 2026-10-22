@@ -19,6 +19,7 @@ from django.utils import timezone
 from outbox.models import publish
 
 from .models import CubeArchive, CubeFait, ParametreCube
+from config.i18n import tr
 
 ZERO = Decimal("0")
 AXES = ("affaire", "chantier", "site", "activite", "centre", "periode")
@@ -78,7 +79,7 @@ def roles_valides(texte):
     roles = [r.strip().lower() for r in (texte or "").split(",") if r.strip()]
     inconnus = [r for r in roles if r not in User.Role.values]
     if inconnus:
-        raise ValueError(f"Rôle(s) inconnu(s) : {', '.join(inconnus)}.")
+        raise ValueError(tr("Rôle(s) inconnu(s) : %(liste)s.") % {"liste": ', '.join(inconnus)})
     return tuple(dict.fromkeys(roles))
 
 
@@ -175,7 +176,7 @@ def alimenter_cube(periode):
     """Reconstruit les faits de `periode` depuis le grand livre. Idempotent : rejouer donne le même cube."""
     debut, fin = _bornes(periode)
     if CubeArchive.objects.filter(periode=periode).exists():
-        raise ValueError(f"Le cube {periode} est archivé : il ne peut plus être recalculé.")
+        raise ValueError(tr("Le cube %(periode)s est archivé : il ne peut plus être recalculé.") % {"periode": periode})
     CubeFait.objects.filter(periode=periode).delete()
     faits = _faits_du_grand_livre(debut, fin)
     CubeFait.objects.bulk_create([CubeFait(periode=periode, **f) for f in faits])
@@ -207,7 +208,7 @@ def archiver_cube(periode, user=None, today=None):
     if fin >= today:
         raise ValueError("La période n'est pas terminée : le cube ne peut être archivé qu'après la fin du mois.")
     if CubeArchive.objects.filter(periode=periode).exists():
-        raise ValueError(f"Le cube {periode} est déjà archivé.")
+        raise ValueError(tr("Le cube %(periode)s est déjà archivé.") % {"periode": periode})
     alimenter_cube(periode)
     faits = _serialiser(CubeFait.objects.filter(periode=periode))
     total = {m: sum((Decimal(f[m]) for f in faits), ZERO) for m in MESURES}
@@ -291,11 +292,11 @@ def lire_cube(periodes=None, axes=("periode",), filtres=None, user=None):
 
     for a in axes:
         if a not in AXES:
-            raise ValueError(f"Axe inconnu : {a} (attendu : {', '.join(AXES)}).")
+            raise ValueError(tr("Axe inconnu : %(a)s (attendu : %(liste)s).") % {"a": a, "liste": ', '.join(AXES)})
     filtres = {k: v for k, v in (filtres or {}).items() if v not in (None, "")}
     for k in filtres:
         if k not in AXES:
-            raise ValueError(f"Filtre inconnu : {k}.")
+            raise ValueError(tr("Filtre inconnu : %(k)s.") % {"k": k})
     archives = {a.periode: a for a in CubeArchive.objects.all()}
     qs = CubeFait.objects.all()
     if periodes:

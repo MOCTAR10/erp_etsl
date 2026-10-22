@@ -16,6 +16,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, Sum
+from config.i18n import tr
 
 ZERO = Decimal("0")
 CENT = Decimal("100")
@@ -58,7 +59,7 @@ def _pct_couts(affaire, jour):
     ).exclude(statut=Budget.Statut.BROUILLON).aggregate(t=Sum("montant"))["t"] or ZERO
     if budget <= 0:
         raise ValidationError(
-            f"Affaire {affaire.code} : aucun budget de charges approuvé (M11) — méthode des coûts impossible."
+            tr("Affaire %(affaire_code)s : aucun budget de charges approuvé (M11) — méthode des coûts impossible.") % {"affaire_code": affaire.code}
         )
     pct = min(CENT, max(ZERO, couts * CENT / budget))
     return pct, f"coûts {couts:.0f} / budget {budget:.0f}"
@@ -143,11 +144,11 @@ def comptabiliser(affaire, jour, user):
     affaire = Affaire.objects.select_for_update(of=("self",)).get(pk=affaire.pk)
     calc = calculer(affaire, jour)
     if not calc["ca_reference"]:
-        raise ValidationError(f"Affaire {affaire.code} sans montant de contrat : rien à reconnaître.")
+        raise ValidationError(tr("Affaire %(affaire_code)s sans montant de contrat : rien à reconnaître.") % {"affaire_code": affaire.code})
     dernier = (ReconnaissanceRevenu.objects.select_for_update(of=("self",))
                .filter(affaire=affaire, statut=ReconnaissanceRevenu.Statut.EN_VIGUEUR).order_by("-date_arrete").first())
     if dernier and dernier.date_arrete > jour:
-        raise ValidationError(f"Une reconnaissance plus récente existe déjà ({dernier.code} au {dernier.date_arrete:%d/%m/%Y}).")
+        raise ValidationError(tr("Une reconnaissance plus récente existe déjà (%(dernier_code)s au %(dernier_date_arrete)s).") % {"dernier_code": dernier.code, "dernier_date_arrete": format(dernier.date_arrete, '%d/%m/%Y')})
     if dernier:
         if dernier.move_id and dernier.move.status == AccountMove.Status.POSTED:
             reverse_move(dernier.move, user=user, date=jour, reference=f"Extourne {dernier.code}",

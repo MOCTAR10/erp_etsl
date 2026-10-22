@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
+from config.i18n import tr
 
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
@@ -139,8 +140,7 @@ def liberer(affaire, user, motif=""):
     motif = (motif or "").strip()
     if not row["echue"] and not motif:
         raise ValidationError(
-            "Garantie non échue (libération prévue le "
-            f"{row['date_liberation']:%d/%m/%Y}) : motif obligatoire pour une libération anticipée."
+            tr("Garantie non échue (libération prévue le %(date_liberation)s) : motif obligatoire pour une libération anticipée.") % {"date_liberation": format(row['date_liberation'], '%d/%m/%Y')}
             if row["date_liberation"] else "Date de libération inconnue (contrat sans fin) : motif obligatoire."
         )
     client = _client_de_affaire(affaire)

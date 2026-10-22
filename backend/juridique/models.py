@@ -20,6 +20,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from config.echeances import bande
+from config.i18n import tr
 
 
 class JuridiqueSequence(models.Model):
@@ -129,14 +130,14 @@ class Courrier(models.Model):
 
     def enregistrer(self):
         if self.statut != self.Statut.RECU:
-            raise ValueError(f"Courrier {self.get_statut_display().lower()} : déjà enregistré.")
+            raise ValueError(tr("Courrier %(statut)s : déjà enregistré.") % {"statut": self.get_statut_display().lower()})
         self.statut = self.Statut.ENREGISTRE
         return self.save(update_fields=["statut", "updated_at"])
 
     def classer(self):
         # Un courrier archivé ne revient pas en arrière (traçabilité du bureau d'ordre, §3.3).
         if self.statut not in (self.Statut.RECU, self.Statut.ENREGISTRE):
-            raise ValueError(f"Courrier {self.get_statut_display().lower()} : classement impossible.")
+            raise ValueError(tr("Courrier %(statut)s : classement impossible.") % {"statut": self.get_statut_display().lower()})
         if self.statut == self.Statut.RECU:
             self.enregistrer()
         self.statut = self.Statut.CLASSE

@@ -13,6 +13,7 @@ from django.db.models import Count, Q, Sum
 
 from .importers_migration import GABARITS, echantillon, get_param_reprise
 from .models_migration import HistoriquePaie, LigneReprise, LotReprise
+from config.i18n import tr
 
 ZERO = Decimal("0")
 
@@ -106,10 +107,9 @@ def _c2(texte_tiers=""):
         tiers.append({"code": code, "nom": nom, "erp": str(erp), "source": None if source is None else str(source),
                       "ecart": None if source is None else str(erp - source)})
     ecarts = [t for t in tiers if t["ecart"] is not None and Decimal(t["ecart"]) != 0]
-    detail = (f"Solde 411 (clients) {s411} ; solde 401 (fournisseurs) {s401} (débit − crédit). "
-              f"{len(tiers)} tiers porteurs d'un solde ; part non ventilée par tiers (compte collectif) {non_ventile}.")
+    detail = (tr("Solde 411 (clients) %(s411)s ; solde 401 (fournisseurs) %(s401)s (débit − crédit). %(nb_tiers)s tiers porteurs d'un solde ; part non ventilée par tiers (compte collectif) %(non_ventile)s.") % {"s411": s411, "s401": s401, "nb_tiers": len(tiers), "non_ventile": non_ventile})
     if sources:
-        detail += f" Comparaison par tiers : {len(ecarts)} tiers en écart."
+        detail += tr(" Comparaison par tiers : %(nb_ecarts)s tiers en écart.") % {"nb_ecarts": len(ecarts)}
     return s411 + s401, detail, tiers, sources, ecarts
 
 
@@ -117,7 +117,7 @@ def _c3():
     from stocks.models import StockQuant
 
     agg = StockQuant.objects.aggregate(q=Sum("quantity"), n=Count("id"))
-    return agg["q"] or ZERO, f"{agg['n']} lignes de stock (dépôt × article × lot)."
+    return agg["q"] or ZERO, tr("%(n)s lignes de stock (dépôt × article × lot).") % {"n": agg['n']}
 
 
 def _c4():
@@ -125,7 +125,7 @@ def _c4():
 
     valeur = StockQuant.objects.aggregate(v=Sum("stock_value"))["v"] or ZERO
     compta = _solde(["3"])
-    return valeur, f"Valorisation stock {valeur} ; solde comptes de stock (classe 3) {compta} ; écart {valeur - compta}.", compta
+    return valeur, tr("Valorisation stock %(valeur)s ; solde comptes de stock (classe 3) %(compta)s ; écart %(valeur2)s.") % {"valeur": valeur, "compta": compta, "valeur2": valeur - compta}, compta
 
 
 def _c5():
@@ -133,7 +133,7 @@ def _c5():
 
     actifs = Employe.objects.filter(statut__in=[Employe.Statut.ACTIF, Employe.Statut.CONGE])
     par_cat = ", ".join(f"{c['categorie']} {c['n']}" for c in actifs.values("categorie").annotate(n=Count("id")).order_by("categorie"))
-    return Decimal(actifs.count()), f"Par catégorie : {par_cat or '—'}."
+    return Decimal(actifs.count()), tr("Par catégorie : %(valeur)s.") % {"valeur": par_cat or '—'}
 
 
 def _c6():
@@ -141,15 +141,14 @@ def _c6():
     par_salarie = HistoriquePaie.objects.values("employe").annotate(mois=Count("periode", distinct=True))
     salaries_mois = sum(p["mois"] for p in par_salarie)
     incomplets = sum(1 for p in par_salarie if p["mois"] < profondeur)
-    return Decimal(salaries_mois), (f"{len(par_salarie)} salariés repris, {incomplets} avec moins de {profondeur} mois "
-                                    "d'historique.")
+    return Decimal(salaries_mois), (tr("%(nb_par_salarie)s salariés repris, %(incomplets)s avec moins de %(profondeur)s mois d'historique.") % {"nb_par_salarie": len(par_salarie), "incomplets": incomplets, "profondeur": profondeur})
 
 
 def _c7():
     from referentiels.models import Article, Partner
 
     tiers, articles = Partner.objects.count(), Article.objects.count()
-    return Decimal(tiers + articles), f"{tiers} tiers, {articles} articles."
+    return Decimal(tiers + articles), tr("%(tiers)s tiers, %(articles)s articles.") % {"tiers": tiers, "articles": articles}
 
 
 def _c8():
@@ -159,8 +158,7 @@ def _c8():
 
     wps, qualifs = WpsWpqr.objects.count(), QualificationSoudeur.objects.count()
     expirees = QualificationSoudeur.objects.filter(date_validite__lt=timezone.localdate()).count()
-    return Decimal(wps + qualifs), (f"{wps} WPS / WPQR, {Soudeur.objects.count()} soudeurs, {qualifs} qualifications "
-                                    f"(dont {expirees} échues).")
+    return Decimal(wps + qualifs), (tr("%(wps)s WPS / WPQR, %(count)s soudeurs, %(qualifs)s qualifications (dont %(expirees)s échues).") % {"wps": wps, "count": Soudeur.objects.count(), "qualifs": qualifs, "expirees": expirees})
 
 
 def _c9():
@@ -171,7 +169,7 @@ def _c9():
     docs = Document.objects.filter(sha256__in=empreintes).select_related("current_version")
     nb = docs.count()
     alterees = sum(1 for d in docs if d.current_version is None or d.current_version.sha256 != d.sha256)
-    return Decimal(nb), f"{nb} documents repris ; {alterees} sans version intègre."
+    return Decimal(nb), tr("%(nb)s documents repris ; %(alterees)s sans version intègre.") % {"nb": nb, "alterees": alterees}
 
 
 def rapprochements(sources):
@@ -187,7 +185,7 @@ def rapprochements(sources):
                 if lot is not None:
                     details.append(f"{g} ({len(cles)}) : " + ", ".join(cles))
             resultats.append({
-                "code": code, "libelle": libelle, "valideur": valideur, "valeur_erp": str(int(taille)),
+                "code": code, "libelle": tr(libelle), "valideur": tr(valideur), "valeur_erp": str(int(taille)),
                 "valeur_source": None, "ecart": None, "statut": "a_controler" if details else "a_saisir",
                 "detail": " | ".join(details) or "Aucun lot réel chargé.",
             })
@@ -204,7 +202,7 @@ def rapprochements(sources):
         if code == "C2" and sortie[4]:
             statut = "ecart"  # un total juste peut masquer des écarts entre tiers qui se compensent
         resultats.append({
-            "code": code, "libelle": libelle, "valideur": valideur, "valeur_erp": str(valeur),
+            "code": code, "libelle": tr(libelle), "valideur": tr(valideur), "valeur_erp": str(valeur),
             "valeur_source": None if source is None else str(source), "ecart": None if ecart is None else str(ecart),
             "statut": statut, "detail": detail,
             **({"tiers": sortie[2]} if code == "C2" else {}),
@@ -232,11 +230,11 @@ STATUTS = {"conforme": "Conforme", "ecart": "Écart", "a_saisir": "Valeur source
 def rapprochements_csv(resultats):
     tampon = io.StringIO()
     ecrivain = csv.writer(tampon, delimiter=";")
-    ecrivain.writerow(["Contrôle", "Libellé", "Valeur ERP", "Valeur source", "Écart", "Statut", "Détail", "Valideur",
-                       "Visa"])
+    ecrivain.writerow([tr("Contrôle"), tr("Libellé"), tr("Valeur ERP"), tr("Valeur source"), tr("Écart"), tr("Statut"), tr("Détail"), tr("Valideur"),
+                       tr("Visa")])
     for r in resultats:
         ecrivain.writerow([r["code"], r["libelle"], r["valeur_erp"], r["valeur_source"] or "", r["ecart"] or "",
-                           STATUTS[r["statut"]], r["detail"], r["valideur"], ""])
+                           tr(STATUTS[r["statut"]]), r["detail"], r["valideur"], ""])
         for t in r.get("tiers", []):  # C2 : détail par tiers
             ecrivain.writerow([f"{r['code']} / {t['code']}", t["nom"], t["erp"], t["source"] or "", t["ecart"] or "",
                                "", "", "", ""])

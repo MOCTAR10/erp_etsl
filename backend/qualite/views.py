@@ -58,6 +58,7 @@ from .serializers import (
 )
 from .services import CanManageQualite, CanValidatePv, can_validate_pv
 from .ecarts_a3 import JointTracabiliteMixin
+from config.i18n import tr
 
 
 def _as_bool(value):
@@ -140,7 +141,7 @@ class WpsWpqrViewSet(viewsets.ModelViewSet):
     def _assert_brouillon(self):
         wps = self.get_object()
         if wps.statut != WpsWpqr.Statut.BROUILLON:
-            raise DRFValidationError(f"{wps.code} {wps.get_statut_display().lower()} : procédure scellée (réviser = nouveau WPS).")
+            raise DRFValidationError(tr("%(wps_code)s %(statut)s : procédure scellée (réviser = nouveau WPS).") % {"wps_code": wps.code, "statut": wps.get_statut_display().lower()})
         return wps
 
     def update(self, request, *args, **kwargs):
@@ -158,7 +159,7 @@ class WpsWpqrViewSet(viewsets.ModelViewSet):
         wps = self.get_object()
         if wps.statut != WpsWpqr.Statut.BROUILLON:
             return Response(
-                {"detail": f"WPS {wps.get_statut_display().lower()} : validation impossible."},
+                {"detail": tr("WPS %(statut)s : validation impossible.") % {"statut": wps.get_statut_display().lower()}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if wps.type == WpsWpqr.Type.WPS and (wps.wpqr is None or wps.wpqr.statut != WpsWpqr.Statut.VALIDE):
@@ -198,7 +199,7 @@ class WpsWpqrViewSet(viewsets.ModelViewSet):
         if ordre is None:
             raise DRFValidationError({"ordre": "OF introuvable."})
         if ordre.status in (OrdreFabrication.Status.CLOTURE, OrdreFabrication.Status.ANNULE):
-            raise DRFValidationError({"ordre": f"OF {ordre.code} clos : diffusion inutile."})
+            raise DRFValidationError({"ordre": tr("OF %(ordre_code)s clos : diffusion inutile.") % {"ordre_code": ordre.code}})
         from .ecarts import controle_wps_profil
 
         if erreur := controle_wps_profil(wps, ordre.affaire):
@@ -314,7 +315,7 @@ class ControleQualiteViewSet(viewsets.ModelViewSet):
         manquants = list(CritereControle.objects.filter(type_controle=controle.type_controle, actif=True)
                          .exclude(mesures__controle=controle).values_list("libelle", flat=True))
         if manquants and not _as_bool(request.data.get("partiel")):
-            raise DRFValidationError({"detail": f"Critères non mesurés : {', '.join(manquants)} (confirmer un contrôle partiel)."})
+            raise DRFValidationError({"detail": tr("Critères non mesurés : %(liste)s (confirmer un contrôle partiel).") % {"liste": ', '.join(manquants)}})
         conclure_mesures(controle, request.user)
         return Response(self.get_serializer(controle).data)
 
@@ -368,10 +369,10 @@ class NonConformiteViewSet(viewsets.ModelViewSet):
         nc = self.get_object()
         # MANUEL 5.8 : une NC se clôture après décision de traitement (pas directement depuis « signalée »).
         if nc.statut != NonConformite.Statut.EN_TRAITEMENT:
-            return Response({"detail": f"NC {nc.get_statut_display().lower()} : décidez d'abord du traitement."},
+            return Response({"detail": tr("NC %(statut)s : décidez d'abord du traitement.") % {"statut": nc.get_statut_display().lower()}},
                             status=status.HTTP_400_BAD_REQUEST)
         if ouvertes := _capa_ouvertes(nc):
-            return Response({"detail": f"CAPA non clôturée(s) : {', '.join(ouvertes)} — clôturez-les avant la NC."},
+            return Response({"detail": tr("CAPA non clôturée(s) : %(liste)s — clôturez-les avant la NC.") % {"liste": ', '.join(ouvertes)}},
                             status=status.HTTP_400_BAD_REQUEST)
         if nc.type_ncr == "soudage":
             # NCR-SD : seule une CND de recontrôle validée et conforme clôt la non-conformité.
@@ -699,7 +700,7 @@ class EpreuvePressionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mix
         if len(ep.releves) < 2:
             raise DRFValidationError("Au moins deux relevés P/T sont nécessaires.")
         if ep.releves[-1]["minute"] - ep.releves[0]["minute"] < ep.duree_minutes:
-            raise DRFValidationError(f"Maintien insuffisant : {ep.duree_minutes} min requises.")
+            raise DRFValidationError(tr("Maintien insuffisant : %(ep_duree_minutes)s min requises.") % {"ep_duree_minutes": ep.duree_minutes})
         pressions = [Decimal(r["pression"]) for r in ep.releves]
         chute = max(pressions) - pressions[-1]
         ok = max(pressions) >= ep.pression_essai and chute <= ep.chute_max

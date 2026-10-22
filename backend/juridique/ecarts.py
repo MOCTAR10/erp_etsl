@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from config.echeances import BANDES, PALIERS_DEFAUT, bande
 from config.echeances import paliers as paliers_communs
+from config.i18n import tr
 
 # cle -> (libellé, valeur par défaut). Toute valeur est PROVISOIRE tant qu'ETSL ne l'a pas confirmée.
 PARAMETRES_DEFAUT = {
@@ -118,7 +119,7 @@ def valider_valeur(cle, valeur):
     if attendu is int and (isinstance(valeur, bool) or not isinstance(valeur, int)):
         raise ValueError("Valeur entière attendue.")
     if not isinstance(valeur, attendu):
-        raise ValueError(f"Valeur de type {attendu.__name__} attendue.")
+        raise ValueError(tr("Valeur de type %(attendu___name)s attendue.") % {"attendu___name": attendu.__name__})
     roles = set(User.Role.values)
     if cle == "roles_dg":
         if not valeur or not set(valeur) <= roles:
@@ -126,7 +127,7 @@ def valider_valeur(cle, valeur):
     if cle == "destinataires_alertes":
         for famille, liste in valeur.items():
             if not isinstance(liste, list) or not set(liste) <= roles:
-                raise ValueError(f"Rôles inconnus pour la famille {famille}.")
+                raise ValueError(tr("Rôles inconnus pour la famille %(famille)s.") % {"famille": famille})
     if cle == "paliers_notification":
         if not all(isinstance(j, int) and not isinstance(j, bool) and 0 <= j <= 365 for j in valeur):
             raise ValueError("Paliers attendus : entiers entre 0 et 365.")
@@ -192,18 +193,18 @@ def controler_signature_convention(convention):
     if parametre("bloquer_dossier_incomplet"):
         c = completude("convention", convention)
         if not c["complet"]:
-            raise ValueError("Dossier incomplet : pièces manquantes " + ", ".join(c["manquantes"]) + ".")
+            raise ValueError(tr("Dossier incomplet : pièces manquantes %(liste)s.") % {"liste": ", ".join(c["manquantes"])})
     if parametre("bloquer_sans_validation_dg"):
         codes = list(convention.cautions.filter(valide_dg_le__isnull=True).values_list("code", flat=True))
         if codes:
             raise ValueError(
-                "Garanties non validées par la Direction Générale : " + ", ".join(codes) + "."
+                tr("Garanties non validées par la Direction Générale : %(liste)s.") % {"liste": ", ".join(codes)}
             )
 
 
 def exiger_validation_dg(obj, acte):
     if parametre("bloquer_sans_validation_dg") and not obj.valide_dg_le:
-        raise ValueError(f"{acte} impossible : la Direction Générale doit d'abord valider {obj.code}.")
+        raise ValueError(tr("%(acte)s impossible : la Direction Générale doit d'abord valider %(obj_code)s.") % {"acte": acte, "obj_code": obj.code})
 
 
 # --------------------------------------------------------------------------------------------------

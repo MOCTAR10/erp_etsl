@@ -15,6 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from config.i18n import tr
 
 CENT = Decimal("0.01")
 
@@ -51,7 +52,7 @@ def valider_valeur_parametre(code, valeur):
     admises = PARAMETRES_ACHATS_DEFAUT.get(code, (None, None, None, None))[3]
     if admises is not None:
         if valeur != valeur.to_integral_value() or int(valeur) not in admises:
-            raise ValidationError(f"Valeurs admises : {', '.join(str(v) for v in sorted(admises))}.")
+            raise ValidationError(tr("Valeurs admises : %(liste)s.") % {"liste": ', '.join(str(v) for v in sorted(admises))})
     elif valeur <= 0:
         raise ValidationError("La valeur doit être strictement positive.")
 
@@ -300,7 +301,7 @@ def comptabiliser_avoir(avoir, user):
         raise ValidationError("Facture d'origine sans montant.")
     deja = sum((a.montant_ht for a in facture.avoirs.filter(statut=AvoirFournisseur.Statut.COMPTABILISE)), Decimal("0"))
     if deja + avoir.montant_ht > total_ht:
-        raise ValidationError(f"Avoirs cumulés ({deja + avoir.montant_ht:.2f}) supérieurs au HT de la facture ({total_ht:.2f}).")
+        raise ValidationError(tr("Avoirs cumulés (%(valeur)s) supérieurs au HT de la facture (%(total_ht)s).") % {"valeur": format(deja + avoir.montant_ht, '.2f'), "total_ht": format(total_ht, '.2f')})
     ratio = avoir.montant_ht / total_ht
     origine = facture.move
     move = AccountMove.objects.create(
@@ -353,7 +354,7 @@ def da_depuis_affaire(affaire, user):
     from .models import PurchaseRequest, PurchaseRequestLine
 
     if affaire.status not in (Affaire.Status.CONFIRMEE, Affaire.Status.EN_COURS):
-        raise ValidationError({"affaire": f"Affaire {affaire.code} {affaire.get_status_display().lower()} : seule une affaire validée (confirmée / en cours) génère ses besoins d'achat."})
+        raise ValidationError({"affaire": tr("Affaire %(affaire_code)s %(status)s : seule une affaire validée (confirmée / en cours) génère ses besoins d'achat.") % {"affaire_code": affaire.code, "status": affaire.get_status_display().lower()}})
     if PurchaseRequest.objects.filter(affaire=affaire, status=PurchaseRequest.Status.BROUILLON).exists():
         raise ValidationError({"affaire": "Une DA brouillon existe déjà pour cette affaire : complétez-la."})
     analytic = affaire.analytic or affaire.assurer_compte_analytique()
@@ -393,7 +394,7 @@ def bc_depuis_location_gr(location, user):
     from comptabilite.gr import bc_lie, controler_liaison_bc
 
     if bc_lie(location):
-        raise ValidationError({"location": f"Un BC achats est déjà lié à la location {location.code}."})
+        raise ValidationError({"location": tr("Un BC achats est déjà lié à la location %(location_code)s.") % {"location_code": location.code}})
     try:
         controler_liaison_bc(location, None)
     except ValidationError as exc:

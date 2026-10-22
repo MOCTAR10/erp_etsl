@@ -24,6 +24,7 @@ from users.models import User
 
 from .cubes import get_param_cube
 from .models import CubeArchive, ScelleMart
+from config.i18n import tr
 
 ZERO = Decimal("0")
 HORIZON_JOURS = 90
@@ -329,7 +330,7 @@ def _modele(nom, dossier):
         f = dossier / sous / f"{nom}.sql"
         if f.exists():
             return _sans_commentaires(_SOURCE.sub(r"\1", f.read_text(encoding="utf-8")))
-    raise FileNotFoundError(f"Modèle dbt introuvable : {nom}")
+    raise FileNotFoundError(tr("Modèle dbt introuvable : %(nom)s") % {"nom": nom})
 
 
 def rendre_sql_mart(nom, dossier=None):

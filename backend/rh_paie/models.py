@@ -17,6 +17,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from config.fields import EncryptedCharField
+from config.i18n import tr as _tr
 
 
 class RhPaieSequence(models.Model):
@@ -495,7 +496,7 @@ class DemandesConge(models.Model):
         duree = (self.date_fin - self.date_debut).days + 1
         if not self.nb_jours or self.nb_jours < 1 or self.nb_jours > duree:
             raise ValidationError(
-                {"nb_jours": f"Le nombre de jours doit être compris entre 1 et {duree} (durée de la période)."}
+                {"nb_jours": _tr("Le nombre de jours doit être compris entre 1 et %(duree)s (durée de la période).") % {"duree": duree}}
             )
         if self.employe_id:
             chevauche = DemandesConge.objects.filter(
@@ -826,15 +827,15 @@ class BaremeImpot(ValeurLegale):
         previous = None
         for i, tr in enumerate(t):
             if not isinstance(tr, dict) or "taux" not in tr or "plafond" not in tr:
-                raise ValidationError({"tranches": f"Tranche {i + 1} : « plafond » et « taux » requis."})
+                raise ValidationError({"tranches": _tr("Tranche %(valeur)s : « plafond » et « taux » requis.") % {"valeur": i + 1}})
             if not (0 <= float(tr["taux"]) <= 100):
-                raise ValidationError({"tranches": f"Tranche {i + 1} : taux hors de [0, 100]."})
+                raise ValidationError({"tranches": _tr("Tranche %(valeur)s : taux hors de [0, 100].") % {"valeur": i + 1}})
             last = i == len(t) - 1
             if last and tr["plafond"] is not None:
                 raise ValidationError({"tranches": "La dernière tranche doit être sans plafond (null)."})
             if not last:
                 if tr["plafond"] is None or float(tr["plafond"]) <= 0:
-                    raise ValidationError({"tranches": f"Tranche {i + 1} : plafond positif requis."})
+                    raise ValidationError({"tranches": _tr("Tranche %(valeur)s : plafond positif requis.") % {"valeur": i + 1}})
                 if previous is not None and float(tr["plafond"]) <= previous:
                     raise ValidationError({"tranches": "Plafonds strictement croissants requis."})
                 previous = float(tr["plafond"])
@@ -1004,7 +1005,7 @@ class CompteEmetteur(models.Model):
             v = getattr(self, champ)
             ok = v.isalnum() if champ == "numero_compte" else v.isdigit()
             if not ok or len(v) > n:
-                raise ValidationError({champ: f"Chiffres uniquement, {n} au plus."})
+                raise ValidationError({champ: _tr("Chiffres uniquement, %(n)s au plus.") % {"n": n}})
 
 
 class OrdreVirement(models.Model):

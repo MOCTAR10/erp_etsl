@@ -10,6 +10,7 @@ from documents.models import Document
 from users.models import User
 
 from .models import Circuit, Delegation, Task, TaskComment
+from config.i18n import tr
 
 
 def _find_assignee(role):
@@ -34,10 +35,10 @@ def _assert_can_act(task, user, verb):
             # Délégation temporaire en cours du titulaire vers cet utilisateur (EX-G-02).
             if Delegation.actives().filter(delegant_id=task.assigned_to_id, delegataire=user).exists():
                 return
-            raise PermissionDenied(f"Seul l'assigné peut {verb} cette tâche.")
+            raise PermissionDenied(tr("Seul l'assigné peut %(verb)s cette tâche.") % {"verb": tr(verb)})
     elif user.role != task.step.actor_role:
         raise PermissionDenied(
-            f"Tâche non assignée : seul un utilisateur du rôle « {task.step.actor_role} » peut {verb}."
+            tr("Tâche non assignée : seul un utilisateur du rôle « %(step_actor_role)s » peut %(verb)s.") % {"step_actor_role": task.step.actor_role, "verb": tr(verb)}
         )
 
 
@@ -80,7 +81,7 @@ def start_circuit(document, user):
         raise ValidationError("Aucun circuit de validation n'est configuré.")
     step = circuit.steps.order_by("order").first()
     if step is None:
-        raise ValidationError(f"Le circuit {circuit.code} ne contient aucune étape.")
+        raise ValidationError(tr("Le circuit %(circuit_code)s ne contient aucune étape.") % {"circuit_code": circuit.code})
 
     task = _create_task(document, circuit, step, user)
 

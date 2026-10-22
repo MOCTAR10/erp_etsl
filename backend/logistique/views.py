@@ -69,6 +69,7 @@ from .services import (
     reporter_compteur,
     stats_parc,
 )
+from config.i18n import tr
 
 
 class IsConfirmateurLogistique(BasePermission):
@@ -192,7 +193,7 @@ class DemandeMobilisationViewSet(_CommonViewSet):
         """Soumission d'un besoin opérationnel (RF-ERP-31)."""
         demande = self.get_object()
         if demande.statut != DemandeMobilisation.Statut.BROUILLON:
-            raise ValidationError({"detail": f"Demande {demande.get_statut_display().lower()} : soumission impossible."})
+            raise ValidationError({"detail": tr("Demande %(statut)s : soumission impossible.") % {"statut": demande.get_statut_display().lower()}})
         demande.statut = DemandeMobilisation.Statut.SOUMISE
         demande.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(demande).data)
@@ -202,7 +203,7 @@ class DemandeMobilisationViewSet(_CommonViewSet):
         """Marque le besoin traité (affectation réalisée)."""
         demande = self.get_object()
         if demande.statut != DemandeMobilisation.Statut.SOUMISE:
-            raise ValidationError({"detail": f"Demande {demande.get_statut_display().lower()} : seule une demande soumise se traite."})
+            raise ValidationError({"detail": tr("Demande %(statut)s : seule une demande soumise se traite.") % {"statut": demande.get_statut_display().lower()}})
         demande.statut = DemandeMobilisation.Statut.TRAITEE
         demande.save(update_fields=["statut", "updated_at"])
         return Response(self.get_serializer(demande).data)

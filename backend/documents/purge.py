@@ -21,6 +21,7 @@ from users.models import User
 
 from .audit import log_audit, request_ip
 from .models import AuditLog, DemandePurge, Document, SignatureRequest
+from config.i18n import tr
 
 PROPOSE_ROLES = (User.Role.ADMIN, User.Role.SECRETAIRE_GENERAL, User.Role.PDG, User.Role.DGA)
 
@@ -84,7 +85,7 @@ class DemandePurgeSerializer(serializers.ModelSerializer):
         if doc.status != Document.Status.ARCHIVED or fin is None:
             raise serializers.ValidationError({"document": "Seul un document archivé soumis à rétention est purgeable."})
         if fin >= timezone.localdate():
-            raise serializers.ValidationError({"document": f"Rétention en cours jusqu'au {fin:%d/%m/%Y}."})
+            raise serializers.ValidationError({"document": tr("Rétention en cours jusqu'au %(fin)s.") % {"fin": format(fin, '%d/%m/%Y')}})
         if DemandePurge.objects.filter(document=doc, statut=DemandePurge.Statut.PROPOSEE).exists():
             raise serializers.ValidationError({"document": "Une demande de purge est déjà en cours."})
         attrs.update(
@@ -188,7 +189,7 @@ class DemandePurgeViewSet(viewsets.ModelViewSet):
             except ProtectedError as exc:
                 refs = sorted({o._meta.verbose_name for o in exc.protected_objects})
                 raise DRFValidationError(
-                    "Document encore référencé (" + ", ".join(str(r) for r in refs) + ") : purge impossible."
+                    tr("Document encore référencé (%(liste)s) : purge impossible.") % {"liste": ", ".join(str(r) for r in refs)}
                 )
             demande.document = None
             demande.statut = DemandePurge.Statut.EXECUTEE

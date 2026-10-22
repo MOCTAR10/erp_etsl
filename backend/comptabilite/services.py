@@ -32,6 +32,7 @@ from .models import (
     RapprochementBancaire,
     ReleveBancaire,
 )
+from config.i18n import tr
 
 COMPTA_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -102,7 +103,7 @@ def _account(code):
     try:
         return Account.objects.get(code=code)
     except Account.DoesNotExist:
-        raise ValidationError(f"Compte {code} absent du plan comptable (seed_referentiels).")
+        raise ValidationError(tr("Compte %(code)s absent du plan comptable (seed_referentiels).") % {"code": code})
 
 
 @transaction.atomic
@@ -136,7 +137,7 @@ def build_paiement_move(paiement, user):
             raise ValidationError("Engagement non approuvé — paiement impossible (proc. 4.3).")
         if paiement.sens == paiement.Sens.SORTIE and paiement.montant > eng.solde:
             raise ValidationError(
-                f"Dépassement de l'engagement : solde disponible {eng.solde}, paiement {paiement.montant}."
+                tr("Dépassement de l'engagement : solde disponible %(eng_solde)s, paiement %(paiement_montant)s.") % {"eng_solde": eng.solde, "paiement_montant": paiement.montant}
             )
 
     banque = paiement.compte_bancaire.compte_comptable
@@ -144,7 +145,7 @@ def build_paiement_move(paiement, user):
     try:
         journal = Journal.objects.get(code=journal_codes[paiement.mode])
     except Journal.DoesNotExist:
-        raise ValidationError(f"Journal {journal_codes[paiement.mode]} absent (seed_accounting).")
+        raise ValidationError(tr("Journal %(journal_codes)s absent (seed_accounting).") % {"journal_codes": journal_codes[paiement.mode]})
     try:
         period = period_for_date(paiement.date)
     except ValidationError as exc:
@@ -260,7 +261,18 @@ PARAMETRES_DEFAUT = {
     "REVENU_METHODE": (
         "Méthode du % d'avancement (1 = coûts engagés / budget M11, 2 = situations de travaux M3)",
         Decimal("2"), "1/2"),
+    # EX-G-07 (lot a8) : factures et bulletins de paie restent en français par défaut (documents légaux gabonais).
+    "DOCS_LEGAUX_LANGUE_UTILISATEUR": (
+        "Factures et bulletins de paie PDF dans la langue de l'utilisateur (0 = toujours en français, 1 = oui)",
+        Decimal("0"), "0/1"),
 }
+
+
+def langue_documents_legaux():
+    """Langue des factures et bulletins PDF : français, sauf si ETSL ouvre la langue de l'utilisateur (provisoire)."""
+    from django.utils import translation
+
+    return (translation.get_language() or "fr") if get_param("DOCS_LEGAUX_LANGUE_UTILISATEUR") else "fr"
 
 
 def get_param(code):
@@ -308,7 +320,7 @@ def lettrer_lignes(lignes, user, automatique=False):
         raise ValidationError("Toutes les lignes doivent appartenir au même compte.")
     compte = lignes[0].account
     if not compte.reconcile:
-        raise ValidationError(f"Le compte {compte.code} n'est pas lettrable.")
+        raise ValidationError(tr("Le compte %(compte_code)s n'est pas lettrable.") % {"compte_code": compte.code})
     if any(l.move.status not in LIGNES_COMPTABILISEES for l in lignes):
         raise ValidationError("Seules les lignes d'écritures comptabilisées sont lettrables.")
     if LigneLettree.objects.filter(ligne_id__in=ids).exists():
@@ -317,7 +329,7 @@ def lettrer_lignes(lignes, user, automatique=False):
         raise ValidationError("Toutes les lignes doivent concerner le même tiers.")
     ecart = abs(sum((l.debit - l.credit for l in lignes), Decimal("0")))
     if ecart > get_param("LETTRAGE_TOLERANCE"):
-        raise ValidationError(f"Lettrage déséquilibré : écart {ecart} supérieur à la tolérance.")
+        raise ValidationError(tr("Lettrage déséquilibré : écart %(ecart)s supérieur à la tolérance.") % {"ecart": ecart})
     lettrage = Lettrage.objects.create(
         compte=compte, partner=lignes[0].partner, ecart=ecart, automatique=automatique, created_by=user
     )
@@ -354,7 +366,7 @@ def lettrer_auto(compte, user, partner=None):
     """Lettrage automatique : (1) groupes de même tiers + même référence qui s'équilibrent ;
     (2) montants uniques côté débit et côté crédit pour un même tiers. Retourne (lettrages créés, lignes restantes)."""
     if not compte.reconcile:
-        raise ValidationError(f"Le compte {compte.code} n'est pas lettrable.")
+        raise ValidationError(tr("Le compte %(compte_code)s n'est pas lettrable.") % {"compte_code": compte.code})
     tol = get_param("LETTRAGE_TOLERANCE")
     crees = 0
     par_tiers = {}
@@ -423,7 +435,7 @@ def importer_releve(compte_bancaire, texte, format_, user):
     if numero and fichier and not (numero.endswith(fichier) or fichier.endswith(numero)):
         anomalies.append({
             "type": "compte_different",
-            "message": f"Le compte du fichier ({data['compte']}) diffère de celui du compte bancaire ({compte_bancaire.numero}).",
+            "message": tr("Le compte du fichier (%(compte)s) diffère de celui du compte bancaire (%(compte_bancaire_numero)s).") % {"compte": data['compte'], "compte_bancaire_numero": compte_bancaire.numero},
         })
     lignes = data["lignes"]
     dates = [l["date"] for l in lignes]

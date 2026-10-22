@@ -8,6 +8,7 @@ from decimal import Decimal
 from django.utils import timezone
 
 from users.models import User
+from config.i18n import en_francais, tr
 
 PARAMETRES_QUALITE_DEFAUT = {
     "CAPA_DELAI_JOURS": ("CAPA : délai de clôture (jours calendaires)", "5", "jours"),
@@ -166,16 +167,16 @@ def dossier_qualite_pdf(pv):
 
     of = pv.ordre
     blocs = [
-        ("PV", f"{pv.code} — {pv.intitule}"), ("Affaire", pv.affaire.code if pv.affaire_id else (of.affaire.code if of and of.affaire_id else "—")),
-        ("Ordre de fabrication", f"{of.code} — {of.label}" if of else "—"), ("Date du PV", _d(pv.date_pv)),
-        ("Statut", pv.get_statut_display()), ("Levée de réserve", _d(pv.levee_reserve)),
-        ("Validé par", pv.validated_by.get_full_name() if pv.validated_by_id else "—"),
-        ("Conservation", f"{pv.retention_years} ans (Oil & Gas)"),
+        ("PV", f"{pv.code} — {pv.intitule}"), (tr("Affaire"), pv.affaire.code if pv.affaire_id else (of.affaire.code if of and of.affaire_id else "—")),
+        (tr("Ordre de fabrication"), f"{of.code} — {of.label}" if of else "—"), (tr("Date du PV"), _d(pv.date_pv)),
+        (tr("Statut"), pv.get_statut_display()), (tr("Levée de réserve"), _d(pv.levee_reserve)),
+        (tr("Validé par"), pv.validated_by.get_full_name() if pv.validated_by_id else "—"),
+        (tr("Conservation"), tr("%(ans)s ans (Oil & Gas)") % {"ans": pv.retention_years}),
     ]
-    tableau = [["Rubrique", "Référence", "Détail", "Date", "Résultat / statut"]]
+    tableau = [[tr("Rubrique"), tr("Référence"), tr("Détail"), tr("Date"), tr("Résultat / statut")]]
     if of:
         for j in JointSoude.objects.filter(ordre=of).select_related("soudeur", "wps"):
-            tableau.append(["Joint", f"{j.code} / {j.repere}", f"{j.soudeur.display_name} · WPS {j.wps.code if j.wps_id else '—'} · coulée {j.numero_coulee or '—'}",
+            tableau.append([tr("Joint"), f"{j.code} / {j.repere}", tr("%(soudeur_display_name)s · WPS %(valeur)s · coulée %(valeur2)s") % {"soudeur_display_name": j.soudeur.display_name, "valeur": j.wps.code if j.wps_id else '—', "valeur2": j.numero_coulee or '—'},
                             _d(j.date_soudage), "—"])
         controles = ControleQualite.objects.filter(ordre=of).exclude(statut=ControleQualite.Statut.ANNULE)
         for c in controles:
@@ -185,20 +186,20 @@ def dossier_qualite_pdf(pv):
             tableau.append([c.get_type_controle_display()[:30], c.code, detail[:80], _d(c.date_controle),
                             f"{c.get_resultat_display()} ({c.get_statut_display()})"])
             for p in c.points.all():
-                tableau.append(["  Point ITP", f"#{p.ordre}", p.description[:80], _d(p.leve_le), p.get_statut_display()])
+                tableau.append([tr("  Point ITP"), f"#{p.ordre}", p.description[:80], _d(p.leve_le), p.get_statut_display()])
         for e in EpreuvePression.objects.filter(ordre=of):
-            tableau.append(["Épreuve", e.code, f"{e.get_type_epreuve_display()} {e.pression_essai} bar / {e.duree_minutes} min",
+            tableau.append([tr("Épreuve"), e.code, f"{e.get_type_epreuve_display()} {e.pression_essai} bar / {e.duree_minutes} min",
                             _d(e.conclu_le), e.get_resultat_display() if e.resultat else e.get_statut_display()])
         for nc in NonConformite.objects.filter(controle__ordre=of).prefetch_related("actions_correctives"):
             tableau.append(["NC", nc.code, nc.description[:80], _d(nc.date_decision), nc.get_statut_display()])
             for a in nc.actions_correctives.all():
                 tableau.append(["  CAPA", a.code, a.description[:80], _d(a.closed_at), a.get_statut_display()])
         for item in PunchItem.objects.filter(ordre=of):
-            tableau.append(["Punch list", item.code, f"{item.categorie} · {item.description}"[:80], _d(item.leve_le), item.get_statut_display()])
+            tableau.append([tr("Punch list"), item.code, f"{item.categorie} · {item.description}"[:80], _d(item.leve_le), item.get_statut_display()])
     for c in pv.controles.all():
         if not of or c.ordre_id != of.pk:
             tableau.append([c.get_type_controle_display()[:30], c.code, (c.point_controle or "")[:80], _d(c.date_controle), c.get_resultat_display()])
-    return _pdf(f"Dossier qualité {of.code if of else pv.code}", blocs, tableau if len(tableau) > 1 else None)
+    return _pdf(tr("Dossier qualité %(valeur)s") % {"valeur": of.code if of else pv.code}, blocs, tableau if len(tableau) > 1 else None)
 
 
 def archiver_dossier_qualite(pv, user=None):
@@ -207,7 +208,7 @@ def archiver_dossier_qualite(pv, user=None):
 
     titre = f"Dossier qualité {pv.ordre.code if pv.ordre_id else pv.code} ({pv.code})"
     return archiver_ged(
-        dossier_qualite_pdf(pv), f"dossier-qualite-{pv.code}.pdf", titre, TYPE_GED_QUALITE, "Documents qualité / ISO",
+        en_francais(dossier_qualite_pdf, pv), f"dossier-qualite-{pv.code}.pdf", titre, TYPE_GED_QUALITE, "Documents qualité / ISO",
         pv.code, "qualite.pvcontrole", pv.pk, user=user, mots=("dossier qualité", "PV de contrôle"), module="M6",
         note="Dossier qualité scellé à la levée de réserve (10 ans Oil & Gas)", retention=RETENTION_QUALITE_ANS,
     )
@@ -270,12 +271,12 @@ def rapport_indicateurs_pdf(data):
     from hse.services import _pdf
 
     periode = f"{data['mois']:02d}/{data['annee']}" if data["mois"] else str(data["annee"])
-    tableau = [["Indicateur", "Valeur"]] + [
+    tableau = [[tr("Indicateur"), tr("Valeur")]] + [
         [libelle, "—" if data[cle] is None else f"{data[cle]}{(' ' + unite) if unite else ''}"]
         for cle, libelle, unite in LIBELLES_INDICATEURS
     ]
-    return _pdf(f"Rapport qualité {'mensuel' if data['mois'] else 'annuel'} — {periode}",
-                [("Période", periode), ("Édité le", f"{timezone.localdate():%d/%m/%Y}")], tableau)
+    return _pdf(tr("Rapport qualité %(valeur)s — %(periode)s") % {"valeur": 'mensuel' if data['mois'] else 'annuel', "periode": periode},
+                [(tr("Période"), periode), (tr("Édité le"), f"{timezone.localdate():%d/%m/%Y}")], tableau)
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -387,7 +388,7 @@ def etiquette_pdf(instrument):
     c.rect(0, hauteur - 12 * mm, largeur, 12 * mm, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 11)
-    c.drawCentredString(largeur / 2, hauteur - 8 * mm, "CONFORME - UTILISABLE" if ok else "INTERDIT D'USAGE")
+    c.drawCentredString(largeur / 2, hauteur - 8 * mm, tr("CONFORME - UTILISABLE") if ok else tr("INTERDIT D'USAGE"))
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 9)
     c.drawString(3 * mm, hauteur - 18 * mm, f"{instrument.code} - {instrument.numero_serie}"[:45])
@@ -396,9 +397,9 @@ def etiquette_pdf(instrument):
     dernier = instrument.etalonnages.first()
     operation = dict(instrument.etalonnages.model._meta.get_field("type_operation").choices).get(instrument.operation_attendue)
     c.drawString(3 * mm, hauteur - 28 * mm, f"{operation} : {instrument.date_etalonnage:%d/%m/%Y}")
-    c.drawString(3 * mm, hauteur - 33 * mm, f"Prochaine échéance : {instrument.echeance_etalonnage:%d/%m/%Y}")
+    c.drawString(3 * mm, hauteur - 33 * mm, tr("Prochaine échéance : %(instrument_echeance_etalonnage)s") % {"instrument_echeance_etalonnage": format(instrument.echeance_etalonnage, '%d/%m/%Y')})
     if dernier and dernier.certificat:
-        c.drawString(3 * mm, hauteur - 38 * mm, f"Certificat : {dernier.certificat}"[:48])
+        c.drawString(3 * mm, hauteur - 38 * mm, (tr("Certificat : %(dernier_certificat)s") % {"dernier_certificat": dernier.certificat})[:48])
     c.showPage()
     c.save()
     return buf.getvalue()

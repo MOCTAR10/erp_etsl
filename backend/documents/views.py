@@ -45,6 +45,7 @@ from .services import (
     visible_documents,
     visible_dossiers,
 )
+from config.i18n import tr
 
 
 class DocumentTypeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -370,7 +371,7 @@ class DocumentViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
             actual = compute_sha256(version.file)
         except Exception as exc:
             return Response(
-                {"detail": f"Lecture du fichier impossible : {exc}"},
+                {"detail": tr("Lecture du fichier impossible : %(exc)s") % {"exc": exc}},
                 status=status.HTTP_409_CONFLICT,
             )
         ok = actual == version.sha256

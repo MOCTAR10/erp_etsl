@@ -18,6 +18,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.utils import timezone
+from config.i18n import tr
 
 
 class HseSequence(models.Model):
@@ -1283,7 +1284,7 @@ class ListeHse(models.Model):
             raise ValidationError({"code": "Code en minuscules, chiffres et « _ » seulement."})
         maxi = self.LONGUEURS.get(self.categorie)
         if maxi and len(self.code or "") > maxi:
-            raise ValidationError({"code": f"Code de {maxi} caractères au plus pour cette catégorie."})
+            raise ValidationError({"code": tr("Code de %(maxi)s caractères au plus pour cette catégorie.") % {"maxi": maxi}})
         if self.categorie == self.Categorie.PARTAGE_GR:
             from users.models import User
 

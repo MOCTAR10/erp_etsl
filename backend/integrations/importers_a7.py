@@ -32,6 +32,7 @@ from .importers_migration import (
     _txt,
     _valider,
 )
+from config.i18n import tr
 
 NOTE_REPRISE = "[Reprise migration]"
 ZERO = Decimal("0")
@@ -44,14 +45,14 @@ def _habilitations_hse(row, ctx):
     matricule = _req(row, "matricule", 20)
     employe = Employe.objects.filter(code=matricule).first()
     if employe is None:
-        raise LigneErreur(f"salarié inconnu : {matricule} (chargez d'abord le gabarit Salariés).")
+        raise LigneErreur(tr("salarié inconnu : %(matricule)s (chargez d'abord le gabarit Salariés).") % {"matricule": matricule})
     intitule = _req(row, "intitule", 180)
     obtention, validite = _date(row, "date_obtention"), _date(row, "date_validite")
     if obtention and validite and validite < obtention:
         raise LigneErreur("date_validite antérieure à date_obtention.")
     existante = Qualification.objects.filter(employe=employe, intitule__iexact=intitule).order_by("-date_validite").first()
     if existante is not None and existante.source != Qualification.Source.RH:
-        raise LigneErreur(f"« {intitule} » est synchronisée depuis {existante.get_source_display()} : non modifiable par reprise.")
+        raise LigneErreur(tr("« %(intitule)s » est synchronisée depuis %(source)s : non modifiable par reprise.") % {"intitule": intitule, "source": existante.get_source_display()})
     valeurs = {
         "type": _choix(row, "type", Qualification.Type.choices, defaut=Qualification.Type.HABILITATION),
         "organisme": _txt(row, "organisme", 120),
@@ -117,7 +118,7 @@ def _releves_compteurs(row, ctx):
     code = _req(row, "equipement", 20)
     equipement = EquipementParc.objects.filter(code=code).first()
     if equipement is None:
-        raise LigneErreur(f"équipement inconnu : {code} (chargez d'abord le gabarit Équipements du parc).")
+        raise LigneErreur(tr("équipement inconnu : %(code)s (chargez d'abord le gabarit Équipements du parc).") % {"code": code})
     jour, valeur = _date(row, "date", obligatoire=True), _dec(row, "valeur", obligatoire=True)
     cle = f"{code}/{jour:%Y-%m-%d}/{valeur}"
     if equipement.releves.filter(date=jour, valeur=valeur).exists():
@@ -137,10 +138,10 @@ def _actifs_maintenance(row, ctx):
     if _txt(row, "equipement_gr"):
         equipement_gr = EquipementParc.objects.filter(code=_txt(row, "equipement_gr")).first()
         if equipement_gr is None:
-            raise LigneErreur(f"équipement du parc inconnu : {_txt(row, 'equipement_gr')} (chargez d'abord le parc).")
+            raise LigneErreur(tr("équipement du parc inconnu : %(txt)s (chargez d'abord le parc).") % {"txt": _txt(row, 'equipement_gr')})
     compteur = _dec(row, "compteur", ZERO)
     if existant is not None and compteur < existant.compteur_value:
-        raise LigneErreur(f"le compteur ne peut baisser (valeur actuelle : {existant.compteur_value}).")
+        raise LigneErreur(tr("le compteur ne peut baisser (valeur actuelle : %(existant_compteur_value)s).") % {"existant_compteur_value": existant.compteur_value})
     valeurs = {
         "designation": _req(row, "designation", 200),
         "categorie": _choix(row, "categorie", Actif.Categorie.choices, defaut=Actif.Categorie.MACHINE),
@@ -180,16 +181,16 @@ def _commandes_ouvertes(row, ctx):
     bc = PurchaseOrder.objects.filter(code=numero).first()
     if bc is not None:
         if not bc.notes.startswith(NOTE_REPRISE):
-            raise LigneErreur(f"BC {numero} déjà saisi dans l'ERP : non modifiable par reprise.")
+            raise LigneErreur(tr("BC %(numero)s déjà saisi dans l'ERP : non modifiable par reprise.") % {"numero": numero})
         if bc.receipts.exists() or bc.invoices.exists():
-            raise LigneErreur(f"BC {numero} déjà mouvementé dans l'ERP (réception ou facture) : non modifiable.")
+            raise LigneErreur(tr("BC %(numero)s déjà mouvementé dans l'ERP (réception ou facture) : non modifiable.") % {"numero": numero})
         if bc.supplier_id != fournisseur.pk:
-            raise LigneErreur(f"BC {numero} : fournisseur différent de celui déjà repris ({bc.supplier.code}).")
+            raise LigneErreur(tr("BC %(numero)s : fournisseur différent de celui déjà repris (%(supplier_code)s).") % {"numero": numero, "supplier_code": bc.supplier.code})
     affaire = None
     if _txt(row, "affaire"):
         affaire = Affaire.objects.filter(code=_txt(row, "affaire")).first()
         if affaire is None:
-            raise LigneErreur(f"affaire inconnue : {_txt(row, 'affaire')} (chargez d'abord le gabarit Affaires).")
+            raise LigneErreur(tr("affaire inconnue : %(txt)s (chargez d'abord le gabarit Affaires).") % {"txt": _txt(row, 'affaire')})
     entete = {
         "supplier": fournisseur,
         "order_date": _date(row, "date", obligatoire=True),
@@ -214,17 +215,17 @@ def _commandes_ouvertes(row, ctx):
         raise LigneErreur("quantite doit être strictement positive.")
     recue = _dec(row, "quantite_recue", ZERO)
     if recue > quantite:
-        raise LigneErreur(f"quantite_recue ({recue}) supérieure à la quantité commandée ({quantite}).")
+        raise LigneErreur(tr("quantite_recue (%(recue)s) supérieure à la quantité commandée (%(quantite)s).") % {"recue": recue, "quantite": quantite})
     article = None
     if _txt(row, "article"):
         article = Article.objects.filter(code=_txt(row, "article")).first()
         if article is None:
-            raise LigneErreur(f"article inconnu : {_txt(row, 'article')} (chargez d'abord le gabarit Articles).")
+            raise LigneErreur(tr("article inconnu : %(txt)s (chargez d'abord le gabarit Articles).") % {"txt": _txt(row, 'article')})
     unite = None
     if _txt(row, "unite"):
         unite = UnitOfMeasure.objects.filter(code=_txt(row, "unite")).first()
         if unite is None:
-            raise LigneErreur(f"unité inconnue : {_txt(row, 'unite')}.")
+            raise LigneErreur(tr("unité inconnue : %(txt)s.") % {"txt": _txt(row, 'unite')})
     ligne = bc.lines.filter(label=designation).first()
     cree = ligne is None
     ligne = ligne or PurchaseOrderLine(purchase_order=bc, label=designation)
@@ -273,8 +274,8 @@ def _conversion(row, ctx, solde):
     try:
         xaf, taux, provisoire = contre_valeur(solde, devise, jour)
     except DjangoValidationError as exc:
-        raise LigneErreur(f"devise {code} sans cours utilisable au {jour:%d/%m/%Y} (date de bascule) : "
-                          f"{' '.join(exc.messages)}")
+        raise LigneErreur(tr("devise %(code)s sans cours utilisable au %(jour)s (date de bascule) : %(motif)s")
+                          % {"code": code, "jour": f"{jour:%d/%m/%Y}", "motif": " ".join(exc.messages)})
     return xaf, {"devise": devise, "montant": solde, "taux": taux, "provisoire": provisoire}
 
 
@@ -322,14 +323,14 @@ def _ventiler(ctx, nature, numero, partner, solde, libelle, info=None):
 
 def _deja_reprise(move, solde, numero, info=None):
     if move is None or not (move.source_ref or "").startswith("reprise/"):
-        raise LigneErreur(f"facture {numero} déjà saisie dans l'ERP : non reprise.")
+        raise LigneErreur(tr("facture %(numero)s déjà saisie dans l'ERP : non reprise.") % {"numero": numero})
     if info:  # rejeu d'une facture en devise : on compare le reste dû en devise (le cours a pu être corrigé)
         solde = info["montant"]
         total = sum((l.amount_currency or ZERO for l in move.lines.all() if l.currency_id), ZERO)
     else:
         total = sum((l.debit for l in move.lines.all()), ZERO)
     if total != solde:
-        raise LigneErreur(f"facture {numero} déjà reprise avec un solde de {total} : extournez la reprise avant de la recharger.")
+        raise LigneErreur(tr("facture %(numero)s déjà reprise avec un solde de %(total)s : extournez la reprise avant de la recharger.") % {"numero": numero, "total": total})
     return "doublon"
 
 
@@ -344,13 +345,13 @@ def _factures_clients(row, ctx):
     existante = FactureClient.objects.filter(code=numero).select_related("move").first()
     if existante is not None:
         if existante.client_id != client.pk:
-            raise LigneErreur(f"facture {numero} déjà reprise pour un autre client.")
+            raise LigneErreur(tr("facture %(numero)s déjà reprise pour un autre client.") % {"numero": numero})
         return _deja_reprise(existante.move, solde, numero, info), numero
     affaire = None
     if _txt(row, "affaire"):
         affaire = Affaire.objects.filter(code=_txt(row, "affaire")).first()
         if affaire is None:
-            raise LigneErreur(f"affaire inconnue : {_txt(row, 'affaire')}.")
+            raise LigneErreur(tr("affaire inconnue : %(txt)s.") % {"txt": _txt(row, 'affaire')})
     origine = _dec(row, "montant_ttc")
     objet = (f"{NOTE_REPRISE} {_txt(row, 'objet')}".strip() + (f" (TTC d'origine {origine})" if origine else "")
              + _mention_devise(info))

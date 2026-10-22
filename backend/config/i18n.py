@@ -7,7 +7,10 @@
 - `TraductionReponsesMiddleware` traduit, en anglais seulement, les chaînes des réponses d'erreur DRF (`detail`,
   erreurs de champ) et les `detail` / `message` des réponses réussies : aucune modification des vues n'est
   nécessaire, un message absent du catalogue reste en français (repli, jamais d'erreur).
-- `tr()` sert aux exports (en-têtes, titres, pied de page PDF) et à tout texte serveur.
+- `tr()` sert aux exports (en-têtes, titres, pied de page PDF) et à tout texte serveur. Message construit à
+  l'exécution : gabarit `tr("… %(nom)s …") % {"nom": valeur}` (le gabarit est au catalogue, lot a8).
+- Les PDF archivés en GED sont produits en français (`en_francais`) ; factures et bulletins aussi, sauf paramètre
+  `DOCS_LEGAUX_LANGUE_UTILISATEUR` (comptabilité, provisoire).
 """
 
 from django.utils import translation
@@ -23,6 +26,12 @@ def tr(texte):
     if not texte or not isinstance(texte, str) or not langue_anglaise():
         return texte
     return gettext(str(texte))
+
+
+def en_francais(fonction, *args, **kwargs):
+    """Appelle `fonction` en français : pièces archivées en GED (langue de référence de l'archive) — EX-G-07."""
+    with translation.override("fr"):
+        return fonction(*args, **kwargs)
 
 
 def traduire(donnees):

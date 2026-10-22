@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
+from config.i18n import tr
 
 JOURS_OUVRES_AN_DEFAUT = Decimal("220")
 
@@ -60,8 +61,7 @@ def controler_budget(plan, cout, exclure=None):
     engage = engage_plan(plan, exclure=exclure)
     if engage + (cout or 0) > plan.budget:
         raise ValidationError(
-            f"Budget du plan {plan.annee} dépassé : {_arrondi(engage + (cout or 0))} F engagés pour "
-            f"{_arrondi(plan.budget)} F votés."
+            tr("Budget du plan %(plan_annee)s dépassé : %(arrondi)s F engagés pour %(arrondi2)s F votés.") % {"plan_annee": plan.annee, "arrondi": _arrondi(engage + (cout or 0)), "arrondi2": _arrondi(plan.budget)}
         )
 
 

@@ -17,6 +17,7 @@ from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from config.inputs import positive_decimal
+from config.i18n import tr
 
 #: Tolérance d'horloge : une saisie « dans le futur » au-delà est refusée (horloge de l'appareil déréglée).
 TOLERANCE_FUTUR = timedelta(minutes=10)
@@ -61,11 +62,10 @@ def controler_synchro(saisi_le, request, doublons=None, objet="Saisie"):
     jours = int(param("TERRAIN_DELAI_SYNCHRO_JOURS"))
     if jours and timezone.now() - saisi_le > timedelta(days=jours):
         raise ConflitSaisie(
-            f"{objet} saisie le {timezone.localtime(saisi_le):%d/%m/%Y %H:%M}, synchronisée plus de {jours} j après : "
-            "à confirmer (Forcer) ou à abandonner."
+            tr("%(objet)s saisie le %(saisi_le)s, synchronisée plus de %(jours)s j après : à confirmer (Forcer) ou à abandonner.") % {"objet": objet, "saisi_le": format(timezone.localtime(saisi_le), '%d/%m/%Y %H:%M'), "jours": jours}
         )
     if doublons is not None and param("TERRAIN_DOUBLON_CONFLIT") and doublons.exists():
-        raise ConflitSaisie(f"{objet} identique déjà enregistrée sur le serveur (doublon probable) : forcer ou abandonner.")
+        raise ConflitSaisie(tr("%(objet)s identique déjà enregistrée sur le serveur (doublon probable) : forcer ou abandonner.") % {"objet": objet})
 
 
 # ----------------------------------------------------------------------------------------------------------------

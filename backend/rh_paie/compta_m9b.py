@@ -10,6 +10,7 @@ from django.db.models import Sum
 
 from .paie_m9a import contrat_en_vigueur, fin_de_mois, grille_en_vigueur
 from .services import _arrondi, _compte, _impot_bulletin, baremes_en_vigueur, parametre, ventilation_bulletin
+from config.i18n import tr
 
 #: Comptes repris tant qu'aucun compte de paie n'est paramétré (comportement historique : tout organisme en 431000).
 COMPTES_DEFAUT = {
@@ -31,7 +32,7 @@ def compte_paie(role, organisme=""):
         return cp.compte
     if role not in COMPTES_DEFAUT:
         raise ValidationError(
-            f"Compte de paie « {ComptePaie.Role(role).label} » non paramétré : le renseigner dans les comptes de paie."
+            tr("Compte de paie « %(label)s » non paramétré : le renseigner dans les comptes de paie.") % {"label": ComptePaie.Role(role).label}
         )
     return _compte(COMPTES_DEFAUT[role])
 

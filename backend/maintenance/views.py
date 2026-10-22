@@ -50,6 +50,7 @@ from .services import (
     parametres_maintenance_provisoires,
 )
 from .ecarts_m5m8 import comptabiliser_ot
+from config.i18n import tr
 
 
 def _montant_positif(raw, field):
@@ -65,7 +66,7 @@ def _montant_positif(raw, field):
 
 def _choix(raw, choices, field):
     if raw not in choices.values:
-        raise ValidationError({field: f"Valeur inconnue : {raw!r}."})
+        raise ValidationError({field: tr("Valeur inconnue : %(raw)s.") % {"raw": repr(raw)}})
     return raw
 
 
@@ -117,7 +118,7 @@ class ActifViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
         valeur = _montant_positif(request.data.get("valeur"), "valeur")
         if valeur < actif.compteur_value:
             raise ValidationError(
-                {"valeur": f"Le compteur ne peut pas reculer (valeur actuelle {actif.compteur_value})."}
+                {"valeur": tr("Le compteur ne peut pas reculer (valeur actuelle %(actif_compteur_value)s).") % {"actif_compteur_value": actif.compteur_value}}
             )
         actif.compteur_value = valeur
         actif.save(update_fields=["compteur_value", "updated_at"])
@@ -243,7 +244,7 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
             ot.technicien = technicien
             manquantes = habilitations_technicien_manquantes(ot)
             if manquantes:
-                raise ValidationError({"technicien": f"Habilitation manquante : {', '.join(manquantes)}."})
+                raise ValidationError({"technicien": tr("Habilitation manquante : %(liste)s.") % {"liste": ', '.join(manquantes)}})
         if request.data.get("priorite"):
             ot.priorite = _choix(request.data.get("priorite"), OrdreTravail.Priorite, "priorite")
         ot.save()
@@ -264,7 +265,7 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         # Aucun départ en intervention sans habilitation valide du technicien (amont M9).
         manquantes = habilitations_technicien_manquantes(ot)
         if manquantes:
-            raise ValidationError({"technicien": f"Habilitation manquante : {', '.join(manquantes)}."})
+            raise ValidationError({"technicien": tr("Habilitation manquante : %(liste)s.") % {"liste": ', '.join(manquantes)}})
         ot.statut = OrdreTravail.Statut.EN_COURS
         ot.date_debut = timezone.now()
         ot.actif.statut = Actif.Statut.EN_MAINTENANCE
@@ -374,10 +375,11 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
             entetes = ["Machine", "Centre", "Compte", "OT"] + mois + ["Total"]
             lignes = [[f"{m['actif']} {m['designation']}", m["centre"], m["compte"], m["nb_ot"], *m["mois"], m["total"]]
                       for m in data["machines"]]
-            lignes += [[f"Centre {c['centre']}", c["libelle"], "", c["nb_ot"], *c["mois"], c["total"]]
+            lignes += [[tr("Centre %(centre)s") % {"centre": c["centre"]}, c["libelle"], "", c["nb_ot"], *c["mois"], c["total"]]
                        for c in data["centres"]]
-            lignes.append(["Cumul", "", "", "", *data["cumul"], data["total"]])
-            return reponse_export(fmt, f"couts-maintenance-{data['annee']}", f"Coûts de maintenance {data['annee']} (XAF)",
+            lignes.append([tr("Cumul"), "", "", "", *data["cumul"], data["total"]])
+            return reponse_export(fmt, f"couts-maintenance-{data['annee']}",
+                                  tr("Coûts de maintenance %(annee)s (XAF)") % {"annee": data["annee"]},
                                   entetes, lignes, "Par machine, par centre analytique et cumul mensuel")
         return Response(en_texte(data))
 

@@ -30,6 +30,7 @@ from .models import (
     ReleveCompteurParc,
     TarifGR,
 )
+from config.i18n import tr
 
 LOGISTIQUE_WRITE_ROLES = (
     User.Role.ADMIN,
@@ -449,7 +450,7 @@ def enregistrer_releve_parc(equipement, valeur, jour, user, commentaire=""):
     equipement = EquipementParc.objects.select_for_update().get(pk=equipement.pk)
     dernier = equipement.releves.order_by("-date", "-created_at").first()
     if valeur < equipement.compteur_value or (dernier and valeur < dernier.valeur):
-        raise ValidationError({"valeur": f"Le compteur ne peut baisser (dernière valeur : {equipement.compteur_value})."})
+        raise ValidationError({"valeur": tr("Le compteur ne peut baisser (dernière valeur : %(equipement_compteur_value)s).") % {"equipement_compteur_value": equipement.compteur_value}})
     if dernier and jour < dernier.date:
         raise ValidationError({"date": "Un relevé plus récent existe déjà."})
     releve = ReleveCompteurParc.objects.create(

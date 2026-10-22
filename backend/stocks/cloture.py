@@ -20,6 +20,7 @@ from outbox.models import publish
 
 from .models import Depot, Inventaire, InventaireLigne, MouvementStock, PlanInventaireTournant, StockQuant, ValorisationMensuelle
 from .services import COMPTES_STOCK
+from config.i18n import tr
 
 
 def _fin_de_periode(periode):
@@ -37,13 +38,13 @@ def figer_valorisation_mensuelle(periode, user=None):
         raise ValueError("La période n'est pas encore commencée.")
     if MouvementStock.objects.filter(executed=True, date__gt=fin).exists():
         raise ValueError(
-            f"Des mouvements postérieurs au {fin} existent : le stock courant ne représente plus la fin de {periode}."
+            tr("Des mouvements postérieurs au %(fin)s existent : le stock courant ne représente plus la fin de %(periode)s.") % {"fin": fin, "periode": periode}
         )
     debut = fin.replace(day=1)
     resultat = []
     for depot in Depot.objects.filter(is_active=True).order_by("code"):
         if ValorisationMensuelle.objects.filter(periode=periode, depot=depot).exists():
-            raise ValueError(f"La valorisation {periode} du dépôt {depot.code} est déjà figée.")
+            raise ValueError(tr("La valorisation %(periode)s du dépôt %(depot_code)s est déjà figée.") % {"periode": periode, "depot_code": depot.code})
         quants = StockQuant.objects.filter(depot=depot).aggregate(q=Sum("quantity"), v=Sum("stock_value"))
         conso = (
             MouvementStock.objects.filter(

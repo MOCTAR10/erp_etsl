@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from .models import AuditLog, Document, DocumentType, Dossier, Version
 from .services import can_see_amount
+from config.i18n import tr
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # RF-03 : upload max 10 Mo
 
@@ -141,7 +142,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     def validate_file(self, value):
         if value.size > MAX_UPLOAD_SIZE:
             raise serializers.ValidationError(
-                f"Fichier trop volumineux (max {MAX_UPLOAD_SIZE // 1024 // 1024} Mo, RF-03)."
+                tr("Fichier trop volumineux (max %(valeur)s Mo, RF-03).") % {"valeur": MAX_UPLOAD_SIZE // 1024 // 1024}
             )
         return value
 
@@ -186,7 +187,7 @@ class NewVersionSerializer(serializers.Serializer):
     def validate_file(self, value):
         if value.size > MAX_UPLOAD_SIZE:
             raise serializers.ValidationError(
-                f"Fichier trop volumineux (max {MAX_UPLOAD_SIZE // 1024 // 1024} Mo, RF-03)."
+                tr("Fichier trop volumineux (max %(valeur)s Mo, RF-03).") % {"valeur": MAX_UPLOAD_SIZE // 1024 // 1024}
             )
         return value
 

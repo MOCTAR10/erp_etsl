@@ -18,6 +18,7 @@ from comptabilite.models import TauxTva
 from referentiels.models import Account
 
 from .models import PurchaseInvoice
+from config.i18n import tr
 
 CENT = Decimal("0.01")
 
@@ -26,7 +27,7 @@ def _compte(code):
     try:
         return Account.objects.get(code=code)
     except Account.DoesNotExist:
-        raise ValidationError(f"Compte {code} absent du plan comptable (seed_referentiels).")
+        raise ValidationError(tr("Compte %(code)s absent du plan comptable (seed_referentiels).") % {"code": code})
 
 
 def taux_defaut():
