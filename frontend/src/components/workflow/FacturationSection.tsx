@@ -7,7 +7,8 @@ import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { usePagedList } from "../../lib/usePagedList";
 import type { AFacturer, FactureClient, ModeleFacture, Paginated } from "../../types";
-import { Badge, Pagination, SearchField, SectionCard } from "../ui";
+import { Badge, FilterBar, Pagination, SearchField, SectionCard } from "../ui";
+import { useFiltresListe } from "../../lib/useFiltresListe";
 
 const CHAMPS: (keyof ModeleFacture)[] = ["entete", "mentions_legales", "conditions_paiement", "coordonnees_bancaires", "pied_page"];
 
@@ -21,8 +22,11 @@ export function FacturationSection() {
   const [error, setError] = useState<string | null>(null);
   const [edition, setEdition] = useState<Partial<ModeleFacture> | null>(null);
 
-  const factures = usePagedList<FactureClient>("factures-clients", (q) =>
-    api.get<Paginated<FactureClient>>(`/api/comptabilite/factures-clients/${q}`),
+  const filtresFc = useFiltresListe("/api/comptabilite/factures-clients/");
+  const factures = usePagedList<FactureClient>(
+    "factures-clients",
+    (q) => api.get<Paginated<FactureClient>>(`/api/comptabilite/factures-clients/${q}`),
+    { extra: filtresFc.extra },
   );
   const aFacturer = useQuery({
     queryKey: ["factures-a-facturer"],
@@ -108,6 +112,7 @@ export function FacturationSection() {
 
       <h4 className="section-heading">{t("facturation.factures", { count: factures.count })}</h4>
       <SearchField value={factures.search} onChange={factures.setSearch} placeholder={t("facturation.search")} />
+      <FilterBar defs={filtresFc.defs} value={filtresFc.criteres} onChange={filtresFc.setCriteres} idPrefix="fc-f" />
       {rows.length === 0 ? (
         <p className="muted">{t("facturation.aucune")}</p>
       ) : (

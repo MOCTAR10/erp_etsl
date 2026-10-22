@@ -51,6 +51,7 @@ from .serializers import (
     GabaritEtatSerializer,
 )
 from users.permissions import can_read_module
+from config.filtres_vues import FiltresMulticriteresMixin
 from .services import (
     CanManageCompta,
     CanValidateCompta,
@@ -328,12 +329,14 @@ class EngagementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelV
         return Response(self.get_serializer(engagement).data)
 
 
-class PaiementViewSet(LockedAfterMixin, DjangoValidationMixin, viewsets.ModelViewSet):
+class PaiementViewSet(FiltresMulticriteresMixin, LockedAfterMixin, DjangoValidationMixin, viewsets.ModelViewSet):
     """Paiements / encaissements — comptabilisation via le noyau (RF-ERP-90)."""
 
     queryset = Paiement.objects.select_related("compte_bancaire", "engagement", "tiers", "facture", "move").all()
     serializer_class = PaiementSerializer
     search_fields = ("code", "reference",)
+    # EX-G-09 (lot a7) : critères combinables ; jamais de montant (masqué RF-59).
+    champs_filtrables = ("sens", "mode", "statut", "date", "imputation_618", "retenue_source")
     locked_statuses = (Paiement.Statut.VALIDE, Paiement.Statut.ANNULE)
     locked_message = "Paiement validé ou annulé : non modifiable (écriture comptable liée)."
 
@@ -566,12 +569,13 @@ class ModeleFactureViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         return Response(self.get_serializer(modele).data)
 
 
-class FactureClientViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
+class FactureClientViewSet(FiltresMulticriteresMixin, DjangoValidationMixin, viewsets.ModelViewSet):
     """Factures et avoirs clients (M10) : brouillon modifiable, puis émission = écriture comptable + scellé."""
 
     queryset = FactureClient.objects.select_related("client", "move", "taux_tva").prefetch_related("lignes").all()
     serializer_class = FactureClientSerializer
     search_fields = ("code", "objet",)
+    champs_filtrables = ("nature", "statut", "date", "echeance")
 
     def get_permissions(self):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):

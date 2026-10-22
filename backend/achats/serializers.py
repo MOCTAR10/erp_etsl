@@ -325,8 +325,14 @@ class GoodsReceiptLineSerializer(serializers.ModelSerializer):
             "organisme_certificat",
             "lot",
             "lot_code",
+            "saisi_le",
         ]
         read_only_fields = ["id", "lot"]
+
+    def validate_saisi_le(self, value):
+        from operations.terrain_a3 import verifier_saisi_le
+
+        return verifier_saisi_le(value)
 
     def validate(self, attrs):
         get = lambda k: attrs.get(k, getattr(self.instance, k, "") if self.instance else "")  # noqa: E731

@@ -38,6 +38,7 @@ from .serializers import (
     PurchaseRequestSerializer,
 )
 from users.permissions import can_read_module
+from config.filtres_vues import FiltresMulticriteresMixin
 from controle_gestion import budget_control
 
 from comptabilite.services import CanValidateCompta
@@ -264,9 +265,11 @@ class ConsultationOfferViewSet(_CommonViewSet):
         return Response(self.get_serializer(offre).data)
 
 
-class PurchaseOrderViewSet(_CommonViewSet):
+class PurchaseOrderViewSet(FiltresMulticriteresMixin, _CommonViewSet):
     serializer_class = PurchaseOrderSerializer
     search_fields = ("code", "supplier__name", "supplier__code",)
+    # EX-G-09 (lot a7) : critères combinables ; jamais de montant (masqué RF-59).
+    champs_filtrables = ("status", "order_date", "expected_date", "is_global_rental")
 
     def get_queryset(self):
         qs = PurchaseOrder.objects.select_related(
@@ -553,9 +556,30 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
             raise ValidationError({"detail": "Réception validée : lignes non modifiables."})
 
     def perform_create(self, serializer):
-        self._garde_reception_ouverte(serializer.validated_data["receipt"])
+        data = serializer.validated_data
+        self._garde_reception_ouverte(data["receipt"])
+        if saisi_le := data.get("saisi_le"):
+            self._conflits_hors_ligne(data, saisi_le)
         ligne = serializer.save()
         declencher_inspections(ligne.receipt, self.request.user)
+
+    def _conflits_hors_ligne(self, data, saisi_le):
+        """Réception saisie hors ligne (CL-OM-08, même motif que /terrain) : 409 si la saisie est trop ancienne
+        (`TERRAIN_DELAI_SYNCHRO_JOURS`), si une ligne identique existe déjà sur le BL (doublon,
+        `TERRAIN_DOUBLON_CONFLIT`) ou si une réception faite entre-temps a soldé la ligne du BC (sur-réception).
+        `forcer=true` (choix explicite de l'utilisateur sur l'appareil) lève le conflit."""
+        from operations.terrain_a3 import ConflitSaisie, as_bool, controler_synchro
+
+        ligne_bc = data["purchase_order_line"]
+        doublons = GoodsReceiptLine.objects.filter(
+            receipt=data["receipt"], purchase_order_line=ligne_bc, quantity=data.get("quantity", 0)
+        )
+        controler_synchro(saisi_le, self.request, doublons, "Réception")
+        if not as_bool(self.request.data.get("forcer")) and ligne_bc.received_qty + data.get("quantity", 0) > ligne_bc.quantity:
+            raise ConflitSaisie(
+                f"Réception hors ligne de {data.get('quantity', 0)} sur « {ligne_bc.label} » : déjà reçu {ligne_bc.received_qty} "
+                f"pour {ligne_bc.quantity} commandé(s) entre-temps. Forcer (sur-réception) ou abandonner."
+            )
 
     def perform_update(self, serializer):
         self._garde_reception_ouverte(serializer.instance.receipt)
@@ -566,9 +590,10 @@ class GoodsReceiptLineViewSet(_CommonViewSet):
         instance.delete()
 
 
-class PurchaseInvoiceViewSet(_CommonViewSet):
+class PurchaseInvoiceViewSet(FiltresMulticriteresMixin, _CommonViewSet):
     serializer_class = PurchaseInvoiceSerializer
     search_fields = ("code", "invoice_ref", "supplier__name",)
+    champs_filtrables = ("status", "invoice_date")
 
     def get_permissions(self):
         # La comptabilisation relève du cercle comptable (CanValidateCompta), pas des rôles d'écriture Achats.

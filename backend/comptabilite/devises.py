@@ -9,6 +9,9 @@
   change) ou 766 (gain de change).
 - Réévaluation à une date de clôture : écart de conversion latent en 478 (actif, perte latente) ou 479 (passif, gain
   latent), contre le compte de tiers ; extournée à la réévaluation suivante ou au règlement.
+- Provision (lot a7) : à la réévaluation de clôture (`reevaluer_tout`), si les écarts latents font apparaître une perte
+  nette, une provision pour risque de change est dotée (Dr 697 / Cr 499, prudence SYSCOHADA) ; elle est contre-passée
+  au calcul suivant. Paramètre provisoire `DEVISE_PROVISION_PERTE` (1 = activé, défaut).
 """
 
 import csv
@@ -32,6 +35,8 @@ COMPTES = {
     "766000": ("Gains de change", 7, "income"),
     "478000": ("Écarts de conversion — actif (perte latente)", 4, "asset"),
     "479000": ("Écarts de conversion — passif (gain latent)", 4, "liability"),
+    "697000": ("Dotations aux provisions financières — perte de change latente", 6, "expense"),
+    "499000": ("Provisions pour risques à court terme — perte de change", 4, "liability"),
 }
 
 
@@ -292,9 +297,16 @@ def reevaluer(op, jour, user):
 
 
 def reevaluer_tout(jour, user):
-    """Réévalue toutes les opérations en devise ouvertes à la date de clôture (cours manquant = signalé)."""
-    from .models import OperationDevise
+    """Réévalue toutes les opérations en devise ouvertes à la date de clôture (cours manquant = signalé), puis
+    contre-passe la provision précédente et dote la nouvelle si la perte latente nette l'exige (lot a7)."""
+    from .models import OperationDevise, ProvisionChange
 
+    derniere = ProvisionChange.objects.filter(statut=ProvisionChange.Statut.ACTIVE).order_by("-date_cloture").first()
+    if derniere is not None and jour < derniere.date_cloture:
+        raise ValidationError(
+            f"Une provision pour perte de change existe au {derniere.date_cloture:%d/%m/%Y} : la réévaluation de clôture "
+            "ne peut pas être antérieure."
+        )
     faites, erreurs = 0, []
     for op in OperationDevise.objects.filter(statut=OperationDevise.Statut.COMPTABILISEE, date__lte=jour):
         try:
@@ -302,7 +314,72 @@ def reevaluer_tout(jour, user):
             faites += 1
         except ValidationError as exc:
             erreurs.append(f"{op.code} : {exc.messages[0]}")
-    return {"reevaluees": faites, "erreurs": erreurs}
+    resultat = {"reevaluees": faites, "erreurs": erreurs}
+    resultat.update(provisionner(jour, user))
+    return resultat
+
+
+def _provision_dict(p):
+    if p is None:
+        return None
+    return {
+        "id": str(p.pk), "date_cloture": p.date_cloture.isoformat(), "montant": str(p.montant),
+        "perte_latente": str(p.perte_latente), "gain_latent": str(p.gain_latent), "statut": p.statut,
+        "move_number": p.move.number if p.move_id else None,
+    }
+
+
+@transaction.atomic
+def provisionner(jour, user):
+    """Contre-passe la provision active (Dr 499 / Cr 697 à `jour`) puis, si le paramètre est activé et que la
+    position de change latente à `jour` est une perte nette, dote la nouvelle provision Dr 697 / Cr 499.
+
+    Position = écarts latents des opérations ouvertes réévaluées à `jour` (pertes − gains)."""
+    from accounting_kernel.services import reverse_move
+    from django.db.models import Q, Sum
+
+    from .models import OperationDevise, ProvisionChange
+
+    contre_passee = None
+    for ancienne in ProvisionChange.objects.select_for_update(of=("self",)).filter(statut=ProvisionChange.Statut.ACTIVE):
+        if ancienne.move.status == ancienne.move.Status.POSTED:
+            ancienne.move_contre_passation = reverse_move(
+                ancienne.move, user=user, date=jour, reference=f"Contre-passation provision change {ancienne.date_cloture}",
+                label=f"Contre-passation de la provision pour perte de change du {ancienne.date_cloture:%d/%m/%Y}",
+            )
+        ancienne.statut, ancienne.date_contre_passation = ProvisionChange.Statut.CONTRE_PASSEE, jour
+        ancienne.save(update_fields=["statut", "move_contre_passation", "date_contre_passation"])
+        contre_passee = ancienne
+
+    ouvertes = OperationDevise.objects.filter(statut=OperationDevise.Statut.COMPTABILISEE, date_reevaluation=jour)
+    agg = ouvertes.aggregate(
+        pertes=Sum("ecart_latent", filter=Q(ecart_latent__lt=0)), gains=Sum("ecart_latent", filter=Q(ecart_latent__gt=0))
+    )
+    pertes, gains = -(agg["pertes"] or ZERO), agg["gains"] or ZERO
+    nette = pertes - gains
+    nouvelle = None
+    active = bool(_param("DEVISE_PROVISION_PERTE"))
+    if active and nette > 0:
+        from accounting_kernel.models import AccountMove, AccountMoveLine
+        from accounting_kernel.services import period_for_date, post_move
+
+        label = f"Provision pour perte de change latente au {jour:%d/%m/%Y}"
+        move = AccountMove.objects.create(
+            journal=_journal("OD"), period=period_for_date(jour), date=jour, reference=f"PRV-CHANGE-{jour:%Y%m%d}",
+            label=label, source="M10", source_ref=f"DEV/PROVISION/{jour:%Y%m%d}", created_by=user,
+        )
+        AccountMoveLine.objects.create(move=move, account=compte("697000"), debit=nette, credit=ZERO, order=0, label=label)
+        AccountMoveLine.objects.create(move=move, account=compte("499000"), debit=ZERO, credit=nette, order=1, label=label)
+        nouvelle = ProvisionChange.objects.create(
+            date_cloture=jour, perte_latente=pertes, gain_latent=gains, montant=nette, operations=ouvertes.count(),
+            move=post_move(move, user=user), cree_par=user,
+        )
+    return {
+        "provision": _provision_dict(nouvelle),
+        "provision_contre_passee": _provision_dict(contre_passee),
+        "position_latente": str(gains - pertes),
+        "provision_active": active,
+    }
 
 
 def anciennete_cours():

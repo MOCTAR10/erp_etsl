@@ -31,7 +31,8 @@ CONFIRMATION_ROLES = (User.Role.ADMIN, User.Role.PDG, User.Role.DGA, User.Role.D
 
 
 class CanReprise(BasePermission):
-    """Au moins un gabarit autorisé : cercle comptable (API d'import), RH (salariés / paie), QA/QC (qualité)."""
+    """Au moins un gabarit autorisé : cercle comptable (API d'import), RH (salariés / paie), QA/QC (qualité),
+    HSE (habilitations), logistique / maintenance (parc, compteurs)."""
 
     message = "Rôle non autorisé à la reprise de données."
 

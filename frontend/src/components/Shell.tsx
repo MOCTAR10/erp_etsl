@@ -72,7 +72,7 @@ const PILOT_NAV: NavItem[] = [
 /** Administration (EX-G-01) : comptes, matrice des droits, référentiels, piste d'audit — rôle admin seulement. */
 const ADMIN_NAV: NavItem[] = [{ to: "/administration", key: "ecarts_tr.nav.administration", Icon: UserCog }];
 /** Reprise de données (CDC §10) : cercle de l'API d'import + RH (salariés, paie) + QA/QC (qualité) + cercle paie. */
-const REPRISE_ROLES = new Set(["admin", "comptable", "finance", "direction", "rh", "qaqc", "pdg", "dga"]);
+const REPRISE_ROLES = new Set(["admin", "comptable", "finance", "direction", "rh", "qaqc", "pdg", "dga", "hse", "logistique", "maintenance"]);
 
 const MODULE_NAV: ModuleNavItem[] = [
   { to: "/pipeline", key: "nav.pipeline", Icon: Filter, app: ROUTE_APP["/pipeline"] },
