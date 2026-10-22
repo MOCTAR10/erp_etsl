@@ -3571,6 +3571,7 @@ export const en = {
       sousTitre: "Two-step verification, temporary delegation of your approvals and access log.",
       mfaTexte: "A one-time code is required at sign-in, in addition to the password.",
       motDePasse: "Change my password",
+      qui: "Delegator → delegate",
       periode: "Period",
       etat: "Status",
       annulerTitre: "Cancel the delegation",

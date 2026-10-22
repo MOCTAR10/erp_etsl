@@ -3571,6 +3571,7 @@ export const fr = {
       sousTitre: "Vérification en deux étapes, délégations temporaires de vos validations et journal des accès.",
       mfaTexte: "Un code à usage unique est demandé à la connexion, en plus du mot de passe.",
       motDePasse: "Changer mon mot de passe",
+      qui: "Délégant → délégataire",
       periode: "Période",
       etat: "État",
       annulerTitre: "Annuler la délégation",

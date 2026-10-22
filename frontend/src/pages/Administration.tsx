@@ -309,7 +309,7 @@ export function AdministrationPage() {
   }
 
   return (
-    <>
+    <div className="shell-page">
       <PageHeader title={t("ecarts_tr.admin.title")} subtitle={t("ecarts_tr.admin.subtitle")} />
 
       <SectionCard
@@ -337,6 +337,7 @@ export function AdministrationPage() {
           </div>
         }
       >
+        <div className="list-tools">
         <div className="shell-toolbar inline">
           <label className="sr-only" htmlFor="admin-role">
             {t("shell.admin.filtreRole")}
@@ -351,10 +352,11 @@ export function AdministrationPage() {
           </select>
         </div>
         <PagedDataGrid list={comptes} columns={colComptes} caption={t("ecarts_tr.admin.comptes")} searchPlaceholder={t("common.searchPlaceholder")} rowActions={actionsCompte} />
+        </div>
       </SectionCard>
 
       <SectionCard title={t("ecarts_tr.admin.matrice")} subtitle={t("ecarts_tr.admin.matriceAide")}>
-        <div className="table-wrap matrice-wrap">
+        <div className="table-wrap matrice-wrap" tabIndex={0} role="region" aria-label={t("ecarts_tr.admin.matrice")}>
           <table className="table matrice" data-testid="matrice-roles">
             <caption className="sr-only">{t("ecarts_tr.admin.matrice")}</caption>
             <thead>
@@ -476,6 +478,7 @@ export function AdministrationPage() {
             </div>
           </div>
         ) : null}
+        <div className="list-tools">
         <div className="shell-toolbar inline">
           <label className="sr-only" htmlFor="audit-module">
             {t("shell.admin.filtreModule")}
@@ -489,6 +492,7 @@ export function AdministrationPage() {
           />
         </div>
         <PagedDataGrid list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" />
+        </div>
       </SectionCard>
 
       <Modal
@@ -544,6 +548,6 @@ export function AdministrationPage() {
           </>
         }
       />
-    </>
+    </div>
   );
 }

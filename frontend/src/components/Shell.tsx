@@ -261,7 +261,9 @@ export function Shell() {
           end={to === "/"}
           onClick={() => setNavOpen(false)}
           aria-label={rail ? label : undefined}
-          className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+          // Classe texte (pas de fonction) : NavLink ajoute `active` lui-même, et le Slot Radix de l'infobulle
+          // (mode rail) ne sait fusionner que des chaînes.
+          className="nav-link"
         >
           <Icon size={16} strokeWidth={1.85} aria-hidden="true" />
           <span className="nav-label">{label}</span>

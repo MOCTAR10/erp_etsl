@@ -88,7 +88,7 @@ export function NotificationsPage() {
     return <ErrorState message={t("common.error")} onRetry={() => void refetch()} retryLabel={t("common.retry")} />;
 
   return (
-    <>
+    <div className="shell-page">
       <PageHeader
         title={t("notifications.title")}
         subtitle={
@@ -129,6 +129,6 @@ export function NotificationsPage() {
           rowActions={(n) => (n.is_read ? [] : [{ label: t("shell.notif.marquerLu"), icon: CheckCheck, onSelect: () => lire.mutate(n.id) }])}
         />
       </div>
-    </>
+    </div>
   );
 }

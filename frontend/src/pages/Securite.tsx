@@ -67,7 +67,7 @@ export function SecuritePage() {
     { key: "code", header: "Code", width: 130, sortValue: (d) => d.code, render: (d) => <span className="num">{d.code}</span> },
     {
       key: "qui",
-      header: t("securite.delegataire"),
+      header: t("shell.secu.qui"),
       sortValue: (d) => d.delegataire_email,
       render: (d) => (
         <span className="deleg-qui">
@@ -114,7 +114,7 @@ export function SecuritePage() {
 
   const mfaActive = Boolean(user?.mfa_active);
   return (
-    <>
+    <div className="shell-page">
       <PageHeader title={t("securite.title")} subtitle={t("shell.secu.sousTitre")} />
 
       <SectionCard title={t("securite.mfa")}>
@@ -229,6 +229,6 @@ export function SecuritePage() {
       >
         <p className="muted">{t("shell.secu.annulerTexte")}</p>
       </Modal>
-    </>
+    </div>
   );
 }
