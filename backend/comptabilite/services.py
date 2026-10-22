@@ -254,6 +254,9 @@ PARAMETRES_DEFAUT = {
     "RETENUE_GARANTIE_COMPTE": ("Compte des retenues de garantie clients (SYSCOHADA 4117)", Decimal("411700"), "compte"),
     "DEVISE_ANCIENNETE_MAX_JOURS": (
         "Ancienneté maximale du cours de change appliqué (0 = sans limite)", Decimal("31"), "jours"),
+    "DEVISE_PROVISION_PERTE": (
+        "Provision pour perte de change latente nette à la réévaluation de clôture (1 = passée 697 / 499, 0 = non)",
+        Decimal("1"), "0/1"),
     "REVENU_METHODE": (
         "Méthode du % d'avancement (1 = coûts engagés / budget M11, 2 = situations de travaux M3)",
         Decimal("2"), "1/2"),

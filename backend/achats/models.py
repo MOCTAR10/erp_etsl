@@ -520,6 +520,8 @@ class GoodsReceiptLine(models.Model):
         "stocks.LotMatiere", null=True, blank=True, on_delete=models.SET_NULL, related_name="lignes_reception",
         verbose_name="Lot créé (M5)",
     )
+    # Lot a7 (CL-OM-08) : horodatage de la saisie sur l'appareil (réception hors ligne synchronisée plus tard).
+    saisi_le = models.DateTimeField(null=True, blank=True, verbose_name="Saisie sur l'appareil (hors ligne)")
 
     class Meta:
         ordering = ["receipt", "id"]

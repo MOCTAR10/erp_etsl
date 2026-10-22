@@ -1195,3 +1195,6 @@ class ReconnaissanceRevenu(models.Model):
         if not self.code:
             self.code = ComptabiliteSequence.next_for("RAV", "RAV")
         return super().save(*args, **kwargs)
+
+
+from .models_a7 import ProvisionChange  # noqa: E402,F401  (lot a7 : provision perte de change)
