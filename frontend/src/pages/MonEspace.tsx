@@ -204,7 +204,6 @@ export function MonEspacePage() {
 
         <h3 style={{ marginTop: "1.2rem" }}>{t("monEspace.nouvelle")}</h3>
         <form
-          className="login-form"
           onSubmit={(e) => {
             e.preventDefault();
             setInfo(null);

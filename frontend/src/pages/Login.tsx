@@ -2,46 +2,40 @@
 import type { FormEvent } from "react";
 
 import {
-  ArrowLeftRight,
+  ArrowRight,
   BadgeCheck,
-  Boxes,
   Calculator,
-  ChartNoAxesColumn,
   CircleAlert,
   Eye,
   EyeOff,
   Factory,
-  FolderTree,
-  GitBranch,
-  Layers,
+  Landmark,
+  LayoutGrid,
   LoaderCircle,
   Lock,
-  LogIn,
   Mail,
-  Scale,
-  ScrollText,
-  ShieldAlert,
+  Moon,
   ShieldCheck,
-  ShoppingCart,
-  TrendingUp,
+  Sun,
   Truck,
   Users,
-  Workflow,
-  Wrench,
+  WifiOff,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
+import type { Variants } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { login, mfaEnrolement, mfaVerification, type MfaChallenge } from "../api/client";
+import { MotionProvider } from "../components/Pilot";
 import { landingForRole } from "../lib/landing";
+import { useThemeMode } from "../lib/useThemeMode";
 import { useAuth } from "../store/auth";
 import { motionTokens } from "../theme/tokens";
 
-type LoginModule = { code: string; labelKey: string; icon: LucideIcon };
-type LoginLayer = { labelKey: string; icon: LucideIcon };
 type DemoAccount = { email: string; roleKey: string; icon: LucideIcon };
+type Proof = { titleKey: string; textKey: string; icon: LucideIcon };
 
 /** Mot de passe commun aux 6 comptes de démonstration (cf. `seed_all_demo`). */
 const DEMO_PASSWORD = "Etls#Demo2026";
@@ -50,28 +44,11 @@ const DEMO_PASSWORD = "Etls#Demo2026";
  *  dont les mots de passe ont été changés). Affiché par défaut (développement, e2e). */
 const SHOW_DEMO_ACCOUNTS = import.meta.env.VITE_DEMO_COMPTES !== "false";
 
-const MODULES: LoginModule[] = [
-  { code: "M01", labelKey: "login.modules.m01", icon: GitBranch },
-  { code: "M02", labelKey: "login.modules.m02", icon: ShoppingCart },
-  { code: "M03", labelKey: "login.modules.m03", icon: Factory },
-  { code: "M04", labelKey: "login.modules.m04", icon: Truck },
-  { code: "M05", labelKey: "login.modules.m05", icon: Boxes },
-  { code: "M06", labelKey: "login.modules.m06", icon: BadgeCheck },
-  { code: "M07", labelKey: "login.modules.m07", icon: ShieldAlert },
-  { code: "M08", labelKey: "login.modules.m08", icon: Wrench },
-  { code: "M09", labelKey: "login.modules.m09", icon: Users },
-  { code: "M10", labelKey: "login.modules.m10", icon: Calculator },
-  { code: "M11", labelKey: "login.modules.m11", icon: TrendingUp },
-  { code: "M12", labelKey: "login.modules.m12", icon: Scale },
-];
-
-const LAYERS: LoginLayer[] = [
-  { labelKey: "login.modules.ged", icon: FolderTree },
-  { labelKey: "login.modules.workflows", icon: Workflow },
-  { labelKey: "login.modules.registres", icon: ScrollText },
-  { labelKey: "login.modules.bi", icon: ChartNoAxesColumn },
-  { labelKey: "login.modules.audit", icon: ShieldCheck },
-  { labelKey: "login.modules.integrations", icon: ArrowLeftRight },
+/** Trois preuves de valeur sobres (remplacent l'ancienne grille de 12 tuiles). */
+const PROOFS: Proof[] = [
+  { titleKey: "login.proofs.modulesTitle", textKey: "login.proofs.modulesText", icon: LayoutGrid },
+  { titleKey: "login.proofs.localTitle", textKey: "login.proofs.localText", icon: Landmark },
+  { titleKey: "login.proofs.offlineTitle", textKey: "login.proofs.offlineText", icon: WifiOff },
 ];
 
 const DEMO_ACCOUNTS: DemoAccount[] = [
@@ -83,11 +60,22 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   { email: "qaqc@etls.local", roleKey: "login.demo.qaqc", icon: BadgeCheck },
 ];
 
+/* Entrée sobre : le contenu du panneau monte en cascade, la carte suit. */
+const rise: Variants = {
+  hidden: { opacity: 0, y: motionTokens.distance.md },
+  show: { opacity: 1, y: 0, transition: { duration: motionTokens.duration.slow, ease: motionTokens.ease.out } },
+};
+const cascade: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: motionTokens.stagger.base, delayChildren: 0.12 } },
+};
+
 export function LoginPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const setSession = useAuth((s) => s.setSession);
+  const isDark = useThemeMode() === "dark";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -99,6 +87,18 @@ export function LoginPage() {
   const [code, setCode] = useState("");
 
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+
+  const toggleTheme = () => {
+    const next = isDark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("etls.theme", next);
+  };
+
+  const toggleLang = () => {
+    const next = i18n.language === "fr" ? "en" : "fr";
+    void i18n.changeLanguage(next);
+    localStorage.setItem("etls.lang", next);
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -149,229 +149,227 @@ export function LoginPage() {
   };
 
   return (
-    <div className="login">
-      <motion.aside
-        className="login-panel"
-        initial={{ opacity: 0, y: motionTokens.distance.md }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out }}
-      >
-        <header className="login-hero">
-          <h1>{t("login.welcome")}</h1>
-          <p>{t("login.heroSub")}</p>
-        </header>
+    <MotionProvider>
+      <div className="login">
+        {/* ══════ Panneau visuel : photo industrielle + accroche + 3 preuves ══════ */}
+        <aside className="login-panel">
+          <motion.div
+            className="login-photo"
+            aria-hidden
+            initial={{ scale: 1.08, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 1.6, ease: motionTokens.ease.out }}
+          />
+          <div className="login-veil" aria-hidden />
+          <div className="login-grain" aria-hidden />
 
-        <section className="login-layers">
-          <span className="login-modules-title">
-            <Layers size={13} aria-hidden />
-            {t("login.transverseTitle")}
-          </span>
-          <div className="login-layers-grid">
-            {LAYERS.map((l) => (
-              <div key={l.labelKey} className="login-layer">
-                <l.icon size={13} aria-hidden />
-                <span>{t(l.labelKey)}</span>
-              </div>
-            ))}
+          <motion.div className="login-panel-inner" variants={cascade} initial="hidden" animate="show">
+            <motion.p className="login-eyebrow" variants={rise}>
+              {t("login.eyebrow")}
+            </motion.p>
+
+            <div className="login-hero">
+              <motion.h2 className="login-hero-title" variants={rise}>
+                {t("login.heroTitle")}
+              </motion.h2>
+              <motion.p className="login-hero-sub" variants={rise}>
+                {t("login.heroSub")}
+              </motion.p>
+            </div>
+
+            <motion.ul className="login-proofs" aria-label={t("login.proofsLabel")} variants={rise}>
+              {PROOFS.map((p) => (
+                <li key={p.titleKey} className="login-proof">
+                  <p.icon size={18} strokeWidth={1.75} aria-hidden />
+                  <b>{t(p.titleKey)}</b>
+                  <span>{t(p.textKey)}</span>
+                </li>
+              ))}
+            </motion.ul>
+          </motion.div>
+        </aside>
+
+        {/* ══════ Colonne d'authentification ══════ */}
+        <main className="login-stage">
+          <div className="login-tools">
+            <button type="button" className="login-tool" onClick={toggleLang} aria-label={t("login.switchLang")} title={t("login.switchLang")}>
+              <span className="login-tool-code">{t("login.langCode")}</span>
+            </button>
+            <button
+              type="button"
+              className="login-tool"
+              onClick={toggleTheme}
+              aria-label={isDark ? t("login.themeLight") : t("login.themeDark")}
+              title={isDark ? t("login.themeLight") : t("login.themeDark")}
+            >
+              {isDark ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
+            </button>
           </div>
-        </section>
 
-        <section className="login-modules">
-          <span className="login-modules-title">{t("login.modulesTitle")}</span>
-          <div className="login-modules-grid">
-            {MODULES.map((m, i) => (
-              <motion.div
-                key={m.code}
-                className="login-module"
-                initial={{ opacity: 0, y: motionTokens.distance.sm }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  delay: i * motionTokens.stagger.quick,
-                  duration: motionTokens.duration.base,
-                  ease: motionTokens.ease.out,
-                }}
-              >
-                <span className="login-module-icon">
-                  <m.icon size={15} aria-hidden />
-                </span>
-                <b>{m.code}</b>
-                <span className="login-module-name">{t(m.labelKey)}</span>
-              </motion.div>
-            ))}
-          </div>
-        </section>
+          <motion.div
+            className="login-auth"
+            initial={{ opacity: 0, y: motionTokens.distance.md }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: motionTokens.duration.slow, ease: motionTokens.ease.out, delay: 0.08 }}
+          >
+            <header className="login-auth-head">
+              <span className="login-auth-mark">
+                <img src={`${import.meta.env.BASE_URL}etsl-logo.jpg`} alt={t("app.logoAlt")} />
+              </span>
+              <span className="login-auth-id">
+                <b>{t("app.brand")}</b>
+                <em>{t("login.brandTagline")}</em>
+              </span>
+            </header>
 
-        <div className="login-foot">{t("login.footer")}</div>
-      </motion.aside>
+            <h1 className="login-auth-title">{mfa ? t("login.mfaTitle") : t("login.title")}</h1>
+            <p className="login-auth-sub">{mfa ? (secret ? t("login.mfaEnrolIntro") : t("login.mfaIntro")) : t("login.formSubtitle")}</p>
 
-      <main className="login-form">
-        <motion.div
-          className="login-auth"
-          initial={{ opacity: 0, y: motionTokens.distance.md, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            duration: motionTokens.duration.base,
-            ease: motionTokens.ease.out,
-            delay: motionTokens.stagger.quick,
-          }}
-        >
-          <header className="login-auth-head">
-            <span className="login-auth-mark">
-              <img src={`${import.meta.env.BASE_URL}etsl-logo.jpg`} alt={t("app.logoAlt")} />
-            </span>
-            <span className="login-auth-id">
-              <b>{t("app.brand")}</b>
-              <em>{t("login.brandTagline")}</em>
-            </span>
-          </header>
+            {error && (
+              <p className="login-alert" role="alert">
+                <CircleAlert size={16} aria-hidden />
+                <span>{error}</span>
+              </p>
+            )}
 
-          <h1 className="login-auth-title">{t("login.title")}</h1>
-          <p className="login-auth-sub">{t("login.formSubtitle")}</p>
-
-          {error && (
-            <p className="login-alert" role="alert">
-              <CircleAlert size={15} aria-hidden />
-              <span>{error}</span>
-            </p>
-          )}
-
-          {mfa ? (
-            <form onSubmit={submitMfa} aria-label={t("login.mfaTitle")}>
-              <h3 className="login-mfa-title">{t("login.mfaTitle")}</h3>
-              {secret ? (
-                <div className="login-mfa-enrol">
-                  <p className="muted">{t("login.mfaEnrolIntro")}</p>
+            {mfa ? (
+              <form className="login-fields" onSubmit={submitMfa} aria-label={t("login.mfaTitle")}>
+                {secret && (
                   <code className="login-mfa-secret" aria-label={t("login.mfaSecret")}>
                     {secret.match(/.{1,4}/g)?.join(" ")}
                   </code>
+                )}
+                <div className="login-field">
+                  <label htmlFor="mfa-code">{t("login.mfaCode")}</label>
+                  <div className="login-input">
+                    <Lock size={16} aria-hidden />
+                    <input
+                      id="mfa-code"
+                      className="login-otp"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      required
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                    />
+                  </div>
                 </div>
-              ) : (
-                <p className="muted">{t("login.mfaIntro")}</p>
-              )}
-              <div className="login-field">
-                <label htmlFor="mfa-code">{t("login.mfaCode")}</label>
-                <div className="login-input">
-                  <Lock size={16} aria-hidden />
-                  <input
-                    id="mfa-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    required
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                  />
-                </div>
-              </div>
-              <button type="submit" className="login-submit" disabled={busy || code.length !== 6}>
-                {busy ? t("common.loading") : t("login.mfaSubmit")}
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => {
-                  setMfa(null);
-                  setSecret(null);
-                  setCode("");
-                  setError(null);
-                }}
-              >
-                {t("login.mfaBack")}
-              </button>
-            </form>
-          ) : (
-          <form onSubmit={submit}>
-            <div className="login-field">
-              <label htmlFor="email">{t("login.email")}</label>
-              <div className="login-input">
-                <Mail size={16} aria-hidden />
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  placeholder={t("login.emailPlaceholder")}
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-
-            <div className="login-field">
-              <label htmlFor="password">{t("login.password")}</label>
-              <div className="login-input">
-                <Lock size={16} aria-hidden />
-                <input
-                  id="password"
-                  type={revealed ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
+                <button type="submit" className="login-submit" disabled={busy || code.length !== 6}>
+                  {busy && <LoaderCircle size={16} className="login-spin" aria-hidden />}
+                  {busy ? t("common.loading") : t("login.mfaSubmit")}
+                </button>
                 <button
                   type="button"
-                  className="login-reveal"
-                  onClick={() => setRevealed((v) => !v)}
-                  aria-label={revealed ? t("login.hidePassword") : t("login.showPassword")}
-                  aria-pressed={revealed}
+                  className="login-back"
+                  onClick={() => {
+                    setMfa(null);
+                    setSecret(null);
+                    setCode("");
+                    setError(null);
+                  }}
                 >
-                  {revealed ? <EyeOff size={15} aria-hidden /> : <Eye size={15} aria-hidden />}
+                  {t("login.mfaBack")}
                 </button>
-              </div>
-            </div>
-
-            <motion.button
-              className="login-submit"
-              type="submit"
-              disabled={busy}
-              whileTap={{ scale: 0.99 }}
-              transition={{ duration: motionTokens.duration.fast }}
-            >
-              {busy ? (
-                <LoaderCircle size={16} className="login-spin" aria-hidden />
-              ) : (
-                <LogIn size={16} aria-hidden />
-              )}
-              {busy ? t("common.loading") : t("login.submit")}
-            </motion.button>
-            <p className="login-forgot" style={{ textAlign: "right", margin: "0.5rem 0 0", fontSize: 13 }}>
-              <Link to="/mot-de-passe-oublie">{t("ecarts_tr.mdp.oublieLien")}</Link>
-            </p>
-          </form>
-          )}
-
-          {SHOW_DEMO_ACCOUNTS && (
-          <section className="login-demo">
-            <div className="login-demo-head">
-              <b>{t("login.demoTitle")}</b>
-              <span>{t("login.demoHint")}</span>
-            </div>
-            <div className="login-demo-grid">
-              {DEMO_ACCOUNTS.map((a) => (
-                <div key={a.email} className="login-demo-chip">
-                  <a.icon size={13} aria-hidden />
-                  <button
-                    type="button"
-                    className="login-demo-role"
-                    onClick={() => prefill(a)}
-                    aria-label={`${t(a.roleKey)} - ${a.email}`}
-                  >
-                    {t(a.roleKey)}
-                  </button>
-                  <span className="login-demo-mail">{a.email}</span>
+              </form>
+            ) : (
+              <form className="login-fields" onSubmit={submit}>
+                <div className="login-field">
+                  <label htmlFor="email">{t("login.email")}</label>
+                  <div className="login-input">
+                    <Mail size={16} aria-hidden />
+                    <input
+                      id="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      placeholder={t("login.emailPlaceholder")}
+                      spellCheck={false}
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
-            <p className="login-demo-pwd">
-              {t("login.demoPassword")} <code>{DEMO_PASSWORD}</code>
-            </p>
-          </section>
-          )}
-        </motion.div>
-      </main>
-    </div>
+
+                <div className="login-field">
+                  <div className="login-label-row">
+                    <label htmlFor="password">{t("login.password")}</label>
+                    <Link className="login-forgot" to="/mot-de-passe-oublie">
+                      {t("ecarts_tr.mdp.oublieLien")}
+                    </Link>
+                  </div>
+                  <div className="login-input">
+                    <Lock size={16} aria-hidden />
+                    <input
+                      id="password"
+                      type={revealed ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      className="login-reveal"
+                      onClick={() => setRevealed((v) => !v)}
+                      aria-label={revealed ? t("login.hidePassword") : t("login.showPassword")}
+                      aria-pressed={revealed}
+                    >
+                      {revealed ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+                    </button>
+                  </div>
+                </div>
+
+                <motion.button
+                  className="login-submit"
+                  type="submit"
+                  disabled={busy}
+                  whileTap={{ scale: 0.99 }}
+                  transition={{ duration: motionTokens.duration.fast }}
+                >
+                  {busy && <LoaderCircle size={16} className="login-spin" aria-hidden />}
+                  {busy ? t("common.loading") : t("login.submit")}
+                  {!busy && <ArrowRight size={16} className="login-submit-arrow" aria-hidden />}
+                </motion.button>
+
+                <p className="login-secure">
+                  <ShieldCheck size={13} aria-hidden />
+                  {t("login.secureNote")}
+                </p>
+              </form>
+            )}
+
+            {SHOW_DEMO_ACCOUNTS && !mfa && (
+              <section className="login-demo" aria-labelledby="login-demo-title">
+                <div className="login-demo-head">
+                  <b id="login-demo-title">{t("login.demoTitle")}</b>
+                  <span className="login-demo-pwd">
+                    {t("login.demoPassword")} <code>{DEMO_PASSWORD}</code>
+                  </span>
+                </div>
+                <div className="login-demo-grid">
+                  {DEMO_ACCOUNTS.map((a) => (
+                    <button
+                      key={a.email}
+                      type="button"
+                      className="login-demo-role"
+                      onClick={() => prefill(a)}
+                      aria-label={`${t(a.roleKey)} - ${a.email}`}
+                      title={`${a.email} — ${t("login.demoHint")}`}
+                    >
+                      <a.icon size={14} aria-hidden />
+                      <span>{t(a.roleKey)}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+          </motion.div>
+
+          <footer className="login-foot">{t("login.footer")}</footer>
+        </main>
+      </div>
+    </MotionProvider>
   );
 }
