@@ -11,6 +11,7 @@ import re
 
 from django.core import mail
 from django.db import connection
+from django.test import override_settings
 from django.urls import resolve
 from rest_framework.test import APITestCase
 
@@ -200,7 +201,18 @@ class MotDePasseTests(_Base):
         self.assertEqual(self._login(self.hse.email, self.NOUVEAU).status_code, 200)
         self.assertTrue(JournalAcces.objects.filter(user=self.hse, evenement="mdp_change").exists())
 
+    def test_sans_messagerie_renvoi_vers_l_administrateur(self):
+        with self.settings(EMAIL_ENABLED=False):
+            self.assertFalse(self.client.get("/api/users/mot-de-passe/config/").json()["email_actif"])
+            r = self.client.post("/api/users/mot-de-passe/oubli/", {"email": self.hse.email}, format="json")
+            self.assertEqual(r.status_code, 200)
+            self.assertFalse(r.json()["email_actif"])
+            self.assertIn("administrateur", r.json()["detail"])
+            self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(EMAIL_ENABLED=True)
     def test_mot_de_passe_oublie_lien_unique_et_reponse_identique(self):
+        self.assertTrue(self.client.get("/api/users/mot-de-passe/config/").json()["email_actif"])
         r_inconnu = self.client.post("/api/users/mot-de-passe/oubli/", {"email": "inconnu@etls.ga"}, format="json")
         self.assertEqual(len(mail.outbox), 0)
         r = self.client.post("/api/users/mot-de-passe/oubli/", {"email": self.hse.email.upper()}, format="json")

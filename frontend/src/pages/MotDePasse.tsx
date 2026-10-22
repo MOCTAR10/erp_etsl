@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { KeyRound } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -110,11 +110,25 @@ export function MotDePasseOubliePage() {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  // Courriel optionnel : sans messagerie configurée, le chemin est la réinitialisation par l'administrateur.
+  const config = useQuery({
+    queryKey: ["mdp-config"],
+    queryFn: () => api.get<{ email_actif: boolean; message: string }>("/api/users/mot-de-passe/config/"),
+    retry: 0,
+  });
   const envoi = useMutation({
     mutationFn: () => api.post<{ detail: string }>("/api/users/mot-de-passe/oubli/", { email }),
     onSuccess: (r) => setMessage({ ok: true, text: r.detail }),
     onError: (e) => setMessage({ ok: false, text: describeError(e) }),
   });
+  if (config.data && !config.data.email_actif)
+    return (
+      <CartePublique titre={t("ecarts_tr.mdp.oublieTitre")}>
+        <p role="note" data-testid="mdp-contacter-admin">
+          {t("ecarts_tr.mdp.contacterAdmin")}
+        </p>
+      </CartePublique>
+    );
   return (
     <CartePublique titre={t("ecarts_tr.mdp.oublieTitre")}>
       <p className="muted">{t("ecarts_tr.mdp.oublieAide")}</p>

@@ -10,7 +10,7 @@ from .views import (
     ThrottledTokenObtainPairView,
     UserViewSet,
 )
-from .motdepasse import ChangerMotDePasseView, MotDePasseOublieView, ReinitialiserMotDePasseView
+from .motdepasse import ChangerMotDePasseView, ConfigMotDePasseView, MotDePasseOublieView, ReinitialiserMotDePasseView
 from .parametres import ParametreTransverseViewSet
 
 router = DefaultRouter()
@@ -25,6 +25,7 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("me/", MeView.as_view(), name="me"),
     path("me/mot-de-passe/", ChangerMotDePasseView.as_view(), name="mot_de_passe_changer"),
+    path("mot-de-passe/config/", ConfigMotDePasseView.as_view(), name="mot_de_passe_config"),
     path("mot-de-passe/oubli/", MotDePasseOublieView.as_view(), name="mot_de_passe_oubli"),
     path("mot-de-passe/reinitialiser/", ReinitialiserMotDePasseView.as_view(), name="mot_de_passe_reinitialiser"),
     path("", include(router.urls)),

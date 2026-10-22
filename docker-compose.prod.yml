@@ -40,8 +40,9 @@ x-backend: &backend
     # Chiffrement au repos des champs sensibles (§8.2) : clé Fernet dédiée, séquestrée hors du serveur.
     FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?set FIELD_ENCRYPTION_KEY}
     MFA_ROLES: ${MFA_ROLES:-admin,pdg,dga,direction,finance,comptable,rh}
-    # Courriel des notifications (EX-G-05) : sans SMTP, les alertes restent internes.
-    EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+    # Courriel OPTIONNEL (EX-G-05) : tant qu'ETSL n'a pas fourni sa messagerie, backend console = aucun envoi,
+    # la notification interne fait foi et « mot de passe oublié » renvoie vers l'administrateur.
+    EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
     EMAIL_HOST: ${EMAIL_HOST:-localhost}
     EMAIL_PORT: ${EMAIL_PORT:-25}
     EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}

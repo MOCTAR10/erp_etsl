@@ -357,6 +357,7 @@ export const fr = {
       lienInvalide: "Lien incomplet : utilisez le lien reçu par e-mail ou refaites une demande.",
       retourConnexion: "Retour à la connexion",
       reinitAdmin: "Réinitialiser le mot de passe",
+      contacterAdmin: "La messagerie n'est pas encore configurée : contactez votre administrateur. Il réinitialisera votre mot de passe et vous en choisirez un nouveau à la connexion.",
       reinitAdminPrompt: "Mot de passe provisoire (l'utilisateur devra le changer à la connexion)",
     },
     circuits: {

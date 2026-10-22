@@ -32,6 +32,25 @@ from .models import JournalAcces, User
 Evt = JournalAcces.Evenement
 SEL = "etls.mdp.reinitialisation"
 MESSAGE_OUBLI = "Si un compte actif correspond à cette adresse, un lien de réinitialisation vient d'être envoyé."
+MESSAGE_SANS_EMAIL = (
+    "L'envoi de courriels n'est pas encore configuré : contactez votre administrateur, qui réinitialisera votre "
+    "mot de passe (vous le changerez à la connexion)."
+)
+
+
+def email_actif():
+    return bool(getattr(settings, "EMAIL_ENABLED", False))
+
+
+class ConfigMotDePasseView(APIView):
+    """`GET /api/users/mot-de-passe/config/` : le lien par courriel est-il disponible ? (public, sans donnée)."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        return Response({"email_actif": email_actif(), "message": "" if email_actif() else MESSAGE_SANS_EMAIL})
 
 
 def _empreinte(user):
@@ -111,6 +130,9 @@ class MotDePasseOublieView(APIView):
         from .parametres import valeur_transverse
 
         email = str(request.data.get("email") or "").strip()
+        if not email_actif():
+            # Messagerie non configurée : aucun lien envoyé, chemin = réinitialisation par l'administrateur.
+            return Response({"detail": MESSAGE_SANS_EMAIL, "email_actif": False})
         user = User.objects.filter(email__iexact=email, is_active=True).first() if email else None
         journaliser(request, Evt.MDP_OUBLI, user=user, email=email)
         if user is not None:
@@ -130,7 +152,7 @@ class MotDePasseOublieView(APIView):
                 )
             except Exception:  # noqa: BLE001 — réponse identique même si l'envoi échoue
                 pass
-        return Response({"detail": MESSAGE_OUBLI})
+        return Response({"detail": MESSAGE_OUBLI, "email_actif": True})
 
 
 class ReinitialiserMotDePasseView(APIView):

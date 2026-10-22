@@ -268,6 +268,12 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="archivage@etls.local")
+# Envoi réel de courriels configuré ? (faux pour les backends console / locmem / dummy) — pilote « mot de passe
+# oublié » : sans envoi réel, l'écran renvoie vers l'administrateur. Forçable par EMAIL_ENABLED.
+EMAIL_ENABLED = env.bool(
+    "EMAIL_ENABLED",
+    default=not any(k in EMAIL_BACKEND for k in ("console", "locmem", "dummy", "filebased")),
+)
 
 # ── Ingestion (RF-04/05) ──
 IMAP_HOST = env("IMAP_HOST", default="")

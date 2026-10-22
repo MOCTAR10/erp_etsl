@@ -357,6 +357,7 @@ export const en = {
       lienInvalide: "Incomplete link: use the link received by e-mail or request a new one.",
       retourConnexion: "Back to sign-in",
       reinitAdmin: "Reset password",
+      contacterAdmin: "E-mail is not configured yet: contact your administrator. They will reset your password and you will choose a new one at sign-in.",
       reinitAdminPrompt: "Temporary password (the user will have to change it at sign-in)",
     },
     circuits: {
