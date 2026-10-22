@@ -1,4 +1,34 @@
 export const fr = {
+  // Primitives d'interface (menus, panneaux, dates, grilles, palette) — composants `components/ui`.
+  ui: {
+    close: "Fermer",
+    moreActions: "Plus d'actions",
+    rowActions: "Actions de la ligne",
+    actions: "Actions",
+    notifications: "Notifications",
+    sortAsc: "tri croissant",
+    sortDesc: "tri décroissant",
+    sortBy: "Trier par {{column}}",
+    loadingRows: "Chargement des lignes…",
+    date: {
+      placeholder: "jj/mm/aaaa",
+      openCalendar: "Ouvrir le calendrier",
+      clear: "Effacer la date",
+      invalid: "Date invalide (format jj/mm/aaaa)",
+      rangePlaceholder: "Choisir une période",
+      from: "Du",
+      to: "au",
+      today: "Aujourd'hui",
+    },
+    command: {
+      label: "Palette de commandes",
+      placeholder: "Rechercher une page, une action…",
+      empty: "Aucun résultat",
+      loading: "Recherche…",
+      hint: "Naviguer ↑ ↓ · Ouvrir ↵ · Fermer Échap",
+      esc: "Échap",
+    },
+  },
   app: {
     title: "ETSL — ERP",
     tagline: "ERP · Gestion & processus",

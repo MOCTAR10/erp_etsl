@@ -24,3 +24,18 @@ export { SearchField } from "./SearchField";
 export { PagedDataTable } from "./PagedDataTable";
 export { FilterBar, filtersToQuery } from "./FilterBar";
 export type { FilterDef, FilterValues } from "./FilterBar";
+// Primitives premium (Radix, sonner, react-day-picker, TanStack Table, cmdk) — styles : styles/primitives.css
+export { Menu } from "./Menu";
+export type { MenuEntry, MenuItemDef, MenuLabelDef } from "./Menu";
+export { Modal, Sheet, SheetClose } from "./Sheet";
+export type { SheetProps } from "./Sheet";
+export { Tooltip } from "./Tooltip";
+export { Popover } from "./Popover";
+export { AppToaster, notify } from "./Toaster";
+export type { NotifyOptions } from "./Toaster";
+export { DatePicker, DateRangePicker, dateToIso, formatIsoDate, isoToDate, parseDateInput } from "./DatePicker";
+export type { DatePickerProps, DateRangePickerProps, DateRangeValue } from "./DatePicker";
+export { DataGrid, PagedDataGrid, toOrdering } from "./DataGrid";
+export type { DataGridProps, GridColumn, GridPagination, GridSort, SortValue } from "./DataGrid";
+export { CommandPalette, normalizeSearch } from "./CommandPalette";
+export type { CommandGroupDef, CommandItemDef, CommandPaletteProps } from "./CommandPalette";
