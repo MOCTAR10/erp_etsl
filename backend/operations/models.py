@@ -298,6 +298,10 @@ class PointageChantier(models.Model):
         related_name="operations_validated_pointages", verbose_name="Validé par",
     )
     validated_at = models.DateTimeField(null=True, blank=True, verbose_name="Validé le")
+    saisi_le = models.DateTimeField(
+        null=True, blank=True, verbose_name="Saisi sur l'appareil le",
+        help_text="Horodatage de la saisie terrain (hors ligne) ; vide pour une saisie au bureau.",
+    )
     saisie_temps = models.OneToOneField(
         "rh_paie.SaisieTemps", null=True, blank=True, on_delete=models.SET_NULL,
         related_name="pointage_chantier", verbose_name="Saisie temps M9",

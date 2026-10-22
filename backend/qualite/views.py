@@ -57,6 +57,7 @@ from .serializers import (
     WpsWpqrSerializer,
 )
 from .services import CanManageQualite, CanValidatePv, can_validate_pv
+from .ecarts_a3 import JointTracabiliteMixin
 
 
 def _as_bool(value):
@@ -243,6 +244,10 @@ class ControleQualiteViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        if saisi_le := serializer.validated_data.get("saisi_le"):  # saisie terrain synchronisée (CL-OM-08)
+            from operations.terrain_a3 import controler_synchro
+
+            controler_synchro(saisi_le, self.request, None, "Contrôle")
         serializer.save(created_by=self.request.user)
 
     @action(detail=True, methods=["post"], url_path="approuver")
@@ -604,11 +609,11 @@ class InstrumentMesureViewSet(viewsets.ModelViewSet):
         return _pdf_response(etiquette_pdf(inst), f"etiquette-{inst.code}.pdf")
 
 
-class JointSoudeViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+class JointSoudeViewSet(JointTracabiliteMixin, mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
                         viewsets.GenericViewSet):
     """Registre des joints : inscription seule (la traçabilité ne se réécrit pas)."""
 
-    queryset = JointSoude.objects.select_related("ordre", "soudeur", "wps").all()
+    queryset = JointSoude.objects.select_related("ordre", "soudeur", "wps", "lot").prefetch_related("lot__certificats").all()
     serializer_class = JointSoudeSerializer
     search_fields = ("code", "repere",)
     permission_classes = [CanManageQualite]

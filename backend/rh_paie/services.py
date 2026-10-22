@@ -525,7 +525,10 @@ def generer_virement(periode, compte, date_execution, user=None):
 # Pointages M3 -> heures supplémentaires, déclarations sans ressaisie, reporting RH (clôture M9)
 # --------------------------------------------------------------------------------------------
 HS_RUBRIQUE = "HS-TEMPS"
-HS_PARAMETRES = ("DUREE_LEGALE_HEBDO", "HS_MAJ_1", "HS_MAJ_2", "HS_SEUIL_2", "MAJ_NUIT", "MAJ_ASTREINTE")
+HS_PARAMETRES = (
+    "DUREE_LEGALE_HEBDO", "HS_MAJ_1", "HS_MAJ_2", "HS_SEUIL_2", "MAJ_NUIT", "MAJ_ASTREINTE",
+    "PRIME_CHANTIER_JOUR", "PRIME_CHANTIER_SEUIL_H",
+)
 #: type de pointage, paramètre (% du taux horaire), rubrique, libellé — valorisés seulement si le taux est saisi.
 PRIMES_HORAIRES = (
     ("nuit", "MAJ_NUIT", "NUIT-TEMPS", "Majoration des heures de nuit"),
@@ -606,7 +609,7 @@ def integrer_temps(bulletin):
         )
     else:
         bulletin.lignes.filter(rubrique=rubrique).delete()
-    primes = _primes_horaires(bulletin, res["taux_horaire"])
+    primes = _primes_horaires(bulletin, res["taux_horaire"]) + _prime_chantier(bulletin)
     SaisieTemps.objects.filter(pk__in=[s.pk for s in res["saisies"]]).update(statut=SaisieTemps.Statut.TRANSFERE_PAIE)
     snaps = [
         s for s in (bulletin.baremes_utilises or [])
@@ -645,6 +648,50 @@ def _primes_horaires(bulletin, taux_horaire):
         else:
             bulletin.lignes.filter(rubrique=rubrique).delete()
     return utilises
+
+
+def jours_chantier(employe, periode, seuil=Decimal("0")):
+    """Jours du mois pointés sur un OF de **chantier** (pointages M3 transférés en paie), au moins `seuil` heures."""
+    from collections import defaultdict
+
+    from .models import SaisieTemps
+
+    heures = defaultdict(Decimal)
+    for st in SaisieTemps.objects.filter(
+        employe=employe, date__year=periode.year, date__month=periode.month,
+        pointage_chantier__ordre__scope="chantier",
+    ):
+        heures[st.date] += st.heures
+    return sorted(j for j, h in heures.items() if h > 0 and h >= seuil)
+
+
+def _prime_chantier(bulletin):
+    """Prime de chantier (M3 → M9) : montant par jour pointé sur un OF de chantier (seuil d'heures minimal), si le
+    paramètre `PRIME_CHANTIER_JOUR` est saisi (> 0) ; sinon la ligne est retirée. Paramètres provisoires."""
+    from .models import BulletinLigne, RubriquePaie
+
+    rubrique, _ = RubriquePaie.objects.get_or_create(
+        code="PRIME-CHANTIER", defaults={"label": "Prime de chantier (pointages)", "nature": RubriquePaie.Nature.GAIN,
+                                         "ordre": 22},
+    )
+    try:
+        taux = parametre("PRIME_CHANTIER_JOUR", bulletin.periode)
+    except ValidationError:
+        taux = None
+    try:
+        seuil = parametre("PRIME_CHANTIER_SEUIL_H", bulletin.periode)
+    except ValidationError:
+        seuil = None
+    jours = jours_chantier(bulletin.employe, bulletin.periode, seuil.valeur if seuil else Decimal("0"))
+    if taux is None or taux.valeur <= 0 or not jours:
+        bulletin.lignes.filter(rubrique=rubrique).delete()
+        return []
+    BulletinLigne.objects.update_or_create(
+        bulletin=bulletin, rubrique=rubrique,
+        defaults={"libelle": f"Prime de chantier ({len(jours)} j à {taux.valeur} FCFA)",
+                  "montant": _arrondi(len(jours) * taux.valeur)},
+    )
+    return [p for p in (taux, seuil) if p is not None]
 
 
 def ventilation_bulletin(bulletin):

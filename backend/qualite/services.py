@@ -35,6 +35,20 @@ PV_VALIDATION_ROLES = (
     User.Role.DIRECTION,
 )
 
+# Coût de non-qualité (lot a3, M6 → M10) : la comptabilisation relève de la finance, pas de la qualité.
+CNQ_VALIDATION_ROLES = (
+    User.Role.ADMIN,
+    User.Role.PDG,
+    User.Role.DGA,
+    User.Role.FINANCE,
+    User.Role.COMPTABLE,
+    User.Role.DIRECTION,
+)
+
+
+def can_comptabiliser_cnq(user):
+    return bool(user and user.is_authenticated and (user.is_superuser or user.role in CNQ_VALIDATION_ROLES))
+
 
 def is_admin_or_staff(user):
     return user.is_authenticated and (

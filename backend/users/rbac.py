@@ -102,6 +102,7 @@ ROLE_MODULES: dict[str, tuple[str, ...]] = {
         "maintenance",
         "operations",
         "stocks",
+        "qualite",  # coût de non-qualité : comptabilisation (CNQ_VALIDATION_ROLES, lot a3)
     ),
     _R.COMPTABLE: (
         "comptabilite",
@@ -114,6 +115,7 @@ ROLE_MODULES: dict[str, tuple[str, ...]] = {
         "maintenance",
         "operations",
         "stocks",
+        "qualite",  # coût de non-qualité : comptabilisation (CNQ_VALIDATION_ROLES, lot a3)
     ),
     _R.QAQC: ("qualite", "operations", "achats"),
     _R.HSE: ("hse", "operations", "qualite", "maintenance", "achats"),

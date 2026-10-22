@@ -19,6 +19,17 @@ PARAMETRES_QUALITE_DEFAUT = {
     # Écarts M6 (lot ecarts-m6m7)
     "CND_ORGANISME_REFERENTIEL": ("CND tiers : organisme agréé du référentiel exigé (1 = oui, 0 = non)", "1", "0/1"),
     "WPS_PROFIL_BLOQUANT": ("Soudage : WPS limités aux WPS requis du profil / contrat M1.3 (1 = oui, 0 = non)", "1", "0/1"),
+    # Lot a3 : traçabilité M5 → M6 (lot / coulée / certificat 3.1 jusqu'au joint) et coût de non-qualité M6 → M10
+    "JOINT_LOT_OBLIGATOIRE": (
+        "Joint soudé : 1 = lot matière obligatoire dès que l'OF a consommé un lot (coulée reprise du lot), 0 = facultatif",
+        "1", "0/1"),
+    "JOINT_LOT_CONSOMME_OF": (
+        "Joint soudé : 1 = le lot cité doit être sorti du stock pour cet OF, 0 = tout lot non bloqué", "1", "0/1"),
+    "CNQ_TAUX_HORAIRE": ("Coût de non-qualité : taux horaire de valorisation des reprises", "6000", "FCFA/h"),
+    "CNQ_COMPTE_CHARGE": ("Coût de non-qualité : compte de charge débité (reclassement)", "624000", "compte"),
+    "CNQ_COMPTE_MATIERE": ("Coût de non-qualité : compte crédité pour la matière rebutée et les frais externes",
+                           "603200", "compte"),
+    "CNQ_COMPTE_MO": ("Coût de non-qualité : compte crédité pour la main-d'œuvre de reprise", "661000", "compte"),
 }
 #: Destinataires des relances qualité (QA/QC) et de l'escalade d'une CAPA en retard (hiérarchie).
 ROLES_QAQC = (User.Role.QAQC,)
