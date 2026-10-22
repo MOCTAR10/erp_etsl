@@ -7,9 +7,9 @@ import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { AptitudeMedicale, ExigenceHabilitationHse, FormationSecurite, ParametreStock, PasseportSecurite, PersonnelHse } from "../../types";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { useListeHse } from "./listesHse";
 
 const TYPES_EPI = ["casque", "lunettes", "ecran_facial", "protection_auditive", "gants", "chaussures", "veste_haute_visibilite", "harnais", "masque", "baudrier"];
-const TYPES_PERMIS = ["chaud", "hauteur", "levage", "confine", "atex", "froid", "electrique", "fouille", "chimique"];
 
 function usePersonnel() {
   return useQuery({ queryKey: ["hse-personnel"], queryFn: () => api.listAll<PersonnelHse>("/api/hse/personnel/"), retry: 0 });
@@ -169,6 +169,7 @@ export function FormationsNominativesSection() {
 /** Habilitations exigées par type de permis (CDC M7-09) : donnée ETSL, contrôlée au démarrage du permis. */
 export function ExigencesPermisSection() {
   const { t } = useTranslation();
+  const typesPermis = useListeHse("type_permis");
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const q = useQuery({ queryKey: ["hse-exigences"], queryFn: () => api.listAll<ExigenceHabilitationHse>("/api/hse/exigences-habilitation/"), retry: 0 });
@@ -190,7 +191,7 @@ export function ExigencesPermisSection() {
           title={t("m7e.exig.nouvelle")}
           endpoint="/api/hse/exigences-habilitation/"
           fields={[
-            { name: "type_permis", label: t("m7e.exig.typePermis"), type: "select", required: true, options: TYPES_PERMIS.map((v) => ({ value: v, label: t(`hse.permis_types.${v}`) })) },
+            { name: "type_permis", label: t("m7e.exig.typePermis"), type: "select", required: true, options: typesPermis },
             { name: "mot_cle", label: t("m7e.exig.motCle"), required: true },
           ]}
         />

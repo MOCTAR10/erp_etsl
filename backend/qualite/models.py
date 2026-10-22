@@ -289,6 +289,11 @@ class ControleQualite(models.Model):
     organisme_libelle = models.CharField(
         max_length=150, blank=True, verbose_name="Organisme (si agréé)"
     )
+    # Référentiel des organismes agréés (écarts M6.1-09) : agrément vérifié (validité, méthodes CND).
+    organisme_agree = models.ForeignKey(
+        "qualite.OrganismeAgree", null=True, blank=True, on_delete=models.PROTECT, related_name="controles",
+        verbose_name="Organisme agréé (référentiel)",
+    )
     affaire = models.ForeignKey(
         "commercial.Affaire",
         null=True,
@@ -1296,3 +1301,75 @@ class RevueDirectionQualite(models.Model):
         if not self.code:
             self.code = QualiteSequence.next_for("RDQ", "RDQ-")
         return super().save(*args, **kwargs)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M6 (lot ecarts-m6m7) : référentiel des organismes agréés (CND) et WPS requis par profil contractuel M1.3
+# ----------------------------------------------------------------------------------------------------------------
+class OrganismeAgree(models.Model):
+    """Organisme de contrôle agréé (CND tiers, M6.1-09) : agrément daté, méthodes couvertes."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nom = models.CharField(max_length=150, verbose_name="Organisme")
+    numero_agrement = models.CharField(max_length=80, verbose_name="N° d'agrément / d'accréditation")
+    autorite = models.CharField(max_length=150, blank=True, verbose_name="Autorité / accréditeur")
+    methodes = models.CharField(
+        max_length=40, blank=True, verbose_name="Méthodes CND couvertes (RT,UT,PT,MT ; vide = toutes)",
+    )
+    date_fin_validite = models.DateField(verbose_name="Agrément valable jusqu'au")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    notes = models.TextField(blank=True, verbose_name="Notes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nom"]
+        verbose_name = "Organisme agréé"
+        verbose_name_plural = "Organismes agréés"
+
+    def __str__(self):
+        return f"{self.nom} ({self.numero_agrement})"
+
+    @property
+    def codes_methodes(self):
+        return [c.strip().upper() for c in (self.methodes or "").split(",") if c.strip()]
+
+    def est_valide(self, jour=None):
+        return self.actif and self.date_fin_validite >= (jour or timezone.localdate())
+
+    def couvre(self, methode):
+        codes = self.codes_methodes
+        return not methode or not codes or methode.upper() in codes
+
+
+class WpsRequis(models.Model):
+    """WPS exigé par profil contractuel M1.3 (défaut) ou par contrat : soudage limité aux WPS requis de l'affaire."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contract = models.ForeignKey(
+        "commercial.Contract", null=True, blank=True, on_delete=models.CASCADE, related_name="wps_requis",
+        verbose_name="Contrat",
+    )
+    profile = models.CharField(max_length=14, blank=True, verbose_name="Profil contractuel")
+    wps = models.ForeignKey(WpsWpqr, on_delete=models.PROTECT, related_name="exigences", verbose_name="WPS")
+    libelle = models.CharField(max_length=200, blank=True, verbose_name="Libellé / justification")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["profile", "created_at"]
+        verbose_name = "WPS requis"
+        verbose_name_plural = "WPS requis"
+
+    def __str__(self):
+        return f"{self.contract or self.profile} — {self.wps.code}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        from commercial.models import Contract
+
+        if not self.contract_id and not self.profile:
+            raise ValidationError({"profile": "Indiquez un contrat ou un profil contractuel."})
+        if self.profile and self.profile not in Contract.Profile.values:
+            raise ValidationError({"profile": "Profil contractuel inconnu."})
+        if self.wps_id and self.wps.type != WpsWpqr.Type.WPS:
+            raise ValidationError({"wps": "Seul un WPS (procédure) peut être exigé."})

@@ -24,6 +24,7 @@ const API_WHITELIST = [
   /\/api\/achats\/receipts\/$/,
   /\/api\/achats\/order-lines\/$/,
   /\/api\/hse\/permis\/$/,
+  /\/api\/hse\/fiches-securite\/$/, // fiches sécurité publiées (CDC M7-08), lecture seule
   /\/api\/qualite\/controles\/$/,
   /\/api\/rh-paie\/mon-espace\/profil\/$/,
 ];

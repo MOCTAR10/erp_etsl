@@ -32,6 +32,8 @@ import {
   PersonnelHseSection,
 } from "../components/hse/HsePersonnelSection";
 import { EnvironnementSection, IndicateursHseSection, RevueDirectionSection } from "../components/hse/HseEnvironnementSection";
+import { EcartsM7Sections } from "../components/hse/EcartsM7Section";
+import { useListeHse } from "../components/hse/listesHse";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
 
@@ -51,7 +53,7 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
   return (
     <div className="card kpi" key={permis.id}>
       <span className="kpi-label">
-        {permis.code} · {t(`hse.permis_types.${permis.type_permis}`)}
+        {permis.code} · {t(`hse.permis_types.${permis.type_permis}`, { defaultValue: permis.type_label })}
       </span>
       <span className="kpi-value">{permis.emplacement}</span>
       <span className="meta muted">
@@ -165,7 +167,7 @@ function bsdColumns(t: T): Column<BordereauDechet>[] {
   return [
     { key: "code", header: t("hse.col.code"), render: (b) => b.code },
     { key: "numero", header: t("hse.col.numeroBsd"), render: (b) => b.numero_bsd || "—" },
-    { key: "type", header: t("hse.col.type"), render: (b) => t(`hse.dechet_types.${b.type_dechet}`) },
+    { key: "type", header: t("hse.col.type"), render: (b) => (t(`hse.dechet_types.${b.type_dechet}`) === `hse.dechet_types.${b.type_dechet}` ? b.type_label : t(`hse.dechet_types.${b.type_dechet}`)) },
     { key: "qty", header: t("hse.col.quantite"), num: true, render: (b) => `${b.quantite} ${b.unite_label}` },
     { key: "transp", header: t("hse.col.transporteur"), render: (b) => b.transporteur_name ?? "—" },
     {
@@ -185,7 +187,7 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="title">
-        {inc.code} <span className="muted">· {t(`hse.incident_types.${inc.type_incident}`)}</span>
+        {inc.code} <span className="muted">· {t(`hse.incident_types.${inc.type_incident}`, { defaultValue: inc.type_label })}</span>
       </div>
       <div className="meta">{inc.lieu} · {formatDate(inc.date_evenement)}</div>
       <div className="meta">{inc.description}</div>
@@ -242,6 +244,8 @@ export function HsePage() {
     queryKey: ["hse-stats"],
     queryFn: api.hseStats,
   });
+
+  const typesIncident = useListeHse("type_incident");
 
   const frequence = useQuery({
     queryKey: ["hse-indicateurs"],
@@ -314,9 +318,7 @@ export function HsePage() {
             type: "select",
             required: true,
             defaultValue: "quasi_accident",
-            options: ["quasi_accident", "incident", "accident", "blessure", "depart_feu", "pollution", "deversement", "dommage_materiel", "situation_dangereuse"].map(
-              (v) => ({ value: v, label: t(`hse.incident_types.${v}`) }),
-            ),
+            options: typesIncident,
           },
           {
             name: "gravite",
@@ -431,6 +433,7 @@ export function HsePage() {
       <EnvironnementSection />
       <RevueDirectionSection />
       <ParametresHseSection />
+      <EcartsM7Sections />
       {(bsd.count > 0 || bsd.search) && (
         <SectionCard title={`${t("hse.bsd")} · ${bsd.count}`}>
           <PagedDataTable list={bsd} columns={bsdColumns(t)} caption={t("hse.bsd")} searchPlaceholder={t("hse.searchBsd")} />
