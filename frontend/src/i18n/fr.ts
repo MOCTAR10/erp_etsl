@@ -672,6 +672,7 @@ export const fr = {
     annule: "Annulé",
   },
   ecarts_suivi: {
+    tableau: "Tableau",
     affaire: "Affaire",
     motif: "Motif",
     provisoire: "provisoire — à confirmer ou modifier par ETSL",

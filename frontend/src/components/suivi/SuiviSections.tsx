@@ -43,7 +43,7 @@ export function MargesTerminaisonSection() {
           { label: t("ecarts_suivi.marges.integrer", { n: q.data?.en_attente ?? 0 }), path: "/api/controle-gestion/marges-terminaison/integrer/", tone: "ghost" as const },
         ]}
       />
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
         <table className="table" data-testid="marges-terminaison">
           <thead>
             <tr>
@@ -107,7 +107,7 @@ function TableEtat({ etat }: { etat: Etat }) {
     <>
       <h4>{etat.titre}</h4>
       <p className="muted">{etat.sous_titre}</p>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label={etat.titre}>
         <table className="table">
           <thead>
             <tr>
@@ -214,7 +214,7 @@ export function ReservationsStockSection() {
           ))}
         </tbody>
       </table>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
         <table className="table" data-testid="reservations-stock">
           <thead>
             <tr>
@@ -285,7 +285,7 @@ export function RetenuesGarantieSection() {
           {t("ecarts_suivi.provisoire")}
         </p>
       )}
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
         <table className="table" data-testid="retenues-garantie">
           <thead>
             <tr>
@@ -517,7 +517,7 @@ export function FluxM4Section() {
           <h4>
             {b.affaire ?? "—"} · {b.titre} <span className="muted">— {t("ecarts_suivi.flux.consoGr")} {formatNumber(Number(b.consommation_gr))}</span>
           </h4>
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
             <table className="table">
               <thead>
                 <tr>
