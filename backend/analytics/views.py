@@ -16,7 +16,9 @@ from rest_framework.views import APIView
 
 from controle_gestion.services import can_manage_gestion, can_see_amount
 
-from . import cubes, pilotage
+from users.models import User
+
+from . import bi_etat, cubes, pilotage
 from .exports import FORMATS, reponse_export, sections_indicateurs
 from .models import CubeArchive, ParametreCube, ScelleMart
 from .serializers import CubeArchiveSerializer, ParametreCubeSerializer, ScelleMartSerializer
@@ -116,7 +118,8 @@ class CanReadCube(BasePermission):
         if not (user and user.is_authenticated):
             return False
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return can_see_amount(user)
+            # Le contrôleur de gestion consomme la Couche D (CDC : DG, DAF, CG) même hors cercle M11 du module.
+            return can_see_amount(user) or user.role == User.Role.CONTROLEUR_GESTION
         return can_manage_gestion(user)
 
 
@@ -301,6 +304,15 @@ class AlertesCalendairesView(APIView):
             "items": pilotage.alertes_calendaires(request.user),
             "paliers": sorted(pilotage.paliers_notification(), reverse=True),
         })
+
+
+@extend_schema(responses={200: OpenApiTypes.OBJECT},
+               description="État de la Couche D : fraîcheur de l'ETL horaire, CAPA qualité / HSE, modèles dbt.")
+class EtatCoucheDView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(bi_etat.etat_couche_d(request.user))
 
 
 class ScelleMartViewSet(viewsets.ReadOnlyModelViewSet):
