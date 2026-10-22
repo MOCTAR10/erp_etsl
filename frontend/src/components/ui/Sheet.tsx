@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -36,6 +36,13 @@ function SheetBase({ variant, ...p }: SheetProps & { variant: "sheet" | "modal" 
     if (!controlled) setInner(v);
     p.onOpenChange?.(v);
   };
+  // Ouverture contrôlée sans `trigger` : on mémorise l'élément actif pour lui rendre le focus à la fermeture.
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
+  if (open && !wasOpen.current && typeof document !== "undefined") {
+    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+  wasOpen.current = open;
   const isSheet = variant === "sheet";
   const style = { "--ui-panel-w": typeof p.width === "number" ? `${p.width}px` : p.width } as CSSProperties;
   const panelMotion = isSheet
@@ -66,6 +73,11 @@ function SheetBase({ variant, ...p }: SheetProps & { variant: "sheet" | "modal" 
                 asChild
                 forceMount
                 {...(p.description ? {} : { "aria-describedby": undefined })}
+                onCloseAutoFocus={(e) => {
+                  if (p.trigger || !returnFocus.current?.isConnected) return;
+                  e.preventDefault();
+                  returnFocus.current.focus();
+                }}
                 onPointerDownOutside={p.preventOutsideClose ? (e) => e.preventDefault() : undefined}
                 onInteractOutside={p.preventOutsideClose ? (e) => e.preventDefault() : undefined}
               >

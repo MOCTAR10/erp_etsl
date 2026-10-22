@@ -1,5 +1,5 @@
 import { createColumnHelper, createSortedRowModel, functionalUpdate, rowSortingFeature, tableFeatures, useTable } from "@tanstack/react-table";
-import type { SortingState, Updater } from "@tanstack/react-table";
+import type { ColumnDef, SortingState, Updater } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ChevronsUpDown, Inbox } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo, useRef } from "react";
@@ -149,7 +149,8 @@ export function DataGrid<T extends { id: string | number }>({
             sortFn: (ra, rb, id) => compare(ra.getValue(id) as string | number, rb.getValue(id) as string | number),
           },
         ),
-      ),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ) as ColumnDef<typeof features, { id: string | number }, any>[],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [signature],
   );
