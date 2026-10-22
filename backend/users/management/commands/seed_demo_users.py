@@ -61,4 +61,22 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"Créé : {email} ({role})"))
             else:
                 self.stdout.write(f"Existe déjà : {email}")
+        self._rattacher_sites()
         self.stdout.write(self.style.SUCCESS(f"Terminé — {created} utilisateur(s) créé(s)."))
+
+    # EX-G-03 (lot a9) : site de rattachement de quelques comptes démo, pour illustrer la restriction par site
+    # (désactivée par défaut : `SITES_LECTURE_RESTREINTE` = 0). Idempotent : un site déjà posé n'est pas écrasé.
+    SITES = {
+        "atelier@etls.local": "POG-ATELIER",
+        "logistique@etls.local": "POG-DEPOT",
+        "maintenance@etls.local": "POG-ATELIER",
+        "rh@etls.local": "LBV-SIEGE",
+    }
+
+    def _rattacher_sites(self):
+        from referentiels.models import Site
+
+        for email, code in self.SITES.items():
+            site = Site.objects.filter(code=code).first()
+            if site is not None:
+                User.objects.filter(email=email, site_etsl__isnull=True).update(site_etsl=site)

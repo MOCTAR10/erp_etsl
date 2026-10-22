@@ -65,6 +65,8 @@ interface Controle {
   ecart: string | null;
   statut: "conforme" | "ecart" | "a_saisir" | "a_controler";
   detail: string;
+  /** C2 (lot a9) : solde 401 + 411 par tiers, comparé à la balance âgée du système source. */
+  tiers?: { code: string; nom: string; erp: string; source: string | null; ecart: string | null }[];
 }
 interface Parametre {
   id: string;
@@ -350,6 +352,16 @@ function RapprochementsSection() {
             </label>
           ))}
         </div>
+        <label className="field">
+          <span>{t("ecarts_a9.c2Tiers")}</span>
+          <textarea
+            rows={3}
+            placeholder={"CLI-001;2360000\nFRS-001;-1180000"}
+            value={sources.c2_tiers ?? ""}
+            onChange={(e) => setSources({ ...sources, c2_tiers: e.target.value })}
+          />
+        </label>
+        <p className="muted">{t("ecarts_a9.c2TiersAide")}</p>
         <div className="action-bar-buttons">
           <button type="button" className="btn" onClick={() => setAppliquees(sources)}>
             {t("ecarts_import.rappro.calculer")}
@@ -392,8 +404,41 @@ function RapprochementsSection() {
             ))}
           </tbody>
         </table>
+        <C2ParTiers tiers={q.data.controles.find((c) => c.code === "C2")?.tiers ?? []} />
       </div>
     </SectionCard>
+  );
+}
+
+function C2ParTiers({ tiers }: { tiers: NonNullable<Controle["tiers"]> }) {
+  const { t } = useTranslation();
+  if (tiers.length === 0) return null;
+  return (
+    <table className="table" data-testid="reprise-c2-tiers">
+      <caption>{t("ecarts_a9.c2Titre")}</caption>
+      <thead>
+        <tr>
+          <th>{t("ecarts_a9.tiers")}</th>
+          <th>{t("ecarts_import.rappro.erp")}</th>
+          <th>{t("ecarts_import.rappro.sourceCol")}</th>
+          <th>{t("ecarts_import.rappro.ecart")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tiers.map((l) => (
+          <tr key={l.code}>
+            <td>
+              <strong>{l.code}</strong> {l.nom}
+            </td>
+            <td className="num">{formatNumber(Number(l.erp))}</td>
+            <td className="num">{l.source === null ? "—" : formatNumber(Number(l.source))}</td>
+            <td className="num">
+              {l.ecart === null ? "—" : Number(l.ecart) === 0 ? <Badge tone="ok">0</Badge> : <Badge tone="err">{formatNumber(Number(l.ecart))}</Badge>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

@@ -25,6 +25,7 @@ GESTION_WRITE_ROLES = (
     User.Role.FINANCE,
     User.Role.COMPTABLE,
     User.Role.DIRECTION,
+    User.Role.CONTROLEUR_GESTION,  # lot a9 : le CG prépare les budgets / révisions et pose le visa CG
 )
 
 GESTION_AMOUNT_ROLES = (

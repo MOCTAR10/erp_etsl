@@ -18,7 +18,7 @@ ZERO = Decimal("0")
 
 CONTROLES = [
     ("C1", "Balance d'ouverture = balance SAGE (total débit)", "DAF + commissaire aux comptes"),
-    ("C2", "Pièces ouvertes : solde net 401 + 411", "DAF"),
+    ("C2", "Pièces ouvertes : solde net 401 + 411, total et par tiers", "DAF"),
     ("C3", "Quantités de stock (toutes lignes dépôt × article × lot)", "Responsable magasin"),
     ("C4", "Valeur de stock = comptes de stock (classe 3) en balance", "DAF"),
     ("C5", "Effectifs actifs (en poste + congé / rotation)", "DRH"),
@@ -62,9 +62,55 @@ def _solde(prefixes):
     return (agg["d"] or ZERO) - (agg["c"] or ZERO)
 
 
-def _c2():
+def _soldes_par_tiers():
+    """{code tiers: (nom, solde 401 + 411 débit − crédit)} ; clé None = part du compte collectif non ventilée."""
+    from accounting_kernel.models import AccountMoveLine
+
+    lignes = (AccountMoveLine.objects.filter(Q(account__code__startswith="411") | Q(account__code__startswith="401"),
+                                             move__status__in=["posted", "reversed"])
+              .values("partner__code", "partner__name").annotate(d=Sum("debit"), c=Sum("credit")))
+    soldes = {}
+    for ligne in lignes:
+        code = ligne["partner__code"]
+        nom, valeur = soldes.get(code, (ligne["partner__name"] or "", ZERO))
+        soldes[code] = (nom, valeur + (ligne["d"] or ZERO) - (ligne["c"] or ZERO))
+    return soldes
+
+
+def sources_par_tiers(texte):
+    """Soldes par tiers du système source (balance âgée SAGE) : une ligne `CODE;solde` (ou `CODE=solde`, tabulation),
+    même convention que l'ERP (débit − crédit : client positif, fournisseur négatif). Lignes illisibles ignorées."""
+    sources = {}
+    for brut in (texte or "").replace("|", "\n").splitlines():
+        for sep in (";", "=", "\t"):
+            if sep in brut:
+                code, _, montant = brut.partition(sep)
+                valeur = _dec(montant)
+                if code.strip() and valeur is not None:
+                    sources[code.strip().upper()] = sources.get(code.strip().upper(), ZERO) + valeur
+                break
+    return sources
+
+
+def _c2(texte_tiers=""):
     s411, s401 = _solde(["411"]), _solde(["401"])
-    return s411 + s401, f"Solde 411 (clients) {s411} ; solde 401 (fournisseurs) {s401} (débit − crédit)."
+    soldes = _soldes_par_tiers()
+    non_ventile = soldes.pop(None, ("", ZERO))[1]
+    sources = sources_par_tiers(texte_tiers)
+    tiers = []
+    for code in sorted(set(soldes) | set(sources)):
+        nom, erp = soldes.get(code, ("", ZERO))
+        source = sources.get(code.upper())
+        if erp == 0 and source is None:
+            continue
+        tiers.append({"code": code, "nom": nom, "erp": str(erp), "source": None if source is None else str(source),
+                      "ecart": None if source is None else str(erp - source)})
+    ecarts = [t for t in tiers if t["ecart"] is not None and Decimal(t["ecart"]) != 0]
+    detail = (f"Solde 411 (clients) {s411} ; solde 401 (fournisseurs) {s401} (débit − crédit). "
+              f"{len(tiers)} tiers porteurs d'un solde ; part non ventilée par tiers (compte collectif) {non_ventile}.")
+    if sources:
+        detail += f" Comparaison par tiers : {len(ecarts)} tiers en écart."
+    return s411 + s401, detail, tiers, sources, ecarts
 
 
 def _c3():
@@ -146,16 +192,22 @@ def rapprochements(sources):
                 "detail": " | ".join(details) or "Aucun lot réel chargé.",
             })
             continue
-        sortie = calculs[code]()
+        sortie = _c2(sources.get("source_c2_tiers") or "") if code == "C2" else calculs[code]()
         valeur, detail = sortie[0], sortie[1]
         source = _dec(sources.get(f"source_{code.lower()}"))
         if code == "C4" and source is None:
             source = sortie[2]  # rapprochement interne : stock ↔ comptes de stock
+        if code == "C2" and source is None and sortie[3]:
+            source = sum(sortie[3].values(), ZERO)  # total source = somme des soldes par tiers saisis
         ecart = None if source is None else valeur - source
+        statut = "a_saisir" if source is None else ("conforme" if ecart == 0 else "ecart")
+        if code == "C2" and sortie[4]:
+            statut = "ecart"  # un total juste peut masquer des écarts entre tiers qui se compensent
         resultats.append({
             "code": code, "libelle": libelle, "valideur": valideur, "valeur_erp": str(valeur),
             "valeur_source": None if source is None else str(source), "ecart": None if ecart is None else str(ecart),
-            "statut": "a_saisir" if source is None else ("conforme" if ecart == 0 else "ecart"), "detail": detail,
+            "statut": statut, "detail": detail,
+            **({"tiers": sortie[2]} if code == "C2" else {}),
         })
     return resultats
 
@@ -185,4 +237,7 @@ def rapprochements_csv(resultats):
     for r in resultats:
         ecrivain.writerow([r["code"], r["libelle"], r["valeur_erp"], r["valeur_source"] or "", r["ecart"] or "",
                            STATUTS[r["statut"]], r["detail"], r["valideur"], ""])
+        for t in r.get("tiers", []):  # C2 : détail par tiers
+            ecrivain.writerow([f"{r['code']} / {t['code']}", t["nom"], t["erp"], t["source"] or "", t["ecart"] or "",
+                               "", "", "", ""])
     return ("﻿" + tampon.getvalue()).encode("utf-8")

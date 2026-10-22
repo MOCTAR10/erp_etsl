@@ -33,6 +33,7 @@ COMM_AMOUNT_ROLES = (
     User.Role.PDG,
     User.Role.DGA,
     User.Role.DIRECTEUR_PROJETS,
+    User.Role.CHARGE_AFFAIRES,  # lot a9 : le chargé d'affaires voit les montants de ses affaires
 )
 
 
