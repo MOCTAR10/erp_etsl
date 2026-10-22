@@ -21,6 +21,10 @@ const ROUTES: { path: string; heading: RegExp }[] = [
   { path: "/terrain", heading: /Saisie terrain/ },
   { path: "/mon-espace", heading: /Mon espace salarié/ },
   { path: "/securite", heading: /Sécurité & délégations/ },
+  { path: "/documents", heading: /GED — Documents/ },
+  { path: "/parametres", heading: /Paramètres ETSL/ },
+  { path: "/administration", heading: /Administration/ },
+  { path: "/mon-mot-de-passe", heading: /Changer mon mot de passe/ },
 ];
 
 test.describe("Régression : navigation (smoke)", () => {

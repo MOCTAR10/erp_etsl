@@ -32,7 +32,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { login, mfaEnrolement, mfaVerification, type MfaChallenge } from "../api/client";
 import { landingForRole } from "../lib/landing";
@@ -333,6 +333,9 @@ export function LoginPage() {
               )}
               {busy ? t("common.loading") : t("login.submit")}
             </motion.button>
+            <p className="login-forgot" style={{ textAlign: "right", margin: "0.5rem 0 0", fontSize: 13 }}>
+              <Link to="/mot-de-passe-oublie">{t("ecarts_tr.mdp.oublieLien")}</Link>
+            </p>
           </form>
           )}
 

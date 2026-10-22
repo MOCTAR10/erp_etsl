@@ -58,5 +58,15 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_display = ["created_at", "user", "action", "object_type", "object_id", "ip_address"]
     list_filter = ["action", "object_type"]
     search_fields = ["object_id", "user__email"]
-    readonly_fields = ["id", "created_at"]
+    readonly_fields = ["id", "user", "action", "object_type", "object_id", "detail", "ip_address", "created_at"]
     date_hierarchy = "created_at"
+
+    # Piste inaltérable (EX-G-06) : consultation seule, même pour un superutilisateur.
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

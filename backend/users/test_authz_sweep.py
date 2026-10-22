@@ -24,6 +24,9 @@ ANON_ALLOWLIST = (
     # Étapes MFA (lot 15b) : appelées avant d'avoir un JWT, protégées par le jeton MFA signé (400 sans lui).
     "/api/users/mfa/enrolement/",
     "/api/users/mfa/verification/",
+    # Mot de passe oublié : publics par nature (réponse identique, jeton signé à usage unique, limite de débit).
+    "/api/users/mot-de-passe/oubli/",
+    "/api/users/mot-de-passe/reinitialiser/",
     "/api/schema/",
 )
 MODULE_PREFIXES = tuple(

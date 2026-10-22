@@ -343,6 +343,16 @@ class AuditLog(models.Model):
     def __str__(self):
         return f"{self.action} {self.object_type}:{self.object_id} ({self.created_at:%Y-%m-%d %H:%M})"
 
+    # Écarts transverses (EX-G-06) : piste inaltérable. Seule sortie : la purge au-delà de la durée de conservation
+    # (paramètre AUDIT_RETENTION_ANS), par l'administrateur, elle-même tracée (`AuditLogViewSet.purger`).
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("Piste d'audit inaltérable : aucune modification.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Piste d'audit inaltérable : aucune suppression unitaire.")
+
 
 class SignatureRequest(models.Model):
     """Demande de signature électronique avancée d'une version de document (CL-OM-06).

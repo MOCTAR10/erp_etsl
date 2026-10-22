@@ -91,10 +91,15 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Piste d'audit générique (EX-G-06) : requête courante, l'auteur est lu à l'écriture.
+    "documents.audit_generique.RequeteCouranteMiddleware",
+    # §8.2 performance : en-tête Server-Timing + journal des requêtes au-delà du seuil (paramètre PERF_SEUIL_MS).
+    "config.performance.MesurePerformanceMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Journal des accès (EX-G-10) : trace chaque export / téléchargement de données.
@@ -154,7 +159,8 @@ AUTH_PASSWORD_VALIDATORS = [
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # JWT + changement de mot de passe imposé après une réinitialisation par l'administrateur.
+        "users.authentication.JWTAuthenticationMdp",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -189,7 +195,12 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
+    # Un changement de mot de passe révoque les jetons déjà émis (autres sessions déconnectées).
+    "CHECK_REVOKE_TOKEN": True,
 }
+
+# Adresse publique du SPA : lien « mot de passe oublié » envoyé par courriel (jamais déduit de l'en-tête Host).
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
 
 # ── CORS ──
 # RF-81: desktop app only; origins configurable for future web access.
@@ -197,6 +208,8 @@ CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", default=[])
 
 # ── Internationalization ──
 LANGUAGE_CODE = "fr-fr"
+# EX-G-07 : le SPA transmet sa langue (`Accept-Language`) ; messages standard Django / DRF en français ou anglais.
+LANGUAGES = [("fr", "Français"), ("en", "English")]
 TIME_ZONE = "Africa/Libreville"
 USE_I18N = True
 USE_TZ = True

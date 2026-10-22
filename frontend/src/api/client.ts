@@ -5,6 +5,15 @@ import type { Me, Tokens } from "../types";
 // BASE_URL = "/" en dev/racine, "/erp_etsl/" sous sous-chemin nginx → préfixe tous les /api.
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+/** Langue de l'interface transmise à l'API (EX-G-07) : messages standard du serveur dans la même langue. */
+function langueApi(): string {
+  try {
+    return localStorage.getItem("etls.lang") === "en" ? "en" : "fr";
+  } catch {
+    return "fr";
+  }
+}
+
 function apiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
@@ -13,6 +22,7 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
   const auth = useAuth.getState();
   const headers = new Headers(init?.headers);
   if (auth.access) headers.set("Authorization", `Bearer ${auth.access}`);
+  headers.set("Accept-Language", langueApi());
   if (init?.body && typeof init.body === "string") {
     headers.set("Content-Type", "application/json");
   }
@@ -37,7 +47,11 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    throw new ApiError(res.status, await res.json().catch(() => null));
+    const detail = await res.json().catch(() => null);
+    const message = (detail as { detail?: unknown } | null)?.detail;
+    // Mot de passe changé depuis une autre session : jetons révoqués, retour à la connexion.
+    if (typeof message === "string" && /password has been changed/i.test(message)) useAuth.getState().clear();
+    throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -160,6 +174,9 @@ export const api = {
   annulerConge: (id: string) =>
     raw<import("../types").MonConge>(`/api/rh-paie/mon-espace/conges/${id}/annuler/`, { method: "POST" }),
   dashboard: () => raw<import("../types").DashboardData>("/api/reports/dashboard/"),
+  /** Registre central des paramètres ETSL (écarts transverses) : liste filtrée et compteur des provisoires. */
+  parametresEtsl: (qs = "") => raw<import("../lib/parametres").ParametresEtslListe>(`/api/parametres-etsl/${qs}`),
+  parametresEtslResume: () => raw<import("../lib/parametres").ParametresEtslResume>("/api/parametres-etsl/resume/"),
   tasks: () => rawList<import("../types").WorkflowTask>("/api/workflow/tasks/"),
   circuits: () => rawList<import("../types").Circuit>("/api/workflow/circuits/"),
   notifications: () => rawList<import("../types").NotificationItem>("/api/workflow/notifications/"),
