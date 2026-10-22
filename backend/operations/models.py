@@ -159,6 +159,10 @@ class OrdreFabrication(models.Model):
     scope = models.CharField(
         max_length=10, choices=Scope.choices, default=Scope.ATELIER, verbose_name="Périmètre"
     )
+    # EX-G-03 : site ETSL de rattachement (référentiel paramétrable ; reconnu automatiquement depuis le texte libre).
+    site_etsl = models.ForeignKey(
+        "referentiels.Site", null=True, blank=True, on_delete=models.PROTECT, related_name="ordres_fabrication", verbose_name="Site ETSL"
+    )
     article = models.ForeignKey(
         "referentiels.Article",
         null=True,

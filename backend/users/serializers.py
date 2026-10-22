@@ -9,14 +9,17 @@ class UserSerializer(serializers.ModelSerializer):
 
     modules = serializers.SerializerMethodField()
     mfa_requise = serializers.SerializerMethodField()
+    site_etsl_code = serializers.CharField(source="site_etsl.code", read_only=True, default=None)
 
     class Meta:
         model = User
         fields = [
             "id", "email", "first_name", "last_name", "role", "is_active", "modules", "mfa_active", "mfa_requise",
-            "doit_changer_mdp",
+            "doit_changer_mdp", "site_etsl", "site_etsl_code",
         ]
-        read_only_fields = ["id", "email", "role", "is_active", "modules", "mfa_active", "mfa_requise", "doit_changer_mdp"]
+        read_only_fields = [
+            "id", "email", "role", "is_active", "modules", "mfa_active", "mfa_requise", "doit_changer_mdp", "site_etsl",
+        ]
 
     def get_mfa_requise(self, obj) -> bool:
         from .mfa import mfa_requise

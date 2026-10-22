@@ -73,7 +73,7 @@ export function FilterBar({
             d.type === "choix"
               ? (d.choix ?? [])
               : d.type === "fk"
-                ? (options[d.champ] ?? null)
+                ? (options[d.champ] ?? d.choix ?? null)
                 : d.type === "bool"
                   ? [
                       { valeur: "true", libelle: t("ecarts_a1.filtres.oui") },

@@ -3,6 +3,7 @@
 from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from django.utils import timezone
+from config.filtres_vues import FiltresMulticriteresMixin
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -94,7 +95,10 @@ class _CommonViewSet(viewsets.ModelViewSet):
         return context
 
 
-class EquipementParcViewSet(_CommonViewSet):
+class EquipementParcViewSet(FiltresMulticriteresMixin, _CommonViewSet):
+    # EX-G-03 : filtre par site (`?site_etsl=<id>`, GET filtres/) et restriction de lecture par site (paramètre).
+    champs_filtrables = ("site_etsl",)
+    champ_site = "site_etsl"
     serializer_class = EquipementParcSerializer
     search_fields = ("code", "label", "registration", "site",)
 

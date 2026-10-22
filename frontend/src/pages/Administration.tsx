@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { SiteCompte, SitesSection } from "../components/sites/SitesSection";
 import { ActionBar, Badge, PageHeader, PagedDataTable, QuickForm, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDateTime } from "../lib/format";
@@ -23,6 +24,7 @@ interface Compte {
   mfa_active: boolean;
   modules: string[];
   last_login: string | null;
+  site_etsl: number | null;
 }
 interface Matrice {
   modules: ErpApp[];
@@ -155,6 +157,7 @@ export function AdministrationPage() {
       ),
     },
     { key: "role", header: t("ecarts_tr.admin.role"), render: (c) => <RoleCompte c={c} roles={roles} /> },
+    { key: "site", header: t("ecarts_a5.siteCompte"), render: (c) => <SiteCompte id={c.id} email={c.email} site={c.site_etsl} /> },
     {
       key: "etat",
       header: t("ecarts_tr.admin.etat"),
@@ -283,6 +286,8 @@ export function AdministrationPage() {
           </table>
         </div>
       </SectionCard>
+
+      <SitesSection />
 
       <SectionCard
         title={t("ecarts_tr.admin.referentiels")}

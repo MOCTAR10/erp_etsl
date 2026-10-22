@@ -22,6 +22,7 @@ from .services import can_see_amount
 
 
 class DepotSerializer(serializers.ModelSerializer):
+    site_etsl_code = serializers.CharField(source="site_etsl.code", read_only=True, default=None)
     responsable_label = serializers.CharField(
         source="responsable.get_full_name", read_only=True, default=None
     )
@@ -29,7 +30,7 @@ class DepotSerializer(serializers.ModelSerializer):
     class Meta:
         model = Depot
         fields = [
-            "id", "code", "label", "site", "responsable", "responsable_label",
+            "id", "code", "label", "site", "site_etsl", "site_etsl_code", "responsable", "responsable_label",
             "description", "methode_valorisation", "is_global_rental", "roles_autorises", "is_active", "created_at", "updated_at",
         ]
         read_only_fields = ["code"]

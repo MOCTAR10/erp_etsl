@@ -1,5 +1,13 @@
+from django.db import transaction
+from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
+from rest_framework.response import Response
+
+from config.filtres_vues import FiltresMulticriteresMixin
 
 from users.permissions import IsAdminOrStaff
 
@@ -11,6 +19,7 @@ from .models import (
     Article,
     Currency,
     Partner,
+    Site,
     UnitOfMeasure,
 )
 from .serializers import (
@@ -21,6 +30,7 @@ from .serializers import (
     ArticleSerializer,
     CurrencySerializer,
     PartnerSerializer,
+    SiteSerializer,
     UnitOfMeasureSerializer,
 )
 
@@ -150,3 +160,59 @@ class AnalyticAccountViewSet(AdminWriteMixin, viewsets.ModelViewSet):
         if axis:
             qs = qs.filter(axis_id=axis)
         return qs
+
+
+class CanEditerSites(BasePermission):
+    message = "Sites ETSL : modification réservée à l'administrateur et à la Direction Générale."
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return bool(request.user and request.user.is_authenticated)
+        from users.parametres import peut_editer
+
+        return peut_editer(request.user)
+
+
+class SiteViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
+    """Sites ETSL (EX-G-03) : liste provisoire paramétrable ; lecture pour tout compte, modification par admin / PDG /
+    DGA. Pas de suppression (un site rattaché se désactive) ; une modification repasse le site en provisoire."""
+
+    serializer_class = SiteSerializer
+    permission_classes = [IsAuthenticated, CanEditerSites]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+    search_fields = ("code", "libelle", "ville")
+    champs_filtrables = ("type_site", "actif")
+
+    def get_queryset(self):
+        return Site.objects.select_related("confirme_par")
+
+    def perform_update(self, serializer):
+        serializer.save(statut_valeur=Site.StatutValeur.PROVISOIRE, confirme_par=None, confirme_le=None)
+
+    @extend_schema(request=None, responses=SiteSerializer)
+    @action(detail=True, methods=["post"])
+    def confirmer(self, request, pk=None):
+        with transaction.atomic():
+            site = Site.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            site.statut_valeur = Site.StatutValeur.CONFIRME
+            site.confirme_par, site.confirme_le = request.user, timezone.now()
+            site.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
+        return Response(self.get_serializer(site).data)
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["get"])
+    def repartition(self, request):
+        """Ressources rattachées par site (dépôts, équipements, actifs, salariés, affaires, OF, comptes)."""
+        from .sites import CODE_RESTRICTION, repartition, restriction_active
+
+        data = repartition()
+        data["restriction"] = {"code": CODE_RESTRICTION, "active": restriction_active()}
+        return Response(data)
+
+    @extend_schema(request=None, responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["post"])
+    def rattacher(self, request):
+        """Rattache les fiches non rattachées dont le texte libre « site » contient un mot-clé d'un site actif."""
+        from .sites import rattacher_tout
+
+        return Response({"rattaches": rattacher_tout()})

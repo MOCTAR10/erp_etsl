@@ -8,6 +8,7 @@ from .models import (
     Article,
     Currency,
     Partner,
+    Site,
     UnitOfMeasure,
 )
 
@@ -148,3 +149,26 @@ class AnalyticAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnalyticAccount
         fields = ["id", "axis", "axis_code", "code", "label", "is_active"]
+
+
+class SiteSerializer(serializers.ModelSerializer):
+    type_site_label = serializers.CharField(source="get_type_site_display", read_only=True)
+    est_provisoire = serializers.BooleanField(read_only=True)
+    confirme_par_email = serializers.CharField(source="confirme_par.email", read_only=True, default=None)
+
+    class Meta:
+        model = Site
+        fields = [
+            "id", "code", "libelle", "type_site", "type_site_label", "ville", "alias", "actif",
+            "statut_valeur", "est_provisoire", "confirme_par_email", "confirme_le", "created_at",
+        ]
+        read_only_fields = ["statut_valeur", "confirme_le", "created_at"]
+
+    def validate_code(self, value):
+        code = value.strip().upper()
+        qs = Site.objects.filter(code__iexact=code)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("Ce code de site existe déjà.")
+        return code

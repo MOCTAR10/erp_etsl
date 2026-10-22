@@ -83,6 +83,10 @@ class EquipementParc(models.Model):
         max_digits=14, decimal_places=2, default=0, verbose_name="Valeur compteur"
     )
     site = models.CharField(max_length=120, blank=True, verbose_name="Site / dépôt")
+    # EX-G-03 : site ETSL de rattachement (référentiel paramétrable ; reconnu automatiquement depuis le texte libre).
+    site_etsl = models.ForeignKey(
+        "referentiels.Site", null=True, blank=True, on_delete=models.PROTECT, related_name="equipements_parc", verbose_name="Site ETSL"
+    )
     plafond_compteur = models.DecimalField(
         max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Plafond du compteur",
         help_text="Kilométrage / heures maximal avant révision ou réforme (sens provisoire, à confirmer par ETSL).",

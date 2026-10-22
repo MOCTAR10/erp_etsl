@@ -21,6 +21,7 @@ COMM_WRITE_ROLES = (
     User.Role.SECRETAIRE_GENERAL,
     User.Role.DIRECTEUR_PROJETS,
     User.Role.DIRECTION,
+    User.Role.CHARGE_AFFAIRES,  # lot a5 : saisie M1 par le chargé d'affaires
 )
 
 # Montants / marge visibles (chef_service volontairement exclu, pattern RF-59).

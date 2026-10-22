@@ -302,6 +302,7 @@ class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeria
     responsable_email = serializers.EmailField(source="responsable.email", read_only=True, default=None)
     analytic_code = serializers.CharField(source="analytic.code", read_only=True, default=None)
     bons_sortie_total = serializers.SerializerMethodField()
+    site_etsl_code = serializers.CharField(source="site_etsl.code", read_only=True, default=None)
 
     def get_bons_sortie_total(self, obj):
         from .ecarts_m1 import bons_sortie
@@ -334,6 +335,8 @@ class AffaireSerializer(AmountMaskMixin, ModelCleanMixin, serializers.ModelSeria
             "responsable_email",
             "analytic",
             "analytic_code",
+            "site_etsl",
+            "site_etsl_code",
             "bons_sortie_total",
             "created_at",
             "updated_at",

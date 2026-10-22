@@ -3,6 +3,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
+from config.filtres_vues import FiltresMulticriteresMixin
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -342,7 +343,10 @@ class TenderReviewViewSet(_CommonViewSet):
         return Response(self.get_serializer(rao).data)
 
 
-class AffaireViewSet(_CommonViewSet):
+class AffaireViewSet(FiltresMulticriteresMixin, _CommonViewSet):
+    # EX-G-03 : filtre par site (`?site_etsl=<id>`, GET filtres/) et restriction de lecture par site (paramètre).
+    champs_filtrables = ("site_etsl",)
+    champ_site = "site_etsl"
     serializer_class = AffaireSerializer
     search_fields = ("code", "title", "client__partner__name",)
 

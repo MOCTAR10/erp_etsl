@@ -85,6 +85,10 @@ class Employe(models.Model):
     fonction = models.CharField(max_length=150, blank=True, verbose_name="Fonction")
     departement = models.CharField(max_length=120, blank=True, verbose_name="Département")
     site = models.CharField(max_length=120, blank=True, verbose_name="Site / affectation")
+    # EX-G-03 : site ETSL de rattachement (référentiel paramétrable ; reconnu automatiquement depuis le texte libre).
+    site_etsl = models.ForeignKey(
+        "referentiels.Site", null=True, blank=True, on_delete=models.PROTECT, related_name="employes", verbose_name="Site ETSL"
+    )
     statut = models.CharField(
         max_length=10, choices=Statut.choices, default=Statut.ACTIF, verbose_name="Statut"
     )

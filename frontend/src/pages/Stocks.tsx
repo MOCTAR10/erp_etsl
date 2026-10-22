@@ -4,6 +4,7 @@ import { ArrowLeftRight, Boxes, Package, Warehouse } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { useSiteOptions } from "../components/sites/SiteFilter";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
@@ -113,6 +114,7 @@ export function StocksPage() {
     queryFn: () => api.listAll<{ id: string; code: string; label: string }>("/api/referentiels/articles/"),
   });
 
+  const siteOpts = useSiteOptions();
   const depots = useQuery({
     queryKey: ["depots"],
     queryFn: () => api.listAll<Depot>("/api/stocks/depots/?active=1"),
@@ -411,6 +413,7 @@ export function StocksPage() {
         fields={[
           { name: "label", label: t("m5e.depot.label"), required: true },
           { name: "site", label: t("m5e.depot.site") },
+          { name: "site_etsl", label: t("ecarts_a5.site"), type: "select", options: siteOpts },
           {
             name: "methode_valorisation", label: t("m5e.depot.methode"), type: "select",
             options: ["fifo", "cump", "pp"].map((m) => ({ value: m, label: t(`m5e.depot.methodes.${m}`) })),

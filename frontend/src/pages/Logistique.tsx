@@ -4,6 +4,7 @@ import { ClipboardList, MapPin, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
 import { GrAffairesSection, ParametresLogistiqueSection } from "../components/workflow/GrAffairesSection";
 import { TarifsGrSection } from "../components/workflow/TarifsGrSection";
 import { EcartsM4Section } from "../components/logistique/EcartsM4Section";
@@ -144,9 +145,10 @@ export function LogistiquePage() {
   const { t } = useTranslation();
 
   const [eqSearch, setEqSearch] = useState("");
+  const [eqSite, setEqSite] = useState("");
   const byStatus = useQuery({
-    queryKey: ["equipements", eqSearch],
-    queryFn: () => api.equipements(pagedQuery(1, 500, eqSearch)),
+    queryKey: ["equipements", eqSearch, eqSite],
+    queryFn: () => api.equipements(pagedQuery(1, 500, eqSearch, siteQuery(eqSite))),
     placeholderData: keepPreviousData,
     select: (page: Paginated<EquipementParc>) => {
       const groups: Groups = {
@@ -220,6 +222,7 @@ export function LogistiquePage() {
       </div>
 
       <SearchField value={eqSearch} onChange={setEqSearch} placeholder={t("logistique.searchEquipements")} />
+      <SiteFilter value={eqSite} onChange={setEqSite} />
 
       <div style={{ overflowX: "auto" }}>
         <Board>

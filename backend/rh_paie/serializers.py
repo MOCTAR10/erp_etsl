@@ -65,6 +65,7 @@ class EmployeSerializer(serializers.ModelSerializer):
     nom_complet = serializers.CharField(read_only=True)
     contrat_actif = ContratActifSerializer(read_only=True)
     solde_conges = serializers.DecimalField(max_digits=8, decimal_places=1, read_only=True)
+    site_etsl_code = serializers.CharField(source="site_etsl.code", read_only=True, default=None)
 
     class Meta:
         model = Employe
@@ -72,7 +73,7 @@ class EmployeSerializer(serializers.ModelSerializer):
             "id", "code", "civilite", "nom", "prenom", "nom_complet",
             "date_naissance", "lieu_naissance", "nationalite", "numero_securite_sociale",
             "telephone", "email", "adresse", "categorie", "fonction", "departement",
-            "site", "statut", "matricule_cnps", "date_embauche", "date_sortie", "user",
+            "site", "site_etsl", "site_etsl_code", "statut", "matricule_cnps", "date_embauche", "date_sortie", "user",
             "contrat_actif", "solde_conges", "created_at", "updated_at", *RIB_FIELDS,
         ]
         read_only_fields = ["code", "nom_complet", "statut"]

@@ -9,6 +9,7 @@ from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from config.filtres_vues import FiltresMulticriteresMixin
 from rest_framework import generics, serializers, status, viewsets
 from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
@@ -76,7 +77,10 @@ from .services import (
 )
 
 
-class EmployeViewSet(viewsets.ModelViewSet):
+class EmployeViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
+    # EX-G-03 : filtre par site (`?site_etsl=<id>`, GET filtres/) et restriction de lecture par site (paramètre).
+    champs_filtrables = ("site_etsl",)
+    champ_site = "site_etsl"
     queryset = Employe.objects.prefetch_related("contrats", "formations", "bulletins").all()
     serializer_class = EmployeSerializer
     search_fields = ("code", "nom", "prenom", "fonction", "departement",)

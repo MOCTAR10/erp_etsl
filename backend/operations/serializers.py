@@ -86,6 +86,7 @@ class OrdreFabricationSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
     responsible_name = serializers.SerializerMethodField()
     pointage_hours = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
     pointages_count = serializers.IntegerField(source="pointages.count", read_only=True)
+    site_etsl_code = serializers.CharField(source="site_etsl.code", read_only=True, default=None)
 
     class Meta:
         model = OrdreFabrication
@@ -99,6 +100,8 @@ class OrdreFabricationSerializer(AmountMaskMixin, ModelCleanMixin, serializers.M
             "gamme_code",
             "scope",
             "scope_label",
+            "site_etsl",
+            "site_etsl_code",
             "article",
             "article_code",
             "quantity",

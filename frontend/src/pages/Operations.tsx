@@ -8,6 +8,7 @@ import { Clock3, Construction, Factory, HardHat } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
@@ -122,9 +123,10 @@ export function OperationsPage() {
   const { t } = useTranslation();
 
   const [ofSearch, setOfSearch] = useState("");
+  const [ofSite, setOfSite] = useState("");
   const byStatus = useQuery({
-    queryKey: ["ordres", ofSearch],
-    queryFn: () => api.ordres(pagedQuery(1, 500, ofSearch)),
+    queryKey: ["ordres", ofSearch, ofSite],
+    queryFn: () => api.ordres(pagedQuery(1, 500, ofSearch, siteQuery(ofSite))),
     placeholderData: keepPreviousData,
     select: (page: Paginated<OrdreFabrication>) => {
       const groups: Groups = {
@@ -222,6 +224,7 @@ export function OperationsPage() {
       {charge.data ? <Charge stats={charge.data} /> : null}
 
       <SearchField value={ofSearch} onChange={setOfSearch} placeholder={t("operations.searchOf")} />
+      <SiteFilter value={ofSite} onChange={setOfSite} />
 
       <div style={{ overflowX: "auto" }}>
         <Board>
