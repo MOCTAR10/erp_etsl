@@ -1066,3 +1066,132 @@ class LiberationRetenue(models.Model):
 
     def __str__(self):
         return f"{self.affaire_id} — {self.montant}"
+
+
+# --------------------------------------------------------------------------------------------------
+# Écarts a2 : multi-devises (EX-G-04) et reconnaissance du revenu à l'avancement (M10 → M11 / M1)
+# --------------------------------------------------------------------------------------------------
+class OperationDevise(models.Model):
+    """Créance client ou dette fournisseur libellée en devise (EUR, USD…) : contre-valeur XAF au cours du jour,
+    règlement au cours du jour de règlement (écart de change réalisé 666 / 766), réévaluation à la clôture
+    (écart de conversion latent 478 / 479). Voir `devises.py`."""
+
+    class Sens(models.TextChoices):
+        CREANCE = "creance", "Créance client"
+        DETTE = "dette", "Dette fournisseur"
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        COMPTABILISEE = "comptabilisee", "Comptabilisée"
+        REGLEE = "reglee", "Réglée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Numéro")
+    sens = models.CharField(max_length=8, choices=Sens.choices, verbose_name="Sens")
+    partner = models.ForeignKey(
+        "referentiels.Partner", on_delete=models.PROTECT, related_name="operations_devise", verbose_name="Tiers"
+    )
+    devise = models.ForeignKey(
+        "referentiels.Currency", on_delete=models.PROTECT, related_name="operations", verbose_name="Devise"
+    )
+    date = models.DateField(default=timezone.localdate, verbose_name="Date de la pièce")
+    libelle = models.CharField(max_length=200, verbose_name="Libellé")
+    reference = models.CharField(max_length=60, blank=True, verbose_name="Référence de la pièce")
+    montant_devise = models.DecimalField(max_digits=18, decimal_places=2, verbose_name="Montant en devise")
+    compte_contrepartie = models.ForeignKey(
+        "referentiels.Account", on_delete=models.PROTECT, related_name="+",
+        verbose_name="Compte de produit / charge",
+    )
+    affaire = models.ForeignKey(
+        "commercial.Affaire", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Affaire",
+    )
+    taux_origine = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True, verbose_name="Cours d'origine")
+    taux_provisoire = models.BooleanField(default=True, verbose_name="Cours provisoire")
+    contre_valeur = models.DecimalField(max_digits=16, decimal_places=2, default=0, verbose_name="Contre-valeur XAF")
+    statut = models.CharField(max_length=14, choices=Statut.choices, default=Statut.BROUILLON, db_index=True)
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture d'origine",
+    )
+    date_reglement = models.DateField(null=True, blank=True, verbose_name="Date de règlement")
+    taux_reglement = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    contre_valeur_reglement = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
+    ecart_change = models.DecimalField(
+        max_digits=16, decimal_places=2, null=True, blank=True, verbose_name="Écart de change réalisé (+ gain / − perte)"
+    )
+    move_reglement = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+    )
+    date_reevaluation = models.DateField(null=True, blank=True, verbose_name="Dernière réévaluation")
+    taux_reevaluation = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    ecart_latent = models.DecimalField(
+        max_digits=16, decimal_places=2, null=True, blank=True, verbose_name="Écart de conversion latent (+ gain / − perte)"
+    )
+    move_reevaluation = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+    )
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Opération en devise"
+        verbose_name_plural = "Opérations en devise"
+
+    def __str__(self):
+        return f"{self.code} {self.montant_devise} {self.devise_id}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ComptabiliteSequence.next_for("DEV", "DEV")
+        return super().save(*args, **kwargs)
+
+
+class ReconnaissanceRevenu(models.Model):
+    """Reconnaissance du revenu à l'avancement d'une affaire à une date d'arrêté (M10 → M11 / M1).
+
+    Revenu cumulé = montant du contrat × % d'avancement ; comparé au cumul facturé HT : excédent = produits à recevoir
+    (Dr 4181 / Cr 706), insuffisance = produits constatés d'avance (Dr 706 / Cr 477). La reconnaissance suivante de
+    la même affaire extourne la précédente : l'écriture en vigueur reflète toujours la dernière position."""
+
+    class Statut(models.TextChoices):
+        EN_VIGUEUR = "en_vigueur", "En vigueur"
+        EXTOURNEE = "extournee", "Extournée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Numéro")
+    affaire = models.ForeignKey(
+        "commercial.Affaire", on_delete=models.PROTECT, related_name="reconnaissances_revenu", verbose_name="Affaire"
+    )
+    date_arrete = models.DateField(verbose_name="Date d'arrêté")
+    methode = models.CharField(max_length=20, verbose_name="Méthode de calcul")
+    pct_avancement = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Avancement (%)")
+    ca_reference = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Montant du contrat")
+    revenu_cumule = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Revenu à l'avancement cumulé")
+    facture_cumule = models.DecimalField(max_digits=16, decimal_places=2, verbose_name="Facturé HT cumulé")
+    ecart = models.DecimalField(
+        max_digits=16, decimal_places=2, verbose_name="Écart (+ produits à recevoir / − produits constatés d'avance)"
+    )
+    detail = models.CharField(max_length=250, blank=True, verbose_name="Base du calcul")
+    methode_provisoire = models.BooleanField(default=True, verbose_name="Méthode provisoire")
+    statut = models.CharField(max_length=12, choices=Statut.choices, default=Statut.EN_VIGUEUR, db_index=True)
+    move = models.ForeignKey(
+        "accounting_kernel.AccountMove", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Écriture",
+    )
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_arrete", "-created_at"]
+        verbose_name = "Reconnaissance du revenu à l'avancement"
+        verbose_name_plural = "Reconnaissances du revenu à l'avancement"
+
+    def __str__(self):
+        return f"{self.code} — {self.affaire_id} au {self.date_arrete}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ComptabiliteSequence.next_for("RAV", "RAV")
+        return super().save(*args, **kwargs)

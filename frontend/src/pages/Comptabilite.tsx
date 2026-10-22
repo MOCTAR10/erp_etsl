@@ -10,6 +10,7 @@ import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
 import { LettrageSection } from "../components/workflow/LettrageSection";
 import { EcartsM10Section } from "../components/comptabilite/EcartsM10Section";
+import { EcartsA2Section } from "../components/comptabilite/EcartsA2Section";
 import { ImportGrandLivreSection, RetenuesGarantieSection } from "../components/suivi/SuiviSections";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
@@ -391,6 +392,7 @@ export function ComptabilitePage() {
       <LettrageSection />
 
       <EcartsM10Section />
+      <EcartsA2Section />
       <RetenuesGarantieSection />
       <ImportGrandLivreSection />
 

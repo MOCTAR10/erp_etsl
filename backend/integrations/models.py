@@ -279,3 +279,37 @@ class GabaritImport(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class ExportEcritures(models.Model):
+    """Export des écritures comptabilisées vers SAGE (interface transitoire de double tenue, H-04 : fichier).
+
+    Le fichier est produit selon le gabarit `SAGE_EXPORT` (séparateur, encodage, format de date, décimale, colonnes),
+    PROVISOIRE tant qu'ETSL n'a pas validé le format d'import attendu par SAGE 100. Le contenu est conservé (empreinte
+    SHA-256) et les écritures exportées sont mémorisées pour ne pas les réexporter."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    date_from = models.DateField(verbose_name="Du")
+    date_to = models.DateField(verbose_name="Au")
+    journal = models.CharField(max_length=10, blank=True, verbose_name="Journal (vide = tous)")
+    seulement_nouvelles = models.BooleanField(default=True, verbose_name="Écritures non encore exportées seulement")
+    nb_ecritures = models.PositiveIntegerField(default=0)
+    nb_lignes = models.PositiveIntegerField(default=0)
+    total_debit = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    total_credit = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    moves = models.JSONField(default=list, blank=True, verbose_name="Écritures exportées (identifiants)")
+    contenu = models.BinaryField(verbose_name="Fichier")
+    nom_fichier = models.CharField(max_length=80)
+    sha256 = models.CharField(max_length=64)
+    gabarit_code = models.CharField(max_length=30)
+    gabarit_provisoire = models.BooleanField(default=True)
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Export d'écritures vers SAGE"
+        verbose_name_plural = "Exports d'écritures vers SAGE"
+
+    def __str__(self):
+        return f"{self.nom_fichier} ({self.nb_ecritures} écritures)"

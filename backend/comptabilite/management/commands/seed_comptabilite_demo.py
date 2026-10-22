@@ -136,6 +136,14 @@ class Command(BaseCommand):
             ),
         )
 
+        # Cours de change de demonstration (EX-G-04) : provisoires, a confirmer par ETSL (source BEAC / banque).
+        from referentiels.models import Currency, TauxChange
+
+        for code, taux in (("EUR", Decimal("655.957")), ("USD", Decimal("605.000000"))):
+            devise = Currency.objects.filter(code=code).first()
+            if devise is not None:
+                TauxChange.objects.get_or_create(devise=devise, date=date.today(), defaults={"taux": taux})
+
         n = AccountMove.objects.filter(source="M10").count()
         self.stdout.write(
             self.style.SUCCESS(

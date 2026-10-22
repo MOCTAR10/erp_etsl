@@ -22,8 +22,14 @@ from .models import FactureClient, LigneFactureClient, ModeleFacture, TauxTva
 TYPE_GED_FACTURE = "factures_clients"
 RETENTION_FACTURE_ANS = 10
 
+ENTETE_DEFAUT = (
+    "ETSL — Entreprise de Tuyauterie, Soudure et Location\nAdresse : à renseigner, Gabon\n"
+    "NIF : à renseigner · RCCM : à renseigner · Tél. / e-mail : à renseigner"
+)
+ANCIENNE_RAISON_SOCIALE = "Établissements Techniques et Services Logistiques"
+
 MODELE_DEFAUT = {
-    "entete": "ETSL — Établissements Techniques et Services Logistiques\nLibreville, Gabon\nNIF : à renseigner · RCCM : à renseigner",
+    "entete": ENTETE_DEFAUT,
     "mentions_legales": "Facture soumise à la TVA au taux en vigueur. Mentions légales à confirmer par ETSL.",
     "conditions_paiement": "Paiement à réception de facture ou à l'échéance indiquée, par virement.",
     "coordonnees_bancaires": "À renseigner (banque, IBAN / numéro de compte).",

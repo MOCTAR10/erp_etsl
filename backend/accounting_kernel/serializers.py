@@ -66,8 +66,11 @@ class AccountMoveLineSerializer(serializers.ModelSerializer):
             "debit",
             "credit",
             "order",
+            "currency",
+            "amount_currency",
+            "exchange_rate",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "currency", "amount_currency", "exchange_rate"]
 
     def validate(self, attrs):
         debit = attrs.get("debit", 0)
