@@ -374,6 +374,8 @@ export const en = {
       acteur: "Actor",
       retirer: "Remove",
       confirmRetirer: "Remove this step from the workflow?",
+    },
+  },
   ecarts_import: {
     nav: "Data migration",
     titre: "Data migration",

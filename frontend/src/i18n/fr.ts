@@ -374,6 +374,8 @@ export const fr = {
       acteur: "Acteur",
       retirer: "Retirer",
       confirmRetirer: "Retirer cette étape du circuit ?",
+    },
+  },
   ecarts_import: {
     nav: "Reprise de données",
     titre: "Reprise de données",
