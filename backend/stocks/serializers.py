@@ -201,9 +201,9 @@ class InventaireSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "type", "plan", "depot", "depot_label", "date", "statut", "responsable",
             "responsable_label", "note", "created_by", "created_by_label",
-            "ecart_total", "lignes", "created_at", "updated_at",
+            "ecart_total", "lignes", "ecarts_valides_par", "ecarts_valides_le", "created_at", "updated_at",
         ]
-        read_only_fields = ["code", "created_by", "statut", "type", "plan"]
+        read_only_fields = ["code", "created_by", "statut", "type", "plan", "ecarts_valides_par", "ecarts_valides_le"]
 
 
 class ArticleStockSerializer(serializers.ModelSerializer):

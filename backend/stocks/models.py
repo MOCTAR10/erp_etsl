@@ -525,6 +525,11 @@ class Inventaire(models.Model):
         verbose_name="Responsable",
     )
     note = models.TextField(blank=True, verbose_name="Note")
+    ecarts_valides_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Régularisation MAD validée par",
+    )
+    ecarts_valides_le = models.DateTimeField(null=True, blank=True, verbose_name="Régularisation MAD validée le")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
