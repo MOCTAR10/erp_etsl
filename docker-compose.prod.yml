@@ -37,6 +37,22 @@ x-backend: &backend
     MINIO_ENDPOINT: ${MINIO_ENDPOINT:?set MINIO_ENDPOINT}
     CELERY_BROKER_URL: redis://redis:6379/0
     CELERY_RESULT_BACKEND: redis://redis:6379/0
+    # Chiffrement au repos des champs sensibles (§8.2) : clé Fernet dédiée, séquestrée hors du serveur.
+    FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?set FIELD_ENCRYPTION_KEY}
+    MFA_ROLES: ${MFA_ROLES:-admin,pdg,dga,direction,finance,comptable,rh}
+    # Courriel OPTIONNEL (EX-G-05) : tant qu'ETSL n'a pas fourni sa messagerie, backend console = aucun envoi,
+    # la notification interne fait foi et « mot de passe oublié » renvoie vers l'administrateur.
+    EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+    EMAIL_HOST: ${EMAIL_HOST:-localhost}
+    EMAIL_PORT: ${EMAIL_PORT:-25}
+    EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+    EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    EMAIL_USE_TLS: ${EMAIL_USE_TLS:-false}
+    DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-erp@etsl.ga}
+    SMS_GATEWAY_URL: ${SMS_GATEWAY_URL:-}
+    SMS_GATEWAY_TOKEN: ${SMS_GATEWAY_TOKEN:-}
+    SMS_SENDER: ${SMS_SENDER:-ETSL}
+    FRONTEND_URL: ${FRONTEND_URL:-https://erp.etsl.local}
   depends_on:
     redis:
       condition: service_healthy

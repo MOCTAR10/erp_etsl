@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Archive, FileText, HardDrive, ListChecks, Timer } from "lucide-react";
+import { AlertTriangle, Archive, FileText, HardDrive, ListChecks, SlidersHorizontal, Timer } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +9,10 @@ import { paletteFor } from "../theme/tokens";
 import { useThemeMode } from "../lib/useThemeMode";
 import { formatBytes, formatDate } from "../lib/format";
 import { ChartCard, ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionCard } from "../components/ui";
+import { useAuth } from "../store/auth";
+
+/** Rôles qui voient le compteur « paramètres provisoires à confirmer par ETSL » (écarts transverses). */
+const ROLES_PARAMETRES = ["admin", "pdg", "dga", "direction"];
 
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
@@ -17,6 +22,13 @@ export function DashboardPage() {
     queryKey: ["dashboard"],
     queryFn: api.dashboard,
   });
+  const role = useAuth((s) => s.user?.role) ?? "";
+  const resume = useQuery({
+    queryKey: ["parametres-etsl-resume"],
+    queryFn: api.parametresEtslResume,
+    enabled: ROLES_PARAMETRES.includes(role),
+    retry: 0,
+  }).data;
 
   if (isLoading) return <KpiGridSkeleton count={6} />;
   if (isError || !data)
@@ -46,6 +58,18 @@ export function DashboardPage() {
         <Kpi label={t("dashboard.overdue")} value={data.workflow.overdue} icon={data.workflow.overdue ? AlertTriangle : ListChecks} tone={data.workflow.overdue ? "err" : "brand"} delay={0.15} />
         <Kpi label={t("dashboard.avgDays")} value={avg === null ? "—" : avg} icon={Timer} tone="accent" delay={0.2} />
         <Kpi label={t("dashboard.retention")} value={data.retention.due_count} hint={t("dashboard.retentionDue")} icon={Archive} tone="warn" delay={0.25} />
+        {resume ? (
+          <Link to="/parametres" data-testid="kpi-parametres-provisoires" style={{ textDecoration: "none", color: "inherit" }}>
+            <Kpi
+              label={t("ecarts_tr.dashboard.provisoires")}
+              value={resume.provisoires}
+              hint={t("ecarts_tr.dashboard.provisoiresHint", { count: resume.provisoires })}
+              icon={SlidersHorizontal}
+              tone={resume.provisoires ? "warn" : "brand"}
+              delay={0.3}
+            />
+          </Link>
+        ) : null}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1rem", alignItems: "start" }}>

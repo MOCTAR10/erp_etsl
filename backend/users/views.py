@@ -2,6 +2,7 @@ import csv
 import io
 
 from django.db import transaction
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -23,7 +24,8 @@ from . import mfa
 from .journal import journaliser
 from .models import JournalAcces, User
 from .permissions import IsAdmin
-from .serializers import JournalAccesSerializer, UserCreateSerializer, UserSerializer
+from .rbac import ERP_APPS, modules_for_role
+from .serializers import AdminUserSerializer, JournalAccesSerializer, UserCreateSerializer, UserSerializer
 
 Evt = JournalAcces.Evenement
 
@@ -142,7 +144,61 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "create":
             return UserCreateSerializer
-        return UserSerializer
+        return AdminUserSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        if role := params.get("role"):
+            qs = qs.filter(role=role)
+        if (actif := params.get("actif")) in ("0", "1"):
+            qs = qs.filter(is_active=actif == "1")
+        if q := params.get("search", "").strip():
+            qs = qs.filter(Q(email__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        fmt = request.query_params.get("export")
+        if fmt not in ("csv", "xlsx", "pdf"):
+            return super().list(request, *args, **kwargs)
+        from config.exports import export_response
+
+        colonnes = [("email", "Email"), ("nom", "Nom"), ("role", "Rôle"), ("actif", "Actif"), ("mfa", "MFA activée"),
+                    ("modules", "Modules lisibles"), ("derniere_connexion", "Dernière connexion")]
+        lignes = [{
+            "email": u.email, "nom": u.get_full_name(), "role": u.get_role_display(), "actif": u.is_active,
+            "mfa": u.mfa_active, "modules": ", ".join(modules_for_role(u.role)), "derniere_connexion": u.last_login,
+        } for u in self.filter_queryset(self.get_queryset())]
+        return export_response(lignes, colonnes, fmt, "Utilisateurs et droits ETSL", "utilisateurs")
+
+    def perform_destroy(self, instance):
+        if instance.pk == self.request.user.pk:
+            raise ValidationError({"detail": "Vous ne pouvez pas supprimer votre propre compte."})
+        # Un compte qui a laissé une trace (pièces, validations) se désactive : la suppression lèverait un 409.
+        instance.delete()
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
+    @action(detail=True, methods=["post"], url_path="reinitialiser-mot-de-passe")
+    def reinitialiser_mot_de_passe(self, request, pk=None):
+        """Mot de passe provisoire `{mot_de_passe}` ; l'utilisateur devra le changer à sa prochaine connexion."""
+        from .motdepasse import reinitialiser_par_admin
+
+        user = self.get_object()
+        reinitialiser_par_admin(request, user)
+        return Response(AdminUserSerializer(user, context={"request": request}).data)
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["get"])
+    def matrice(self, request):
+        """Matrice rôle → modules ERP lisibles (EX-G-01), avec le nombre de comptes actifs par rôle."""
+        comptes = dict(User.objects.filter(is_active=True).values_list("role").annotate(n=Count("id")).order_by())
+        return Response({
+            "modules": list(ERP_APPS),
+            "roles": [
+                {"role": code, "label": label, "modules": list(modules_for_role(code)), "comptes_actifs": comptes.get(code, 0)}
+                for code, label in User.Role.choices
+            ],
+        })
 
     @action(detail=True, methods=["post"], url_path="reinitialiser-mfa")
     def reinitialiser_mfa(self, request, pk=None):
