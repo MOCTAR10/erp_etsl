@@ -58,3 +58,8 @@ export function canSeeApp(modules: string[] | undefined, app: string): boolean {
 export function appForRoute(to: string): ErpApp | undefined {
   return (ROUTE_APP as Record<string, ErpApp>)[to];
 }
+
+/** Libellé de menu sans code de module (« Commandes M2 » → « Commandes ») : les clés `nav.*` restent inchangées. */
+export function sansCode(label: string): string {
+  return label.replace(/\s+M\d{1,2}$/, "");
+}

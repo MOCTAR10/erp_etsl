@@ -7,11 +7,10 @@ interface BrandLogoProps {
 
 export function BrandLogo({ size = "sm", showTag = true }: BrandLogoProps) {
   const { t } = useTranslation();
-  const chip = size === "lg" ? "8px 12px" : "6px 9px";
 
   return (
     <div className="brand-lockup" data-testid="brand-logo">
-      <span className="brand-chip" style={{ padding: chip }}>
+      <span className={size === "lg" ? "brand-chip lg" : "brand-chip"}>
         <img src={`${import.meta.env.BASE_URL}etsl-logo.jpg`} alt={t("app.logoAlt")} />
       </span>
       <div className="brand-text">
