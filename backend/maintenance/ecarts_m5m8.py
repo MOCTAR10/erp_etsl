@@ -76,6 +76,10 @@ def comptabiliser_ot(ot, user=None):
     move = None
     if total <= 0:
         ot.motif_ecriture = "Aucun coût à comptabiliser."
+    elif gr and ot.bc_gr_id:
+        # Anti-double 618 (lot correctif) : la facture d'achat GR du BC lié porte la charge ; pas d'OD ici.
+        ot.motif_ecriture = (f"Charge 618 portée par la facture GLOBAL RENTAL du BC {ot.bc_gr.code} : "
+                             "pas d'écriture OD (pas de double charge).")[:255]
     else:
         try:
             with transaction.atomic():  # savepoint : jamais d'écriture brouillon partielle
@@ -112,6 +116,7 @@ def comptabiliser_ot(ot, user=None):
         "ot": ot.code, "actif": ot.actif.code, "centre": centre.code, "compte": COMPTE_GR if gr else
         str(int(get_param_maintenance("COMPTE_ENTRETIEN"))), "main_oeuvre": str(mo), "pieces": str(pieces),
         "total": str(total), "date": jour.isoformat(), "ecriture": move.number if move else None,
+        "bc_gr": ot.bc_gr.code if ot.bc_gr_id else None,
     })
     return move
 

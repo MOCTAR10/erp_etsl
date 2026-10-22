@@ -273,6 +273,11 @@ class OrdreTravail(models.Model):
         verbose_name="Écriture du coût (clôture)",
     )
     motif_ecriture = models.CharField(max_length=255, blank=True, verbose_name="Écriture non passée : motif")
+    # Lot correctif (anti-double 618) : BC GLOBAL RENTAL dont la facture d'achat porte la charge 618 de cet OT.
+    bc_gr = models.ForeignKey(
+        "achats.PurchaseOrder", null=True, blank=True, on_delete=models.PROTECT, related_name="ots_maintenance_gr",
+        verbose_name="BC GLOBAL RENTAL (charge 618 facturée)",
+    )
     qualifie_le = models.DateTimeField(null=True, blank=True, verbose_name="Qualifié le")
     qualifie_par = models.ForeignKey(
         settings.AUTH_USER_MODEL,
