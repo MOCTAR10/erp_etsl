@@ -48,6 +48,17 @@ describe("corpsEdition", () => {
   });
 });
 
+describe("corpsEdition — gabarit composite", () => {
+  it("répartit l'objet JSON dans le corps et refuse un non-objet", () => {
+    const gabarit = { ...base, type_valeur: "json" as const, edition: { ...base.edition, champ: "*" } };
+    expect(corpsEdition(gabarit, '{"separateur": ";", "colonnes": {"compte": "A"}}')).toEqual({
+      separateur: ";",
+      colonnes: { compte: "A" },
+    });
+    expect(() => corpsEdition(gabarit, "[1]")).toThrow(SaisieInvalide);
+  });
+});
+
 describe("parModule", () => {
   it("regroupe par module en conservant l'ordre", () => {
     const rows = [base, { ...base, id: "2", module: "users", module_label: "Socle" }, { ...base, id: "3" }];

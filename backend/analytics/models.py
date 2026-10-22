@@ -29,6 +29,10 @@ class ParametreCube(models.Model):
     label = models.CharField(max_length=200, verbose_name="Libellé")
     valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
     unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    texte = models.CharField(
+        max_length=500, blank=True, verbose_name="Valeur texte",
+        help_text="Paramètres de type liste (ex. rôles destinataires, séparés par des virgules).",
+    )
     statut_valeur = models.CharField(
         max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE,
         verbose_name="Statut de la valeur",
@@ -93,6 +97,10 @@ class CubeArchive(models.Model):
     retention_provisoire = models.BooleanField(
         default=True, verbose_name="Durée de conservation provisoire au moment du scellement"
     )
+    document = models.ForeignKey(
+        "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Archive GED (CSV scellé)",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="+", verbose_name="Figé par",
@@ -114,3 +122,43 @@ class CubeArchive(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Une archive de cube ne peut pas être supprimée (conservation légale).")
+
+
+class ScelleMart(models.Model):
+    """Scellé d'exécution d'un mart dbt : contenu figé + empreinte SHA-256, conservé 10 ans (financier) ou 5 ans
+    (opérationnel), immuable (piste d'audit des datamarts, CDC Couche D)."""
+
+    class TypeDonnees(models.TextChoices):
+        FINANCIER = "financier", "Financier"
+        OPERATIONNEL = "operationnel", "Opérationnel"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    mart = models.CharField(max_length=80, db_index=True, verbose_name="Mart")
+    type_donnees = models.CharField(max_length=14, choices=TypeDonnees.choices, verbose_name="Type de données")
+    source = models.CharField(max_length=20, verbose_name="Lu depuis")
+    colonnes = models.JSONField(default=list)
+    lignes = models.JSONField(default=list)
+    nb_lignes = models.PositiveIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, verbose_name="Empreinte SHA-256")
+    conserve_jusqu_au = models.DateField(verbose_name="Conservé jusqu'au")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Scellé par",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "mart"]
+        verbose_name = "Scellé de mart"
+        verbose_name_plural = "Scellés de marts"
+
+    def __str__(self):
+        return f"{self.mart} {self.created_at:%Y-%m-%d %H:%M}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Un scellé de mart est immuable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Un scellé de mart ne peut pas être supprimé avant la fin de sa conservation.")

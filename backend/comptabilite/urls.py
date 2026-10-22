@@ -20,6 +20,7 @@ from .views import (
     AutoFactureViewSet,
     GabaritEtatViewSet,
     LocationGrComptaViewSet,
+    RetenueGarantieViewSet,
 )
 
 router = DefaultRouter()
@@ -41,6 +42,7 @@ router.register("previsions-tresorerie", PrevisionTresorerieViewSet, basename="c
 router.register("autofactures", AutoFactureViewSet, basename="compta-autofactures")
 router.register("gabarits", GabaritEtatViewSet, basename="compta-gabarits")
 router.register("locations-gr", LocationGrComptaViewSet, basename="compta-locations-gr")
+router.register("retenues-garantie", RetenueGarantieViewSet, basename="compta-retenues-garantie")
 
 urlpatterns = [
     path("", include(router.urls)),

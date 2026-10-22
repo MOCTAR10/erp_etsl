@@ -50,13 +50,16 @@ class RegistreParametresTests(_Base):
         data = r.json()
         modules = {x["module"] for x in data["results"]}
         for attendu in ("users", "documents", "commercial", "achats", "operations", "logistique", "stocks", "qualite",
-                        "hse", "maintenance", "comptabilite", "controle_gestion", "juridique"):
+                        "hse", "maintenance", "comptabilite", "controle_gestion", "juridique", "integrations"):
             self.assertIn(attendu, modules)
         self.assertGreater(data["provisoires"], 0)
         for ligne in data["results"]:
             resolve(ligne["edition"]["path"])  # l'endpoint d'édition de l'application existe
             resolve(ligne["confirmation"])
             self.assertIn(ligne["edition"]["method"], ("PATCH", "POST"))
+        gabarit = [x for x in data["results"] if x["modele"] == "integrations.GabaritImport"]
+        self.assertTrue(gabarit and gabarit[0]["edition"]["champ"] == "*")
+        self.assertIn("colonnes", gabarit[0]["valeur"])
         r = self.client.get("/api/parametres-etsl/?module=hse&statut=provisoire")
         self.assertTrue(r.json()["results"])
         self.assertEqual({x["module"] for x in r.json()["results"]}, {"hse"})

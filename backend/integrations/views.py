@@ -3,6 +3,7 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,7 +11,7 @@ from rest_framework.views import APIView
 from .importers import ImportError, run_import
 from .models import ImportBatch
 from accounting_kernel.permissions import CanPostAccounting
-from .serializers import ImportBatchSerializer
+from .serializers import GabaritImportSerializer, ImportBatchSerializer
 
 
 @extend_schema(
@@ -20,9 +21,10 @@ from .serializers import ImportBatchSerializer
             "properties": {
                 "connector": {
                     "type": "string",
-                    "enum": ["partners", "gl"],
-                    "description": "Connecteur d'import (tiers ou écritures).",
+                    "enum": ["partners", "gl", "sage"],
+                    "description": "Connecteur d'import (tiers, écritures CSV / XML, export SAGE).",
                 },
+                "gabarit": {"type": "string", "description": "Code du gabarit (connecteur sage ; défaut SAGE_GL)."},
                 "file": {"type": "string", "format": "binary"},
                 "force": {"type": "string", "description": "true pour rejouer un lot existant."},
             },
@@ -53,9 +55,16 @@ class ImportFileView(APIView):
                 {"detail": "fichier requis (champ « file »)."}, status=status.HTTP_400_BAD_REQUEST
             )
         force = str(request.data.get("force", "")).lower() in ("1", "true", "yes")
+        gabarit = None
+        if request.data.get("gabarit"):
+            from .models import GabaritImport
+
+            gabarit = GabaritImport.objects.filter(code=str(request.data["gabarit"])).first()
+            if gabarit is None:
+                return Response({"detail": "gabarit inconnu."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             batch, replayed = run_import(
-                connector, upload.name, upload.read(), user=request.user, force=force
+                connector, upload.name, upload.read(), user=request.user, force=force, gabarit=gabarit
             )
         except ImportError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -107,3 +116,30 @@ class OpeningBalanceView(APIView):
              "total_debit": str(move.total_debit), "total_credit": str(move.total_credit), "lines": move.lines.count()},
             status=status.HTTP_200_OK if replayed else status.HTTP_201_CREATED,
         )
+
+
+class GabaritImportViewSet(viewsets.ModelViewSet):
+    """Gabarits de lecture des exports (SAGE transitoire) : modifiables par le cercle comptable, puis confirmés."""
+
+    permission_classes = [CanPostAccounting]
+    serializer_class = GabaritImportSerializer
+    http_method_names = ["get", "patch", "post", "head", "options"]
+
+    def get_queryset(self):
+        from .gabarits import gabarit_sage
+        from .models import GabaritImport
+
+        gabarit_sage()
+        return GabaritImport.objects.all()
+
+    @action(detail=True, methods=["post"])
+    def confirmer(self, request, pk=None):
+        from django.utils import timezone
+
+        from .models import GabaritImport
+
+        g = self.get_object()
+        g.statut_valeur = GabaritImport.StatutValeur.CONFIRME
+        g.confirme_par, g.confirme_le = request.user, timezone.now()
+        g.save(update_fields=["statut_valeur", "confirme_par", "confirme_le", "updated_at"])
+        return Response(self.get_serializer(g).data)

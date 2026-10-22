@@ -1,0 +1,3 @@
+# Certificats fournis par ETSL (fullchain.pem, privkey.pem) : jamais commites.
+*
+!.gitignore

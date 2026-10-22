@@ -63,6 +63,11 @@ export function corpsEdition(p: ParametreEtsl, saisie: string): Record<string, u
   } else if (!brut) {
     throw new SaisieInvalide("texte");
   }
+  if (p.edition.champ === "*") {
+    // Paramètre composite (gabarit d'import) : chaque clé de l'objet est un champ de l'endpoint.
+    if (!valeur || typeof valeur !== "object" || Array.isArray(valeur)) throw new SaisieInvalide("objet JSON");
+    return { ...p.edition.extra, ...(valeur as Record<string, unknown>) };
+  }
   return { ...p.edition.extra, [p.edition.champ]: valeur };
 }
 

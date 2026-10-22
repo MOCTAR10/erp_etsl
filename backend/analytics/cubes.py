@@ -27,14 +27,75 @@ AXE_PAR_TYPE = {"projet": "affaire", "chantier": "chantier", "site": "site", "ce
 
 PARAMETRES_DEFAUT = {
     "RETENTION_ANS": ("Conservation de l'archive du cube (données Oil & Gas)", Decimal("10"), "ans"),
+    "RETENTION_SCELLE_ANS": ("Durée de garde des scellés de marts opérationnels", Decimal("5"), "ans"),
+    "BLOCAGE_AVANT_CLOTURE": ("Données financières réservées aux producteurs avant clôture M11 (1 = oui, 0 = non)",
+                              Decimal("1"), "0/1"),
+    "PALIER_ALERTE_J60": ("Palier d'alerte supplémentaire avant échéance (0 = aucun)", Decimal("60"), "jours"),
+    "REVUE_DIRECTION_MOIS": ("Périodicité de la revue de direction", Decimal("12"), "mois"),
+    "TRESO_DELAI_ENCAISSEMENT": ("Cash-flow : délai d'encaissement d'une facture sans échéance", Decimal("30"), "jours"),
+    "TRESO_DELAI_DECAISSEMENT": ("Cash-flow : délai de décaissement (facture fournisseur, engagement)",
+                                 Decimal("30"), "jours"),
+    "BUDGET_SEUIL_ALERTE": ("Seuil budgétaire : alerte", Decimal("90"), "%"),
+    "BUDGET_SEUIL_ATTEINT": ("Seuil budgétaire : budget atteint", Decimal("100"), "%"),
+    "BUDGET_SEUIL_DEPASSE": ("Seuil budgétaire : dépassement (analyse obligatoire)", Decimal("110"), "%"),
 }
+# Destinataires des 4 familles d'alertes calendaires (liste de rôles dans `texte`, valeur inutilisée = 0).
+DESTINATAIRES_DEFAUT = {
+    "DEST_GARANTIE": ("Destinataires des alertes de garantie équipement (rôles)", "maintenance,directeur_operations"),
+    "DEST_AGREMENT_FOURNISSEUR": ("Destinataires des alertes d'agrément fournisseur / matière (rôles)", "qaqc,hse"),
+    "DEST_AUDIT_INTERNE": ("Destinataires des alertes d'audit interne (rôles)", "qaqc"),
+    "DEST_REVUE_DIRECTION": ("Destinataires des alertes de revue de direction (rôles)", "qaqc,pdg,dga"),
+}
+for _code, (_label, _roles) in DESTINATAIRES_DEFAUT.items():
+    PARAMETRES_DEFAUT[_code] = (_label, Decimal("0"), "rôles")
+FAMILLE_DESTINATAIRES = {
+    "garantie": "DEST_GARANTIE", "agrement_fournisseur": "DEST_AGREMENT_FOURNISSEUR",
+    "audit_interne": "DEST_AUDIT_INTERNE", "revue_direction": "DEST_REVUE_DIRECTION",
+}
+# Paramètres pouvant valoir 0 (interrupteur ou palier désactivé).
+PARAMETRES_ZERO_AUTORISE = ("BLOCAGE_AVANT_CLOTURE", "PALIER_ALERTE_J60", *DESTINATAIRES_DEFAUT)
+TYPE_GED_CUBE = "archive-cube-bi"
+DOSSIER_GED_CUBE = "Archives BI (Couche D)"
 
 
 def get_param_cube(code):
     """Valeur du paramètre `code` ; crée le défaut provisoire si absent."""
+    return _param_obj(code).valeur
+
+
+def _param_obj(code):
     label, valeur, unite = PARAMETRES_DEFAUT[code]
-    obj, _ = ParametreCube.objects.get_or_create(code=code, defaults={"label": label, "valeur": valeur, "unite": unite})
-    return obj.valeur
+    defaults = {"label": label, "valeur": valeur, "unite": unite}
+    if code in DESTINATAIRES_DEFAUT:
+        defaults["texte"] = DESTINATAIRES_DEFAUT[code][1]
+    return ParametreCube.objects.get_or_create(code=code, defaults=defaults)[0]
+
+
+def roles_valides(texte):
+    """Liste de rôles (séparés par des virgules) ; lève ValueError sur un rôle inconnu."""
+    from users.models import User
+
+    roles = [r.strip().lower() for r in (texte or "").split(",") if r.strip()]
+    inconnus = [r for r in roles if r not in User.Role.values]
+    if inconnus:
+        raise ValueError(f"Rôle(s) inconnu(s) : {', '.join(inconnus)}.")
+    return tuple(dict.fromkeys(roles))
+
+
+def destinataires_famille(famille):
+    """Rôles destinataires d'une famille d'alertes calendaires (paramètre provisoire `DEST_*`), ou None."""
+    code = FAMILLE_DESTINATAIRES.get(famille)
+    if code is None:
+        return None
+    try:
+        return roles_valides(_param_obj(code).texte)
+    except ValueError:
+        return roles_valides(DESTINATAIRES_DEFAUT[code][1])
+
+
+def param_provisoire(code):
+    get_param_cube(code)
+    return ParametreCube.objects.filter(code=code).exclude(statut_valeur="confirme").exists()
 
 
 def parametres_provisoires():
@@ -151,10 +212,11 @@ def archiver_cube(periode, user=None, today=None):
     faits = _serialiser(CubeFait.objects.filter(periode=periode))
     total = {m: sum((Decimal(f[m]) for f in faits), ZERO) for m in MESURES}
     annees = int(get_param_cube("RETENTION_ANS"))
+    sha = _sceller(faits)
     archive = CubeArchive.objects.create(
-        periode=periode, faits=faits, nb_faits=len(faits), sha256=_sceller(faits),
-        conserve_jusqu_au=_ajouter_annees(fin, annees), retention_provisoire=parametres_provisoires(),
-        created_by=user, **total,
+        periode=periode, faits=faits, nb_faits=len(faits), sha256=sha,
+        conserve_jusqu_au=_ajouter_annees(fin, annees), retention_provisoire=param_provisoire("RETENTION_ANS"),
+        document=_archiver_ged(periode, fin, faits, sha, annees, user), created_by=user, **total,
     )
     publish("analytics.cube.archive", {
         "periode": periode, "sha256": archive.sha256, "conserve_jusqu_au": str(archive.conserve_jusqu_au),
@@ -163,16 +225,70 @@ def archiver_cube(periode, user=None, today=None):
     return archive
 
 
+def _archiver_ged(periode, fin, faits, sha_faits, annees, user):
+    """Dépose le cube figé en GED (CSV, type « archive-cube-bi », conservation N ans), dans un dossier refusé aux
+    utilisateurs hors cercle des montants M11 (RF-59)."""
+    import csv
+    import io
+
+    from django.core.files.base import ContentFile
+
+    from controle_gestion.services import can_see_amount
+    from documents.models import Document, DocumentType, Dossier, DossierAccess, Version
+    from users.models import User
+
+    type_doc, _ = DocumentType.objects.get_or_create(
+        code=TYPE_GED_CUBE, defaults={"label": "Archives BI (cubes Couche D)", "retention_years": annees}
+    )
+    if type_doc.retention_years != annees:
+        type_doc.retention_years = annees
+        type_doc.save(update_fields=["retention_years"])
+    dossier = Dossier.objects.filter(name=DOSSIER_GED_CUBE, parent__isnull=True).first() or Dossier.objects.create(
+        name=DOSSIER_GED_CUBE, created_by=user
+    )
+    for u in User.objects.filter(is_active=True):
+        if not can_see_amount(u):
+            DossierAccess.objects.update_or_create(
+                dossier=dossier, user=u, defaults={"permission": DossierAccess.Permission.DENY}
+            )
+    buf = io.StringIO()
+    colonnes = [a for a in AXES if a != "periode"] + list(MESURES)
+    w = csv.writer(buf, delimiter=";")
+    w.writerow(["periode", *colonnes])
+    for f in faits:
+        w.writerow([periode, *(f[c] for c in colonnes)])
+    w.writerow([])
+    w.writerow(["sha256_faits", sha_faits])
+    contenu = buf.getvalue().encode("utf-8-sig")
+    sha = hashlib.sha256(contenu).hexdigest()
+    nom = f"cube_{periode}.csv"
+    document = Document.objects.create(
+        title=f"Cube BI {periode} — archive scellée", status=Document.Status.ARCHIVED, archived_at=timezone.now(),
+        type=type_doc, dossier=dossier, document_date=fin, reference=f"CUBE-{periode}",
+        keywords=["couche D", "cube", periode], sha256=sha, created_by=user,
+    )
+    version = Version.objects.create(
+        document=document, number=1, file=ContentFile(contenu, name=nom), sha256=sha, size=len(contenu),
+        original_filename=nom, created_by=user,
+    )
+    document.current_version = version
+    document.save(update_fields=["current_version"])
+    return document
+
+
 def verifier_archive(archive):
     """True si les faits stockés correspondent encore au sceau SHA-256."""
     return _sceller(archive.faits) == archive.sha256
 
 
-def lire_cube(periodes=None, axes=("periode",), filtres=None):
+def lire_cube(periodes=None, axes=("periode",), filtres=None, user=None):
     """Coupe du cube : mesures agrégées selon `axes` (sous-ensemble des 6 axes), filtrées par `filtres` {axe: valeur}.
 
-    Une période archivée est lue dans l'archive scellée, sinon dans les faits courants.
+    Une période archivée est lue dans l'archive scellée, sinon dans les faits courants. Avec `user` consommateur
+    (hors producteurs des chiffres) et le blocage actif, seuls les mois dont la clôture M11 est réalisée sont servis.
     """
+    from .pilotage import periodes_cloturees, voit_non_cloture
+
     for a in axes:
         if a not in AXES:
             raise ValueError(f"Axe inconnu : {a} (attendu : {', '.join(AXES)}).")
@@ -194,6 +310,11 @@ def lire_cube(periodes=None, axes=("periode",), filtres=None):
             continue
         lignes += [{"periode": p, **{k: (Decimal(v) if k in MESURES else v) for k, v in f.items()}} for f in arc.faits]
     lignes = [l for l in lignes if all(l.get(k) == v for k, v in filtres.items())]
+    masquees = []
+    if not voit_non_cloture(user):
+        cloturees = periodes_cloturees()
+        masquees = sorted({l["periode"] for l in lignes if l["periode"] not in cloturees})
+        lignes = [l for l in lignes if l["periode"] in cloturees]
     cumul = defaultdict(lambda: {m: ZERO for m in MESURES})
     for l in lignes:
         cible = cumul[tuple(l[a] for a in axes)]
@@ -209,5 +330,6 @@ def lire_cube(periodes=None, axes=("periode",), filtres=None):
         "rows": rows,
         "totaux": {**{m: f"{t:.2f}" for m, t in totaux.items()}, "marge": f"{totaux['produits'] - totaux['charges']:.2f}"},
         "periodes_archivees": sorted(p for p in archives if not periodes or p in periodes),
+        "periodes_non_publiees": masquees,
         "parametres_provisoires": parametres_provisoires(),
     }

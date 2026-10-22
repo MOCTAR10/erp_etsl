@@ -249,6 +249,9 @@ PARAMETRES_DEFAUT = {
     "BAL_AGEE_TRANCHE_3": ("Balance âgée : fin de la 3e tranche", Decimal("90"), "jours"),
     "RETENUE_SOURCE_TAUX": ("Taux de retenue à la source sur les règlements fournisseurs", Decimal("10"), "%"),
     "CONSERVATION_ANS": ("Durée de conservation des écritures et pièces fiscales", Decimal("10"), "ans"),
+    "RETENUE_GARANTIE_ACTIVE": (
+        "Retenue de garantie portée sur les factures clients (1 = oui, 0 = non)", Decimal("1"), "0/1"),
+    "RETENUE_GARANTIE_COMPTE": ("Compte des retenues de garantie clients (SYSCOHADA 4117)", Decimal("411700"), "compte"),
 }
 
 

@@ -79,3 +79,17 @@ models:
         tests:
           - not_null
           - unique
+  - name: dm_marges_m11
+    description: "Marges M11 par affaire et par mois (Couche D) : grand livre impute au compte analytique de l affaire, meme regle que compute_marges (618 isole)."
+    columns:
+      - name: affaire_id
+        tests:
+          - not_null
+  - name: dm_pipe_affaires
+    description: "Pipe commercial pondere 90/60/25 par etape et affaires par statut (Couche D, flux M1 vers M11)."
+    columns:
+      - name: objet
+        tests:
+          - not_null
+  - name: dm_qualite_itp_cnd
+    description: "Indicateurs qualite ITP / CND du reporting client petrolier (Couche D)."

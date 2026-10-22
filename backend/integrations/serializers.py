@@ -38,3 +38,54 @@ class ImportBatchSerializer(serializers.ModelSerializer):
             "rows",
         ]
         read_only_fields = fields
+
+
+class GabaritImportSerializer(serializers.ModelSerializer):
+    est_provisoire = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        from .models import GabaritImport
+
+        model = GabaritImport
+        fields = [
+            "id", "code", "label", "separateur", "encodage", "format_date", "separateur_decimal", "colonnes",
+            "statut_valeur", "est_provisoire", "confirme_par", "confirme_le", "updated_at",
+        ]
+        read_only_fields = ["id", "statut_valeur", "est_provisoire", "confirme_par", "confirme_le", "updated_at"]
+
+    def validate_encodage(self, value):
+        import codecs
+
+        try:
+            codecs.lookup(value)
+        except LookupError:
+            raise serializers.ValidationError("Encodage inconnu (ex. cp1252, utf-8, latin-1).")
+        return value
+
+    def validate_format_date(self, value):
+        from datetime import date
+
+        try:
+            date(2026, 1, 31).strftime(value)
+        except ValueError:
+            raise serializers.ValidationError("Format de date invalide (ex. %d/%m/%Y).")
+        if "%d" not in value or "%m" not in value or not ("%Y" in value or "%y" in value):
+            raise serializers.ValidationError("Le format doit contenir le jour, le mois et l'année.")
+        return value
+
+    def validate_colonnes(self, value):
+        from .gabarits import CHAMPS_SAGE
+
+        if not isinstance(value, dict) or any(not isinstance(v, str) for v in value.values()):
+            raise serializers.ValidationError("Objet attendu : {champ ERP : nom de colonne}.")
+        inconnus = sorted(set(value) - set(CHAMPS_SAGE))
+        if inconnus:
+            raise serializers.ValidationError(f"Champ(s) inconnu(s) : {', '.join(inconnus)}.")
+        return value
+
+    def update(self, instance, validated_data):
+        # Toute modification repasse le gabarit en provisoire jusqu'à nouvelle confirmation.
+        instance.statut_valeur = instance.StatutValeur.PROVISOIRE
+        instance.confirme_par = None
+        instance.confirme_le = None
+        return super().update(instance, validated_data)

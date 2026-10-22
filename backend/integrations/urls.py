@@ -10,10 +10,11 @@ from .gr_views import (
     WebhookDeliveryViewSet,
     WebhookEndpointViewSet,
 )
-from .views import ImportBatchViewSet, ImportFileView, OpeningBalanceView
+from .views import GabaritImportViewSet, ImportBatchViewSet, ImportFileView, OpeningBalanceView
 
 router = DefaultRouter()
 router.register("batches", ImportBatchViewSet, basename="importbatch")
+router.register("gabarits", GabaritImportViewSet, basename="gabarit-import")
 router.register("api-clients", ApiClientViewSet, basename="api-client")
 router.register("webhooks", WebhookEndpointViewSet, basename="webhook-endpoint")
 router.register("webhook-deliveries", WebhookDeliveryViewSet, basename="webhook-delivery")
@@ -27,3 +28,6 @@ urlpatterns = [
     path("gr/documents/", GrDocumentsView.as_view(), name="gr-documents"),
     path("", include(router.urls)),
 ]
+
+# Reprise de données (CDC §10) : gabarits CSV / XML / ZIP GED, à blanc, rapprochements C1-C10.
+urlpatterns += [path("migration/", include("integrations.urls_migration"))]

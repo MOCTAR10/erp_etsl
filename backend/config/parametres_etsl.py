@@ -39,6 +39,7 @@ MODULES = {
     "controle_gestion": "M11 Contrôle de gestion",
     "juridique": "M12 Juridique",
     "analytics": "Couche D — cubes",
+    "integrations": "Reprise et interfaces (SAGE)",
 }
 
 
@@ -56,6 +57,7 @@ class Registre:
     champ: str = "valeur"
     confirmation: str = "confirmer"
     groupe: str = ""  # attribut de regroupement éventuel (ex. table RGM_*)
+    champs_json: tuple = ()  # paramètre composite (gabarit) : ces champs forment la valeur JSON, PATCH champ par champ
     extra: dict = field(default_factory=dict)
 
     @property
@@ -87,6 +89,12 @@ REGISTRE = (
     _std("juridique.ParametreJuridique", "juridique.views.ParametreJuridiqueViewSet", "/api/juridique/parametres/", "/juridique",
          cle="cle", libelle="libelle", type_valeur="json", edition="modifier"),
     _std("analytics.ParametreCube", "analytics.views.ParametreCubeViewSet", "/api/analytics/cubes/parametres/", "/direction"),
+    _std("integrations.ParametreReprise", "integrations.views_migration.ParametreRepriseViewSet",
+         "/api/integrations/migration/parametres/", "/reprise"),
+    # Gabarit de lecture des exports SAGE (SAGE_GL…) : séparateurs, encodage, format de date, colonnes.
+    _std("integrations.GabaritImport", "integrations.views.GabaritImportViewSet", "/api/integrations/gabarits/", "/reprise",
+         valeur="colonnes", type_valeur="json", champ="*",
+         champs_json=("separateur", "encodage", "format_date", "separateur_decimal", "colonnes")),
 )
 
 
@@ -114,8 +122,11 @@ def _confirmation(obj):
 
 
 def _valeur_texte(entry, obj):
+    if entry.champs_json:
+        return json.dumps({c: getattr(obj, c) for c in entry.champs_json}, ensure_ascii=False), "json"
     v = getattr(obj, entry.valeur)
-    if entry.modele == "users.ParametreTransverse" and obj.texte:
+    # Paramètre à valeur texte (transverse, M1, cubes…) : la valeur affichée et éditée est le texte.
+    if getattr(obj, "texte", ""):
         return obj.texte, "texte"
     if entry.type_valeur == "json":
         return json.dumps(v, ensure_ascii=False), "json"
@@ -156,7 +167,7 @@ def _ligne(entry, obj):
         # Valeur légale confirmée : nouvelle version datée (l'ancienne est close la veille).
         edit = {"method": "POST", "path": f"{base}reviser/", "champ": "valeur",
                 "extra": {"date_effet": timezone.localdate().isoformat()}}
-    if entry.modele == "users.ParametreTransverse" and type_valeur == "texte":
+    if type_valeur == "texte" and hasattr(obj, "texte"):
         edit["champ"] = "texte"
     return {
         "id": str(obj.pk),

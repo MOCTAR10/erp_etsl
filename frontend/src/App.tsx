@@ -38,6 +38,7 @@ const ReinitialiserMotDePassePage = lazy(() =>
   import("./pages/MotDePasse").then((m) => ({ default: m.ReinitialiserMotDePassePage })),
 );
 const AdministrationPage = lazy(() => import("./pages/Administration").then((m) => ({ default: m.AdministrationPage })));
+const ReprisePage = lazy(() => import("./pages/Reprise").then((m) => ({ default: m.ReprisePage })));
 
 function pilotPage(children: ReactNode) {
   return withPilot(<Suspense fallback={<KpiGridSkeleton count={6} />}>{children}</Suspense>);
@@ -124,6 +125,7 @@ export default function App() {
         <Route path="parametres" element={pilotPage(<ParametresPage />)} />
         <Route path="administration" element={pilotPage(<AdministrationPage />)} />
         <Route path="mon-mot-de-passe" element={pilotPage(<MonMotDePassePage />)} />
+        <Route path="reprise" element={pilotPage(<ReprisePage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

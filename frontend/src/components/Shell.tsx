@@ -5,6 +5,7 @@ import {
   Calculator,
   CircleUser,
   FileSignature,
+  FileUp,
   Filter,
   FolderOpen,
   GitBranch,
@@ -65,10 +66,13 @@ const PILOT_NAV: NavItem[] = [
   { to: "/terrain", key: "nav.terrain", Icon: Smartphone },
   { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
   { to: "/securite", key: "nav.securite", Icon: KeyRound },
+  { to: "/reprise", key: "ecarts_import.nav", Icon: FileUp },
 ];
 
 /** Administration (EX-G-01) : comptes, matrice des droits, référentiels, piste d'audit — rôle admin seulement. */
 const ADMIN_NAV: NavItem[] = [{ to: "/administration", key: "ecarts_tr.nav.administration", Icon: UserCog }];
+/** Reprise de données (CDC §10) : cercle de l'API d'import + RH (salariés, paie) + QA/QC (qualité) + cercle paie. */
+const REPRISE_ROLES = new Set(["admin", "comptable", "finance", "direction", "rh", "qaqc", "pdg", "dga"]);
 
 const MODULE_NAV: ModuleNavItem[] = [
   { to: "/pipeline", key: "nav.pipeline", Icon: Filter, app: ROUTE_APP["/pipeline"] },
@@ -116,12 +120,16 @@ export function Shell() {
     navigate("/login", { replace: true });
   };
 
+  const pilotNav = useMemo(() => {
+    const base = PILOT_NAV.filter(({ to }) => to !== "/reprise" || REPRISE_ROLES.has(user?.role ?? ""));
+    // Administration (EX-G-01) : rôle admin seulement.
+    return user?.role === "admin" ? [...base, ...ADMIN_NAV] : base;
+  }, [user?.role]);
+
   const visibleModules = useMemo(
     () => MODULE_NAV.filter(({ app }) => canSeeApp(user?.modules, app)),
     [user?.modules],
   );
-
-  const pilotNav = useMemo(() => (user?.role === "admin" ? [...PILOT_NAV, ...ADMIN_NAV] : PILOT_NAV), [user?.role]);
 
   const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email || "";
   const initials = (displayName || "?")
