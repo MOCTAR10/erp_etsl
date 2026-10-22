@@ -323,6 +323,29 @@ class OrdreTravailViewSet(viewsets.ModelViewSet):
         comptabiliser_ot(ot, request.user)  # coût → 624 / 618 sur le centre analytique (non bloquant)
         return Response(self.get_serializer(ot).data)
 
+    @action(detail=False, methods=["get"], url_path="bc-gr")
+    def bc_gr(self, request):
+        """BC GLOBAL RENTAL non annulés, à rattacher à un OT GR (anti-double 618, lot correctif)."""
+        from .ecarts_correctif import bc_gr_candidats
+
+        return Response(bc_gr_candidats())
+
+    @action(detail=True, methods=["post"], url_path="lier-bc-gr")
+    def lier_bc_gr(self, request, pk=None):
+        """Rattache le BC GR dont la facture porte la charge 618 ; l'OD 618 déjà passée par l'OT est extournée."""
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from .ecarts_correctif import lier_bc_gr
+
+        try:
+            with transaction.atomic():
+                ot = self._locked()
+                lier_bc_gr(ot, request.data.get("bc"), request.user)
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": " ".join(exc.messages)})
+        ot.refresh_from_db()
+        return Response(self.get_serializer(ot).data)
+
     @action(detail=False, methods=["get"], url_path="couts-annuels")
     def couts_annuels(self, request):
         """Coût consolidé de maintenance par an, mois, machine et centre analytique (`?annee=`, `?export=xlsx|pdf`)."""

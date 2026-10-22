@@ -11,9 +11,91 @@ import type { Paginated, SignatureCertificate, SignatureRequestItem } from "../t
 
 const TONE: Record<string, "ok" | "warn" | "err"> = { completed: "ok", pending: "warn", refused: "err" };
 
+/** Second facteur offert au signataire (lot correctif) : code e-mail si la messagerie est active, sinon TOTP. */
+interface ModeSignature {
+  email_actif: boolean;
+  mfa_active: boolean;
+  methodes: ("email" | "totp")[];
+  methode_defaut: "email" | "totp" | null;
+  enrolement_requis: boolean;
+  message: string;
+}
+const MODE_KEY = ["signatures", "mode"];
+const useModeSignature = () =>
+  useQuery({ queryKey: MODE_KEY, queryFn: () => api.get<ModeSignature>("/api/documents/signatures/mode/"), retry: 0 });
+
+/** Enrôlement de la double authentification depuis l'écran Signatures (sans messagerie, seul second facteur). */
+function EnrolementTotp() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [cle, setCle] = useState<{ secret: string; otpauth_uri: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const demarrer = useMutation({
+    mutationFn: () => api.post<{ secret: string; otpauth_uri: string }>("/api/documents/signatures/enrolement-totp/"),
+    onSuccess: (r) => {
+      setCle(r);
+      setError(null);
+    },
+    onError: (e) => setError(describeError(e)),
+  });
+  const activer = useMutation({
+    mutationFn: () => api.post("/api/documents/signatures/activation-totp/", { code }),
+    onSuccess: () => {
+      setError(null);
+      void qc.invalidateQueries({ queryKey: MODE_KEY });
+    },
+    onError: (e) => setError(describeError(e)),
+  });
+  return (
+    <SectionCard title={t("ecarts_correctif.sig.enrolTitle")}>
+      <div id="enrolement-totp" className="sign-panel" data-testid="enrolement-totp">
+        <p className="muted">{t("ecarts_correctif.sig.enrolIntro")}</p>
+        {!cle ? (
+          <div className="sign-row">
+            <button className="btn" onClick={() => demarrer.mutate()} disabled={demarrer.isPending}>
+              {t("ecarts_correctif.sig.enrolStart")}
+            </button>
+          </div>
+        ) : (
+          <>
+            <p>
+              {t("ecarts_correctif.sig.enrolSecret")} : <code>{cle.secret}</code>
+            </p>
+            <p className="muted">
+              <a href={cle.otpauth_uri}>{t("ecarts_correctif.sig.enrolLien")}</a>
+            </p>
+            <div className="sign-row">
+              <input
+                inputMode="numeric"
+                maxLength={6}
+                placeholder={t("ecarts_correctif.sig.codeTotp")}
+                aria-label={t("ecarts_correctif.sig.codeTotp")}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              />
+              <button className="btn" onClick={() => activer.mutate()} disabled={activer.isPending || code.length !== 6}>
+                {t("ecarts_correctif.sig.enrolActiver")}
+              </button>
+            </div>
+          </>
+        )}
+        {error && (
+          <p className="action-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 function SignPanel({ req }: { req: SignatureRequestItem }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const mode = useModeSignature().data;
+  const [choix, setChoix] = useState<"email" | "totp" | null>(null);
+  const methode = choix ?? mode?.methode_defaut ?? "email";
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [sent, setSent] = useState(false);
@@ -30,7 +112,7 @@ function SignPanel({ req }: { req: SignatureRequestItem }) {
     onError: (e) => setError(describeError(e)),
   });
   const sign = useMutation({
-    mutationFn: () => api.post(`/api/documents/signatures/${req.id}/sign/`, { otp, password }),
+    mutationFn: () => api.post(`/api/documents/signatures/${req.id}/sign/`, { otp, password, methode }),
     onSuccess: () => {
       setError(null);
       setOtp("");
@@ -47,16 +129,34 @@ function SignPanel({ req }: { req: SignatureRequestItem }) {
 
   return (
     <div className="sign-panel">
-      <p className="muted">{t("signatures.explain")}</p>
+      {mode?.enrolement_requis ? (
+        <p className="action-error" role="alert">
+          {mode.message || t("ecarts_correctif.sig.sansFacteur")} <a href="#enrolement-totp">{t("ecarts_correctif.sig.lienEnrol")}</a>
+        </p>
+      ) : (
+        <p className="muted">{methode === "totp" ? t("ecarts_correctif.sig.explainTotp") : t("signatures.explain")}</p>
+      )}
+      {(mode?.methodes.length ?? 0) > 1 && (
+        <div className="sign-row" role="radiogroup" aria-label={t("ecarts_correctif.sig.methode")}>
+          {mode!.methodes.map((m) => (
+            <label key={m}>
+              <input type="radio" name={`methode-${req.id}`} checked={methode === m} onChange={() => setChoix(m)} />{" "}
+              {t(`ecarts_correctif.sig.methodes.${m}`)}
+            </label>
+          ))}
+        </div>
+      )}
       <div className="sign-row">
-        <button className="btn ghost" onClick={() => sendOtp.mutate()} disabled={sendOtp.isPending}>
-          {sent ? t("signatures.resend") : t("signatures.sendCode")}
-        </button>
+        {methode === "email" && (
+          <button className="btn ghost" onClick={() => sendOtp.mutate()} disabled={sendOtp.isPending}>
+            {sent ? t("signatures.resend") : t("signatures.sendCode")}
+          </button>
+        )}
         <input
           inputMode="numeric"
           maxLength={6}
-          placeholder={t("signatures.code")}
-          aria-label={t("signatures.code")}
+          placeholder={methode === "totp" ? t("ecarts_correctif.sig.codeTotp") : t("signatures.code")}
+          aria-label={methode === "totp" ? t("ecarts_correctif.sig.codeTotp") : t("signatures.code")}
           value={otp}
           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
         />
@@ -108,6 +208,7 @@ function Certificate({ id }: { id: string }) {
         {c.signatures.map((s) => (
           <li key={s.order}>
             {s.order}. {s.signer} — {formatDateTime(s.signed_at, i18n.language)} · {s.ip ?? "—"} ·{" "}
+            {t(`ecarts_correctif.sig.methodes.${(s as { methode?: string }).methode ?? "email"}`)} ·{" "}
             <Badge tone={s.seal_valid ? "ok" : "err"}>{s.seal_valid ? t("signatures.sealOk") : t("signatures.sealKo")}</Badge>
           </li>
         ))}
@@ -268,6 +369,7 @@ function NewRequest() {
 
 export function SignaturesPage() {
   const { t } = useTranslation();
+  const mode = useModeSignature().data;
   const list = useQuery({
     queryKey: ["signatures"],
     queryFn: () => api.get<Paginated<SignatureRequestItem>>("/api/documents/signatures/").then((p) => p.results),
@@ -284,6 +386,7 @@ export function SignaturesPage() {
     <>
       <PageHeader title={t("signatures.title")} subtitle={t("signatures.subtitle")} />
       <NewRequest />
+      {mode?.enrolement_requis && <EnrolementTotp />}
       {rows.length === 0 && <EmptyState label={t("signatures.none")} icon={FileSignature} />}
       {toSign.length > 0 && (
         <SectionCard title={`${t("signatures.toSign")} · ${toSign.length}`}>

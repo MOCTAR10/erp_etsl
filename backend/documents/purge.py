@@ -11,9 +11,8 @@ from datetime import timedelta
 from django.db import transaction
 from django.db.models import ProtectedError
 from django.utils import timezone
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
@@ -153,9 +152,32 @@ class DemandePurgeViewSet(viewsets.ModelViewSet):
             doc = demande.document
             if doc is None:
                 raise DRFValidationError("Document introuvable.")
+            # Revérification avec la durée EN VIGUEUR (la rétention du type a pu être allongée depuis la proposition,
+            # ex. contrats 5 → 10 ans) : la demande n'est plus purgeable → rejet tracé, document conservé.
             fin = fin_retention(doc)
-            if fin is None or fin >= timezone.localdate():
-                raise PermissionDenied("Rétention non échue : purge impossible.")
+            if doc.status != Document.Status.ARCHIVED or fin is None or fin >= timezone.localdate():
+                ans = doc.type.retention_years if doc.type_id else None
+                if doc.status != Document.Status.ARCHIVED or fin is None:
+                    detail = "Document plus soumis à rétention archivée : purge refusée."
+                else:
+                    detail = (f"Rétention en vigueur ({ans} ans) : document conservé jusqu'au {fin:%d/%m/%Y}, "
+                              "purge refusée.")
+                demande.statut = DemandePurge.Statut.REJETEE
+                demande.valide_par = request.user
+                demande.traite_le = timezone.now()
+                demande.motif = detail[:255]
+                champs = ["statut", "valide_par", "traite_le", "motif"]
+                if fin is not None:
+                    demande.fin_retention = fin
+                    champs.append("fin_retention")
+                demande.save(update_fields=champs)
+                log_audit(request.user, AuditLog.Action.UPDATE, "document", doc.pk,
+                          {"purge": "refusee", "motif": detail}, request_ip(request))
+                return Response({"detail": detail, "demande": self.get_serializer(demande).data},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if demande.fin_retention != fin:  # trace alignée sur la durée en vigueur
+                demande.fin_retention = fin
+                demande.save(update_fields=["fin_retention"])
             fichiers = [(v.file.storage, v.file.name) for v in doc.versions.all() if v.file]
             doc_id, titre = doc.pk, doc.title
             try:

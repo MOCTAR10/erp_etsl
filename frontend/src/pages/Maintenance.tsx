@@ -8,6 +8,7 @@ import { ActionBar, type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardS
 import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
 import { ExigencesHabilitationSection, OtDetails, PlansPreventifsSection } from "../components/workflow/MaintenancePlansSection";
 import { CoutsMaintenanceSection } from "../components/maintenance/EcartsM5m8Section";
+import { LiaisonBcGrSection } from "../components/maintenance/EcartsCorrectifSection";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
@@ -305,6 +306,7 @@ export function MaintenancePage() {
       <PiecesRechangeSection />
       <ExigencesHabilitationSection />
       <CoutsMaintenanceSection />
+      <LiaisonBcGrSection />
       <ParametresMaintenanceSection />
 
       <QuickForm

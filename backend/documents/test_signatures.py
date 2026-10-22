@@ -31,6 +31,7 @@ def user(email, role):
 @override_settings(
     STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}},
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ENABLED=True,  # messagerie reelle active : code par e-mail (lot correctif : sinon TOTP)
 )
 class SignatureBase(APITestCase):
     def setUp(self):

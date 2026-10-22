@@ -13,12 +13,57 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
+from users import mfa
+
 from .models import SignatureRequest, Signer, Version
 
 OTP_TTL_MINUTES = 10
 OTP_RESEND_SECONDS = 20
 MAX_ATTEMPTS = 5
 DEFAULT_VALIDITY_DAYS = 14
+
+# Second facteur (lot correctif) : code e-mail quand la messagerie réelle est active (EMAIL_ENABLED), sinon code TOTP
+# de l'application d'authentification déjà utilisée par la MFA (users/mfa.py). Méthode par défaut = e-mail si la
+# messagerie est active, sinon TOTP ; un signataire avec la MFA peut toujours choisir le TOTP.
+METHODE_EMAIL = "email"
+METHODE_TOTP = "totp"
+MESSAGE_SANS_FACTEUR = (
+    "La messagerie n'est pas encore configurée : activez la double authentification (application "
+    "d'authentification) pour signer."
+)
+MESSAGE_TOTP_SEUL = (
+    "La messagerie n'est pas encore configurée : signez avec le code de votre application d'authentification."
+)
+
+
+def email_actif() -> bool:
+    return bool(getattr(settings, "EMAIL_ENABLED", False))
+
+
+def totp_disponible(user) -> bool:
+    return bool(getattr(user, "mfa_active", False) and getattr(user, "mfa_secret", ""))
+
+
+def methodes_disponibles(user) -> list:
+    out = []
+    if email_actif():
+        out.append(METHODE_EMAIL)
+    if totp_disponible(user):
+        out.append(METHODE_TOTP)
+    return out
+
+
+def mode_signature(user) -> dict:
+    """Méthodes de second facteur offertes au signataire (lu par l'écran Signatures)."""
+    methodes = methodes_disponibles(user)
+    return {
+        "email_actif": email_actif(),
+        "mfa_active": totp_disponible(user),
+        "methodes": methodes,
+        "methode_defaut": methodes[0] if methodes else None,
+        "enrolement_requis": not methodes,
+        "message": "" if methodes else MESSAGE_SANS_FACTEUR,
+    }
 
 
 def _hmac(data: str) -> str:
@@ -38,20 +83,19 @@ def file_sha256(version: Version) -> str:
 
 
 def _evidence(signer: Signer) -> str:
-    return json.dumps(
-        {
-            "request": str(signer.request_id),
-            "version": str(signer.request.version_id),
-            "sha256": signer.document_sha256,
-            "signer": str(signer.user_id),
-            "email": signer.user.email,
-            "order": signer.order,
-            "signed_at": signer.signed_at.isoformat() if signer.signed_at else None,
-            "ip": signer.ip_address,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    )
+    data = {
+        "request": str(signer.request_id),
+        "version": str(signer.request.version_id),
+        "sha256": signer.document_sha256,
+        "signer": str(signer.user_id),
+        "email": signer.user.email,
+        "order": signer.order,
+        "signed_at": signer.signed_at.isoformat() if signer.signed_at else None,
+        "ip": signer.ip_address,
+    }
+    if signer.methode:  # méthode scellée dans la preuve (absente des signatures antérieures : sceaux inchangés)
+        data["method"] = signer.methode
+    return json.dumps(data, sort_keys=True, separators=(",", ":"))
 
 
 def compute_seal(signer: Signer, previous_seal: str) -> str:
@@ -107,6 +151,8 @@ def send_otp(req: SignatureRequest, user):
     req = SignatureRequest.objects.select_for_update().get(pk=req.pk)
     _check_open(req)
     signer = _my_turn(req, user)
+    if not email_actif():
+        raise ValidationError(MESSAGE_TOTP_SEUL if totp_disponible(user) else MESSAGE_SANS_FACTEUR)
     if signer.otp_attempts >= MAX_ATTEMPTS:
         raise ValidationError("Signature verrouillée après trop d'essais : contactez l'émetteur de la demande.")
     now = timezone.now()
@@ -137,30 +183,59 @@ class _AuthFailure(Exception):
         self.signer_pk = signer_pk
 
 
-def sign(req: SignatureRequest, user, otp: str, password: str, ip=None, user_agent=""):
-    """Signe pour `user` ; un échec d'authentification incrémente le compteur d'essais (hors transaction annulée)."""
+def sign(req: SignatureRequest, user, otp: str, password: str, ip=None, user_agent="", methode=""):
+    """Signe pour `user` ; un échec d'authentification incrémente le compteur d'essais (hors transaction annulée).
+
+    `methode` : « email » (code reçu par e-mail) ou « totp » (code courant de l'application d'authentification) ;
+    vide = code e-mail s'il en a été demandé un, sinon TOTP si la MFA est active.
+    """
     try:
         with transaction.atomic():
-            return _sign(req, user, otp, password, ip, user_agent)
+            return _sign(req, user, otp, password, ip, user_agent, methode)
     except _AuthFailure as failure:
         Signer.objects.filter(pk=failure.signer_pk).update(otp_attempts=F("otp_attempts") + 1)
         attempts = Signer.objects.get(pk=failure.signer_pk).otp_attempts
         raise ValidationError(f"Code ou mot de passe invalide ({attempts}/{MAX_ATTEMPTS} essais).")
 
 
-def _sign(req: SignatureRequest, user, otp: str, password: str, ip=None, user_agent=""):
+def _resoudre_methode(signer: Signer, user, methode: str) -> str:
+    methode = (methode or "").strip().lower()
+    if methode and methode not in (METHODE_EMAIL, METHODE_TOTP):
+        raise ValidationError("Méthode de signature inconnue (email ou totp).")
+    if not methode:
+        methode = METHODE_EMAIL if signer.otp_hash or not totp_disponible(user) else METHODE_TOTP
+    if methode == METHODE_TOTP and not totp_disponible(user):
+        raise ValidationError(MESSAGE_SANS_FACTEUR if not email_actif() else
+                              "Double authentification non activée : signez avec le code reçu par e-mail.")
+    if methode == METHODE_EMAIL and not signer.otp_hash and not email_actif():
+        raise ValidationError(MESSAGE_TOTP_SEUL if totp_disponible(user) else MESSAGE_SANS_FACTEUR)
+    return methode
+
+
+def _sign(req: SignatureRequest, user, otp: str, password: str, ip=None, user_agent="", methode=""):
     req = SignatureRequest.objects.select_for_update().get(pk=req.pk)
     _check_open(req)
     signer = _my_turn(req, user)
     signer = Signer.objects.select_for_update().get(pk=signer.pk)
     if signer.otp_attempts >= MAX_ATTEMPTS:
         raise ValidationError("Signature verrouillée après trop d'essais : contactez l'émetteur de la demande.")
-    if not signer.otp_hash or not signer.otp_expires_at or timezone.now() > signer.otp_expires_at:
-        raise ValidationError("Aucun code valide : demandez un nouveau code.")
-
-    ok = hmac.compare_digest(signer.otp_hash, _otp_digest(signer, str(otp))) and user.check_password(password or "")
+    methode = _resoudre_methode(signer, user, methode)
+    pas_totp = None
+    if methode == METHODE_TOTP:
+        # Verrou sur le compte : un même code TOTP ne sert qu'une fois (connexion ou signature), comme à la MFA.
+        compte = type(user).objects.select_for_update().get(pk=user.pk)
+        pas_totp = mfa.verifier(compte.mfa_secret, otp, compte.mfa_dernier_pas)
+        ok = pas_totp is not None and compte.check_password(password or "")
+    else:
+        if not signer.otp_hash or not signer.otp_expires_at or timezone.now() > signer.otp_expires_at:
+            raise ValidationError("Aucun code valide : demandez un nouveau code.")
+        ok = hmac.compare_digest(signer.otp_hash, _otp_digest(signer, str(otp))) and user.check_password(
+            password or ""
+        )
     if not ok:
         raise _AuthFailure(signer.pk)
+    if pas_totp is not None:
+        type(user).objects.filter(pk=user.pk).update(mfa_dernier_pas=pas_totp)
 
     # intégrité : la version n'a pas changé depuis la demande (empreinte en base ET fichier réel)
     version = req.version
@@ -176,6 +251,7 @@ def _sign(req: SignatureRequest, user, otp: str, password: str, ip=None, user_ag
     signer.user_agent = (user_agent or "")[:255]
     signer.document_sha256 = req.document_sha256
     signer.otp_hash = ""
+    signer.methode = methode
     signer.seal = compute_seal(signer, previous)
     signer.save()
     if not req.signers.filter(status=Signer.Status.PENDING).exists():
@@ -217,6 +293,7 @@ def certificate(req: SignatureRequest) -> dict:
             {
                 "order": s.order, "signer": s.user.get_full_name() or s.user.email, "email": s.user.email,
                 "signed_at": s.signed_at, "ip": s.ip_address, "seal": s.seal, "seal_valid": valid,
+                "methode": s.methode or METHODE_EMAIL,
             }
         )
         previous = s.seal
@@ -230,8 +307,9 @@ def certificate(req: SignatureRequest) -> dict:
         "document_intact": file_sha256(req.version) == req.document_sha256,
         "signatures": rows,
         "valid": chain_ok and bool(rows),
-        "method": "Signature électronique avancée interne : authentification (mot de passe + code e-mail), "
-        "empreinte SHA-256 du document, sceau HMAC-SHA256 chaîné.",
+        "method": "Signature électronique avancée interne : authentification (mot de passe + code à usage unique "
+        "reçu par e-mail ou code TOTP de l'application d'authentification), empreinte SHA-256 du document, "
+        "sceau HMAC-SHA256 chaîné.",
     }
 
 

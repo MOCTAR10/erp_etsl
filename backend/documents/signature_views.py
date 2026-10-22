@@ -1,7 +1,9 @@
 """API de signature électronique avancée (CL-OM-06) — demandes, code à usage unique, signature, certificat."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, serializers, status, viewsets
@@ -9,7 +11,9 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from users.models import User
+from users import mfa
+from users.journal import journaliser
+from users.models import JournalAcces, User
 
 from . import signatures
 from .audit import log_audit, request_ip
@@ -23,7 +27,7 @@ class SignerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Signer
-        fields = ["id", "user", "name", "email", "order", "status", "signed_at", "refusal_reason"]
+        fields = ["id", "user", "name", "email", "order", "status", "signed_at", "refusal_reason", "methode"]
 
     def get_name(self, obj):
         return obj.user.get_full_name() or obj.user.email
@@ -112,6 +116,48 @@ class SignatureRequestViewSet(
                   request_ip(request))
         return Response(self.get_serializer(req).data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["get"], url_path="mode")
+    def mode(self, request):
+        """Second facteur offert au signataire connecté : code e-mail (messagerie active) et/ou TOTP (MFA active)."""
+        return Response(signatures.mode_signature(User.objects.get(pk=request.user.pk)))
+
+    @extend_schema(request=None, responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["post"], url_path="enrolement-totp")
+    def enrolement_totp(self, request):
+        """Enrôlement de la double authentification depuis l'écran Signatures (sans messagerie, seul second facteur).
+
+        Même secret et même vérification que la MFA de connexion (users/mfa.py) : une fois activée, la connexion
+        demandera aussi le code de l'application d'authentification.
+        """
+        user = User.objects.get(pk=request.user.pk)
+        if user.mfa_active:
+            return Response({"detail": "Double authentification déjà activée."}, status=status.HTTP_400_BAD_REQUEST)
+        if not user.mfa_secret:
+            user.mfa_secret = mfa.generer_secret()
+            user.save(update_fields=["mfa_secret"])
+        journaliser(request, JournalAcces.Evenement.MFA_ENROLEMENT, user=user, details={"origine": "signatures"})
+        return Response({"secret": user.mfa_secret, "otpauth_uri": mfa.uri_otpauth(user.mfa_secret, user.email)})
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["post"], url_path="activation-totp")
+    def activation_totp(self, request):
+        """Active la double authentification après un premier code TOTP valide (non rejouable)."""
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            if user.mfa_active:
+                return Response({"detail": "Double authentification déjà activée."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            pas = mfa.verifier(user.mfa_secret, request.data.get("code"), user.mfa_dernier_pas)
+            if pas is not None:
+                user.mfa_dernier_pas, user.mfa_active, user.mfa_active_le = pas, True, timezone.now()
+                user.save(update_fields=["mfa_dernier_pas", "mfa_active", "mfa_active_le"])
+        if pas is None:
+            journaliser(request, JournalAcces.Evenement.MFA_ECHEC, user=user, details={"origine": "signatures"})
+            return Response({"code": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
+        journaliser(request, JournalAcces.Evenement.MFA_SUCCES, user=user, details={"origine": "signatures"})
+        return Response(signatures.mode_signature(user))
+
     @extend_schema(request=None, responses=OpenApiTypes.OBJECT)
     @action(detail=True, methods=["post"])
     def otp(self, request, pk=None):
@@ -125,17 +171,19 @@ class SignatureRequestViewSet(
     @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
     @action(detail=True, methods=["post"])
     def sign(self, request, pk=None):
-        """Signe : code e-mail + mot de passe (ré-authentification) ; preuve scellée et chaînée."""
+        """Signe : code (e-mail ou TOTP, `methode`) + mot de passe (ré-authentification) ; preuve scellée et chaînée."""
         req = self.get_object()
         try:
             signer = signatures.sign(
                 req, request.user, request.data.get("otp", ""), request.data.get("password", ""),
                 ip=request_ip(request), user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                methode=str(request.data.get("methode", "") or ""),
             )
         except DjangoValidationError as exc:
             return _bad_request(exc)
         log_audit(request.user, AuditLog.Action.UPDATE, "signature", req.pk,
-                  {"event": "signed", "order": signer.order, "sha256": signer.document_sha256}, request_ip(request))
+                  {"event": "signed", "order": signer.order, "sha256": signer.document_sha256,
+                   "methode": signer.methode}, request_ip(request))
         req.refresh_from_db()
         return Response(self.get_serializer(req).data)
 

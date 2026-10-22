@@ -415,6 +415,12 @@ class Signer(models.Model):
     document_sha256 = models.CharField(max_length=64, blank=True)
     refusal_reason = models.CharField(max_length=300, blank=True)
     seal = models.CharField(max_length=64, blank=True, verbose_name="Sceau HMAC chaîné")
+    # Second facteur utilisé à la signature : code e-mail ou code TOTP de l'application d'authentification (vide =
+    # signature antérieure au choix de méthode, toujours e-mail ; exclu de la preuve pour garder les sceaux valides).
+    methode = models.CharField(
+        max_length=10, blank=True, choices=[("email", "Code e-mail"), ("totp", "Application d'authentification")],
+        verbose_name="Second facteur",
+    )
 
     class Meta:
         ordering = ["request", "order"]

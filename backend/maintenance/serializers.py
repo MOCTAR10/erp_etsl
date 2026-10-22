@@ -91,7 +91,15 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
     qualifie_par_name = serializers.CharField(source="qualifie_par.get_full_name", read_only=True, default=None)
     document_titre = serializers.CharField(source="document.title", read_only=True, default=None)
     ecriture_numero = serializers.CharField(source="ecriture.number", read_only=True, default=None)
+    ecriture_statut = serializers.CharField(source="ecriture.status", read_only=True, default=None)
+    bc_gr_code = serializers.CharField(source="bc_gr.code", read_only=True, default=None)
     centre_code = serializers.SerializerMethodField()
+    est_gr = serializers.SerializerMethodField()
+
+    def get_est_gr(self, obj) -> bool:
+        from .ecarts_m5m8 import est_gr
+
+        return est_gr(obj.actif)
 
     def get_centre_code(self, obj):
         from .ecarts_m5m8 import centre_actif
@@ -110,12 +118,13 @@ class OrdreTravailSerializer(serializers.ModelSerializer):
             "statut_label", "plan", "plan_code", "archive_le", "archive_par",
             "qualifie_le", "qualifie_par", "qualifie_par_name", "document", "document_titre",
             "centre_code", "ecriture", "ecriture_numero", "motif_ecriture",
+            "ecriture_statut", "bc_gr", "bc_gr_code", "est_gr",
             "created_by", "created_at", "updated_at",
         ]
         read_only_fields = ["created_by", "demandeur",
             "code", "cout_main_oeuvre", "cout_total", "date_debut", "date_fin",
             "decision", "rapport", "statut", "plan", "archive_le", "archive_par", "qualifie_le", "qualifie_par", "document",
-            "ecriture", "motif_ecriture"]
+            "ecriture", "motif_ecriture", "bc_gr"]
 
     def get_has_amount_access(self, obj):
         return can_see_amount(self.context.get("request").user)
