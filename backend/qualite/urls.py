@@ -31,6 +31,8 @@ from .views_systeme import (
     RevueDirectionQualiteViewSet,
 )
 
+from .views_m6m7 import OrganismeAgreeViewSet, WpsRequisViewSet
+
 router = DefaultRouter()
 router.register("soudeurs", SoudeurViewSet, basename="soudeurs")
 router.register("qualifications", QualificationSoudeurViewSet, basename="qualifications")
@@ -56,6 +58,10 @@ router.register("audits", AuditQualiteViewSet, basename="audits-qualite")
 router.register("constats-audit", ConstatAuditQualiteViewSet, basename="constats-audit-qualite")
 router.register("revues-direction", RevueDirectionQualiteViewSet, basename="revues-direction-qualite")
 router.register("competences", CompetencesQualiteViewSet, basename="competences-qualite")
+
+# Écarts M6 (lot ecarts-m6m7)
+router.register("organismes-agrees", OrganismeAgreeViewSet, basename="organismes-agrees")
+router.register("wps-requis", WpsRequisViewSet, basename="wps-requis")
 
 urlpatterns = [
     path("", include(router.urls)),

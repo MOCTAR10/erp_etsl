@@ -7,24 +7,34 @@ import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { CoutsHseResult, PermisTravail, PersonnelHse } from "../../types";
 import { ActionBar, QuickForm, SectionCard } from "../ui";
+import { useListeHse } from "./listesHse";
 
-const TYPES_PERMIS = ["chaud", "hauteur", "levage", "confine", "atex", "froid", "electrique", "fouille", "chimique"];
 const FIGES = ["cloture", "refuse", "annule", "expire"];
 
 /** Demande de permis de travail à l'écran (CDC M7-11) : le demandeur est l'utilisateur connecté. */
 export function DemandePermisForm() {
   const { t } = useTranslation();
+  const types = useListeHse("type_permis");
+  // Plans de prévention validés (site GR : exigés au démarrage, écarts M7) ; liste vide si non lisible.
+  const plans = useQuery({
+    queryKey: ["ecarts-m6m7", "plans-valides"],
+    queryFn: () => api.listAll<{ id: string; code: string; site: string }>("/api/hse/plans-prevention/?statut=valide"),
+    retry: 0,
+  }).data ?? [];
   return (
     <QuickForm
       title={t("m7e.permisEcran.demander")}
       endpoint="/api/hse/permis/"
+      transform={(v) => ({ ...v, site_gr: v.site_gr === "true" })}
       fields={[
-        { name: "type_permis", label: t("m7e.permisEcran.type"), type: "select", required: true, defaultValue: "chaud", options: TYPES_PERMIS.map((v) => ({ value: v, label: t(`hse.permis_types.${v}`) })) },
+        { name: "type_permis", label: t("m7e.permisEcran.type"), type: "select", required: true, defaultValue: "chaud", options: types },
         { name: "emplacement", label: t("m7e.permisEcran.emplacement"), required: true },
         { name: "description", label: t("m7e.permisEcran.description"), type: "textarea", required: true },
         { name: "mesures", label: t("m7e.permisEcran.mesures"), type: "textarea" },
         { name: "date_debut", label: t("m7e.permisEcran.debut"), type: "date", required: true },
         { name: "date_fin", label: t("m7e.permisEcran.fin"), type: "date" },
+        { name: "site_gr", label: t("ecarts_m6m7.gr.siteGr"), type: "select", defaultValue: "false", options: [{ value: "false", label: t("ecarts_m6m7.non") }, { value: "true", label: t("ecarts_m6m7.oui") }] },
+        { name: "plan_prevention", label: t("ecarts_m6m7.gr.planPrevention"), type: "select", options: plans.map((p) => ({ value: p.id, label: `${p.code} · ${p.site}` })) },
       ]}
     />
   );

@@ -97,7 +97,16 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
         # pas son propre permis) se contourne en créant le permis « au nom » d'un collègue.
         from .services import notifier_niveau_suivant
 
-        notifier_niveau_suivant(serializer.save(demandeur=self.request.user))
+        permis = serializer.save(demandeur=self.request.user)
+        notifier_niveau_suivant(permis)
+        if permis.site_gr:
+            from .ecarts_m6m7 import partager_site_gr
+
+            partager_site_gr(
+                f"Site GLOBAL RENTAL : permis {permis.code} demandé",
+                f"{permis.get_type_permis_display()} — {permis.emplacement}, début le {permis.date_debut:%d/%m/%Y}.",
+                exclure=self.request.user,
+            )
 
     def _modifiable(self, permis):
         if permis.statut in PermisTravail.STATUTS_FIGES:
@@ -220,6 +229,10 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
                 {"detail": "Permis expiré : sa date de fin est dépassée."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        from .ecarts_m6m7 import controle_site_gr
+
+        if erreur_gr := controle_site_gr(permis, aujourdhui):
+            return Response({"detail": erreur_gr}, status=status.HTTP_400_BAD_REQUEST)
         if manquantes := habilitations_manquantes(permis, aujourdhui):
             return Response(
                 {"detail": "Habilitation manquante ou expirée - " + " ; ".join(manquantes)},
@@ -356,6 +369,15 @@ class IncidentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         incident = serializer.save(declared_by=self.request.user)
         escalader_si_grave(incident)
+        if incident.zone == "site_gr":
+            from .ecarts_m6m7 import partager_site_gr
+
+            partager_site_gr(
+                f"Site GLOBAL RENTAL : {incident.get_type_incident_display().lower()} {incident.code}",
+                f"Déclaré le {timezone.localtime(incident.date_evenement):%d/%m/%Y %H:%M} à {incident.lieu} "
+                f"(gravité {incident.get_gravite_display().lower()}) : {incident.description[:300]}",
+                exclure=self.request.user,
+            )
 
     def perform_update(self, serializer):
         escalader_si_grave(serializer.save())
@@ -765,19 +787,71 @@ class BordereauDechetViewSet(viewsets.ModelViewSet):
         if statut := params.get("statut"):
             qs = qs.filter(statut=statut)
         if params.get("dangereux") == "1":
-            qs = qs.filter(type_dechet__in=[
-                BordereauDechet.TypeDechet.HUILES,
-                BordereauDechet.TypeDechet.SOLVANTS,
-                BordereauDechet.TypeDechet.BATTERIES,
-                BordereauDechet.TypeDechet.PEINTURES,
-            ])
+            from .ecarts_m6m7 import codes_dangereux
+
+            qs = qs.filter(type_dechet__in=codes_dangereux())
         return qs
+
+    def _transition(self, request, cible, depuis):
+        """Émission puis traitement du BSD : statut posé par action, prestataire agréé contrôlé (paramètre)."""
+        from .ecarts_m6m7 import controle_prestataire_bsd
+
+        bsd = BordereauDechet.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if bsd.statut not in depuis:
+            return Response({"detail": "Transition impossible depuis ce statut."}, status=status.HTTP_400_BAD_REQUEST)
+        if erreur := controle_prestataire_bsd(bsd.type_dechet, bsd.prestataire, bsd.date_enlevement):
+            return Response({"prestataire": erreur}, status=status.HTTP_400_BAD_REQUEST)
+        if cible == BordereauDechet.Statut.EMIS:
+            numero = str(request.data.get("numero_bsd") or bsd.numero_bsd or "").strip()[:80]
+            if not numero:
+                return Response({"numero_bsd": "N° de BSD requis à l'émission."}, status=status.HTTP_400_BAD_REQUEST)
+            bsd.numero_bsd = numero
+            bsd.date_enlevement = bsd.date_enlevement or timezone.localdate()
+        bsd.statut = cible
+        bsd.save()
+        if cible == BordereauDechet.Statut.TRAITE:
+            self._archiver(bsd)
+        return Response(self.get_serializer(bsd).data)
+
+    @action(detail=True, methods=["post"], url_path="affecter-prestataire")
+    @transaction.atomic
+    def affecter_prestataire(self, request, pk=None):
+        """Affecte un prestataire déchets agréé (en cours de validité, type couvert) à un BSD en attente."""
+        from .ecarts_m6m7 import controle_prestataire_bsd
+        from .models import PrestataireDechet
+
+        bsd = BordereauDechet.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if bsd.statut != BordereauDechet.Statut.EN_ATTENTE:
+            return Response({"detail": "BSD déjà émis : prestataire figé."}, status=status.HTTP_400_BAD_REQUEST)
+        prestataire = fk_input(request.data.get("prestataire"), PrestataireDechet.objects.all(), "prestataire")
+        if prestataire is None:
+            return Response({"prestataire": "Prestataire requis."}, status=status.HTTP_400_BAD_REQUEST)
+        if not prestataire.est_valide(bsd.date_enlevement) or not prestataire.couvre(bsd.type_dechet):
+            erreur = controle_prestataire_bsd(bsd.type_dechet, prestataire, bsd.date_enlevement)
+            return Response({"prestataire": erreur or "Prestataire non agréé pour ce BSD."}, status=status.HTTP_400_BAD_REQUEST)
+        bsd.prestataire = prestataire
+        bsd.save(update_fields=["prestataire", "updated_at"])
+        return Response(self.get_serializer(bsd).data)
+
+    @action(detail=True, methods=["post"], url_path="emettre")
+    @transaction.atomic
+    def emettre(self, request, pk=None):
+        return self._transition(request, BordereauDechet.Statut.EMIS, (BordereauDechet.Statut.EN_ATTENTE,))
+
+    @action(detail=True, methods=["post"], url_path="traiter")
+    @transaction.atomic
+    def traiter(self, request, pk=None):
+        return self._transition(request, BordereauDechet.Statut.TRAITE, (BordereauDechet.Statut.EMIS,))
 
     def perform_update(self, serializer):
         """BSD traité / valorisé : bordereau scellé et archivé en GED (conservation 10 ans, CDC M7 §9.5)."""
         avant = serializer.instance.statut
         bsd = serializer.save()
-        if bsd.statut == BordereauDechet.Statut.TRAITE and avant != BordereauDechet.Statut.TRAITE and not bsd.document_id:
+        if bsd.statut == BordereauDechet.Statut.TRAITE and avant != BordereauDechet.Statut.TRAITE:
+            self._archiver(bsd)
+
+    def _archiver(self, bsd):
+        if not bsd.document_id:
             from .services import TYPE_GED_BSD, archiver_ged, bsd_pdf
 
             bsd.document = archiver_ged(
@@ -817,8 +891,16 @@ class AuditHseViewSet(viewsets.ModelViewSet):
         audit = AuditHse.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if audit.statut != AuditHse.Statut.PLANIFIE:
             return Response({"detail": "Seul un audit planifié peut être réalisé."}, status=status.HTTP_400_BAD_REQUEST)
+        from .ecarts_m6m7 import score_checklist
+
+        if audit.reponses_checklist.filter(reponse="en_attente").exists():
+            return Response({"detail": "Check-list incomplète : évaluer tous les points avant de réaliser l'audit."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        brut = request.data.get("score")
+        if brut in (None, "") and score_checklist(audit) is not None:
+            brut = score_checklist(audit)  # score calculé sur la check-list
         try:
-            score = serializers.IntegerField(min_value=0, max_value=100).run_validation(request.data.get("score"))
+            score = serializers.IntegerField(min_value=0, max_value=100).run_validation(brut)
             jour = serializers.DateField().run_validation(request.data.get("date_realisation") or timezone.localdate())
         except serializers.ValidationError as exc:
             return Response({"detail": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -843,6 +925,32 @@ class AuditHseViewSet(viewsets.ModelViewSet):
         audit.cloture_par, audit.cloture_le = request.user, timezone.now()
         audit.save()
         return Response(self.get_serializer(audit).data)
+
+    @action(detail=True, methods=["post"], url_path="appliquer-checklist")
+    @transaction.atomic
+    def appliquer_checklist(self, request, pk=None):
+        """Charge les questions d'un modèle de check-list sur l'audit (une fois par modèle)."""
+        from .ecarts_m6m7 import appliquer_checklist
+        from .models import ModeleChecklistHse
+
+        audit = AuditHse.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+        if audit.statut != AuditHse.Statut.PLANIFIE:
+            return Response({"detail": "Check-list applicable à un audit planifié seulement."}, status=status.HTTP_400_BAD_REQUEST)
+        modele = fk_input(request.data.get("modele"), ModeleChecklistHse.objects.filter(actif=True), "modele")
+        if modele is None:
+            return Response({"modele": "Modèle de check-list requis."}, status=status.HTTP_400_BAD_REQUEST)
+        if audit.reponses_checklist.filter(modele=modele).exists():
+            return Response({"detail": "Check-list déjà appliquée à cet audit."}, status=status.HTTP_400_BAD_REQUEST)
+        appliquer_checklist(audit, modele)
+        return Response(self.get_serializer(audit).data)
+
+    @action(detail=True, methods=["get"], url_path="rapport-pdf")
+    def rapport_pdf(self, request, pk=None):
+        """Rapport d'audit PDF : en-tête, check-list, constats et actions correctives (trame provisoire)."""
+        from .ecarts_m6m7 import rapport_audit_pdf
+
+        audit = self.get_object()
+        return _pdf_response(rapport_audit_pdf(audit), f"rapport-audit-{audit.code}.pdf")
 
 
 class ConstatAuditViewSet(viewsets.ModelViewSet):

@@ -61,6 +61,7 @@ class PermisTravailSerializer(serializers.ModelSerializer):
     )
     gaz_obligatoire = serializers.BooleanField(read_only=True)
     test_gaz_valide = serializers.BooleanField(read_only=True)
+    plan_prevention_code = serializers.CharField(source="plan_prevention.code", read_only=True, default=None)
 
     prochain_niveau = serializers.CharField(read_only=True, allow_null=True)
     intervenants_noms = serializers.SerializerMethodField()
@@ -76,6 +77,7 @@ class PermisTravailSerializer(serializers.ModelSerializer):
             "date_validation", "date_cloture", "notes", "created_at", "updated_at",
             "gaz_obligatoire", "test_gaz_resultat", "test_gaz_valeur", "test_gaz_date",
             "test_gaz_par", "test_gaz_valide", "intervenants", "intervenants_noms", "photo", "plan",
+            "site_gr", "plan_prevention", "plan_prevention_code",
         ]
         read_only_fields = [
             "visa_superviseur_par", "visa_superviseur_le", "visa_hse_par", "visa_hse_le", "visa_dg_par", "visa_dg_le", "prochain_niveau","validateur", "demandeur", 
@@ -86,6 +88,11 @@ class PermisTravailSerializer(serializers.ModelSerializer):
 
     def get_intervenants_noms(self, obj):
         return [str(e) for e in obj.intervenants.all()]
+
+    def validate_type_permis(self, value):
+        from .ecarts_m6m7 import valider_code
+
+        return valider_code("type_permis", value, self.instance.type_permis if self.instance else None)
 
     def validate(self, attrs):
         # M2M exclu du constructeur du modèle (cf. _apply_and_validate), puis remis pour create()/update().
@@ -173,6 +180,11 @@ class IncidentSerializer(serializers.ModelSerializer):
     def get_ncr_hse(self, obj):
         return [f"{nc.code} ({nc.get_statut_display()})" for nc in obj.ncr_hse.all()]
 
+    def validate_type_incident(self, value):
+        from .ecarts_m6m7 import valider_code
+
+        return valider_code("type_incident", value, self.instance.type_incident if self.instance else None)
+
     def validate(self, attrs):
         return _apply_and_validate(self, attrs)
 
@@ -257,6 +269,7 @@ class BordereauDechetSerializer(serializers.ModelSerializer):
     transporteur_name = serializers.CharField(
         source="transporteur.name", read_only=True, default=None
     )
+    prestataire_nom = serializers.CharField(source="prestataire.nom", read_only=True, default=None)
 
     class Meta:
         model = BordereauDechet
@@ -264,9 +277,26 @@ class BordereauDechetSerializer(serializers.ModelSerializer):
             "id", "code", "type_dechet", "type_label", "quantite", "unite",
             "unite_label", "transporteur", "transporteur_name", "numero_bsd",
             "date_enlevement", "destination", "statut", "statut_label", "notes", "document",
-            "created_at", "updated_at",
+            "prestataire", "prestataire_nom", "created_at", "updated_at",
         ]
         read_only_fields = ["code", "document"]
+
+    def validate_type_dechet(self, value):
+        from .ecarts_m6m7 import valider_code
+
+        return valider_code("type_dechet", value, self.instance.type_dechet if self.instance else None)
+
+    def validate(self, attrs):
+        # BSD émis ou traité : prestataire déchets agréé, en cours de validité, pour ce type (paramètre provisoire).
+        statut = attrs.get("statut", self.instance.statut if self.instance else BordereauDechet.Statut.EN_ATTENTE)
+        if statut != BordereauDechet.Statut.EN_ATTENTE and (not self.instance or self.instance.statut != statut):
+            from .ecarts_m6m7 import controle_prestataire_bsd
+
+            courant = lambda champ: attrs.get(champ, getattr(self.instance, champ, None))  # noqa: E731
+            if erreur := controle_prestataire_bsd(courant("type_dechet") or BordereauDechet.TypeDechet.DIB,
+                                                  courant("prestataire"), courant("date_enlevement")):
+                raise serializers.ValidationError({"prestataire": erreur})
+        return attrs
 
 
 class ExigenceHabilitationSerializer(serializers.ModelSerializer):
@@ -275,6 +305,11 @@ class ExigenceHabilitationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExigenceHabilitation
         fields = ["id", "type_permis", "type_label", "mot_cle", "actif"]
+
+    def validate_type_permis(self, value):
+        from .ecarts_m6m7 import valider_code
+
+        return valider_code("type_permis", value, self.instance.type_permis if self.instance else None)
 
     def validate(self, attrs):
         return _apply_and_validate(self, attrs, exclude=("code",))
@@ -405,6 +440,12 @@ class ParametreHseSerializer(serializers.ModelSerializer):
         read_only_fields = ["code", "label", "unite", "statut_valeur", "confirme_par", "confirme_le"]
 
     def validate_valeur(self, value):
+        from .ecarts_m6m7 import PARAMETRES_BOOLEENS
+
+        if self.instance and self.instance.code in PARAMETRES_BOOLEENS:
+            if value not in (0, 1):
+                raise serializers.ValidationError("Valeur attendue : 1 (oui) ou 0 (non).")
+            return value
         if value <= 0:
             raise serializers.ValidationError("La valeur doit être strictement positive.")
         return value

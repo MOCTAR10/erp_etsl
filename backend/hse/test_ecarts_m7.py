@@ -8,6 +8,8 @@
 - BSD traité archivé en GED (10 ans), puis non supprimable.
 """
 
+from datetime import timedelta
+
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -82,7 +84,12 @@ class RapportEtArchivageTests(_Base):
         self.assertTrue(LienDocument.objects.filter(document=doc, objet_type="hse.incident", objet_id=str(inc.pk)).exists())
 
     def test_bsd_traite_archive_en_ged_puis_non_supprimable(self):
-        bsd = BordereauDechet.objects.create(type_dechet="dib", quantite=2)
+        from .models import PrestataireDechet
+
+        prestataire = PrestataireDechet.objects.create(
+            nom="Collecte agréée", numero_agrement="MIN-ENV-1", date_fin_validite=timezone.localdate() + timedelta(days=90),
+        )
+        bsd = BordereauDechet.objects.create(type_dechet="dib", quantite=2, prestataire=prestataire)
         r = self.client.patch(f"/api/hse/bordereaux-dechets/{bsd.pk}/", {"statut": "traite"}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         bsd.refresh_from_db()

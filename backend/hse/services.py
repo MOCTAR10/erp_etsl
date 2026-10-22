@@ -243,6 +243,11 @@ PARAMETRES_HSE_DEFAUT = {
 }
 PREFIXE_FORMATION_RH = "Formation HSE — "
 
+# Écarts M7 (lot ecarts-m6m7) : seuils de cotation, revue du DUER, agrément BSD, plan de prévention sur site GR.
+from .ecarts_m6m7 import PARAMETRES_M6M7  # noqa: E402
+
+PARAMETRES_HSE_DEFAUT.update(PARAMETRES_M6M7)
+
 
 def get_param_hse(code):
     from decimal import Decimal

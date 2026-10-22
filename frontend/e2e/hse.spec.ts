@@ -115,3 +115,25 @@ test.describe("M7 HSE : permis demandé à l'écran", () => {
     await expect(page.getByTestId("couts-hse")).toContainText(/HSE/);
   });
 });
+
+// Écarts M7 (lot ecarts-m6m7) : check-lists, plans de prévention, prestataires déchets agréés, fiches sécurité, listes.
+test.describe("M7 HSE : écarts check-lists, prévention, BSD et fiches sécurité", () => {
+  test("les fiches sécurité sont publiées et un prestataire déchets agréé se saisit", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
+    await page.goto("/hse");
+    await expect(page.getByTestId("fiches-securite")).toContainText("Travaux à chaud");
+    await expect(page.getByTestId("checklists-hse")).toBeVisible();
+    await expect(page.getByTestId("plans-prevention")).toBeVisible();
+    await expect(page.getByTestId("listes-hse")).toContainText("Provisoire");
+    const bloc = page.getByTestId("bsd-prestataires");
+    const nom = `Collecte e2e ${Date.now()}`;
+    await bloc.getByRole("button", { name: "Ajouter un prestataire agréé" }).click();
+    const form = page.getByRole("form", { name: "Ajouter un prestataire agréé" });
+    await form.getByLabel("Raison sociale *", { exact: true }).fill(nom);
+    await form.getByLabel("N° d'agrément *", { exact: true }).fill("MIN-ENV-E2E");
+    await form.getByLabel("Agrément valable jusqu'au *", { exact: true }).fill("2030-12-31");
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+    await expect(bloc.getByRole("row", { name: new RegExp(nom) })).toContainText("Agréé");
+  });
+});

@@ -17,6 +17,9 @@ PARAMETRES_QUALITE_DEFAUT = {
     "AGREMENT_SCORE_MIN": ("Audit fournisseur : score minimal d'agrément", "70", "%"),
     "AGREMENT_DUREE_MOIS": ("Audit fournisseur : durée de l'agrément qualité", "36", "mois"),
     "DOC_REVUE_ALERTE_JOURS": ("Document qualité : alerte avant la date de revue", "30", "jours"),
+    # Écarts M6 (lot ecarts-m6m7)
+    "CND_ORGANISME_REFERENTIEL": ("CND tiers : organisme agréé du référentiel exigé (1 = oui, 0 = non)", "1", "0/1"),
+    "WPS_PROFIL_BLOQUANT": ("Soudage : WPS limités aux WPS requis du profil / contrat M1.3 (1 = oui, 0 = non)", "1", "0/1"),
 }
 #: Destinataires des relances qualité (QA/QC) et de l'escalade d'une CAPA en retard (hiérarchie).
 ROLES_QAQC = (User.Role.QAQC,)
@@ -389,3 +392,59 @@ def etiquette_pdf(instrument):
     c.showPage()
     c.save()
     return buf.getvalue()
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M6 (lot ecarts-m6m7) : organisme agréé (M6.1-09), WPS requis par profil contractuel (M1.3)
+# ----------------------------------------------------------------------------------------------------------------
+def controle_organisme(organisme, organisme_agree, methode, jour=None):
+    """Message d'erreur si un contrôle confié à un organisme agréé ne cite pas un organisme valide, sinon None."""
+    if organisme != "agrege" or not int(get_param_qualite("CND_ORGANISME_REFERENTIEL")):
+        return None
+    if organisme_agree is None:
+        return "Organisme agréé du référentiel obligatoire (Qualité › Organismes agréés)."
+    if not organisme_agree.est_valide(jour):
+        return f"Agrément de {organisme_agree.nom} expiré ou inactif (valable jusqu'au {organisme_agree.date_fin_validite:%d/%m/%Y})."
+    if not organisme_agree.couvre(methode):
+        return f"{organisme_agree.nom} n'est pas agréé pour la méthode {methode}."
+    return None
+
+
+def wps_requis_affaire(affaire):
+    """WPS exigés pour une affaire : exigences propres à ses contrats, sinon celles de leurs profils (M1.3)."""
+    from .models import WpsRequis
+
+    if affaire is None:
+        return []
+    contrats = list(affaire.contracts.all())
+    if not contrats:
+        return []
+    propres = list(WpsRequis.objects.filter(contract__in=contrats).select_related("wps"))
+    if propres:
+        return propres
+    profils = {c.profile for c in contrats if c.profile}
+    return list(WpsRequis.objects.filter(contract__isnull=True, profile__in=profils).select_related("wps"))
+
+
+def controle_wps_profil(wps, affaire):
+    """Message d'erreur si le WPS n'est pas requis par le profil / contrat de l'affaire (paramètre), sinon None."""
+    if wps is None or affaire is None or not int(get_param_qualite("WPS_PROFIL_BLOQUANT")):
+        return None
+    requis = wps_requis_affaire(affaire)
+    if requis and wps.pk not in {r.wps_id for r in requis}:
+        codes = ", ".join(sorted({r.wps.code for r in requis}))
+        return f"WPS {wps.code} non prévu par le profil contractuel de l'affaire {affaire.code} (WPS requis : {codes})."
+    return None
+
+
+def conformite_wps_affaire(affaire):
+    """Couverture des WPS requis : chaque WPS exigé doit être validé (non obsolète)."""
+    lignes = []
+    for r in wps_requis_affaire(affaire):
+        lignes.append({
+            "wps": str(r.wps_id), "wps_code": r.wps.code, "procede": r.wps.procede, "statut": r.wps.statut,
+            "valide": r.wps.statut == "valide", "origine": r.contract.code if r.contract_id else r.profile,
+            "libelle": r.libelle,
+        })
+    return {"affaire": str(affaire.pk), "affaire_code": affaire.code, "requis": lignes,
+            "conforme": all(ligne["valide"] for ligne in lignes)}
