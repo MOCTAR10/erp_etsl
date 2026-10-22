@@ -3,6 +3,8 @@
  * CommandPalette). S'appuie UNIQUEMENT sur les variables de global.css (couleurs, rayons, ombres) :
  * aucune couleur en dur hors voile d'arrière-plan. Classes préfixées `ui-` (aucune classe e2e renommée).
  * Mouvement : 120–200 ms, désactivé sous prefers-reduced-motion.
+ * Volontairement HORS @layer : ne cible que des classes `ui-*` et les attributs de sonner / react-day-picker
+ * (feuilles tierces non stratifiées, à surcharger) ; aucune règle sur les classes de global.css.
  */
 
 :root {
