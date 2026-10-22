@@ -192,7 +192,7 @@ class Command(BaseCommand):
             ("PAN", "Prime de panier", "gain", "fixe", None, 20),
             ("TRA", "Prime transport", "gain", "fixe", None, 30),
             ("HRS", "Heures supplémentaires", "gain", "brut", 150.0, 40),
-            ("CNS", "Cotisation CNSS'", "retenue", "salaire", 5.0, 50),
+            ("CNS", "Cotisation CNSS", "retenue", "salaire", 5.0, 50),
             ("CMA", "Cotisation CNAMGS", "retenue", "salaire", 2.5, 60),
         ]
         for code, label, nature, base, taux, ordre in rubriques:

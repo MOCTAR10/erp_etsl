@@ -55,7 +55,7 @@ class Command(BaseCommand):
         self.parcours_atelier()
         self.parcours_chantier()
         self.parcours_gr()
-        self.stdout.write(self.style.SUCCESS("Parcours demo lot A pret."))
+        self.stdout.write(self.style.SUCCESS("Parcours lot A pret."))
 
     # -- infra -------------------------------------------------------------------------------------------
     def api(self, email):
@@ -87,7 +87,7 @@ class Command(BaseCommand):
                 employe.save(update_fields=["user"])
             Qualification.objects.get_or_create(
                 employe=employe, type=Qualification.Type.HABILITATION, intitule="Habilitation chantier (demo)",
-                defaults={"organisme": "Organisme demo", "date_obtention": self.today - timedelta(days=365),
+                defaults={"organisme": "Organisme agréé", "date_obtention": self.today - timedelta(days=365),
                           "date_validite": self.today + timedelta(days=365)},
             )
 
@@ -129,7 +129,7 @@ class Command(BaseCommand):
         existante = Reunion.objects.filter(affaire=affaire, type=Reunion.Type.LANCEMENT).first()
         if existante is None:
             existante = Reunion.objects.get(pk=self.call("admin@etls.local", "post", "/api/juridique/reunions/", {
-                "type": Reunion.Type.LANCEMENT, "objet": f"Reunion de lancement {affaire.code}",
+                "type": Reunion.Type.LANCEMENT, "objet": f"Réunion de lancement {affaire.code}",
                 "date_reunion": timezone.now().isoformat(), "lieu": "Libreville", "affaire": str(affaire.pk),
             })["id"])
         # `tenir` (API) affecte l'id brut au FK : defaut connu, le compte-rendu est donc rattache par PATCH.
@@ -197,8 +197,8 @@ class Command(BaseCommand):
             self.call("atelier@etls.local", "post", f"/api/operations/affectations/{aff['id']}/mobiliser/")
         if not of.presences.exists():
             # (opérateur, décalage en jours, statut, motif) : présent, retard et absence motivés
-            releves = ((0, 0, "present", ""), (1, 0, "present", ""), (0, -1, "retard", "Transport (demo)"),
-                       (1, -1, "absent", "Maladie (demo)"))
+            releves = ((0, 0, "present", ""), (1, 0, "present", ""), (0, -1, "retard", "Transport"),
+                       (1, -1, "absent", "Maladie"))
             for idx, decalage, statut, motif in releves:
                 self.call("atelier@etls.local", "post", "/api/operations/presences/", {
                     "ordre": str(of.pk), "employe": str(Employe.objects.get(user=ops[idx]).pk),
@@ -209,8 +209,8 @@ class Command(BaseCommand):
         """Permis à 3 visas (superviseur / HSE / DG), signataires distincts, lié à l'OF chantier."""
         permis = self.call("admin@etls.local", "post", "/api/hse/permis/", {
             "type_permis": "hauteur", "affaire": str(of.affaire_id), "ordre": str(of.pk),
-            "emplacement": "Site client (demo)", "description": f"Montage tuyauterie {of.code}",
-            "mesures": "Harnais, balisage, surveillant (demo)",
+            "emplacement": "Site client", "description": f"Montage tuyauterie {of.code}",
+            "mesures": "Harnais, balisage, surveillant",
             "date_debut": str(self.today), "date_fin": str(self.today + timedelta(days=60)),
         })
         for email in ("atelier@etls.local", "hse@etls.local", "pdg@etls.local"):

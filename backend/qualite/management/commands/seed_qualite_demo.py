@@ -32,7 +32,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write("Seed M6 - Qualite & Soudage (demo)")
+        self.stdout.write("Seed M6 - Qualite & Soudage")
 
         qaqc = User.objects.filter(role=User.Role.QAQC).first()
         if qaqc is None:
@@ -43,7 +43,7 @@ class Command(BaseCommand):
 
         if Soudeur.objects.exists():
             self._seed_itp(qaqc)  # idempotent : complète une base seedée avant l'ajout de l'ITP
-            self.stdout.write("Deja seed - ITP de demo verifie.")
+            self.stdout.write("Deja seed - ITP verifie.")
             return
 
         affaire = Affaire.objects.first()
@@ -119,7 +119,7 @@ class Command(BaseCommand):
                 ordre=of,
                 wps=wps,
                 lot=lot,
-                point_controle="Joint 01 - raccord line A",
+                point_controle="Joint 01 - raccord ligne A",
                 date_controle=today,
                 resultat=ControleQualite.Resultat.CONFORME,
                 statut=ControleQualite.Statut.VALIDE,
@@ -143,7 +143,7 @@ class Command(BaseCommand):
             controle=controles[1],
             source=NonConformite.Source.CONTROLE,
             gravite=NonConformite.Gravite.MAJEURE,
-            description="Porosite sur le joint 4 (gamme TIG) - controle ressuyage non conforme",
+            description="Porosité sur le joint 4 (gamme TIG) - contrôle ressuage non conforme",
             traitement=NonConformite.Traitement.REPRISE,
             statut=NonConformite.Statut.EN_TRAITEMENT,
             decided_by=qaqc,
@@ -153,7 +153,7 @@ class Command(BaseCommand):
         ActionCorrective.objects.create(
             non_conformite=nc,
             type=ActionCorrective.TypeAction.CORRECTIVE,
-            description="Reprise du joint 4 + recontrôle ressuyage et radio.",
+            description="Reprise du joint 4 + recontrôle ressuage et radio.",
             responsable=qaqc,
             echeance=today + timedelta(days=5),
             statut=ActionCorrective.Statut.EN_COURS,
@@ -170,7 +170,7 @@ class Command(BaseCommand):
         PvControle.objects.create(
             affaire=affaire,
             ordre=of,
-            intitule="Reception interne - tirage TV horizontale",
+            intitule="Réception interne - tirage TV horizontale",
             date_pv=today,
             statut=PvControle.Statut.EN_COURS,
             resultat=ControleQualite.Resultat.CONFORME,
@@ -178,13 +178,13 @@ class Command(BaseCommand):
         )
         PvControle.objects.create(
             affaire=affaire,
-            intitule="PV tuyauterie - levage et pose line A",
+            intitule="PV tuyauterie - levage et pose ligne A",
             date_pv=today,
             statut=PvControle.Statut.RECEPTIONNE,
             resultat=ControleQualite.Resultat.CONFORME,
             levee_reserve=today,
             validated_by=qaqc,
-            notes="Reception apres controles visuels OK.",
+            notes="Réception après contrôles visuels OK.",
         )
 
         self._seed_itp(qaqc)
