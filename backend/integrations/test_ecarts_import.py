@@ -251,7 +251,8 @@ class RhPaieQualiteTests(APITestCase):
         codes = {g["code"] for g in self.client.get(URL + "catalogue/").data}
         self.assertEqual(codes, {"wps_wpqr", "soudeurs"})
         self.client.force_authenticate(self.rh)
-        self.assertEqual({g["code"] for g in self.client.get(URL + "catalogue/").data}, {"salaries", "paie_historique"})
+        self.assertEqual({g["code"] for g in self.client.get(URL + "catalogue/").data},
+                         {"salaries", "paie_historique", "habilitations_hse"})
         self.client.force_authenticate(self.service)
         self.assertEqual(self.client.get(URL + "catalogue/").status_code, 403)
         self.assertEqual(self.client.get(URL + "lots/").status_code, 403)

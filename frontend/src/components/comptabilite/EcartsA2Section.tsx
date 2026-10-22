@@ -6,6 +6,7 @@ import { api } from "../../api/client";
 import { formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { ProvisionsChangeA7 } from "./ProvisionsChangeA7";
 
 interface SituationDevise {
   devise: string;
@@ -280,6 +281,7 @@ export function EcartsA2Section() {
           </table>
         </div>
         <p className="muted">{t("ecarts_a2.ops.note")}</p>
+        <ProvisionsChangeA7 />
       </SectionCard>
 
       <SectionCard title={t("ecarts_a2.rav.title")} subtitle={t("ecarts_a2.rav.subtitle")}>

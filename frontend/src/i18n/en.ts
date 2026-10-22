@@ -819,6 +819,21 @@ export const en = {
     annulee: "Cancelled",
     previ: "Forecast",
   },
+  ecarts_a7: {
+    provisoire: "provisional — to be confirmed or changed by ETSL",
+    provision: {
+      title: "Provisions for unrealised exchange losses (697 / 499)",
+      subtitle:
+        "Booked by “Revalue all” when translation differences show a net loss; reversed at the next run. Parameter DEVISE_PROVISION_PERTE (1 = enabled).",
+      vide: "No provision booked.",
+      date: "Closing",
+      pertes: "Unrealised losses",
+      gains: "Unrealised gains",
+      montant: "Provision",
+      statut: "Status",
+      ecritures: "Entries",
+    },
+  },
   ecarts_m2: {
     provisoire: "Provisional — to be confirmed or changed by ETSL",
     confirme: "Confirmed",

@@ -819,6 +819,21 @@ export const fr = {
     annulee: "Annulée",
     previ: "Prévisionnel",
   },
+  ecarts_a7: {
+    provisoire: "provisoire — à confirmer ou modifier par ETSL",
+    provision: {
+      title: "Provisions pour perte de change latente (697 / 499)",
+      subtitle:
+        "Dotée par « Réévaluer tout » quand les écarts de conversion font apparaître une perte nette ; contre-passée au calcul suivant. Paramètre DEVISE_PROVISION_PERTE (1 = activé).",
+      vide: "Aucune provision constatée.",
+      date: "Clôture",
+      pertes: "Pertes latentes",
+      gains: "Gains latents",
+      montant: "Provision",
+      statut: "Statut",
+      ecritures: "Écritures",
+    },
+  },
   ecarts_m2: {
     provisoire: "Provisoire — à confirmer ou modifier par ETSL",
     confirme: "Confirmé",

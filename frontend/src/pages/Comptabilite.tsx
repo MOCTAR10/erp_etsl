@@ -4,7 +4,7 @@ import { BadgePercent, ClipboardList, CreditCard, Inbox, Landmark } from "lucide
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, FilterBar, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { ClotureSection } from "../components/workflow/ClotureSection";
 import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
@@ -14,6 +14,7 @@ import { EcartsA2Section } from "../components/comptabilite/EcartsA2Section";
 import { ImportGrandLivreSection, RetenuesGarantieSection } from "../components/suivi/SuiviSections";
 import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
+import { useFiltresListe } from "../lib/useFiltresListe";
 import type {
   CompteBancaire,
   ControleInterne,
@@ -134,7 +135,8 @@ export function ComptabilitePage() {
   const banques = useQuery({ queryKey: ["compta-banques"], queryFn: () => api.listAll<CompteBancaire>("/api/comptabilite/comptes-bancaires/") });
 
   // Paiements : tableau paginé avec recherche ; liste complète pour le décompte des validés.
-  const paiements = usePagedList<Paiement>("compta-paiements", (q) => api.paiements(q));
+  const filtresPai = useFiltresListe("/api/comptabilite/paiements/");
+  const paiements = usePagedList<Paiement>("compta-paiements", (q) => api.paiements(q), { extra: filtresPai.extra });
   const paiementsTous = useQuery({ queryKey: ["compta-paiements-tous"], queryFn: () => api.listAll<Paiement>("/api/comptabilite/paiements/") });
 
   // Engagements : liste complète pour le choix du formulaire (approuvés), Kanban filtré par la recherche.
@@ -329,9 +331,10 @@ export function ComptabilitePage() {
         </SectionCard>
       )}
 
-      {(paiements.count > 0 || paiements.search) && (
+      {(paiements.count > 0 || paiements.search || filtresPai.extra) && (
         <SectionCard title={`${t("comptabilite.paiements")} · ${paiements.count}`}>
           <SearchField value={paiements.search} onChange={paiements.setSearch} placeholder={t("comptabilite.searchPaiements")} />
+          <FilterBar defs={filtresPai.defs} value={filtresPai.criteres} onChange={filtresPai.setCriteres} idPrefix="pai-f" />
           <div className="table-wrap">
             <table className="table">
               <thead>

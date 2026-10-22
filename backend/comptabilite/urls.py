@@ -23,7 +23,7 @@ from .views import (
     RetenueGarantieViewSet,
 )
 
-from .views_a2 import OperationDeviseViewSet, ReconnaissanceRevenuViewSet, TauxChangeViewSet
+from .views_a2 import OperationDeviseViewSet, ProvisionChangeViewSet, ReconnaissanceRevenuViewSet, TauxChangeViewSet
 
 router = DefaultRouter()
 router.register("taux-tva", TauxTvaViewSet, basename="compta-taux-tva")
@@ -47,6 +47,7 @@ router.register("locations-gr", LocationGrComptaViewSet, basename="compta-locati
 router.register("retenues-garantie", RetenueGarantieViewSet, basename="compta-retenues-garantie")
 router.register("taux-change", TauxChangeViewSet, basename="compta-taux-change")
 router.register("operations-devise", OperationDeviseViewSet, basename="compta-operations-devise")
+router.register("provisions-change", ProvisionChangeViewSet, basename="compta-provisions-change")
 router.register("reconnaissances-revenu", ReconnaissanceRevenuViewSet, basename="compta-reconnaissances-revenu")
 
 urlpatterns = [

@@ -2,9 +2,10 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
+import { useFiltresListe } from "../../lib/useFiltresListe";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
-import { ActionBar, Badge, PagedDataTable, QuickForm, SectionCard, type ActionDef, type Column } from "../ui";
+import { ActionBar, Badge, FilterBar, PagedDataTable, QuickForm, SectionCard, type ActionDef, type Column } from "../ui";
 import { useAnalytiques, useRefOptions } from "./refs";
 
 type Tone = "ok" | "warn" | "err" | "brand";
@@ -135,7 +136,10 @@ function ConsultationsSection() {
 
 function CommandesSection() {
   const { t } = useTranslation();
-  const commandes = usePagedList<Commande>("achats-bc-saisie", (q) => api.get<Paginated<Commande>>(`/api/achats/orders/${q}`));
+  const filtresBc = useFiltresListe("/api/achats/orders/");
+  const commandes = usePagedList<Commande>("achats-bc-saisie", (q) => api.get<Paginated<Commande>>(`/api/achats/orders/${q}`), {
+    extra: filtresBc.extra,
+  });
   const fournisseurs = useFournisseurs();
   const das = useDaApprouvees();
   const analytiques = useAnalytiques();
@@ -195,7 +199,8 @@ function CommandesSection() {
         ]}
         transform={(v) => ({ ...v, quantity: num(v.quantity), unit_price: num(v.unit_price) })}
       />
-      {(commandes.count > 0 || commandes.search) && (
+      <FilterBar defs={filtresBc.defs} value={filtresBc.criteres} onChange={filtresBc.setCriteres} idPrefix="bc-f" />
+      {(commandes.count > 0 || commandes.search || filtresBc.extra) && (
         <PagedDataTable list={commandes} columns={cols} caption={t("achatsSaisie.commandes")} searchPlaceholder={t("achatsSaisie.searchCommandes")} />
       )}
     </SectionCard>
@@ -204,7 +209,10 @@ function CommandesSection() {
 
 function FacturesSection() {
   const { t } = useTranslation();
-  const factures = usePagedList<Facture>("achats-factures", (q) => api.get<Paginated<Facture>>(`/api/achats/invoices/${q}`));
+  const filtresFf = useFiltresListe("/api/achats/invoices/");
+  const factures = usePagedList<Facture>("achats-factures", (q) => api.get<Paginated<Facture>>(`/api/achats/invoices/${q}`), {
+    extra: filtresFf.extra,
+  });
   const fournisseurs = useFournisseurs();
   const commandes = useRefOptions<{ id: string; code: string; supplier_name: string | null }>(
     "bc-facturables", "/api/achats/orders/", (o) => `${o.code} — ${o.supplier_name ?? "—"}`,
@@ -260,7 +268,8 @@ function FacturesSection() {
         ]}
         transform={(v) => ({ ...v, quantity: num(v.quantity), unit_price: num(v.unit_price) })}
       />
-      {(factures.count > 0 || factures.search) && (
+      <FilterBar defs={filtresFf.defs} value={filtresFf.criteres} onChange={filtresFf.setCriteres} idPrefix="ff-f" />
+      {(factures.count > 0 || factures.search || filtresFf.extra) && (
         <PagedDataTable list={factures} columns={cols} caption={t("achatsSaisie.factures")} searchPlaceholder={t("achatsSaisie.searchFactures")} />
       )}
     </SectionCard>

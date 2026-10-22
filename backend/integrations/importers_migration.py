@@ -790,6 +790,11 @@ GABARITS = {
 }
 
 
+from .importers_a7 import GABARITS_A7  # noqa: E402  (lot a7 : gabarits complémentaires, mêmes règles)
+
+GABARITS.update({g.code: g for g in GABARITS_A7})
+
+
 # --------------------------------------------------------------------------------------------------
 # Droits par gabarit
 # --------------------------------------------------------------------------------------------------
@@ -799,9 +804,16 @@ def _cercle_compta(user):
     return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser or user.role in POSTING_ROLES))
 
 
-def peut_gabarit(user, gabarit):
-    from users.models import User
+#: Rôles métier habilités par cercle, en plus du cercle comptable (lot a7 : HSE, parc / maintenance).
+CERCLES_METIER = {
+    "rh": ("rh",),
+    "qualite": ("qaqc",),
+    "hse": ("rh", "hse"),
+    "parc": ("logistique", "maintenance"),
+}
 
+
+def peut_gabarit(user, gabarit):
     if not (user and user.is_authenticated):
         return False
     if gabarit.cercle == "paie":
@@ -810,9 +822,7 @@ def peut_gabarit(user, gabarit):
         return can_manage_paie(user)
     if _cercle_compta(user):
         return True
-    return (gabarit.cercle == "rh" and user.role == User.Role.RH) or (
-        gabarit.cercle == "qualite" and user.role == User.Role.QAQC
-    )
+    return user.role in CERCLES_METIER.get(gabarit.cercle, ())
 
 
 def gabarits_autorises(user):

@@ -11,7 +11,7 @@ from referentiels.models import TauxChange
 from users.permissions import can_read_module
 
 from . import avancement, devises
-from .models import OperationDevise, ReconnaissanceRevenu
+from .models import OperationDevise, ProvisionChange, ReconnaissanceRevenu
 from .serializers import _MasqueMontantsMixin
 from .services import CanValidateCompta, can_see_amount, parametres_provisoires
 from .views import DjangoValidationMixin
@@ -237,3 +237,36 @@ class ReconnaissanceRevenuViewSet(DjangoValidationMixin, mixins.ListModelMixin, 
         jour = date_input(request.data.get("date_arrete"), "date_arrete", default=timezone.localdate())
         rec = avancement.comptabiliser(affaire, jour, request.user)
         return Response(self.get_serializer(rec).data, status=status.HTTP_201_CREATED)
+
+
+# ------------------------------------------------------------------------------------------------ lot a7 : provision
+class ProvisionChangeSerializer(_MasqueMontantsMixin, serializers.ModelSerializer):
+    champs_montants = ("perte_latente", "gain_latent", "montant")
+    statut_label = serializers.CharField(source="get_statut_display", read_only=True)
+    move_number = serializers.CharField(source="move.number", read_only=True, default=None)
+    move_contre_passation_number = serializers.CharField(source="move_contre_passation.number", read_only=True, default=None)
+    has_amount_access = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProvisionChange
+        fields = [
+            "id", "date_cloture", "perte_latente", "gain_latent", "montant", "operations", "statut", "statut_label",
+            "move_number", "move_contre_passation_number", "date_contre_passation", "has_amount_access", "created_at",
+        ]
+        read_only_fields = fields
+
+
+class ProvisionChangeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Provisions pour perte de change latente (lecture) : dotées / contre-passées par « Réévaluer tout »."""
+
+    serializer_class = ProvisionChangeSerializer
+    get_permissions = _lecture_ou(CanValidateCompta)
+
+    def get_queryset(self):
+        return ProvisionChange.objects.select_related("move", "move_contre_passation").all()
+
+    def list(self, request, *args, **kwargs):
+        reponse = super().list(request, *args, **kwargs)
+        if isinstance(reponse.data, dict):
+            reponse.data["provisoire"] = parametres_provisoires(["DEVISE_PROVISION_PERTE"])
+        return reponse
