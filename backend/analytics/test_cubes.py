@@ -149,8 +149,14 @@ class ApiTests(CubeBase):
         rows = r.json() if isinstance(r.json(), list) else r.json()["results"]
         p = next(x for x in rows if x["code"] == "RETENTION_ANS")
         self.assertEqual((p["code"], p["est_provisoire"]), ("RETENTION_ANS", True))
+        # Harmonisation : la Finance modifie, la Direction confirme.
+        self.assertEqual(self.client.post(f"{BASE}parametres/{p['id']}/confirmer/").status_code, 403)
+        from users.models import User
+
+        self.client.force_authenticate(User.objects.create_user(email="pdg-cube@etls.ga", password="x-Cube-2026", role=User.Role.PDG))
         r = self.client.post(f"{BASE}parametres/{p['id']}/confirmer/")
         self.assertEqual((r.status_code, r.json()["est_provisoire"]), (200, False))
+        self.client.force_authenticate(self.finance)
         r = self.client.patch(f"{BASE}parametres/{p['id']}/", {"valeur": "12"}, format="json")
         self.assertEqual((r.status_code, r.json()["est_provisoire"]), (200, True))
         self.assertEqual(self.client.patch(f"{BASE}parametres/{p['id']}/", {"valeur": "0"}, format="json").status_code, 400)

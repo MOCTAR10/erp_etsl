@@ -248,11 +248,10 @@ def alertes_calendaires(user=None, today=None):
 
 
 def paliers_notification():
-    """Paliers J-n notifiés : ceux du socle (J-90 / 30 / 15 / 0) + le palier paramétrable (J-60 par défaut)."""
-    from config.echeances import PALIERS_NOTIFICATION
+    """Paliers J-n notifiés : paramètre central commun à tous les modules (J-90 / 60 / 30 / 15 / 0 par défaut)."""
+    from config.echeances import paliers
 
-    supplementaire = int(get_param_cube("PALIER_ALERTE_J60"))
-    return set(PALIERS_NOTIFICATION) | ({supplementaire} if supplementaire > 0 else set())
+    return set(paliers())
 
 
 # ---------------------------------------------------------------------------------------------------------------------

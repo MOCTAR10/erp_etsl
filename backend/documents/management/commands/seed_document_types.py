@@ -12,7 +12,7 @@ class Command(BaseCommand):
         # code, label, retention_years, restricted_rh, circuit
         ("factures_fournisseurs", "Factures fournisseurs", 10, False, "circuit_comptabilite"),
         ("devis_bons_de_commande", "Devis / Bons de commande", 5, False, "circuit_controle_gestion"),
-        ("contrats", "Contrats clients / fournisseurs / prêts", 5, False, "circuit_controle_gestion"),
+        ("contrats", "Contrats clients / fournisseurs / prêts", 10, False, "circuit_controle_gestion"),  # CDC : 10 ans
         ("bulletins_de_paie", "Bulletins de paie", 10, True, None),
         ("documents_rh", "Documents RH (CV, contrats, absences)", 1, True, None),
         ("courriers", "Courriers entrants / sortants", None, False, "circuit_reception"),

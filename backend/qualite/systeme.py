@@ -125,8 +125,11 @@ def cloturer_audit(audit, user):
         audit.agrement_accorde = decision_agrement(audit)
         partenaire = audit.fournisseur
         if audit.agrement_accorde:
+            from achats.ecarts import get_param as get_param_achats
+
+            # Durée unique d'agrément (paramètre M2 `AGREMENT_DUREE_MOIS`, lu aussi par la demande d'agrément).
             partenaire.agree_qualite_jusqu = _ajouter_mois(audit.date_realisation or timezone.localdate(),
-                                                           get_param_qualite("AGREMENT_DUREE_MOIS"))
+                                                           get_param_achats("AGREMENT_DUREE_MOIS"))
         else:
             partenaire.agree_qualite_jusqu = None
         partenaire.save(update_fields=["agree_qualite_jusqu"])

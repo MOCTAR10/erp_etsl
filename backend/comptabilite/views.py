@@ -30,7 +30,7 @@ from .models import (
 from config.inputs import date_input
 
 from . import cloture, facturation
-from .permissions import IsComptaAdmin
+from .permissions import CanConfirmerParametreCompta, IsComptaAdmin
 from .serializers import (
     CompteBancaireSerializer,
     ControleInterneSerializer,
@@ -460,7 +460,7 @@ class ParametreComptaViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
             return [can_read_module("comptabilite")()]
         if self.action == "confirmer":
-            return [CanValidateCompta()]
+            return [CanConfirmerParametreCompta()]
         return [IsComptaAdmin()]
 
     def create(self, request, *args, **kwargs):
@@ -551,7 +551,7 @@ class ModeleFactureViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
             return [can_read_module("comptabilite")()]
         if self.action == "confirmer":
-            return [CanValidateCompta()]
+            return [CanConfirmerParametreCompta()]
         return [IsComptaAdmin()]
 
     def create(self, request, *args, **kwargs):
@@ -941,7 +941,7 @@ class GabaritEtatViewSet(DjangoValidationMixin, viewsets.ReadOnlyModelViewSet):
         if self.request.method in ("GET", "HEAD", "OPTIONS"):
             return [can_read_module("comptabilite")()]
         if self.action == "confirmer":
-            return [CanValidateCompta()]
+            return [CanConfirmerParametreCompta()]
         return [IsComptaAdmin()]
 
     @action(detail=True, methods=["post"])

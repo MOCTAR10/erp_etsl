@@ -635,7 +635,7 @@ def _primes_horaires(bulletin, taux_horaire):
             taux = parametre(code, bulletin.periode)
         except ValidationError:
             taux = None
-        if heures and taux is not None:
+        if heures and taux is not None and taux.valeur > 0:  # 0 % = taux non saisi par ETSL
             BulletinLigne.objects.update_or_create(
                 bulletin=bulletin, rubrique=rubrique,
                 defaults={"libelle": f"{label} ({heures} h à {taux.valeur} %)",

@@ -10,7 +10,8 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from config.echeances import BANDES, bande
+from config.echeances import BANDES, PALIERS_DEFAUT, bande
+from config.echeances import paliers as paliers_communs
 
 # cle -> (libellé, valeur par défaut). Toute valeur est PROVISOIRE tant qu'ETSL ne l'a pas confirmée.
 PARAMETRES_DEFAUT = {
@@ -52,7 +53,7 @@ PARAMETRES_DEFAUT = {
         "tant que la Direction Générale n'a pas validé",
         True,
     ),
-    "paliers_notification": ("Paliers de notification des échéances juridiques (jours)", [90, 60, 30, 15, 0]),
+    "paliers_notification": ("Paliers d'alerte des échéances, communs à tous les modules (M1, M12, Couche D) (jours)", list(PALIERS_DEFAUT)),
     "destinataires_alertes": (
         "Rôles prévenus par famille d'échéance",
         {
@@ -347,7 +348,7 @@ def notifier_echeances_juridiques():
 
     from .services import compute_alertes
 
-    paliers = set(parametre("paliers_notification"))
+    paliers = set(paliers_communs())
     destinataires = parametre("destinataires_alertes")
     alertes = compute_alertes()
     debut_jour = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)

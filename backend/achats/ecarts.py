@@ -27,7 +27,7 @@ PARAMETRES_ACHATS_DEFAUT = {
         "Référence « DS » exigée pour confirmer un BC GLOBAL RENTAL (1 = oui, 0 = non)", "0", "choix", {0, 1},
     ),
     "RETENTION_PIECES_ACHAT_ANS": ("Conservation des pièces d'achat et des litiges en GED", "10", "ans", None),
-    "AGREMENT_DUREE_MOIS": ("Durée d'un agrément fournisseur sans date de fin saisie", "12", "mois", None),
+    "AGREMENT_DUREE_MOIS": ("Durée d'un agrément fournisseur (demande M2 sans date de fin et audit qualité M6)", "12", "mois", None),  # source unique (M2 + M6), à confirmer par ETSL
     "AGREMENT_ALERTE_JOURS": ("Alerte avant la fin d'un agrément fournisseur", "30", "jours", None),
 }
 TYPE_GED_ACHATS = "pieces-achats"
