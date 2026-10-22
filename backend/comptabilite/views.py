@@ -1018,3 +1018,45 @@ class LocationGrComptaViewSet(DjangoValidationMixin, viewsets.ViewSet):
             raise NotFound("Location inconnue.")
         move = gr.comptabiliser_location_gr(location, request.user)
         return Response({"numero": move.number, "montant": str(move.total_debit)}, status=status.HTTP_201_CREATED)
+
+
+class RetenueGarantieViewSet(DjangoValidationMixin, viewsets.ViewSet):
+    """Retenues de garantie clients par affaire (M1 → M10) : cumul, libéré, solde, échéance ; libération."""
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [can_read_module("comptabilite")()]
+        return [CanValidateCompta()]
+
+    def list(self, request):
+        from . import retenues
+        from .services import parametres_provisoires
+
+        voit = can_see_amount(request.user)
+        rows = []
+        for r in retenues.situation_affaires():
+            rows.append({
+                **r, "date_liberation": r["date_liberation"].isoformat() if r["date_liberation"] else None,
+                **{k: (str(r[k]) if voit else None) for k in ("retenue", "liberee", "solde")},
+            })
+        return Response({
+            "rows": rows, "has_amount_access": voit, "compte": retenues.compte_retenue().code if voit else None,
+            "provisoire": parametres_provisoires(["RETENUE_GARANTIE_ACTIVE", "RETENUE_GARANTIE_COMPTE"]),
+        })
+
+    @action(detail=True, methods=["post"])
+    def liberer(self, request, pk=None):
+        from commercial.models import Affaire
+
+        from . import retenues
+
+        if not _est_uuid(pk):
+            raise DRFValidationError("Affaire inconnue.")
+        affaire = Affaire.objects.filter(pk=pk).first()
+        if affaire is None:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound("Affaire inconnue.")
+        lib = retenues.liberer(affaire, request.user, str(request.data.get("motif", "") or ""))
+        return Response({"montant": str(lib.montant), "numero": lib.move.number if lib.move else None},
+                        status=status.HTTP_201_CREATED)

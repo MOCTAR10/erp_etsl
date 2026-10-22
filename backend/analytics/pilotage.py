@@ -175,6 +175,7 @@ def pipe_vers_budget(annee=None):
 # ---------------------------------------------------------------------------------------------------------------------
 # Alertes calendaires : garantie, agrément fournisseur / matière, audit interne, revue de direction
 # ---------------------------------------------------------------------------------------------------------------------
+# Défauts seulement : la valeur effective est le paramètre `DEST_*` (cubes.destinataires_famille).
 DESTINATAIRES_CALENDAIRES = {
     "garantie": (User.Role.MAINTENANCE, User.Role.DIRECTEUR_OPERATIONS),
     "agrement_fournisseur": (User.Role.QAQC, User.Role.HSE),

@@ -31,6 +31,7 @@ from .serializers import (
     LotMatiereSerializer,
     MouvementStockSerializer,
     ParametreStockSerializer,
+    ReservationStockSerializer,
     PlanInventaireTournantSerializer,
     StockQuantSerializer,
     TraceabiliteEntrySerializer,
@@ -452,3 +453,46 @@ class ParametreStockViewSet(viewsets.ModelViewSet):
         p.confirme_le = timezone.now()
         p.save(update_fields=["statut_valeur", "confirme_par", "confirme_le"])
         return Response(self.get_serializer(p).data)
+
+
+class ReservationStockViewSet(viewsets.ReadOnlyModelViewSet):
+    """Réservations physiques des besoins matière M3 ; disponible = physique − réservations actives des autres OF."""
+
+    serializer_class = ReservationStockSerializer
+    permission_classes = [CanManageStocks]
+
+    def get_queryset(self):
+        from .models import ReservationStock
+
+        qs = ReservationStock.objects.select_related("article", "ordre")
+        for param, champ in (("statut", "statut"), ("article", "article_id"), ("ordre", "ordre_id")):
+            valeur = self.request.query_params.get(param)
+            if valeur:
+                qs = qs.filter(**{champ: valeur})
+        return qs
+
+    @action(detail=False, methods=["get"])
+    def disponibilites(self, request):
+        """Par article réservé : stock physique, réservé actif, disponible."""
+        from .models import ReservationStock
+        from .reservations import reserve_active, stock_physique
+
+        articles = {}
+        for r in ReservationStock.objects.filter(statut=ReservationStock.Statut.ACTIVE).select_related("article"):
+            articles[r.article_id] = r.article
+        rows = []
+        for art_id, art in sorted(articles.items(), key=lambda kv: kv[1].code):
+            physique, reserve = stock_physique(art_id), reserve_active(art_id)
+            rows.append({"article": str(art_id), "code": art.code, "label": art.label, "physique": str(physique),
+                         "reserve": str(reserve), "disponible": str(physique - reserve)})
+        return Response({"rows": rows, "bloquante": get_param_stock("RESERVATION_BLOQUANTE") >= 1})
+
+    @action(detail=True, methods=["post"])
+    def liberer(self, request, pk=None):
+        from .reservations import liberer
+
+        try:
+            resa = liberer(self.get_object(), str(request.data.get("motif", "") or "").strip(), request.user)
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": exc.messages})
+        return Response(self.get_serializer(resa).data)

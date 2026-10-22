@@ -2,6 +2,8 @@
 
 from rest_framework import serializers
 
+from config.serializers import ModelCleanMixin
+
 from .models import (
     CompteBancaire,
     ControleInterne,
@@ -305,7 +307,7 @@ class DeclarationTvaSerializer(serializers.ModelSerializer):
         return data
 
 
-class ControleInterneSerializer(serializers.ModelSerializer):
+class ControleInterneSerializer(ModelCleanMixin, serializers.ModelSerializer):
     statut_label = serializers.CharField(source="get_statut_display", read_only=True)
     responsable_name = serializers.CharField(
         source="responsable.get_full_name", read_only=True, default=None
@@ -437,18 +439,19 @@ class FactureClientSerializer(serializers.ModelSerializer):
     has_amount_access = serializers.SerializerMethodField()
     avertissement_provisoire = serializers.SerializerMethodField()
     move_number = serializers.CharField(source="move.number", read_only=True, default=None)
+    net_a_payer = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
 
     class Meta:
         model = FactureClient
         fields = [
             "id", "code", "nature", "statut", "client", "client_name", "affaire", "jalon", "situation",
             "facture_origine", "objet", "date", "echeance", "taux_tva", "montant_ht", "montant_tva",
-            "montant_ttc", "move", "move_number", "document", "emise_par", "emise_le", "lignes",
-            "has_amount_access", "avertissement_provisoire", "created_at",
+            "montant_ttc", "taux_retenue", "montant_retenue", "net_a_payer", "move", "move_number", "document",
+            "emise_par", "emise_le", "lignes", "has_amount_access", "avertissement_provisoire", "created_at",
         ]
         read_only_fields = [
             "code", "nature", "statut", "affaire", "jalon", "situation", "facture_origine", "montant_ht",
-            "montant_tva", "montant_ttc", "move", "document", "emise_par", "emise_le",
+            "montant_tva", "montant_ttc", "taux_retenue", "montant_retenue", "move", "document", "emise_par", "emise_le",
         ]
 
     def get_has_amount_access(self, obj):
@@ -491,8 +494,15 @@ class FactureClientSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        if instance.statut == FactureClient.Statut.BROUILLON:
+            # Report prévisionnel de la retenue (fixée à l'émission d'après le contrat de l'affaire, M1).
+            from . import retenues
+
+            taux, montant = retenues.calculer(instance)
+            data["taux_retenue"], data["montant_retenue"] = str(taux), str(montant)
+            data["net_a_payer"] = str(instance.montant_ttc - montant)
         if not data["has_amount_access"]:
-            for cle in ("montant_ht", "montant_tva", "montant_ttc"):
+            for cle in ("montant_ht", "montant_tva", "montant_ttc", "montant_retenue", "net_a_payer"):
                 data[cle] = None
             for l in data["lignes"]:
                 l["prix_unitaire"] = l["montant"] = None

@@ -68,14 +68,55 @@ DEFINITION_BS = "BS = bon de sortie magasin (M5) consommé par un OF de l'affair
 
 NATURES_ACHAT = ("fourniture", "sous_traitance", "equipement")
 
+# Ces valeurs sont des DÉFAUTS : la valeur effective est un `ParametreCommercial` (champ `texte`, + `valeur` = poids
+# pour un critère RAO), modifiable à l'écran et confirmé par la Direction.
+TEXTES_DEFAUT = {
+    **{f"RAO_CRITERE_{i}": c["libelle"] for i, c in enumerate(CRITERES_RAO_DEFAUT, start=1)},
+    "DEFINITION_BS": DEFINITION_BS,
+    "DEFINITION_PRIX_MOYEN": "Moyenne du montant des offres gagnées (option retenue) — définition provisoire.",
+    "NOTE_MODELE_PDF": "Modèle provisoire généré par l'ERP — à confirmer ou remplacer par le modèle officiel ETSL.",
+}
+for _i, _c in enumerate(CRITERES_RAO_DEFAUT, start=1):
+    PARAMETRES_DEFAUT[f"RAO_CRITERE_{_i}"] = (
+        f"RAO ENG-PR1-01 : critère {_i} (libellé en texte, poids en valeur ; poids 0 = critère retiré)",
+        Decimal(_c["poids"]), "pts",
+    )
+PARAMETRES_DEFAUT["DEFINITION_BS"] = ("Définition du « BS » (affaires, jalons, OF, BS)", ZERO, "texte")
+PARAMETRES_DEFAUT["DEFINITION_PRIX_MOYEN"] = ("Reporting : définition du prix moyen des offres", ZERO, "texte")
+PARAMETRES_DEFAUT["NOTE_MODELE_PDF"] = ("Mention portée sur les PDF RAO / RC (modèle provisoire)", ZERO, "texte")
+CODES_TEXTE_SEUL = ("DEFINITION_BS", "DEFINITION_PRIX_MOYEN", "NOTE_MODELE_PDF")
+CODES_CRITERES_RAO = tuple(f"RAO_CRITERE_{i}" for i in range(1, len(CRITERES_RAO_DEFAUT) + 1))
+
 
 # --------------------------------------------------------------------------------------------- paramètres
 def get_param(code):
     from .models import ParametreCommercial
 
+    return _param_obj(code).valeur
+
+
+def _param_obj(code):
+    from .models import ParametreCommercial
+
     label, valeur, unite = PARAMETRES_DEFAUT[code]
-    obj, _ = ParametreCommercial.objects.get_or_create(code=code, defaults={"label": label, "valeur": valeur, "unite": unite})
-    return obj.valeur
+    defaults = {"label": label, "valeur": valeur, "unite": unite, "texte": TEXTES_DEFAUT.get(code, "")}
+    return ParametreCommercial.objects.get_or_create(code=code, defaults=defaults)[0]
+
+
+def get_texte(code):
+    """Valeur texte d'un paramètre (définition, libellé de critère) ; le défaut si ETSL l'a vidée."""
+    return _param_obj(code).texte or TEXTES_DEFAUT.get(code, "")
+
+
+def criteres_rao():
+    """Critères du formulaire RAO ENG-PR1-01 : paramètres `RAO_CRITERE_n` (poids 0 = critère retiré)."""
+    sortie = []
+    for code in CODES_CRITERES_RAO:
+        p = _param_obj(code)
+        if p.valeur > 0:
+            poids = int(p.valeur) if p.valeur == p.valeur.to_integral_value() else float(p.valeur)
+            sortie.append({"libelle": p.texte or TEXTES_DEFAUT[code], "poids": poids})
+    return sortie
 
 
 def assurer_parametres():
@@ -826,7 +867,7 @@ def pdf_rao(rao):
     tableau = [["Critère", "Poids", "Note /100"]] + [
         [str(c.get("libelle", "")), str(c.get("poids", "")), str(c.get("note", ""))] for c in (rao.criteres or [])
     ]
-    return _pdf(f"Revue d'appel d'offres {rao.tender_ref or ''}".strip(), lignes, tableau, NOTE_MODELE)
+    return _pdf(f"Revue d'appel d'offres {rao.tender_ref or ''}".strip(), lignes, tableau, get_texte("NOTE_MODELE_PDF"))
 
 
 def pdf_rc(revue):
@@ -839,7 +880,7 @@ def pdf_rc(revue):
         ["Commentaire", revue.commentaire or "—"], ["Validée par", str(revue.valide_par or "—")],
         ["Validée le", f"{revue.valide_le:%d/%m/%Y %H:%M}" if revue.valide_le else "—"],
     ]
-    return _pdf(f"Revue de commande {revue.affaire.code}", lignes, note=NOTE_MODELE)
+    return _pdf(f"Revue de commande {revue.affaire.code}", lignes, note=get_texte("NOTE_MODELE_PDF"))
 
 
 def archiver_rao(rao, user):
@@ -891,5 +932,5 @@ def indicateurs_commerciaux(voir):
         "score_moyen": _s(Decimal(sum(scores)) / len(scores)) if scores else None,
         "clients_sous_seuil": sum(1 for s in scores if s < seuil),
         "clients_70_plus": sum(1 for s in scores if s >= 70),
-        "definition_prix_moyen": "Moyenne du montant des offres gagnées (option retenue) — définition provisoire.",
+        "definition_prix_moyen": get_texte("DEFINITION_PRIX_MOYEN"),
     }

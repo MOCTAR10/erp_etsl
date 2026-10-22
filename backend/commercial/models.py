@@ -985,6 +985,10 @@ class ParametreCommercial(models.Model):
     label = models.CharField(max_length=200, verbose_name="Libellé")
     valeur = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Valeur")
     unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    texte = models.TextField(
+        blank=True, verbose_name="Valeur texte",
+        help_text="Libellé d'un critère RAO, définition (BS, prix moyen) ou mention de modèle PDF.",
+    )
     statut_valeur = models.CharField(
         max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut de la valeur"
     )

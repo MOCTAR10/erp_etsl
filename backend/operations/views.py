@@ -193,15 +193,23 @@ class OrdreFabricationViewSet(_CommonViewSet):
         reponse = self._transition([OrdreFabrication.Status.TERMINE], OrdreFabrication.Status.CLOTURE, controle_liberation)
         if reponse.status_code == status.HTTP_200_OK:
             figer_dossier(OrdreFabrication.objects.get(pk=pk))  # dossier opérationnel scellé, archivage 10 ans
+            from stocks.reservations import liberer_ordre
+
+            liberer_ordre(OrdreFabrication.objects.get(pk=pk), "OF clôturé : reliquat de réservation libéré")
         return reponse
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def annuler(self, request, pk=None):
-        return self._transition(
+        reponse = self._transition(
             [OrdreFabrication.Status.PREVU, OrdreFabrication.Status.LANCE, OrdreFabrication.Status.EN_COURS],
             OrdreFabrication.Status.ANNULE,
         )
+        if reponse.status_code == status.HTTP_200_OK:
+            from stocks.reservations import liberer_ordre
+
+            liberer_ordre(OrdreFabrication.objects.get(pk=pk), "OF annulé : réservation libérée")
+        return reponse
 
     @action(detail=False, methods=["get"], url_path="charge")
     def charge(self, request):
@@ -999,3 +1007,22 @@ class EscaladeSurchargeViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         return [can_read_module("operations")()]
+
+
+class FluxM4View(viewsets.ViewSet):
+    """Flux M4 → M3 par affaire (machines parc / GR, compteurs, BL), lu par l'écran opérations (lecture seule)."""
+
+    permission_classes = [can_read_module("operations")]
+
+    def list(self, request):
+        from logistique.services import flux_operations
+
+        affaire = request.query_params.get("affaire") or None
+        if affaire:
+            import uuid as _uuid
+
+            try:
+                _uuid.UUID(str(affaire))
+            except ValueError:
+                raise DRFValidationError({"affaire": "Identifiant d'affaire invalide."})
+        return Response(flux_operations(affaire))
