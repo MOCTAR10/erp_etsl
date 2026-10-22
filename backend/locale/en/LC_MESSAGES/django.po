@@ -6358,3 +6358,21 @@ msgstr "Source value to enter"
 
 msgid "À contrôler"
 msgstr "To be checked"
+
+msgid "aucun BC GLOBAL RENTAL lié à la prestation %(code)s : générez-le depuis la location (Achats)."
+msgstr "no GLOBAL RENTAL PO linked to service %(code)s: generate it from the rental (Purchasing)."
+
+msgid "BC %(code)s sans ligne."
+msgstr "PO %(code)s has no line."
+
+msgid "ligne de prestation introuvable ou ambiguë (%(ligne)s) : précisez la colonne « ligne » (désignation exacte)."
+msgstr "service line not found or ambiguous (%(ligne)s): fill in the \"ligne\" column (exact description)."
+
+msgid "montant_ht doit être strictement positif."
+msgstr "montant_ht must be strictly positive."
+
+msgid "partenaire de la prestation non marqué GLOBAL RENTAL (compte 618)."
+msgstr "the service partner is not flagged GLOBAL RENTAL (account 618)."
+
+msgid "date_reception dans le futur."
+msgstr "date_reception is in the future."

@@ -6,7 +6,7 @@
 - Clôture d'OT : écriture au journal OD (source M8), débit du compte d'entretien (624000 paramétrable) ou du 618000
   pour une machine GLOBAL RENTAL, sur le centre analytique ; crédit des comptes de transfert de la main-d'œuvre interne
   et des pièces sorties du stock (paramètres provisoires). Non bloquante : sans journal / période / compte, le motif
-  est conservé sur l'OT. Publication outbox `maintenance.ot.cout` pour M11.
+  est conservé sur l'OT. Publication outbox `maintenance.ot.cout` (diffusable par webhook ; M11 lit l'écriture analytique directement).
 - Coûts consolidés par an, mois, machine et centre analytique (`?export=xlsx|pdf`).
 """
 

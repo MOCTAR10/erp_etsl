@@ -168,6 +168,10 @@ class ChiffrageTests(BaseM1):
         da = PurchaseRequest.objects.get(pk=r.data["id"])
         affaire.refresh_from_db()
         self.assertEqual((da.lines.count(), da.analytic_id), (1, affaire.analytic_id))  # main-d'œuvre non achetée
+        # INT-02 / écart E2 : règle unique des Achats -> la DA porte l'affaire (filtres « par affaire » des Achats).
+        self.assertEqual(da.affaire_id, affaire.pk)
+        r = self.client.get(f"/api/achats/requests/?affaire={affaire.pk}")
+        self.assertEqual([d["id"] for d in r.data["results"]], [str(da.pk)])
         self.assertEqual(self.client.post(f"/api/commercial/affaires/{affaire.pk}/besoins-achat/").status_code, 400)
         r = self.client.get(f"/api/commercial/affaires/{affaire.pk}/achats/")
         self.assertEqual(r.data["demandes"][0]["code"], da.code)

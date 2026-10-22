@@ -257,6 +257,34 @@ class CircuitAmontTests(_Base):
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(r.data["affaire"], affaire.pk)
 
+    def test_regle_unique_affaire_da_m1_et_m2(self):
+        """INT-02 / écart E2 : les deux points d'entrée appliquent la même règle (affaire liée, natures achetées)."""
+        from achats.ecarts import da_depuis_affaire
+        from commercial.ecarts_m1 import generer_besoins_achat
+
+        service = Article.objects.create(code="SRV-U", label="Prestation", article_type="service", unit=self.unite)
+        opp = Opportunity.objects.create(subject="Unique")
+        offre = Estimate.objects.create(title="Offre", opportunity=opp, status=Estimate.Status.GAGNEE)
+        EstimateLine.objects.create(estimate=offre, article=self.tube, label="Tube", quantity=4, unit_price=500)
+        EstimateLine.objects.create(estimate=offre, article=service, label="Prestation", quantity=1, unit_price=900)
+        EstimateLine.objects.create(estimate=offre, label="Sous-traitance peinture", quantity=1, cout_unitaire=300,
+                                    unit_price=400, nature="sous_traitance")
+        EstimateLine.objects.create(estimate=offre, label="Soudeurs", quantity=1, unit_price=800, nature="main_oeuvre")
+        a1 = Affaire.objects.create(title="Depuis M1", opportunity=opp, status=Affaire.Status.CONFIRMEE)
+        a2 = Affaire.objects.create(title="Depuis M2", opportunity=opp, status=Affaire.Status.CONFIRMEE)
+        da1 = generer_besoins_achat(a1, self.logistique)
+        da2, n = da_depuis_affaire(a2, self.logistique)
+        self.assertEqual((da1.affaire_id, da2.affaire_id), (a1.pk, a2.pk))
+        libelles = lambda da: sorted(da.lines.values_list("label", flat=True))  # noqa: E731
+        self.assertEqual(libelles(da1), libelles(da2))
+        self.assertEqual(libelles(da1), ["Sous-traitance peinture", "Tube"])
+        self.assertEqual(n, 2)
+        self.assertEqual(da1.lines.get(label="Sous-traitance peinture").estimated_price, 300)
+        # Une seule DA brouillon par affaire, quel que soit le point d'entrée.
+        self.as_(self.logistique)
+        r = self.client.post("/api/achats/requests/depuis-affaire/", {"affaire": str(a1.pk)}, format="json")
+        self.assertEqual(r.status_code, 400)
+
     def test_location_gr_genere_le_bc_618_et_ds_parametrable(self):
         gr = Partner.objects.create(code="GR-E", name="Global Rental", kind=Partner.Kind.FOURNISSEUR, is_global_rental=True)
         eq = EquipementParc.objects.create(label="Grue 25 t", categorie="levage")

@@ -239,7 +239,7 @@ class Gabarit:
     cle: str
     colonnes: list
     traiter: Callable
-    cercle: str = "compta"  # compta | rh | paie | qualite
+    cercle: str = "compta"  # compta | rh | paie | qualite | hse | parc | gr
     sensibles: tuple = ()
     formats: tuple = ("csv", "xml")
     fichier_entier: bool = False
@@ -254,6 +254,8 @@ class Contexte:
     options: dict = field(default_factory=dict)
     archive: object = None  # zipfile.ZipFile (gabarit GED)
     lot_id: object = None
+    lignes: list = field(default_factory=list)  # toutes les lignes du fichier (gabarits groupés : BL GR)
+    memo: dict = field(default_factory=dict)  # état partagé entre les lignes d'un même fichier
 
 
 def _tiers(row, ctx):
@@ -795,6 +797,10 @@ from .importers_a7 import GABARITS_A7  # noqa: E402  (lot a7 : gabarits complém
 
 GABARITS.update({g.code: g for g in GABARITS_A7})
 
+from .importers_gr import GABARITS_GR  # noqa: E402  (D25 : échanges GLOBAL RENTAL récurrents par fichiers)
+
+GABARITS.update({g.code: g for g in GABARITS_GR})
+
 
 # --------------------------------------------------------------------------------------------------
 # Droits par gabarit
@@ -811,6 +817,7 @@ CERCLES_METIER = {
     "qualite": ("qaqc",),
     "hse": ("rh", "hse"),
     "parc": ("logistique", "maintenance"),
+    "gr": ("logistique",),  # D25 : lectures de compteur et BL GLOBAL RENTAL (factures GR = cercle comptable)
 }
 
 
@@ -913,6 +920,7 @@ def executer_lot(code, nom, contenu, user, mode=LotReprise.Mode.BLANC, force=Fal
             raise FichierErreur(tr("Colonnes manquantes : %(liste)s.") % {"liste": ", ".join(manquantes)})
         if not lignes:
             raise FichierErreur("Fichier vide.")
+        ctx.lignes = lignes
         for opt in gabarit.options:
             if opt == "date" and not ctx.options.get("date"):
                 raise FichierErreur("date obligatoire (1er jour de l'exercice).")

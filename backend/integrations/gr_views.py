@@ -11,8 +11,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from logistique.models import EquipementParc, LectureCompteur, LocationGR
-from logistique.services import reporter_compteur
+from logistique.models import EquipementParc, LocationGR
+from logistique.services import enregistrer_lecture_gr
 from users.permissions import IsAdminOrStaff
 
 from .auth import ApiKeyAuthentication, HasApiScope
@@ -106,22 +106,8 @@ class GrCompteursView(GrAPIView):
         d = s.validated_data
         with transaction.atomic():
             loc = _location(d["location"])
-            if loc.statut != LocationGR.Statut.ACTIVE:
-                raise serializers.ValidationError({"location": "La prestation n'est pas active."})
-            dernier = loc.lectures.order_by("-valeur").values_list("valeur", flat=True).first()
-            plancher = max(x for x in (dernier, loc.lecture_initiale) if x is not None) if (
-                dernier is not None or loc.lecture_initiale is not None
-            ) else None
-            if plancher is not None and d["valeur"] < plancher:
-                raise serializers.ValidationError(
-                    {"valeur": tr("Compteur en baisse : %(valeur)s < dernier relevé connu %(plancher)s.") % {"valeur": d['valeur'], "plancher": plancher}}
-                )
-            lecture = LectureCompteur.objects.create(
-                location=loc, date=d["date"], valeur=d["valeur"], type_lecture=d["type_lecture"],
-                source=LectureCompteur.Source.GR,
-            )
-            # Compteur du parc mis à jour (jamais à la baisse) et seuils préventifs M8 évalués (CDC M4 §12.7 / §12.11).
-            reporter_compteur(loc.equipement, lecture.valeur)
+            # Règle partagée avec le gabarit de fichier `gr_lectures_compteurs` (D25).
+            lecture = enregistrer_lecture_gr(loc, d["date"], d["valeur"], d["type_lecture"])
         return Response(
             {"id": str(lecture.pk), "code": lecture.code, "location": loc.code, "valeur": str(lecture.valeur)},
             status=status.HTTP_201_CREATED,
