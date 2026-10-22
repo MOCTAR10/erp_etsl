@@ -34,7 +34,7 @@ def evaluer(seuils, locust, chrono):
         taux = 100 * float(total["Failure Count"]) / float(total["Request Count"])
         lignes.append(("Taux d'erreur global (%)", round(taux, 2), seuils["taux_erreur_max_pct"],
                        taux <= seuils["taux_erreur_max_pct"]))
-        lignes.append(("Débit moyen (requêtes/s)", float(total.get("Requests/s") or 0), None, None))
+        lignes.append(("Débit moyen (requêtes/s)", round(float(total.get("Requests/s") or 0), 2), None, None))
     if chrono:
         lignes.append(("Paie complète du mois (s)", chrono["paie_complete_s"], seuils["paie_complete_s"],
                        chrono["paie_complete_s"] <= seuils["paie_complete_s"] and not chrono["paie"]["erreurs"]))
