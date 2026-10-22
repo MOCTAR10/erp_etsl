@@ -38,7 +38,6 @@ const ReinitialiserMotDePassePage = lazy(() =>
   import("./pages/MotDePasse").then((m) => ({ default: m.ReinitialiserMotDePassePage })),
 );
 const AdministrationPage = lazy(() => import("./pages/Administration").then((m) => ({ default: m.AdministrationPage })));
-const DemoUiPage = lazy(() => import("./pages/DemoUi").then((m) => ({ default: m.DemoUiPage })));
 const ReprisePage = lazy(() => import("./pages/Reprise").then((m) => ({ default: m.ReprisePage })));
 
 function pilotPage(children: ReactNode) {
@@ -128,7 +127,6 @@ export default function App() {
         <Route path="administration" element={pilotPage(<AdministrationPage />)} />
         <Route path="mon-mot-de-passe" element={pilotPage(<MonMotDePassePage />)} />
         <Route path="reprise" element={pilotPage(<ReprisePage />)} />
-        <Route path="demo-ui" element={pilotPage(<DemoUiPage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
