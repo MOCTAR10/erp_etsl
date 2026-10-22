@@ -1,4 +1,33 @@
 export const en = {
+  // UI primitives (menus, sheets, dates, grids, palette) — `components/ui` components.
+  ui: {
+    close: "Close",
+    moreActions: "More actions",
+    rowActions: "Row actions",
+    actions: "Actions",
+    notifications: "Notifications",
+    sortAsc: "sorted ascending",
+    sortDesc: "sorted descending",
+    sortBy: "Sort by {{column}}",
+    loadingRows: "Loading rows…",
+    date: {
+      placeholder: "dd/mm/yyyy",
+      openCalendar: "Open calendar",
+      clear: "Clear date",
+      invalid: "Invalid date (format dd/mm/yyyy)",
+      rangePlaceholder: "Pick a period",
+      from: "From",
+      to: "to",
+      today: "Today",
+    },
+    command: {
+      label: "Command palette",
+      placeholder: "Search a page, an action…",
+      empty: "No results",
+      loading: "Searching…",
+      hint: "Navigate ↑ ↓ · Open ↵ · Close Esc",
+    },
+  },
   app: {
     title: "ETSL — ERP",
     tagline: "ERP · Operations & workflows",
