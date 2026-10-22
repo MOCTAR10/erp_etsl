@@ -22,4 +22,6 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 MFA_ROLES = []
 
 CELERY_TASK_ALWAYS_EAGER = True
+# PDF/A : pas de Ghostscript dans la suite (empreintes SHA-256 stables) ; `documents/test_ecarts_a1.py` l'active.
+PDFA_ACTIF = False
 CELERY_TASK_EAGER_PROPAGATES = True

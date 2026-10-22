@@ -28,11 +28,11 @@ const useModeSignature = () =>
 function EnrolementTotp() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [cle, setCle] = useState<{ secret: string; otpauth_uri: string } | null>(null);
+  const [cle, setCle] = useState<{ secret: string; otpauth_uri: string; qr_svg?: string } | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const demarrer = useMutation({
-    mutationFn: () => api.post<{ secret: string; otpauth_uri: string }>("/api/documents/signatures/enrolement-totp/"),
+    mutationFn: () => api.post<{ secret: string; otpauth_uri: string; qr_svg?: string }>("/api/documents/signatures/enrolement-totp/"),
     onSuccess: (r) => {
       setCle(r);
       setError(null);
@@ -59,6 +59,12 @@ function EnrolementTotp() {
           </div>
         ) : (
           <>
+            {cle.qr_svg ? (
+              <>
+                <p className="muted">{t("ecarts_a1.signatures.scanner")}</p>
+                <img className="totp-qr" src={cle.qr_svg} alt={t("ecarts_a1.signatures.qrAlt")} data-testid="totp-qr" />
+              </>
+            ) : null}
             <p>
               {t("ecarts_correctif.sig.enrolSecret")} : <code>{cle.secret}</code>
             </p>
@@ -218,9 +224,38 @@ function Certificate({ id }: { id: string }) {
   );
 }
 
+/** Déblocage d'un signataire bloqué après trop d'essais : émetteur ou administration (`peut_debloquer`). */
+function Deblocage({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const debloquer = useMutation({
+    mutationFn: () => api.post<{ detail: string }>(`/api/documents/signatures/${id}/unlock/`),
+    onSuccess: (r) => {
+      setMsg({ ok: true, text: r.detail });
+      void qc.invalidateQueries({ queryKey: ["signatures"] });
+    },
+    onError: (e) => setMsg({ ok: false, text: describeError(e) }),
+  });
+  return (
+    <div className="sign-row">
+      <span className="action-error">{t("ecarts_a1.signatures.bloque")}</span>
+      <button className="btn ghost" onClick={() => debloquer.mutate()} disabled={debloquer.isPending}>
+        {t("ecarts_a1.signatures.debloquer")}
+      </button>
+      {msg && (
+        <span className={msg.ok ? "quick-form-ok" : "action-error"} role={msg.ok ? "status" : "alert"}>
+          {msg.text}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function RequestCard({ req }: { req: SignatureRequestItem }) {
   const { t, i18n } = useTranslation();
   const [showCert, setShowCert] = useState(false);
+  const peutDebloquer = (req as SignatureRequestItem & { peut_debloquer?: boolean }).peut_debloquer;
   return (
     <article className="card sign-card">
       <header className="itp-head">
@@ -244,6 +279,7 @@ function RequestCard({ req }: { req: SignatureRequestItem }) {
           </li>
         ))}
       </ol>
+      {peutDebloquer && <Deblocage id={req.id} />}
       {req.a_mon_tour && <SignPanel req={req} />}
       {req.status === "completed" && (
         <>
@@ -386,7 +422,8 @@ export function SignaturesPage() {
     <>
       <PageHeader title={t("signatures.title")} subtitle={t("signatures.subtitle")} />
       <NewRequest />
-      {mode?.enrolement_requis && <EnrolementTotp />}
+      {/* Application d'authentification toujours proposée tant qu'elle n'est pas activée (même avec la messagerie). */}
+      {mode && !mode.mfa_active && <EnrolementTotp />}
       {rows.length === 0 && <EmptyState label={t("signatures.none")} icon={FileSignature} />}
       {toSign.length > 0 && (
         <SectionCard title={`${t("signatures.toSign")} · ${toSign.length}`}>

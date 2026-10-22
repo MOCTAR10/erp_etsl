@@ -3,8 +3,11 @@
 - XLSX **typé** : nombres et montants en cellules numériques (format `# ##0.00`), dates en dates, booléens « Oui/Non »
   (et non tout en texte) ; en-tête figé, filtre automatique, largeur de colonne ajustée.
 - PDF : A4 paysage, en-tête répété à chaque page, métadonnées (titre, auteur, sujet), pied de page daté et paginé.
-  Le profil PDF/A (ICC, XMP) n'est pas produit par ReportLab : réserve signalée (question ETSL sur la norme exigée).
+  Post-traitement PDF/A (Ghostscript, `config/pdfa.py`) si le paramètre GED `PDFA_EXPORTS` est actif (EX-G-08).
 - CSV : séparateur `;`, UTF-8 avec BOM (ouverture directe dans Excel).
+
+Bilingue (EX-G-07) : titres, en-têtes de colonnes, Oui/Non et pied de page traduits par le catalogue `locale/`
+si la requête est en anglais (texte inconnu du catalogue : laissé en français).
 
 Le téléchargement est journalisé par `users.journal.JournalExportsMiddleware` (pièce jointe).
 """
@@ -17,6 +20,8 @@ from decimal import Decimal
 from django.http import HttpResponse
 from django.utils import timezone
 
+from .i18n import tr
+
 CONTENT_TYPES = {
     "csv": "text/csv; charset=utf-8",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -28,7 +33,7 @@ def _texte(v):
     if v is None:
         return ""
     if isinstance(v, bool):
-        return "Oui" if v else "Non"
+        return tr("Oui") if v else tr("Non")
     if isinstance(v, datetime):
         return timezone.localtime(v).strftime("%d/%m/%Y %H:%M") if timezone.is_aware(v) else v.strftime("%d/%m/%Y %H:%M")
     if isinstance(v, date):
@@ -45,7 +50,7 @@ def _cellule(v):
     if v is None:
         return None
     if isinstance(v, bool):
-        return "Oui" if v else "Non"
+        return tr("Oui") if v else tr("Non")
     if isinstance(v, Decimal):
         return float(v)
     if isinstance(v, datetime):
@@ -115,8 +120,8 @@ def to_pdf(lignes, colonnes, titre="Export", sous_titre=""):
     def pied(canvas, doc):
         canvas.saveState()
         canvas.setFont("Helvetica", 7)
-        canvas.drawString(10 * mm, 6 * mm, f"ETSL ERP — {titre} — généré le {genere}")
-        canvas.drawRightString(landscape(A4)[0] - 10 * mm, 6 * mm, f"Page {doc.page}")
+        canvas.drawString(10 * mm, 6 * mm, tr("ETSL ERP — %(titre)s — généré le %(date)s") % {"titre": titre, "date": genere})
+        canvas.drawRightString(landscape(A4)[0] - 10 * mm, 6 * mm, tr("Page %(numero)s") % {"numero": doc.page})
         canvas.restoreState()
 
     doc = SimpleDocTemplate(
@@ -145,13 +150,27 @@ def to_pdf(lignes, colonnes, titre="Export", sous_titre=""):
     return buffer.getvalue()
 
 
+def pdf_archivable(contenu):
+    """PDF converti en PDF/A selon les paramètres GED (`PDFA_EXPORTS`, `PDFA_NORME`) ; inchangé sinon."""
+    from documents.parametres import norme_pdfa, pdfa_exports_actif
+
+    from .pdfa import convertir_pdfa
+
+    norme = norme_pdfa()
+    if not norme or not pdfa_exports_actif():
+        return contenu
+    return convertir_pdfa(contenu, norme)[0]
+
+
 def export_response(lignes, colonnes, fmt, titre, nom_fichier, sous_titre=""):
-    """Réponse HTTP en pièce jointe pour `fmt` ∈ csv | xlsx | pdf."""
+    """Réponse HTTP en pièce jointe pour `fmt` ∈ csv | xlsx | pdf (libellés traduits, PDF/A selon le paramètre)."""
     lignes = list(lignes)
+    colonnes = [(k, tr(h)) for k, h in colonnes]
+    titre, sous_titre = tr(titre), tr(sous_titre)
     if fmt == "xlsx":
         contenu = to_xlsx(lignes, colonnes, titre)
     elif fmt == "pdf":
-        contenu = to_pdf(lignes, colonnes, titre, sous_titre)
+        contenu = pdf_archivable(to_pdf(lignes, colonnes, titre, sous_titre))
     else:
         fmt = "csv"
         contenu = to_csv(lignes, colonnes)
