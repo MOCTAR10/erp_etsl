@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
 interface Ref {
@@ -65,7 +65,7 @@ interface Synthese {
   has_amount_access: boolean;
 }
 
-const fcfa = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null) => (v === null ? "—" : formatMoney(Number(v)));
 function useListe<T>(key: string, path: string): T[] {
   return useQuery({ queryKey: ["a3", key], queryFn: () => api.listAll<T>(path), retry: 0 }).data ?? [];
 }

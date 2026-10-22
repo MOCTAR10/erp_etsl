@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
@@ -169,7 +169,7 @@ interface FnpApercu {
   compte: string;
 }
 
-const money = (v: string | null | undefined) => (v === null || v === undefined ? "••••••" : `${formatNumber(Number(v))} F`);
+const money = (v: string | null | undefined) => (v === null || v === undefined ? "••••••" : formatMoney(Number(v)));
 const pct = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${formatNumber(Number(v))} %`);
 const BASE = "/api/controle-gestion";
 

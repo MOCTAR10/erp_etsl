@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { Badge, QuickForm, SectionCard } from "../ui";
 
 interface Account {
@@ -39,7 +39,7 @@ interface CoutOf {
 }
 
 const ROLES = ["brut", "patronal", "net", "organismes", "impot", "autres_retenues", "provision_charge", "provision_dette"];
-const fcfa = (v: string) => `${formatNumber(Number(v))} F`;
+const fcfa = (v: string) => formatMoney(Number(v));
 
 /** Coût de main-d'œuvre chargé des pointages transférés en paie, par OF (aval M3 / M11). Masqué hors cercle des montants. */
 export function CoutMainOeuvreSection() {

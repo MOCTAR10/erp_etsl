@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 import { ApiError, api } from "../api/client";
 import { Badge, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionCard } from "../components/ui";
-import { formatDate, formatDateTime, formatNumber } from "../lib/format";
+import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { MonBulletin } from "../types";
 
 const TYPES = ["annuel", "rotation", "maladie", "maternite", "sans_solde", "exceptionnel"] as const;
@@ -124,9 +124,9 @@ export function MonEspacePage() {
               {bulletins.data!.map((b) => (
                 <tr key={b.id}>
                   <td>{b.periode.slice(0, 7)}</td>
-                  <td>{formatNumber(b.brut)} F</td>
+                  <td>{formatMoney(b.brut)}</td>
                   <td>
-                    <strong>{formatNumber(b.net)} F</strong>
+                    <strong>{formatMoney(b.net)}</strong>
                   </td>
                   <td>{b.disponible_le ? formatDateTime(b.disponible_le, lang) : "—"}</td>
                   <td>
@@ -154,7 +154,7 @@ export function MonEspacePage() {
                     <td>{l.libelle}</td>
                     <td style={{ textAlign: "right" }}>
                       {l.nature === "retenue" ? "−" : ""}
-                      {formatNumber(l.montant)} F
+                      {formatMoney(l.montant)}
                     </td>
                   </tr>
                 ))}
@@ -163,7 +163,7 @@ export function MonEspacePage() {
                     <strong>{t("monEspace.net")}</strong>
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    <strong>{formatNumber(ouvert.net)} F</strong>
+                    <strong>{formatMoney(ouvert.net)}</strong>
                   </td>
                 </tr>
               </tbody>

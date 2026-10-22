@@ -70,8 +70,9 @@ test.describe("M8 Maintenance : plans préventifs, qualification et historique",
 
     const plans = section.getByRole("table", { name: "Plans préventifs et calendrier (M8.2)" });
     const form = page.getByRole("form", { name: "Nouveau plan préventif" });
-    await section.getByRole("button", { name: "Nouveau plan préventif" }).click();
+    // Le formulaire s'ouvre dans un panneau latéral, refermé après chaque enregistrement.
     const saisir = async (libelle: string, periodicite: string, derniere: string) => {
+      await section.getByRole("button", { name: "Nouveau plan préventif" }).click();
       const equipement = form.getByLabel(/Équipement/);
       await expect(equipement.locator("option").nth(1)).toBeAttached();
       await equipement.selectOption({ index: 1 });
