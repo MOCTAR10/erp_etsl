@@ -32,6 +32,8 @@ PARAMETRES_DEFAUT = {
     "MDP_LIEN_VALIDITE_MIN": ("Validité du lien « mot de passe oublié »", Decimal("60"), "min", ""),
     # §8.2 Performance : seuil de temps de réponse au-delà duquel une requête est journalisée comme lente.
     "PERF_SEUIL_MS": ("Seuil de temps de réponse d'un écran (au-delà : requête journalisée lente)", Decimal("3000"), "ms", ""),
+    # EX-G-03 : un compte rattaché à un site ne lit que les fiches de son site (1) ; 0 = tous les sites (défaut).
+    "SITES_LECTURE_RESTREINTE": ("Lecture limitée au site de rattachement du compte (1 = oui, 0 = non)", Decimal("0"), "booléen", ""),
 }
 
 #: Paramètres à valeur texte (les autres sont numériques).
@@ -109,7 +111,7 @@ class ParametreTransverseViewSet(viewsets.ModelViewSet):
                     raise serializers.ValidationError({"valeur": "Nombre attendu."})
                 if valeur < 0 or not valeur.is_finite():
                     raise serializers.ValidationError({"valeur": "Valeur positive attendue."})
-                if p.code == "NOTIF_EMAIL_ACTIF" and valeur not in (0, 1):
+                if p.code in ("NOTIF_EMAIL_ACTIF", "SITES_LECTURE_RESTREINTE") and valeur not in (0, 1):
                     raise serializers.ValidationError({"valeur": "0 (non) ou 1 (oui)."})
                 p.valeur = valeur
             p.statut_valeur = ParametreTransverse.StatutValeur.PROVISOIRE

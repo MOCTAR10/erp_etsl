@@ -35,6 +35,7 @@ GESTION_AMOUNT_ROLES = (
     User.Role.FINANCE,
     User.Role.COMPTABLE,
     User.Role.DIRECTION,
+    User.Role.CONTROLEUR_GESTION,  # lot a5 : le contrôleur de gestion voit les montants de M11
 )
 
 ZERO = Decimal("0")

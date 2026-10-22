@@ -51,6 +51,10 @@ class Depot(models.Model):
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
     label = models.CharField(max_length=200, verbose_name="Désignation")
     site = models.CharField(max_length=120, blank=True, verbose_name="Site / localisation")
+    # EX-G-03 : site ETSL de rattachement (référentiel paramétrable ; reconnu automatiquement depuis le texte libre).
+    site_etsl = models.ForeignKey(
+        "referentiels.Site", null=True, blank=True, on_delete=models.PROTECT, related_name="depots", verbose_name="Site ETSL"
+    )
     responsable = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

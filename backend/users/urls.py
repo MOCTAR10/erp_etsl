@@ -7,6 +7,7 @@ from .views import (
     MeView,
     MfaEnrolementView,
     MfaVerificationView,
+    RolesView,
     ThrottledTokenObtainPairView,
     UserViewSet,
 )
@@ -24,6 +25,7 @@ urlpatterns = [
     path("mfa/verification/", MfaVerificationView.as_view(), name="mfa_verification"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("me/", MeView.as_view(), name="me"),
+    path("roles/", RolesView.as_view(), name="roles"),
     path("me/mot-de-passe/", ChangerMotDePasseView.as_view(), name="mot_de_passe_changer"),
     path("mot-de-passe/config/", ConfigMotDePasseView.as_view(), name="mot_de_passe_config"),
     path("mot-de-passe/oubli/", MotDePasseOublieView.as_view(), name="mot_de_passe_oubli"),

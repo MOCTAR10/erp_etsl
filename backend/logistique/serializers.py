@@ -40,6 +40,7 @@ class EquipementParcSerializer(serializers.ModelSerializer):
     proprietaire_code = serializers.CharField(source="proprietaire.code", read_only=True, default=None)
     proprietaire_gr = serializers.SerializerMethodField()
     plafond_pct = serializers.SerializerMethodField()
+    site_etsl_code = serializers.CharField(source="site_etsl.code", read_only=True, default=None)
 
     class Meta:
         model = EquipementParc
@@ -56,6 +57,8 @@ class EquipementParcSerializer(serializers.ModelSerializer):
             "compteur_type_label",
             "compteur_value",
             "site",
+            "site_etsl",
+            "site_etsl_code",
             "plafond_compteur",
             "plafond_pct",
             "is_global_rental",

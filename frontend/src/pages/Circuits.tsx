@@ -8,15 +8,24 @@ import type { Circuit, Paginated } from "../types";
 
 /** Rôles autorisés à modifier les circuits à chaud (EX-G-02) — le serveur reste la garde. */
 const GESTION_CIRCUITS = ["admin", "pdg", "dga"];
-const ROLES_ACTEURS = [
+/** Secours si `/api/users/roles/` est indisponible ; la liste de référence vient du serveur (`User.Role`). */
+const ROLES_SECOURS = [
   "pdg", "dga", "secretaire_general", "directeur_projets", "directeur_operations", "rh", "finance", "qaqc", "hse",
-  "logistique", "maintenance", "chef_atelier", "admin", "direction", "chef_service", "comptable",
+  "logistique", "maintenance", "chef_atelier", "charge_affaires", "controleur_gestion", "admin", "direction",
+  "chef_service", "comptable",
 ];
 
 export function CircuitsPage() {
   const { t } = useTranslation();
   const role = useAuth((s) => s.user?.role) ?? "";
   const gestion = GESTION_CIRCUITS.includes(role);
+  const roles = useQuery({
+    queryKey: ["roles-applicatifs"],
+    queryFn: () => api.get<{ results: { role: string; label: string }[] }>("/api/users/roles/").then((r) => r.results),
+    enabled: gestion,
+    retry: 0,
+    staleTime: 300_000,
+  }).data;
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["circuits", gestion],
     queryFn: () =>
@@ -31,7 +40,9 @@ export function CircuitsPage() {
       <ErrorState message={t("common.error")} onRetry={() => void refetch()} retryLabel={t("common.retry")} />
     );
 
-  const roleOpts = ROLES_ACTEURS.map((r) => ({ value: r, label: r }));
+  const roleOpts = roles?.length
+    ? roles.map((r) => ({ value: r.role, label: r.label }))
+    : ROLES_SECOURS.map((r) => ({ value: r, label: r }));
 
   return (
     <>

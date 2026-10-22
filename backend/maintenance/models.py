@@ -81,6 +81,10 @@ class Actif(models.Model):
         max_length=100, blank=True, verbose_name="N° de série"
     )
     site = models.CharField(max_length=120, blank=True, verbose_name="Site / dépôt")
+    # EX-G-03 : site ETSL de rattachement (référentiel paramétrable ; reconnu automatiquement depuis le texte libre).
+    site_etsl = models.ForeignKey(
+        "referentiels.Site", null=True, blank=True, on_delete=models.PROTECT, related_name="actifs_maintenance", verbose_name="Site ETSL"
+    )
     statut = models.CharField(
         max_length=14, choices=Statut.choices, default=Statut.OPERATIONNEL,
         verbose_name="Statut",

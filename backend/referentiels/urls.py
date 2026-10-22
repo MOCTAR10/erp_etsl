@@ -9,6 +9,7 @@ from .views import (
     ArticleViewSet,
     CurrencyViewSet,
     PartnerViewSet,
+    SiteViewSet,
     UnitOfMeasureViewSet,
 )
 
@@ -21,6 +22,7 @@ router.register("partners", PartnerViewSet, basename="partner")
 router.register("articles", ArticleViewSet, basename="article")
 router.register("analytic-axes", AnalyticAxisViewSet, basename="analyticaxis")
 router.register("analytic-accounts", AnalyticAccountViewSet, basename="analyticaccount")
+router.register("sites", SiteViewSet, basename="site")
 
 urlpatterns = [
     path("", include(router.urls)),

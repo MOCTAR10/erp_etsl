@@ -201,3 +201,12 @@ def can_read_app(user, app: str) -> bool:
     if app not in ERP_APPS:
         return True
     return app in modules_for_role(user.role)
+
+
+#: EX-G-03 (provisoire, à confirmer par ETSL) : rôles qui lisent tous les sites même quand la lecture est limitée au
+#: site de rattachement (paramètre transverse `SITES_LECTURE_RESTREINTE`).
+ROLES_TOUS_SITES: tuple[str, ...] = (_R.ADMIN, _R.PDG, _R.DGA, _R.DIRECTION, _R.CONTROLEUR_GESTION)
+
+
+def lecture_tous_sites(user) -> bool:
+    return bool(getattr(user, "is_staff", False)) or getattr(user, "role", None) in ROLES_TOUS_SITES

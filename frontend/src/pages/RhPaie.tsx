@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Banknote, CalendarClock, FileText, Inbox, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, Pagination, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
@@ -171,7 +173,8 @@ export function RhPaiePage() {
 
   const stats = useQuery({ queryKey: ["rhpaie-stats"], queryFn: api.rhPaieStats });
 
-  const employes = usePagedList<Employe>("rhpaie-employes", (q) => api.employes(q), { pageSize: 20 });
+  const [employeSite, setEmployeSite] = useState("");
+  const employes = usePagedList<Employe>("rhpaie-employes", (q) => api.employes(q), { pageSize: 20, extra: siteQuery(employeSite) });
 
   const conges = useQuery({
     queryKey: ["rhpaie-conges"],
@@ -253,9 +256,10 @@ export function RhPaiePage() {
         {t("rhPaie.pendingNote")}
       </p>
 
-      {(employes.count > 0 || employes.search) && (
+      {(employes.count > 0 || employes.search || employeSite) && (
         <SectionCard title={`${t("rhPaie.employes")} · ${employes.count}`}>
           <SearchField value={employes.search} onChange={employes.setSearch} placeholder={t("rhPaie.searchEmployes")} />
+          <SiteFilter value={employeSite} onChange={setEmployeSite} />
           {employesAll.length === 0 ? (
             <EmptyState icon={Inbox} label={t("common.empty")} />
           ) : (

@@ -4,6 +4,7 @@ import { ClipboardCheck, Coins, Hammer, Inbox, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
+import { SiteFilter, siteQuery, useSiteOptions } from "../components/sites/SiteFilter";
 import { ActionBar, type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
 import { ExigencesHabilitationSection, OtDetails, PlansPreventifsSection } from "../components/workflow/MaintenancePlansSection";
@@ -111,7 +112,9 @@ export function MaintenancePage() {
   const stats = useQuery({ queryKey: ["maintenance-stats"], queryFn: api.maintenanceStats });
 
   // Tableau des actifs paginé ; liste complète (toutes les pages) pour le formulaire et le décompte des arrêts.
-  const actifs = usePagedList<Actif>("maintenance-actifs", (q) => api.actifs(q));
+  const [actifSite, setActifSite] = useState("");
+  const siteOpts = useSiteOptions();
+  const actifs = usePagedList<Actif>("maintenance-actifs", (q) => api.actifs(q), { extra: siteQuery(actifSite) });
   const actifsTous = useQuery({
     queryKey: ["maintenance-actifs-choix"],
     queryFn: () => api.listAll<Actif>("/api/maintenance/actifs/"),
@@ -237,6 +240,7 @@ export function MaintenancePage() {
         endpoint="/api/maintenance/actifs/"
         fields={[
           { name: "designation", label: t("maintenance.col.designation"), required: true },
+          { name: "site_etsl", label: t("ecarts_a5.site"), type: "select", options: siteOpts },
           {
             name: "categorie", label: t("maintenance.col.category"), type: "select", required: true, defaultValue: "machine",
             options: ["machine", "engin", "levage", "atelier", "chantier", "outillage"].map((v) => ({ value: v, label: t(`maintenance.categories.${v}`) })),
@@ -251,9 +255,10 @@ export function MaintenancePage() {
           { name: "date_mise_en_service", label: t("m8e.actif.miseEnService"), type: "date" },
         ]}
       />
-      {(actifs.count > 0 || actifs.search) && (
+      {(actifs.count > 0 || actifs.search || actifSite) && (
         <SectionCard title={`${t("maintenance.actifs")} · ${actifs.count}`}>
           <SearchField value={actifs.search} onChange={actifs.setSearch} placeholder={t("maintenance.searchActifs")} />
+          <SiteFilter value={actifSite} onChange={setActifSite} />
           <div className="table-wrap">
             <table className="table">
               <thead>

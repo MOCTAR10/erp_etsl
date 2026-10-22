@@ -347,3 +347,59 @@ class TauxChange(models.Model):
     @property
     def est_provisoire(self):
         return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class Site(models.Model):
+    """Site ETSL (EX-G-03 multi-sites Port-Gentil / Libreville) : atelier, chantier, dépôt, base, bureaux.
+
+    Liste PROVISOIRE paramétrable à l'écran (Administration) tant qu'ETSL n'a pas fourni la liste officielle. Les
+    ressources structurantes (dépôt, équipement, actif, salarié, affaire, OF, compte utilisateur) s'y rattachent par
+    une clé `site_etsl` facultative. Les `alias` (mots-clés séparés par des virgules) rattachent automatiquement le
+    texte libre historique (« Base Libreville », « Port-Gentil »…) : voir `referentiels.sites`.
+    """
+
+    class TypeSite(models.TextChoices):
+        ATELIER = "atelier", "Atelier"
+        CHANTIER = "chantier", "Chantier"
+        DEPOT = "depot", "Dépôt / magasin"
+        BASE = "base", "Base logistique"
+        BUREAU = "bureau", "Bureaux / siège"
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    libelle = models.CharField(max_length=120, verbose_name="Libellé")
+    type_site = models.CharField(max_length=10, choices=TypeSite.choices, default=TypeSite.ATELIER, verbose_name="Type de site")
+    ville = models.CharField(max_length=80, blank=True, verbose_name="Ville")
+    alias = models.CharField(
+        max_length=300, blank=True, verbose_name="Mots-clés de rattachement",
+        help_text="Séparés par des virgules : le texte libre « site » des fiches qui les contient est rattaché à ce site.",
+    )
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="Confirmé par"
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Site ETSL"
+        verbose_name_plural = "Sites ETSL"
+
+    def __str__(self):
+        return f"{self.code} — {self.libelle}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+    @classmethod
+    def choix_filtre(cls):
+        """Valeurs proposées par le filtre multicritère (`config.filtres`, critère de type fk)."""
+        return [{"valeur": str(s.pk), "libelle": f"{s.code} — {s.libelle}"} for s in cls.objects.filter(actif=True)]

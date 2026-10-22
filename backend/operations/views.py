@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from integrations.idempotency import idempotent
+from config.filtres_vues import FiltresMulticriteresMixin
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -94,7 +95,10 @@ class GammeOperationViewSet(_CommonViewSet):
         return qs
 
 
-class OrdreFabricationViewSet(ConsommationOfMixin, _CommonViewSet):
+class OrdreFabricationViewSet(FiltresMulticriteresMixin, ConsommationOfMixin, _CommonViewSet):
+    # EX-G-03 : filtre par site (`?site_etsl=<id>`, GET filtres/) et restriction de lecture par site (paramètre).
+    champs_filtrables = ("site_etsl",)
+    champ_site = "site_etsl"
     serializer_class = OrdreFabricationSerializer
     search_fields = ("code", "label",)
 

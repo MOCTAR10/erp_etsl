@@ -55,11 +55,13 @@ class ActifSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Centre de coût attendu (axe AX-CC).")
         return value
 
+    site_etsl_code = serializers.CharField(source="site_etsl.code", read_only=True, default=None)
+
     class Meta:
         model = Actif
         fields = [
             "id", "code", "designation", "categorie", "categorie_label", "fabricant",
-            "modele", "numero_serie", "site", "statut", "statut_label", "en_arret",
+            "modele", "numero_serie", "site", "site_etsl", "site_etsl_code", "statut", "statut_label", "en_arret",
             "date_mise_en_service", "garanti_jusqu", "compteur_type",
             "compteur_type_label", "compteur_value", "compteur_lecture",
             "is_global_rental", "equipement_gr", "equipe_gr_code", "signe_618",

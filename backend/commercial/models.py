@@ -516,6 +516,10 @@ class Affaire(models.Model):
     )
     title = models.CharField(max_length=200, verbose_name="Intitulé")
     description = models.TextField(blank=True, verbose_name="Description")
+    # EX-G-03 : site ETSL de rattachement (référentiel paramétrable ; reconnu automatiquement depuis le texte libre).
+    site_etsl = models.ForeignKey(
+        "referentiels.Site", null=True, blank=True, on_delete=models.PROTECT, related_name="affaires", verbose_name="Site ETSL"
+    )
     affaire_type = models.CharField(
         max_length=12, choices=AffaireType.choices, default=AffaireType.ATELIER,
         verbose_name="Type",

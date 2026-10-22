@@ -243,3 +243,13 @@ class JournalAccesViewSet(viewsets.ReadOnlyModelViewSet):
         response = HttpResponse(buffer.getvalue().encode("utf-8-sig"), content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="journal_acces.csv"'
         return response
+
+
+class RolesView(APIView):
+    """Rôles applicatifs `{role, label}` (listes de choix du SPA, ex. acteurs des circuits) : tout compte connecté."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        return Response({"results": [{"role": v, "label": str(lib)} for v, lib in User.Role.choices]})

@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
+from config.filtres_vues import FiltresMulticriteresMixin
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -60,7 +61,10 @@ from .services import (
 )
 
 
-class DepotViewSet(viewsets.ModelViewSet):
+class DepotViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
+    # EX-G-03 : filtre par site (`?site_etsl=<id>`, GET filtres/) et restriction de lecture par site (paramètre).
+    champs_filtrables = ("site_etsl",)
+    champ_site = "site_etsl"
     queryset = Depot.objects.select_related("responsable").all()
     serializer_class = DepotSerializer
     search_fields = ("code", "label", "site",)

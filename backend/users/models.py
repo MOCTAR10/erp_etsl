@@ -80,6 +80,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     mfa_dernier_pas = models.BigIntegerField(null=True, blank=True, editable=False)
     # Réinitialisation par l'administrateur : changement de mot de passe imposé à la prochaine connexion.
     doit_changer_mdp = models.BooleanField(default=False, verbose_name="Doit changer son mot de passe")
+    # EX-G-03 : site ETSL de rattachement (référentiel paramétrable ; reconnu automatiquement depuis le texte libre).
+    site_etsl = models.ForeignKey(
+        "referentiels.Site", null=True, blank=True, on_delete=models.PROTECT, related_name="utilisateurs", verbose_name="Site ETSL"
+    )
 
     objects = UserManager()
 

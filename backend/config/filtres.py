@@ -117,6 +117,8 @@ def decrire_filtres(model, champs, libelles=None):
         description = {"champ": nom, "type": genre, "libelle": tr(libelle)}
         if genre == "choix":
             description["choix"] = [{"valeur": str(v), "libelle": tr(str(lib))} for v, lib in field.flatchoices]
+        elif genre == "fk" and hasattr(field.related_model, "choix_filtre"):  # petit référentiel (ex. sites ETSL)
+            description["choix"] = field.related_model.choix_filtre()
         if genre in ("date", "nombre"):
             description["parametres"] = [f"{nom}__gte", f"{nom}__lte"]
         else:
@@ -129,6 +131,11 @@ class FiltreMulticritere(BaseFilterBackend):
     """Backend DRF : inerte tant que la vue ne déclare pas `champs_filtrables`."""
 
     def filter_queryset(self, request, queryset, view):
+        # EX-G-03 : restriction de lecture par site (paramètre transverse, désactivé par défaut), listes ET détail.
+        if champ_site := getattr(view, "champ_site", None):
+            from referentiels.sites import restreindre_par_site
+
+            queryset = restreindre_par_site(request, queryset, champ_site)
         champs = getattr(view, "champs_filtrables", None)
         if not champs or getattr(view, "detail", False):  # actions de détail : pas de filtrage de liste
             return queryset

@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 from django.utils import timezone
+from config.filtres_vues import FiltresMulticriteresMixin
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -68,7 +69,10 @@ def _choix(raw, choices, field):
     return raw
 
 
-class ActifViewSet(viewsets.ModelViewSet):
+class ActifViewSet(FiltresMulticriteresMixin, viewsets.ModelViewSet):
+    # EX-G-03 : filtre par site (`?site_etsl=<id>`, GET filtres/) et restriction de lecture par site (paramètre).
+    champs_filtrables = ("site_etsl",)
+    champ_site = "site_etsl"
     queryset = Actif.objects.select_related("equipement_gr").all()
     serializer_class = ActifSerializer
     search_fields = ("code", "designation", "numero_serie",)
