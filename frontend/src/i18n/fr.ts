@@ -256,6 +256,24 @@ export const fr = {
     search: "Rechercher un module…",
     noResult: "Aucun module trouvé",
   },
+  ecarts_a1: {
+    filtres: {
+      titre: "Filtres multicritères",
+      du: "du",
+      au: "au",
+      tous: "Tous",
+      oui: "Oui",
+      non: "Non",
+      effacer_one: "Effacer le filtre",
+      effacer_other: "Effacer les {{count}} filtres",
+    },
+    signatures: {
+      scanner: "Scannez ce QR code avec votre application d'authentification (ou saisissez la clé ci-dessous).",
+      qrAlt: "QR code d'enrôlement de l'application d'authentification",
+      bloque: "Signataire bloqué après trop d'essais.",
+      debloquer: "Débloquer",
+    },
+  },
   ecarts_tr: {
     nav: { ged: "GED — Documents", parametres: "Paramètres ETSL", administration: "Administration" },
     dashboard: {

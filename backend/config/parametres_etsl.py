@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 
 MODULES = {
     "users": "Socle — transverse",
-    "documents": "Socle — GED (rétention)",
+    "documents": "Socle — GED (rétention, PDF/A)",
     "commercial": "M1 Commercial",
     "achats": "M2 Achats",
     "operations": "M3 Opérations",
@@ -74,6 +74,7 @@ REGISTRE = (
     _std("documents.DocumentType", "documents.views.DocumentTypeViewSet", "/api/documents/types/", "/documents",
          valeur="retention_years", type_valeur="entier", edition="definir-retention", champ="retention_years",
          confirmation="confirmer-retention", extra={"unite": "ans"}),
+    _std("documents.ParametreGed", "documents.parametres.ParametreGedViewSet", "/api/documents/parametres/", "/documents"),
     _std("commercial.ParametreCommercial", "commercial.views.ParametreCommercialViewSet", "/api/commercial/parametres/", "/pipeline"),
     _std("achats.ParametreAchats", "achats.views_ecarts.ParametreAchatsViewSet", "/api/achats/parametres/", "/purchases"),
     _std("operations.ParametreOperations", "operations.views.ParametreOperationsViewSet", "/api/operations/parametres/", "/operations"),
@@ -233,9 +234,10 @@ class ParametresEtslView(APIView):
         fmt = p.get("export")
         if fmt in ("csv", "xlsx", "pdf"):
             from .exports import export_response
+            from .i18n import tr
 
             for ligne in lignes:
-                ligne["statut"] = "Provisoire — à confirmer ou modifier par ETSL" if ligne["provisoire"] else "Confirmé"
+                ligne["statut"] = tr("Provisoire — à confirmer ou modifier par ETSL") if ligne["provisoire"] else tr("Confirmé")
                 ligne["a_confirmer"] = ""
             return export_response(
                 lignes, COLONNES_EXPORT, fmt, "Paramètres ETSL", "parametres_etsl",

@@ -137,6 +137,8 @@ rpds-py==2026.9.1
     #   referencing
 s3transfer==0.19.2
     # via boto3
+segno==1.6.6
+    # via -r requirements.txt
 six==1.17.0
     # via python-dateutil
 sqlparse==0.6.0

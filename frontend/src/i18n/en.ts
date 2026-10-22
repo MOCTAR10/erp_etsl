@@ -256,6 +256,24 @@ export const en = {
     search: "Search a module…",
     noResult: "No module found",
   },
+  ecarts_a1: {
+    filtres: {
+      titre: "Multi-criteria filters",
+      du: "from",
+      au: "to",
+      tous: "All",
+      oui: "Yes",
+      non: "No",
+      effacer_one: "Clear the filter",
+      effacer_other: "Clear the {{count}} filters",
+    },
+    signatures: {
+      scanner: "Scan this QR code with your authenticator app (or enter the key below).",
+      qrAlt: "Authenticator app enrolment QR code",
+      bloque: "Signer locked after too many attempts.",
+      debloquer: "Unlock",
+    },
+  },
   ecarts_tr: {
     nav: { ged: "DMS — Documents", parametres: "ETSL settings", administration: "Administration" },
     dashboard: {

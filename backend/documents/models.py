@@ -107,6 +107,9 @@ class Version(models.Model):
     size = models.PositiveBigIntegerField(verbose_name="Taille (octets)")
     original_filename = models.CharField(max_length=255, verbose_name="Nom d'origine")
     note = models.CharField(max_length=255, blank=True, verbose_name="Note de version")
+    # EX-G-08 : résultat du post-traitement PDF/A au versement (converti, non_pdf, pdf_signe, gs_absent, echec…).
+    pdfa_statut = models.CharField(max_length=12, blank=True, default="", verbose_name="Conversion PDF/A")
+    pdfa_norme = models.CharField(max_length=4, blank=True, default="", verbose_name="Norme PDF/A")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL
     )
@@ -474,3 +477,37 @@ class DemandePurge(models.Model):
 
     def __str__(self):
         return f"{self.document_title} [{self.statut}]"
+
+
+class ParametreGed(models.Model):
+    """Paramètre provisoire de la GED (écarts a1) : norme PDF/A d'archivage, PDF/A des exports (EX-G-08).
+
+    Défauts créés à la volée par `documents.parametres` ; provisoire tant qu'ETSL ne l'a pas confirmé.
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Valeur")
+    texte = models.CharField(max_length=200, blank=True, verbose_name="Valeur texte")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut de la valeur"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre GED"
+        verbose_name_plural = "Paramètres GED"
+
+    def __str__(self):
+        return f"{self.code} = {self.texte or self.valeur} {self.unite}"

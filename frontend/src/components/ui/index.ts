@@ -21,3 +21,5 @@ export type { QuickField } from "./QuickForm";
 export { PAGE_SIZES, Pagination } from "./Pagination";
 export { SearchField } from "./SearchField";
 export { PagedDataTable } from "./PagedDataTable";
+export { FilterBar, filtersToQuery } from "./FilterBar";
+export type { FilterDef, FilterValues } from "./FilterBar";

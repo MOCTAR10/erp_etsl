@@ -16,3 +16,5 @@ gunicorn>=22.0
 openpyxl>=3.1
 cryptography>=43
 reportlab>=4.2
+# QR code SVG de l enrolement TOTP (ecran Signatures), pur Python sans dependance.
+segno>=1.6

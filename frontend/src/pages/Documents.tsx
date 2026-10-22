@@ -5,8 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Kpi, PageHeader, PagedDataTable, SectionCard } from "../components/ui";
-import type { BadgeTone, Column } from "../components/ui";
+import { ActionBar, Badge, FilterBar, filtersToQuery, Kpi, PageHeader, PagedDataTable, SectionCard } from "../components/ui";
+import type { BadgeTone, Column, FilterDef, FilterValues } from "../components/ui";
 import { formatDate } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
 import { usePagedList } from "../lib/usePagedList";
@@ -33,6 +33,8 @@ interface DocRow {
   reference: string;
   sha256: string;
   created_at: string;
+  pdfa_statut?: string;
+  pdfa_norme?: string;
 }
 interface Facets {
   total: number;
@@ -44,7 +46,6 @@ interface Verification {
   actual_sha256: string;
 }
 
-const STATUTS = ["draft", "in_validation", "rejected", "archived"] as const;
 const TON: Record<string, BadgeTone> = { draft: "neutral", in_validation: "warn", rejected: "err", archived: "ok" };
 
 /** Formulaire d'ajout d'un document (fichier + métadonnées) : POST multipart sur l'API GED existante. */
@@ -144,18 +145,22 @@ function AjoutDocument({ types }: { types: DocType[] }) {
 
 /** GED autonome (flux M12 → tous) : recherche plein texte, filtres, ajout, téléchargement, intégrité, circuit. */
 export function DocumentsPage() {
-  const { t } = useTranslation();
-  const [statut, setStatut] = useState("");
-  const [type, setType] = useState("");
+  const { t, i18n } = useTranslation();
+  const [criteres, setCriteres] = useState<FilterValues>({});
   const [annee, setAnnee] = useState("");
   const [verif, setVerif] = useState<Record<string, Verification | string>>({});
-  const filtres = new URLSearchParams();
-  if (statut) filtres.set("status", statut);
-  if (type) filtres.set("type", type);
+  // EX-G-09 : critères multicritères décrits par l'API (libellés traduits côté serveur) + année.
+  const filtres = new URLSearchParams(filtersToQuery(criteres));
   if (/^\d{4}$/.test(annee)) filtres.set("year", annee);
   const extra = filtres.toString();
 
   const types = useQuery({ queryKey: ["ged-types"], queryFn: () => api.listAll<DocType>("/api/documents/types/"), retry: 0 }).data ?? [];
+  const defs =
+    useQuery({
+      queryKey: ["ged-filtres", i18n.language],
+      queryFn: () => api.get<{ results: FilterDef[] }>("/api/documents/documents/filtres/"),
+      retry: 0,
+    }).data?.results ?? [];
   const facets = useQuery({
     queryKey: ["ged-facets", extra],
     queryFn: () => api.get<Facets>(`/api/documents/documents/facets/${extra ? `?${extra}` : ""}`),
@@ -182,6 +187,12 @@ export function DocumentsPage() {
       render: (d) => (
         <>
           <strong>{d.title}</strong>
+          {d.pdfa_statut === "converti" ? (
+            <>
+              {" "}
+              <Badge tone="ok">PDF/A-{d.pdfa_norme}</Badge>
+            </>
+          ) : null}
           <div className="muted" style={{ fontSize: 12 }}>
             {[d.reference, d.counterparty, d.project, d.dossier_path].filter(Boolean).join(" · ")}
           </div>
@@ -250,29 +261,14 @@ export function DocumentsPage() {
           </div>
         }
       >
+        <FilterBar
+          defs={defs}
+          value={criteres}
+          onChange={setCriteres}
+          idPrefix="ged-f"
+          options={{ type: types.map((ty) => ({ valeur: String(ty.id), libelle: ty.label })) }}
+        />
         <div className="quick-form-grid">
-          <div className="field">
-            <label htmlFor="ged-f-statut">{t("ecarts_tr.ged.statut")}</label>
-            <select id="ged-f-statut" value={statut} onChange={(e) => setStatut(e.target.value)}>
-              <option value="">{t("ecarts_tr.parametres.tous")}</option>
-              {STATUTS.map((s) => (
-                <option key={s} value={s}>
-                  {t(`ecarts_tr.ged.statuts.${s}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="ged-f-type">{t("ecarts_tr.ged.type")}</label>
-            <select id="ged-f-type" value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="">{t("ecarts_tr.parametres.tous")}</option>
-              {types.map((ty) => (
-                <option key={ty.id} value={ty.id}>
-                  {ty.label}
-                </option>
-              ))}
-            </select>
-          </div>
           <div className="field">
             <label htmlFor="ged-f-annee">{t("ecarts_tr.ged.annee")}</label>
             <input id="ged-f-annee" inputMode="numeric" maxLength={4} value={annee} onChange={(e) => setAnnee(e.target.value)} />
