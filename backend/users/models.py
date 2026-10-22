@@ -1,7 +1,10 @@
 import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.conf import settings
 from django.db import models
+
+from config.fields import EncryptedCharField
 
 
 class UserManager(BaseUserManager):
@@ -67,10 +70,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     # MFA TOTP (lot 15b, CDC §8.2) : le secret ne sort jamais par l'API ; `mfa_dernier_pas` interdit le rejeu d'un code.
-    mfa_secret = models.CharField(max_length=64, blank=True, editable=False, verbose_name="Secret TOTP")
+    # Écarts transverses (§8.2 chiffrement au repos) : secret chiffré en base (Fernet, `FIELD_ENCRYPTION_KEY`).
+    mfa_secret = EncryptedCharField(blank=True, default="", editable=False, verbose_name="Secret TOTP (chiffré)")
     mfa_active = models.BooleanField(default=False, verbose_name="MFA activée")
     mfa_active_le = models.DateTimeField(null=True, blank=True, verbose_name="MFA activée le")
     mfa_dernier_pas = models.BigIntegerField(null=True, blank=True, editable=False)
+    # Réinitialisation par l'administrateur : changement de mot de passe imposé à la prochaine connexion.
+    doit_changer_mdp = models.BooleanField(default=False, verbose_name="Doit changer son mot de passe")
 
     objects = UserManager()
 
@@ -106,6 +112,9 @@ class JournalAcces(models.Model):
         MFA_ECHEC = "mfa_echec", "Code MFA refusé"
         MFA_REINITIALISATION = "mfa_reinitialisation", "MFA réinitialisée"
         EXPORT = "export", "Export / téléchargement de données"
+        MDP_CHANGE = "mdp_change", "Mot de passe changé par l'utilisateur"
+        MDP_OUBLI = "mdp_oubli", "Demande de lien « mot de passe oublié »"
+        MDP_REINITIALISATION = "mdp_reinitialisation", "Mot de passe réinitialisé"
 
     RETENTION_ANS = 5
 
@@ -137,3 +146,43 @@ class JournalAcces(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValueError("Journal des accès inaltérable : aucune suppression.")
+
+
+class ParametreTransverse(models.Model):
+    """Paramètre transverse (socle) modifiable par ETSL : rétention de la piste d'audit, courriels d'alerte,
+    fenêtre de maintenance, exercice de restauration, seuil de performance (écarts transverses).
+
+    Valeur provisoire tant qu'ETSL ne l'a pas confirmée ; défauts créés à la volée par `users.parametres`.
+    `valeur` porte les nombres, `texte` les valeurs libres (fenêtre, responsable).
+    """
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True, verbose_name="Identifiant")
+    label = models.CharField(max_length=200, verbose_name="Libellé")
+    valeur = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Valeur")
+    texte = models.CharField(max_length=200, blank=True, verbose_name="Valeur texte")
+    unite = models.CharField(max_length=20, blank=True, verbose_name="Unité")
+    statut_valeur = models.CharField(
+        max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE, verbose_name="Statut de la valeur"
+    )
+    confirme_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Confirmé par",
+    )
+    confirme_le = models.DateTimeField(null=True, blank=True, verbose_name="Confirmé le")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Paramètre transverse"
+        verbose_name_plural = "Paramètres transverses"
+
+    def __str__(self):
+        return f"{self.code} = {self.texte or self.valeur} {self.unite}"
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME

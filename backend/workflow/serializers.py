@@ -31,6 +31,18 @@ class CircuitSerializer(serializers.ModelSerializer):
         model = Circuit
         fields = ["id", "code", "label", "max_days", "is_active", "steps"]
 
+    def validate_code(self, value):
+        if self.instance is not None and value != self.instance.code:
+            raise serializers.ValidationError("Le code d'un circuit ne se modifie pas (types de documents liés).")
+        if self.instance is None and Circuit.objects.filter(code=value).exists():
+            raise serializers.ValidationError("Ce code de circuit existe déjà.")
+        return value
+
+    def validate_max_days(self, value):
+        if not 1 <= value <= 365:
+            raise serializers.ValidationError("Délai attendu entre 1 et 365 jours.")
+        return value
+
 
 class TaskCommentSerializer(serializers.ModelSerializer):
     author_email = serializers.EmailField(source="author.email", read_only=True)

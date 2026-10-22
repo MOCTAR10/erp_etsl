@@ -33,9 +33,142 @@ from .services import (
 )
 
 
-class CircuitViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Circuit.objects.prefetch_related("steps").filter(is_active=True)
+class CircuitViewSet(viewsets.ModelViewSet):
+    """Circuits de validation (RF-29 à 31), modifiables à chaud (EX-G-02) par l'administrateur et la Direction
+    Générale : libellé, délai, activation, étapes (ajout, modification, ordre, retrait d'une étape inutilisée).
+    Les tâches en cours gardent leur étape ; les nouvelles soumissions suivent le circuit modifié."""
+
     serializer_class = CircuitSerializer
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        qs = Circuit.objects.prefetch_related("steps")
+        if not (self.action != "list" or self.request.query_params.get("tous") == "1" and _gere_circuits(self.request.user)):
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def get_permissions(self):
+        perms = super().get_permissions()
+        if self.request.method not in ("GET", "HEAD", "OPTIONS"):
+            perms.append(_CanGererCircuits())
+        return perms
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    def _etape(self, circuit, request):
+        from .models import CircuitStep
+
+        try:
+            return CircuitStep.objects.select_for_update(of=("self",)).get(circuit=circuit, pk=int(request.data.get("etape")))
+        except (CircuitStep.DoesNotExist, TypeError, ValueError):
+            raise DRFValidationError({"etape": "Étape inconnue pour ce circuit."})
+
+    @staticmethod
+    def _valider_etape(data, partiel=False):
+        out = {}
+        if not partiel or "name" in data:
+            nom = str(data.get("name", "")).strip()
+            if not nom:
+                raise DRFValidationError({"name": "Nom de l'étape obligatoire."})
+            out["name"] = nom[:120]
+        if not partiel or "actor_role" in data:
+            role = data.get("actor_role")
+            if role not in User.Role.values:
+                raise DRFValidationError({"actor_role": "Rôle inconnu."})
+            out["actor_role"] = role
+        if not partiel or "max_days" in data:
+            try:
+                jours = int(data.get("max_days", 1))
+            except (TypeError, ValueError):
+                raise DRFValidationError({"max_days": "Nombre de jours entier attendu."})
+            if not 1 <= jours <= 365:
+                raise DRFValidationError({"max_days": "Délai attendu entre 1 et 365 jours."})
+            out["max_days"] = jours
+        return out
+
+    @action(detail=True, methods=["post"], url_path="ajouter-etape")
+    def ajouter_etape(self, request, pk=None):
+        from django.db import transaction
+        from django.db.models import Max
+
+        from .models import CircuitStep
+
+        valeurs = self._valider_etape(request.data)
+        with transaction.atomic():
+            circuit = Circuit.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            ordre = (circuit.steps.aggregate(m=Max("order"))["m"] or 0) + 1
+            CircuitStep.objects.create(circuit=circuit, order=ordre, **valeurs)
+        return Response(CircuitSerializer(Circuit.objects.prefetch_related("steps").get(pk=circuit.pk)).data, status=201)
+
+    @action(detail=True, methods=["post"], url_path="modifier-etape")
+    def modifier_etape(self, request, pk=None):
+        from django.db import transaction
+
+        valeurs = self._valider_etape(request.data, partiel=True)
+        with transaction.atomic():
+            circuit = Circuit.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            etape = self._etape(circuit, request)
+            for champ, valeur in valeurs.items():
+                setattr(etape, champ, valeur)
+            etape.save()
+        return Response(CircuitSerializer(Circuit.objects.prefetch_related("steps").get(pk=circuit.pk)).data)
+
+    @action(detail=True, methods=["post"], url_path="deplacer-etape")
+    def deplacer_etape(self, request, pk=None):
+        """`{"etape": id, "sens": "haut" | "bas"}` : échange l'ordre avec l'étape voisine."""
+        from django.db import transaction
+
+        sens = request.data.get("sens")
+        if sens not in ("haut", "bas"):
+            raise DRFValidationError({"sens": "« haut » ou « bas » attendu."})
+        with transaction.atomic():
+            circuit = Circuit.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            etape = self._etape(circuit, request)
+            voisins = circuit.steps.filter(order__lt=etape.order).order_by("-order") if sens == "haut" else \
+                circuit.steps.filter(order__gt=etape.order).order_by("order")
+            voisin = voisins.first()
+            if voisin is not None:
+                a, b = etape.order, voisin.order
+                etape.order = 0
+                etape.save(update_fields=["order"])
+                voisin.order = a
+                voisin.save(update_fields=["order"])
+                etape.order = b
+                etape.save(update_fields=["order"])
+        return Response(CircuitSerializer(Circuit.objects.prefetch_related("steps").get(pk=circuit.pk)).data)
+
+    @action(detail=True, methods=["post"], url_path="retirer-etape")
+    def retirer_etape(self, request, pk=None):
+        """Retire une étape jamais utilisée (une étape portée par des tâches reste : historique des circuits)."""
+        from django.db import transaction
+
+        with transaction.atomic():
+            circuit = Circuit.objects.select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            etape = self._etape(circuit, request)
+            if etape.tasks.exists():
+                raise DRFValidationError({"etape": "Étape déjà utilisée par des tâches : modifiez-la plutôt que la retirer."})
+            if circuit.steps.count() <= 1:
+                raise DRFValidationError({"etape": "Un circuit garde au moins une étape."})
+            etape.delete()
+        return Response(CircuitSerializer(Circuit.objects.prefetch_related("steps").get(pk=circuit.pk)).data)
+
+
+CIRCUIT_ROLES = (User.Role.ADMIN, User.Role.PDG, User.Role.DGA)
+
+
+def _gere_circuits(user):
+    return bool(user and user.is_authenticated) and (user.is_staff or user.role in CIRCUIT_ROLES)
+
+
+class _CanGererCircuits:
+    message = "Modification des circuits réservée à l'administrateur et à la Direction Générale."
+
+    def has_permission(self, request, view):
+        return _gere_circuits(request.user)
+
+    def has_object_permission(self, request, view, obj):
+        return True
 
 
 class TaskViewSet(viewsets.ReadOnlyModelViewSet):

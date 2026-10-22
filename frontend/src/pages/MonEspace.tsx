@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, FileText } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { ApiError, api } from "../api/client";
 import { Badge, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionCard } from "../components/ui";
@@ -65,6 +66,11 @@ export function MonEspacePage() {
     return sansFiche ? (
       <>
         <PageHeader title={t("monEspace.title")} />
+      <p>
+        <Link className="btn ghost" to="/mon-mot-de-passe">
+          {t("ecarts_tr.mdp.menu")}
+        </Link>
+      </p>
         <EmptyState label={t("monEspace.pasDeFiche")} />
       </>
     ) : (
@@ -82,6 +88,11 @@ export function MonEspacePage() {
   return (
     <>
       <PageHeader title={t("monEspace.title")} subtitle={`${p.nom_complet} · ${t("monEspace.subtitle")}`} />
+      <p>
+        <Link className="btn ghost" to="/mon-mot-de-passe">
+          {t("ecarts_tr.mdp.menu")}
+        </Link>
+      </p>
 
       <div className="kpis">
         <Kpi

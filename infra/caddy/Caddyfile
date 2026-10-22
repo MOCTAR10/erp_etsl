@@ -1,0 +1,41 @@
+# Reverse proxy HTTPS de l'ERP ETSL (CDC §8.2 : chiffrement des flux, TLS 1.2 minimum).
+#
+# Variables (docker-compose.prod.yml / .env) :
+#   ETSL_DOMAIN : nom servi (ex. erp.etsl.ga). Caddy redirige automatiquement http:// (80) vers https:// (443).
+#   ETSL_TLS    : source du certificat, au choix :
+#                 - une adresse e-mail (ex. dsi@etsl.ga)          -> certificat automatique ACME (Let's Encrypt) ;
+#                 - "/certs/fullchain.pem /certs/privkey.pem"     -> certificat fourni par ETSL (monté en lecture seule) ;
+#                 - "internal"                                     -> autorité interne Caddy (recette / réseau privé).
+#   HSTS_MAX_AGE : durée HSTS en secondes (défaut 1 an).
+#
+# Vérifier : docker compose -f docker-compose.prod.yml --env-file .env run --rm proxy caddy validate --config /etc/caddy/Caddyfile
+{
+	# Pas de HTTP/3 (UDP 443) : flux TCP seulement, plus simple à filtrer côté pare-feu.
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$ETSL_DOMAIN:localhost} {
+	tls {$ETSL_TLS:internal} {
+		protocols tls1.2 tls1.3
+	}
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age={$HSTS_MAX_AGE:31536000}; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Lots GED de reprise (ZIP) : 512 Mo au plus par requête (paramètre TAILLE_MAX_LOT_GED_MO côté ERP).
+	request_body {
+		max_size 512MB
+	}
+
+	# Caddy transmet X-Forwarded-Proto : Django (SECURE_SSL=true) en déduit cookies sécurisés et redirection HTTPS.
+	reverse_proxy web:8000
+}

@@ -10,6 +10,8 @@ export interface ActionDef {
   /** Chemin de l'action DRF (POST), ex. `/api/hse/permis/<id>/valider/`. */
   path: string;
   body?: unknown;
+  /** Verbe HTTP : POST (action DRF, défaut) ou PATCH (modification d'un champ, ex. circuit à chaud). */
+  method?: "POST" | "PATCH";
   tone?: "primary" | "ghost" | "danger";
   /** Demande de confirmation avant d'exécuter (actions engageantes : comptabiliser, clôturer…). */
   confirm?: string;
@@ -32,7 +34,7 @@ export function ActionBar({ actions }: { actions: ActionDef[] }) {
   const [choosing, setChoosing] = useState<ActionDef | null>(null);
   const [choice, setChoice] = useState("");
   const run = useMutation({
-    mutationFn: (a: ActionDef) => api.post<unknown>(a.path, a.body),
+    mutationFn: (a: ActionDef) => (a.method === "PATCH" ? api.patch<unknown>(a.path, a.body ?? {}) : api.post<unknown>(a.path, a.body)),
     onSuccess: () => {
       setError(null);
       setChoosing(null);
