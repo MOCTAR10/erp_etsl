@@ -1,16 +1,19 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ClipboardCheck, Coins, Hammer, Inbox, Wrench } from "lucide-react";
+import { ClipboardCheck, Coins, Hammer, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { SiteFilter, siteQuery, useSiteOptions } from "../components/sites/SiteFilter";
-import { ActionBar, type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { CardActions } from "../components/ui/Board";
+import { actionsColumn } from "../components/ui/DataTable";
+import type { Column } from "../components/ui";
 import { FiabiliteSection, ParametresMaintenanceSection, PiecesRechangeSection } from "../components/workflow/MaintenanceM8Section";
 import { ExigencesHabilitationSection, OtDetails, PlansPreventifsSection } from "../components/workflow/MaintenancePlansSection";
 import { CoutsMaintenanceSection } from "../components/maintenance/EcartsM5m8Section";
 import { LiaisonBcGrSection } from "../components/maintenance/EcartsCorrectifSection";
-import { formatDate } from "../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   Actif,
@@ -32,6 +35,8 @@ const OT_BADGE: Record<StatutOT, "ok" | "warn" | "err" | "brand"> = {
   annule: "err",
 };
 const OT_ORDER: StatutOT[] = ["demande", "planifie", "en_cours", "termine", "cloture", "archive", "annule"];
+/** Colonnes du board : les OT annulés restent consultables via la recherche, sans colonne dédiée. */
+const OT_BOARD: StatutOT[] = ["demande", "planifie", "en_cours", "termine", "cloture", "archive"];
 const OT_VALID = new Set<StatutOT>(OT_ORDER);
 
 function actifTone(a: Actif): "ok" | "warn" | "err" | "brand" {
@@ -81,26 +86,25 @@ function otActions(ot: OrdreTravail, t: (k: string) => string) {
 
 function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
   const { t } = useTranslation();
+  const prio = ot.priorite === "critique" ? "err" : ot.priorite === "haute" ? "warn" : "neutral";
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        {ot.code} <span className="muted">· {t(`maintenance.ot_types.${ot.type_ot}`)}</span>
-        {ot.actif_code ? <span className="muted"> · {ot.actif_code}</span> : null}
-      </div>
-      <div className="meta">{ot.actif_designation || "—"}</div>
-      <div className="meta">{ot.description}</div>
-      <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className={`badge ${ot.priorite === "critique" ? "err" : ot.priorite === "haute" ? "warn" : "brand"}`}>
-          {t(`maintenance.ot_priorites.${ot.priorite}`)}
+      <div className="card-top">
+        <span className="card-code">
+          {ot.code} · {t(`maintenance.ot_types.${ot.type_ot}`)}
         </span>
-        <span className="muted">
-          {formatDate(ot.date_demande)}
-          {ot.technicien_name ? ` · ${ot.technicien_name}` : ""}
-          {ot.has_amount_access && ot.cout_total !== null ? ` · ${ot.cout_total} F` : ""}
+        <span className="card-tags">
+          <Badge tone={prio}>{t(`maintenance.ot_priorites.${ot.priorite}`)}</Badge>
         </span>
       </div>
-      <ActionBar actions={otActions(ot, t)} />
+      <div className="title">{ot.description || ot.actif_designation || "—"}</div>
+      <div className="meta">{[ot.actif_code, ot.actif_designation].filter(Boolean).join(" · ") || "—"}</div>
+      <div className="card-foot">
+        <span>{[formatDate(ot.date_demande), ot.technicien_name].filter(Boolean).join(" · ")}</span>
+        {ot.has_amount_access && ot.cout_total !== null ? <span className="amount">{formatMoney(ot.cout_total)}</span> : null}
+      </div>
       <OtDetails ot={ot} />
+      <CardActions actions={otActions(ot, t)} />
     </BoardCard>
   );
 }
@@ -163,148 +167,148 @@ export function MaintenancePage() {
     .filter(([k]) => !["cloture", "archive", "annule"].includes(k))
     .reduce((sum, [, arr]) => sum + arr.length, 0);
 
+  const actifColumns: Column<Actif>[] = [
+    { key: "code", header: t("maintenance.col.code"), sortValue: (a) => a.code, render: (a) => a.code },
+    {
+      key: "designation",
+      header: t("maintenance.col.designation"),
+      sortValue: (a) => a.designation,
+      render: (a) => (
+        <>
+          {a.designation} {a.is_global_rental && <Badge tone="brand">{t("maintenance.GR")}</Badge>}
+          {a.signe_618 && <Badge tone="neutral">{t("maintenance.cpt618")}</Badge>}
+        </>
+      ),
+    },
+    { key: "categorie", header: t("maintenance.col.category"), render: (a) => t(`maintenance.categories.${a.categorie}`) },
+    { key: "site", header: t("maintenance.col.site"), render: (a) => a.site || "—" },
+    { key: "compteur", header: t("maintenance.compteur"), num: true, render: (a) => formatNumber(a.compteur_lecture ?? a.compteur_value) },
+    { key: "statut", header: t("maintenance.col.status"), render: (a) => <Badge tone={actifTone(a)}>{t(`maintenance.statut_actif.${a.statut}`)}</Badge> },
+    actionsColumn<Actif>(t("listes.col.actions"), (a) =>
+      !a.is_global_rental && a.compteur_type !== "aucun"
+        ? [{ label: t("m8e.actif.relever"), path: `/api/maintenance/actifs/${a.id}/releve-compteur/`, tone: "ghost", prompt: { name: "valeur", label: t("m8e.actif.nouvelleValeur") } }]
+        : [],
+    ),
+  ];
+  const inspectionColumns: Column<Inspection>[] = [
+    { key: "code", header: t("maintenance.col.code"), sortValue: (i) => i.code, render: (i) => i.code },
+    { key: "actif", header: t("maintenance.col.designation"), render: (i) => i.actif_designation },
+    { key: "type", header: t("maintenance.col.type"), render: (i) => t(`maintenance.inspection_types.${i.type_inspection}`) },
+    { key: "date", header: t("maintenance.col.date"), sortValue: (i) => i.date_inspection, render: (i) => formatDate(i.date_inspection, lang) },
+    { key: "prochaine", header: t("maintenance.prochaine"), sortValue: (i) => i.prochaine_inspection, render: (i) => formatDate(i.prochaine_inspection, lang) },
+    { key: "ot", header: t("maintenance.col.ot"), render: (i) => i.ot_genere_code ?? "—" },
+    {
+      key: "statut",
+      header: t("maintenance.col.status"),
+      render: (i) => (
+        <Badge tone={inspectionTone(i)}>
+          {i.statut === "realisee" && i.resultat ? t(`maintenance.inspection_resultats.${i.resultat}`) : t(`maintenance.inspection_statut.${i.statut}`)}
+        </Badge>
+      ),
+    },
+    actionsColumn<Inspection>(t("listes.col.actions"), (i) => inspectionActions(i, t)),
+  ];
+
   return (
-    <>
-      <PageHeader title={t("maintenance.title")} />
-      <QuickForm
-        title={t("maintenance.form.title")}
-        endpoint="/api/maintenance/ordres/"
-        fields={[
-          {
-            name: "actif",
-            label: t("maintenance.form.actif"),
-            type: "select",
-            required: true,
-            options: actifsChoix.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
-          },
-          {
-            name: "type_ot",
-            label: t("maintenance.col.type"),
-            type: "select",
-            required: true,
-            defaultValue: "correctif",
-            options: ["correctif", "preventif", "urgence", "inspection"].map((v) => ({ value: v, label: t(`maintenance.ot_types.${v}`) })),
-          },
-          {
-            name: "priorite",
-            label: t("maintenance.form.priorite"),
-            type: "select",
-            required: true,
-            defaultValue: "moyenne",
-            options: ["basse", "moyenne", "haute", "critique"].map((v) => ({ value: v, label: t(`maintenance.ot_priorites.${v}`) })),
-          },
-          { name: "date_planifiee", label: t("maintenance.form.datePlanifiee"), type: "date" },
-          { name: "description", label: t("maintenance.form.description"), type: "textarea", required: true },
-        ]}
+    <div className="listes-page">
+      <PageHeader
+        title={t("maintenance.title")}
+        subtitle={t("listes.sub.maintenance")}
+        actions={
+          <QuickForm
+            title={t("maintenance.form.title")}
+            endpoint="/api/maintenance/ordres/"
+            fields={[
+              {
+                name: "actif",
+                label: t("maintenance.form.actif"),
+                type: "select",
+                required: true,
+                options: actifsChoix.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
+              },
+              {
+                name: "type_ot",
+                label: t("maintenance.col.type"),
+                type: "select",
+                required: true,
+                defaultValue: "correctif",
+                options: ["correctif", "preventif", "urgence", "inspection"].map((v) => ({ value: v, label: t(`maintenance.ot_types.${v}`) })),
+              },
+              {
+                name: "priorite",
+                label: t("maintenance.form.priorite"),
+                type: "select",
+                required: true,
+                defaultValue: "moyenne",
+                options: ["basse", "moyenne", "haute", "critique"].map((v) => ({ value: v, label: t(`maintenance.ot_priorites.${v}`) })),
+              },
+              { name: "date_planifiee", label: t("maintenance.form.datePlanifiee"), type: "date" },
+              { name: "description", label: t("maintenance.form.description"), type: "textarea", required: true },
+            ]}
+          />
+        }
       />
 
       <div className="kpi-grid">
         <Kpi label={t("maintenance.otOuverts")} value={s.ot_ouverts} hint={`${t("maintenance.enCours")} · ${s.ot_en_cours} · ${t("maintenance.critiques")} · ${s.ot_critiques}`} icon={Wrench} tone="brand" delay={0} />
         <Kpi label={t("maintenance.actifsArret")} value={arrete || s.actifs_arret} hint={`${t("maintenance.operationnels")} · ${s.actifs_operationnels}`} icon={Hammer} tone="warn" delay={0.05} />
-        <Kpi label={t("maintenance.inspectionsPrevues")} value={s.inspections_prevues} hint={`${t("maintenance.heuresTotal")} · ${s.heures_total}`} icon={ClipboardCheck} tone="accent" delay={0.1} />
-        <Kpi label={t("maintenance.coutTotal")} value={`${s.cout_total > 0 ? s.cout_total.toLocaleString("fr-FR") : "0"} F`} hint={`${t("maintenance.actifs")} · ${actifs.count}`} icon={Coins} tone="brand" delay={0.15} />
+        <Kpi label={t("maintenance.inspectionsPrevues")} value={s.inspections_prevues} hint={`${t("maintenance.heuresTotal")} · ${formatNumber(s.heures_total)}`} icon={ClipboardCheck} tone="accent" delay={0.1} />
+        <Kpi label={t("maintenance.coutTotal")} value={s.cout_total} kind="money" hint={`${t("maintenance.actifs")} · ${actifs.count}`} icon={Coins} tone="brand" delay={0.15} />
       </div>
 
-      <SearchField value={otSearch} onChange={setOtSearch} placeholder={t("maintenance.searchOt")} />
-
-      <div style={{ overflowX: "auto" }}>
-        <Board>
-          {OT_ORDER.map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={t(`maintenance.ot_statut.${st}`)}
-              count={groups[st].length}
-              tone={OT_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={260}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <EmptyState icon={Inbox} label={t("common.empty")} />
-              ) : (
-                groups[st].map((ot, i) => <OtCard key={ot.id} ot={ot} index={i} />)
-              )}
+      <section className="listes-block">
+        <div className="list-toolbar">
+          <SearchField value={otSearch} onChange={setOtSearch} placeholder={t("maintenance.searchOt")} />
+        </div>
+        <Board label={t("listes.boardLabel.maintenance")}>
+          {OT_BOARD.map((st, ci) => (
+            <BoardColumn key={st} title={t(`maintenance.ot_statut.${st}`)} count={groups[st].length} tone={OT_BADGE[st]} delay={ci * 0.04} limit={20}>
+              {groups[st].map((ot, i) => (
+                <OtCard key={ot.id} ot={ot} index={i} />
+              ))}
             </BoardColumn>
           ))}
         </Board>
-      </div>
+        {ouvertNonClos > 0 ? <p className="listes-note">{t("maintenance.pendingNote")}</p> : null}
+      </section>
 
-      {ouvertNonClos > 0 ? (
-        <p className="muted" style={{ marginTop: "0.5rem" }}>
-          {t("maintenance.pendingNote")}
-        </p>
-      ) : null}
-
-      <QuickForm
-        title={t("m8e.actif.nouveau")}
-        endpoint="/api/maintenance/actifs/"
-        fields={[
-          { name: "designation", label: t("maintenance.col.designation"), required: true },
-          { name: "site_etsl", label: t("ecarts_a5.site"), type: "select", options: siteOpts },
-          {
-            name: "categorie", label: t("maintenance.col.category"), type: "select", required: true, defaultValue: "machine",
-            options: ["machine", "engin", "levage", "atelier", "chantier", "outillage"].map((v) => ({ value: v, label: t(`maintenance.categories.${v}`) })),
-          },
-          { name: "numero_serie", label: t("m8e.actif.serie") },
-          { name: "site", label: t("maintenance.col.site") },
-          {
-            name: "compteur_type", label: t("m8e.actif.compteur"), type: "select", required: true, defaultValue: "heures",
-            options: ["heures", "km", "aucun"].map((v) => ({ value: v, label: t(`maintenance.compteur_types.${v}`) })),
-          },
-          { name: "compteur_value", label: t("m8e.actif.valeurCompteur"), type: "number", min: 0, step: "0.01" },
-          { name: "date_mise_en_service", label: t("m8e.actif.miseEnService"), type: "date" },
-        ]}
-      />
-      {(actifs.count > 0 || actifs.search || actifSite) && (
-        <SectionCard title={`${t("maintenance.actifs")} · ${actifs.count}`}>
+      <SectionCard
+        title={`${t("maintenance.actifs")} · ${actifs.count}`}
+        actions={
+          <QuickForm
+            title={t("m8e.actif.nouveau")}
+            endpoint="/api/maintenance/actifs/"
+            fields={[
+              { name: "designation", label: t("maintenance.col.designation"), required: true },
+              { name: "site_etsl", label: t("ecarts_a5.site"), type: "select", options: siteOpts },
+              {
+                name: "categorie", label: t("maintenance.col.category"), type: "select", required: true, defaultValue: "machine",
+                options: ["machine", "engin", "levage", "atelier", "chantier", "outillage"].map((v) => ({ value: v, label: t(`maintenance.categories.${v}`) })),
+              },
+              { name: "numero_serie", label: t("m8e.actif.serie") },
+              { name: "site", label: t("maintenance.col.site") },
+              {
+                name: "compteur_type", label: t("m8e.actif.compteur"), type: "select", required: true, defaultValue: "heures",
+                options: ["heures", "km", "aucun"].map((v) => ({ value: v, label: t(`maintenance.compteur_types.${v}`) })),
+              },
+              { name: "compteur_value", label: t("m8e.actif.valeurCompteur"), type: "number", min: 0, step: "0.01" },
+              { name: "date_mise_en_service", label: t("m8e.actif.miseEnService"), type: "date" },
+            ]}
+          />
+        }
+      >
+        <div className="list-toolbar">
           <SearchField value={actifs.search} onChange={actifs.setSearch} placeholder={t("maintenance.searchActifs")} />
           <SiteFilter value={actifSite} onChange={setActifSite} />
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("maintenance.col.code")}</th>
-                  <th>{t("maintenance.col.designation")}</th>
-                  <th>{t("maintenance.col.category")}</th>
-                  <th>{t("maintenance.col.site")}</th>
-                  <th className="num">{t("maintenance.compteur")}</th>
-                  <th>{t("maintenance.col.status")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {actifsAll.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.code}</td>
-                    <td>
-                      {a.designation}{" "}
-                      {a.is_global_rental && <Badge tone="brand">{t("maintenance.GR")}</Badge>}{" "}
-                      {a.signe_618 && <Badge tone="warn">{t("maintenance.cpt618")}</Badge>}
-                    </td>
-                    <td>{t(`maintenance.categories.${a.categorie}`)}</td>
-                    <td>{a.site || "—"}</td>
-                    <td className="num">{String(a.compteur_lecture ?? a.compteur_value)}</td>
-                    <td>
-                      <Badge tone={actifTone(a)}>{t(`maintenance.statut_actif.${a.statut}`)}</Badge>
-                    </td>
-                    <td>
-                      {!a.is_global_rental && a.compteur_type !== "aucun" && (
-                        <ActionBar
-                          actions={[{
-                            label: t("m8e.actif.relever"), path: `/api/maintenance/actifs/${a.id}/releve-compteur/`, tone: "ghost",
-                            prompt: { name: "valeur", label: t("m8e.actif.nouvelleValeur") },
-                          }]}
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={actifs.page} pageSize={actifs.pageSize} count={actifs.count} onPageChange={actifs.setPage} onPageSizeChange={actifs.setPageSize} />
-        </SectionCard>
-      )}
+        </div>
+        <DataGrid
+          rows={actifsAll}
+          columns={actifColumns}
+          caption={t("maintenance.actifs")}
+          loading={actifs.query.isFetching}
+          pagination={{ page: actifs.page, pageSize: actifs.pageSize, count: actifs.count, onPageChange: actifs.setPage, onPageSizeChange: actifs.setPageSize }}
+        />
+      </SectionCard>
 
       <PlansPreventifsSection actifs={actifsChoix} />
       <FiabiliteSection />
@@ -314,67 +318,39 @@ export function MaintenancePage() {
       <LiaisonBcGrSection />
       <ParametresMaintenanceSection />
 
-      <QuickForm
-        title={t("m8e.insp.nouvelle")}
-        endpoint="/api/maintenance/inspections/"
-        fields={[
-          {
-            name: "actif", label: t("maintenance.form.actif"), type: "select", required: true,
-            options: actifsChoix.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
-          },
-          {
-            name: "type_inspection", label: t("maintenance.col.type"), type: "select", required: true, defaultValue: "visuelle",
-            options: ["visuelle", "fonctionnelle", "securite", "levage", "atex", "metrologie"].map((v) => ({ value: v, label: t(`maintenance.inspection_types.${v}`) })),
-          },
-          { name: "date_inspection", label: t("m8e.insp.date"), type: "date", required: true },
-          { name: "prochaine_inspection", label: t("maintenance.prochaine"), type: "date" },
-          { name: "organisme_libelle", label: t("m8e.insp.organisme") },
-        ]}
-      />
-      {(inspections.count > 0 || inspections.search) && (
-        <SectionCard title={`${t("maintenance.inspections")} · ${inspections.count}`}>
+      <SectionCard
+        title={`${t("maintenance.inspections")} · ${inspections.count}`}
+        actions={
+          <QuickForm
+            title={t("m8e.insp.nouvelle")}
+            endpoint="/api/maintenance/inspections/"
+            fields={[
+              {
+                name: "actif", label: t("maintenance.form.actif"), type: "select", required: true,
+                options: actifsChoix.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
+              },
+              {
+                name: "type_inspection", label: t("maintenance.col.type"), type: "select", required: true, defaultValue: "visuelle",
+                options: ["visuelle", "fonctionnelle", "securite", "levage", "atex", "metrologie"].map((v) => ({ value: v, label: t(`maintenance.inspection_types.${v}`) })),
+              },
+              { name: "date_inspection", label: t("m8e.insp.date"), type: "date", required: true },
+              { name: "prochaine_inspection", label: t("maintenance.prochaine"), type: "date" },
+              { name: "organisme_libelle", label: t("m8e.insp.organisme") },
+            ]}
+          />
+        }
+      >
+        <div className="list-toolbar">
           <SearchField value={inspections.search} onChange={inspections.setSearch} placeholder={t("maintenance.searchInspections")} />
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("maintenance.col.code")}</th>
-                  <th>{t("maintenance.col.designation")}</th>
-                  <th>{t("maintenance.col.type")}</th>
-                  <th>{t("maintenance.col.date")}</th>
-                  <th>{t("maintenance.prochaine")}</th>
-                  <th>{t("maintenance.col.ot")}</th>
-                  <th>{t("maintenance.col.status")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {inspectionsAll.map((i) => (
-                  <tr key={i.id}>
-                    <td>{i.code}</td>
-                    <td>{i.actif_designation}</td>
-                    <td>{t(`maintenance.inspection_types.${i.type_inspection}`)}</td>
-                    <td>{formatDate(i.date_inspection, lang)}</td>
-                    <td>{i.prochaine_inspection ? formatDate(i.prochaine_inspection, lang) : "—"}</td>
-                    <td>{i.ot_genere_code ?? "—"}</td>
-                    <td>
-                      <Badge tone={inspectionTone(i)}>
-                        {i.statut === "realisee" && i.resultat
-                          ? t(`maintenance.inspection_resultats.${i.resultat}`)
-                          : t(`maintenance.inspection_statut.${i.statut}`)}
-                      </Badge>
-                    </td>
-                    <td>
-                      <ActionBar actions={inspectionActions(i, t)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={inspections.page} pageSize={inspections.pageSize} count={inspections.count} onPageChange={inspections.setPage} onPageSizeChange={inspections.setPageSize} />
-        </SectionCard>
-      )}
-    </>
+        </div>
+        <DataGrid
+          rows={inspectionsAll}
+          columns={inspectionColumns}
+          caption={t("maintenance.inspections")}
+          loading={inspections.query.isFetching}
+          pagination={{ page: inspections.page, pageSize: inspections.pageSize, count: inspections.count, onPageChange: inspections.setPage, onPageSizeChange: inspections.setPageSize }}
+        />
+      </SectionCard>
+    </div>
   );
 }

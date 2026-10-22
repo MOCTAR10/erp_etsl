@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
@@ -121,7 +121,7 @@ interface FactureAchat {
 }
 
 const num = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatNumber(Number(v)));
-const fcfa = (v: string | null) => (v === null ? "••••••" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 const moisCourant = () => new Date().toISOString().slice(0, 7);
 const ETATS = ["bon", "usage", "degrade", "hors_service"];
 

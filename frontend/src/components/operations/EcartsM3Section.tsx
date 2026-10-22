@@ -3,7 +3,7 @@ import { FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { ActionBar, Badge, Kpi, QuickForm, SectionCard } from "../ui";
 
 interface Parametre {
@@ -184,7 +184,7 @@ interface Option {
   nom_complet?: string;
 }
 
-const fcfa = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null) => formatMoney(v);
 const pct = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} %`);
 const q = <T,>(key: string, path: string) => ({ queryKey: ["ecarts-m3", key], queryFn: () => api.listAll<T>(path), retry: 0 });
 

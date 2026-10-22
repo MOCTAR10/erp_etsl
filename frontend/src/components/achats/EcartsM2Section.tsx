@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
@@ -404,7 +404,7 @@ export function EcartsM2Section() {
                   {a.facture_code} · {a.fournisseur_nom ?? "—"}
                 </td>
                 <td>{formatDate(a.date_avoir)}</td>
-                <td>{a.montant_ht === null ? "—" : formatNumber(Number(a.montant_ht))}</td>
+                <td>{formatMoney(a.montant_ht)}</td>
                 <td>
                   <Badge tone={a.statut === "comptabilise" ? "ok" : "warn"}>{a.statut_label}</Badge> {a.move_number ?? ""}
                 </td>

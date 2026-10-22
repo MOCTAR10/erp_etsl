@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatPercent } from "../../lib/format";
 import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
@@ -156,7 +156,7 @@ interface Rc {
 
 const NATURES = ["fourniture", "main_oeuvre", "sous_traitance", "equipement", "frais_directs"];
 const PROFILS = ["marche_travaux", "maintenance"];
-const montant = (v: string | null | undefined) => (v === null || v === undefined ? "••••" : formatNumber(v));
+const montant = (v: string | null | undefined) => (v === null || v === undefined ? "••••••" : formatMoney(v));
 const liste = <T,>(path: string) => () => api.listAll<T>(path);
 
 function ParametresM1() {
@@ -499,7 +499,7 @@ function Chiffrage() {
         caption={t("ecarts_m1.derive.caption")}
         columns={[
           { key: "code", header: t("commercial.col.code"), render: (d) => `${d.code} · ${d.titre}` },
-          { key: "av", header: t("ecarts_m1.derive.avancement"), num: true, render: (d) => `${formatNumber(d.avancement_pct)} %` },
+          { key: "av", header: t("ecarts_m1.derive.avancement"), num: true, render: (d) => formatPercent(d.avancement_pct) },
           { key: "prevu", header: t("ecarts_m1.derive.prevu"), num: true, render: (d) => montant(d.cout_prevu_a_date) },
           { key: "reel", header: t("ecarts_m1.derive.reel"), num: true, render: (d) => montant(d.cout_reel) },
           {

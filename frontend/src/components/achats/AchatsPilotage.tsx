@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { ActionBar, Badge, DataTable, PagedDataTable, QuickForm, SectionCard } from "../ui";
@@ -46,7 +46,7 @@ interface Reporting {
 }
 
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
-const montant = (v: string | null) => (v === null ? "••••" : formatNumber(v));
+const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 
 function actionsLitige(l: Litige, t: (k: string) => string): ActionDef[] {
   if (l.statut === "resolu") return [];
