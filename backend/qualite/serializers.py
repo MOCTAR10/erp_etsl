@@ -138,7 +138,7 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
             "date_controle", "resultat", "resultat_label", "statut", "statut_label",
             "notes", "created_by", "created_by_name", "created_at", "updated_at",
             "points", "points_arret_restants", "methode_cnd", "instrument", "instrument_code",
-            "approuve_par", "approuve_le", "images_count", "mesures",
+            "approuve_par", "approuve_le", "images_count", "mesures", "organisme_agree", "organisme_agree_nom",
         ]
         read_only_fields = [
             "code", "created_by", "points", "points_arret_restants", "approuve_par", "approuve_le", "images_count",
@@ -146,6 +146,7 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
         ]
 
     instrument_code = serializers.CharField(source="instrument.code", read_only=True, default=None)
+    organisme_agree_nom = serializers.CharField(source="organisme_agree.nom", read_only=True, default=None)
     images_count = serializers.SerializerMethodField()
     mesures = serializers.SerializerMethodField()
     points = serializers.SerializerMethodField()
@@ -179,6 +180,16 @@ class ControleQualiteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"instrument": "Instrument hors échéance d'étalonnage ou bloqué : utilisation interdite."}
             )
+        from .ecarts import controle_organisme, controle_wps_profil
+
+        courant = lambda champ: attrs[champ] if champ in attrs else getattr(self.instance, champ, None)  # noqa: E731
+        if erreur := controle_organisme(courant("organisme"), courant("organisme_agree"), courant("methode_cnd"),
+                                        courant("date_controle")):
+            raise serializers.ValidationError({"organisme_agree": erreur})
+        if ("wps" in attrs or "affaire" in attrs) and (erreur := controle_wps_profil(courant("wps"), courant("affaire"))):
+            raise serializers.ValidationError({"wps": erreur})
+        if courant("organisme_agree") and not courant("organisme_libelle"):
+            attrs["organisme_libelle"] = courant("organisme_agree").nom[:150]
         type_controle = attrs.get("type_controle") or (self.instance.type_controle if self.instance else None)
         if type_controle == ControleQualite.TypeControle.TTH:
             four = instrument or (self.instance.instrument if self.instance else None)
@@ -389,6 +400,10 @@ class JointSoudeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"wps": "WPS obligatoire : un joint se soude selon une procédure qualifiée."})
         if wps.statut != WpsWpqr.Statut.VALIDE or wps.type != WpsWpqr.Type.WPS:
             raise serializers.ValidationError({"wps": f"WPS {wps.code} non validé ou obsolète : soudage interdit."})
+        from .ecarts import controle_wps_profil
+
+        if erreur := controle_wps_profil(wps, attrs["ordre"].affaire):
+            raise serializers.ValidationError({"wps": erreur})
         if not DiffusionWps.objects.filter(wps=wps, ordre=attrs["ordre"]).exists():
             raise serializers.ValidationError({"wps": f"WPS {wps.code} non diffusé sur l'OF {attrs['ordre'].code}."})
         poste = attrs.get("poste")

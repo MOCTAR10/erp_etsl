@@ -73,10 +73,8 @@ class PermisTravail(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
-    type_permis = models.CharField(
-        max_length=14, choices=TypePermis.choices, default=TypePermis.CHAUD,
-        verbose_name="Type de permis",
-    )
+    # Types paramétrables (écarts M7 §9.2) : liste `ListeHse` (catégorie type_permis), défauts = TypePermis.
+    type_permis = models.CharField(max_length=14, default=TypePermis.CHAUD, verbose_name="Type de permis")
     affaire = models.ForeignKey(
         "commercial.Affaire",
         null=True,
@@ -151,6 +149,11 @@ class PermisTravail(models.Model):
         "rh_paie.Employe", blank=True, related_name="permis_hse", verbose_name="Intervenants",
     )
     notes = models.TextField(blank=True, verbose_name="Notes")
+    site_gr = models.BooleanField(default=False, verbose_name="Site loué GLOBAL RENTAL")
+    plan_prevention = models.ForeignKey(
+        "hse.PlanPrevention", null=True, blank=True, on_delete=models.PROTECT, related_name="permis",
+        verbose_name="Plan de prévention",
+    )
     photo = models.FileField(upload_to="hse/permis/photos/", blank=True, verbose_name="Photo de la zone")
     plan = models.FileField(upload_to="hse/permis/plans/", blank=True, verbose_name="Plan / croquis")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -182,9 +185,16 @@ class PermisTravail(models.Model):
             raise ValidationError(
                 {"date_fin": "La date de fin doit être postérieure à la date de début."}
             )
+    def get_type_permis_display(self):
+        from .ecarts_m6m7 import libelle_liste
+
+        return libelle_liste("type_permis", self.type_permis)
+
     @property
     def gaz_obligatoire(self):
-        return self.type_permis in self.GAZ_TYPES
+        from .ecarts_m6m7 import gaz_obligatoire
+
+        return gaz_obligatoire(self.type_permis)
 
     @property
     def test_gaz_valide(self):
@@ -281,12 +291,15 @@ class EvaluationRisque(models.Model):
 
     @property
     def criticite_scores(self):
+        from .ecarts_m6m7 import seuils_risque
+
         score = self.probabilite * self.gravite
-        if score >= 15:
+        moyen, eleve, critique = seuils_risque()
+        if score >= critique:
             return score, self.Criticite.CRITIQUE
-        if score >= 9:
+        if score >= eleve:
             return score, self.Criticite.ELEVEE
-        if score >= 4:
+        if score >= moyen:
             return score, self.Criticite.MOYENNE
         return score, self.Criticite.FAIBLE
 
@@ -395,10 +408,7 @@ class Incident(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
-    type_incident = models.CharField(
-        max_length=22, choices=TypeIncident.choices, default=TypeIncident.INCIDENT,
-        verbose_name="Type",
-    )
+    type_incident = models.CharField(max_length=22, default=TypeIncident.INCIDENT, verbose_name="Type")
     gravite = models.CharField(
         max_length=10, choices=Gravite.choices, default=Gravite.MINEURE, verbose_name="Gravité"
     )
@@ -479,6 +489,11 @@ class Incident(models.Model):
             raise ValidationError(
                 {"jours_arret": "Des jours d'arrêt supposent une conséquence « arrêt de travail » ou « décès »."}
             )
+
+    def get_type_incident_display(self):
+        from .ecarts_m6m7 import libelle_liste
+
+        return libelle_liste("type_incident", self.type_incident)
 
     @property
     def classification_osha(self):
@@ -716,10 +731,7 @@ class BordereauDechet(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=20, unique=True, verbose_name="Code")
-    type_dechet = models.CharField(
-        max_length=14, choices=TypeDechet.choices, default=TypeDechet.DIB,
-        verbose_name="Type de déchet",
-    )
+    type_dechet = models.CharField(max_length=14, default=TypeDechet.DIB, verbose_name="Type de déchet")
     quantite = models.DecimalField(
         max_digits=14, decimal_places=2, default=0, verbose_name="Quantité"
     )
@@ -735,6 +747,10 @@ class BordereauDechet(models.Model):
         verbose_name="Transporteur / filière",
     )
     numero_bsd = models.CharField(max_length=80, blank=True, verbose_name="N° BSD")
+    prestataire = models.ForeignKey(
+        "hse.PrestataireDechet", null=True, blank=True, on_delete=models.PROTECT, related_name="bordereaux",
+        verbose_name="Prestataire déchets agréé",
+    )
     date_enlevement = models.DateField(null=True, blank=True, verbose_name="Date d'enlèvement")
     destination = models.CharField(
         max_length=200, blank=True, verbose_name="Destination (exutoire / valorisation)"
@@ -763,12 +779,17 @@ class BordereauDechet(models.Model):
             self.code = HseSequence.next_for("BSD", "BSD")
         return super().save(*args, **kwargs)
 
+    def get_type_dechet_display(self):
+        from .ecarts_m6m7 import libelle_liste
+
+        return libelle_liste("type_dechet", self.type_dechet)
+
 
 class ExigenceHabilitation(models.Model):
     """Habilitation exigée pour un type de permis : une qualification RH valide dont l'intitulé contient `mot_cle`."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    type_permis = models.CharField(max_length=14, choices=PermisTravail.TypePermis.choices, verbose_name="Type de permis")
+    type_permis = models.CharField(max_length=14, verbose_name="Type de permis")
     mot_cle = models.CharField(max_length=80, verbose_name="Mot-clé de l'intitulé de qualification")
     actif = models.BooleanField(default=True, verbose_name="Actif")
 
@@ -780,6 +801,11 @@ class ExigenceHabilitation(models.Model):
 
     def __str__(self):
         return f"{self.get_type_permis_display()} → {self.mot_cle}"
+
+    def get_type_permis_display(self):
+        from .ecarts_m6m7 import libelle_liste
+
+        return libelle_liste("type_permis", self.type_permis)
 
 
 class AuditHse(models.Model):
@@ -911,7 +937,9 @@ class Duer(models.Model):
     def a_revoir(self):
         if self.statut != self.Statut.APPROUVE or not self.approuve_le:
             return False
-        return (timezone.now() - self.approuve_le).days > self.REVUE_JOURS
+        from .ecarts_m6m7 import duer_revue_jours
+
+        return (timezone.now() - self.approuve_le).days > duer_revue_jours()
 
 
 class PlanUrgence(models.Model):
@@ -1195,4 +1223,267 @@ class RevueDirectionHse(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             self.code = HseSequence.next_for("RDD", "RDD")
+        return super().save(*args, **kwargs)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Écarts M7 (lot ecarts-m6m7) : listes paramétrables, check-lists d'audit, plan de prévention, prestataires
+# déchets agréés, fiches sécurité terrain.
+# ----------------------------------------------------------------------------------------------------------------
+class ListeHse(models.Model):
+    """Listes paramétrables M7 (§9.2) : types de permis, d'incidents, de déchets ; rôles destinataires du partage
+    des événements sur site GLOBAL RENTAL. Valeurs livrées provisoires, à confirmer ou modifier par ETSL."""
+
+    class Categorie(models.TextChoices):
+        TYPE_PERMIS = "type_permis", "Type de permis"
+        TYPE_INCIDENT = "type_incident", "Type d'incident"
+        TYPE_DECHET = "type_dechet", "Type de déchet"
+        PARTAGE_GR = "partage_gr", "Destinataire du partage site GR (rôle)"
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    #: Longueur maximale du code par catégorie (champ cible du permis, de l'incident, du BSD).
+    LONGUEURS = {"type_permis": 14, "type_incident": 22, "type_dechet": 14, "partage_gr": 30}
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    categorie = models.CharField(max_length=16, choices=Categorie.choices, verbose_name="Catégorie")
+    code = models.CharField(max_length=30, verbose_name="Code")
+    libelle = models.CharField(max_length=150, verbose_name="Libellé")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    gaz_obligatoire = models.BooleanField(default=False, verbose_name="Test gaz obligatoire (permis)")
+    dangereux = models.BooleanField(default=False, verbose_name="Déchet dangereux")
+    ordre = models.PositiveSmallIntegerField(default=0, verbose_name="Ordre")
+    statut_valeur = models.CharField(max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE)
+    confirme_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    confirme_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["categorie", "ordre", "code"]
+        verbose_name = "Liste HSE paramétrable"
+        verbose_name_plural = "Listes HSE paramétrables"
+        constraints = [models.UniqueConstraint(fields=["categorie", "code"], name="uniq_liste_hse")]
+
+    def __str__(self):
+        return f"{self.get_categorie_display()} — {self.libelle}"
+
+    def clean(self):
+        import re
+
+        if self.code and not re.fullmatch(r"[a-z0-9_]+", self.code):
+            raise ValidationError({"code": "Code en minuscules, chiffres et « _ » seulement."})
+        maxi = self.LONGUEURS.get(self.categorie)
+        if maxi and len(self.code or "") > maxi:
+            raise ValidationError({"code": f"Code de {maxi} caractères au plus pour cette catégorie."})
+        if self.categorie == self.Categorie.PARTAGE_GR:
+            from users.models import User
+
+            if self.code not in User.Role.values:
+                raise ValidationError({"code": "Rôle utilisateur inconnu."})
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class ModeleChecklistHse(models.Model):
+    """Modèle de check-list d'audit / d'inspection (CDC M7-02) : questions ordonnées, provisoire tant qu'ETSL ne
+    l'a pas confirmé (trame à fournir)."""
+
+    class StatutValeur(models.TextChoices):
+        PROVISOIRE = "provisoire", "Provisoire"
+        CONFIRME = "confirme", "Confirmé"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    intitule = models.CharField(max_length=200, verbose_name="Intitulé")
+    type_audit = models.CharField(
+        max_length=12, choices=AuditHse.TypeAudit.choices, default=AuditHse.TypeAudit.INSPECTION, verbose_name="Type",
+    )
+    referentiel = models.CharField(max_length=120, blank=True, verbose_name="Référentiel")
+    questions = models.JSONField(default=list, blank=True, verbose_name="Questions")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    statut_valeur = models.CharField(max_length=10, choices=StatutValeur.choices, default=StatutValeur.PROVISOIRE)
+    confirme_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    confirme_le = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Modèle de check-list HSE"
+        verbose_name_plural = "Modèles de check-lists HSE"
+
+    def __str__(self):
+        return f"{self.code} — {self.intitule}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("CHK", "CHK")
+        return super().save(*args, **kwargs)
+
+    @property
+    def est_provisoire(self):
+        return self.statut_valeur != self.StatutValeur.CONFIRME
+
+
+class ReponseChecklistHse(models.Model):
+    """Réponse à une question de check-list sur un audit ; une non-conformité ouvre un constat d'audit."""
+
+    class Reponse(models.TextChoices):
+        EN_ATTENTE = "en_attente", "À évaluer"
+        CONFORME = "conforme", "Conforme"
+        NON_CONFORME = "non_conforme", "Non conforme"
+        SANS_OBJET = "sans_objet", "Sans objet"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    audit = models.ForeignKey(AuditHse, on_delete=models.CASCADE, related_name="reponses_checklist", verbose_name="Audit")
+    modele = models.ForeignKey(ModeleChecklistHse, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    ordre = models.PositiveSmallIntegerField(default=0)
+    question = models.TextField(verbose_name="Question")
+    reponse = models.CharField(max_length=12, choices=Reponse.choices, default=Reponse.EN_ATTENTE, verbose_name="Réponse")
+    commentaire = models.TextField(blank=True, verbose_name="Commentaire / preuve")
+    constat = models.ForeignKey(ConstatAudit, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    repondu_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    repondu_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["audit", "ordre"]
+        verbose_name = "Réponse de check-list HSE"
+        verbose_name_plural = "Réponses de check-lists HSE"
+
+    def __str__(self):
+        return f"{self.audit.code} — Q{self.ordre}"
+
+
+class PlanPrevention(models.Model):
+    """Plan de prévention (CDC M7-03) : intervention d'une entreprise extérieure ou sur site tiers (dont les sites
+    loués GLOBAL RENTAL) — inspection commune, risques d'interférence, mesures ; validé par le HSE."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        VALIDE = "valide", "Validé"
+        CLOS = "clos", "Clos"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    affaire = models.ForeignKey(
+        "commercial.Affaire", null=True, blank=True, on_delete=models.PROTECT, related_name="plans_prevention_hse",
+        verbose_name="Affaire",
+    )
+    entreprise_exterieure = models.CharField(max_length=200, verbose_name="Entreprise extérieure / utilisatrice")
+    site = models.CharField(max_length=200, verbose_name="Site / zone d'intervention")
+    site_gr = models.BooleanField(default=False, verbose_name="Site loué GLOBAL RENTAL")
+    date_inspection_commune = models.DateField(null=True, blank=True, verbose_name="Inspection commune le")
+    date_debut = models.DateField(default=timezone.localdate, verbose_name="Début")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Fin")
+    risques = models.ManyToManyField(EvaluationRisque, blank=True, related_name="plans_prevention", verbose_name="Risques")
+    mesures = models.TextField(blank=True, verbose_name="Mesures de prévention")
+    consignes_urgence = models.TextField(blank=True, verbose_name="Consignes d'urgence")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    valide_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    valide_le = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_debut"]
+        verbose_name = "Plan de prévention"
+        verbose_name_plural = "Plans de prévention"
+
+    def __str__(self):
+        return f"{self.code} — {self.entreprise_exterieure} ({self.site})"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("PDP", "PDP")
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
+            raise ValidationError({"date_fin": "La date de fin doit suivre la date de début."})
+
+    def en_vigueur(self, jour=None):
+        jour = jour or timezone.localdate()
+        return (
+            self.statut == self.Statut.VALIDE and self.date_debut <= jour
+            and (self.date_fin is None or self.date_fin >= jour)
+        )
+
+
+class PrestataireDechet(models.Model):
+    """Prestataire déchets (collecte, transport, traitement) et son agrément réglementaire : un BSD ne s'émet
+    qu'avec un prestataire agréé en cours de validité pour le type de déchet (traçabilité, CDC M7)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nom = models.CharField(max_length=200, verbose_name="Raison sociale")
+    partenaire = models.ForeignKey(
+        "referentiels.Partner", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Tiers (référentiel)",
+    )
+    numero_agrement = models.CharField(max_length=80, verbose_name="N° d'agrément")
+    autorite = models.CharField(max_length=150, blank=True, verbose_name="Autorité de délivrance")
+    types_dechets = models.CharField(
+        max_length=300, blank=True, verbose_name="Types de déchets autorisés (codes, vide = tous)",
+    )
+    date_fin_validite = models.DateField(verbose_name="Agrément valable jusqu'au")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    notes = models.TextField(blank=True, verbose_name="Notes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nom"]
+        verbose_name = "Prestataire déchets agréé"
+        verbose_name_plural = "Prestataires déchets agréés"
+
+    def __str__(self):
+        return f"{self.nom} ({self.numero_agrement})"
+
+    @property
+    def codes_types(self):
+        return [c.strip() for c in (self.types_dechets or "").split(",") if c.strip()]
+
+    def est_valide(self, jour=None):
+        return self.actif and self.date_fin_validite >= (jour or timezone.localdate())
+
+    def couvre(self, type_dechet):
+        codes = self.codes_types
+        return not codes or type_dechet in codes
+
+
+class FicheSecurite(models.Model):
+    """Fiche sécurité consultable sur smartphone, y compris hors ligne (CDC M7-08, PWA /terrain)."""
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        PUBLIEE = "publiee", "Publiée"
+        RETIREE = "retiree", "Retirée"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    titre = models.CharField(max_length=200, verbose_name="Titre")
+    categorie = models.CharField(max_length=30, blank=True, verbose_name="Type de permis / activité")
+    risques = models.TextField(blank=True, verbose_name="Risques principaux")
+    consignes = models.TextField(verbose_name="Consignes de sécurité")
+    epi = models.TextField(blank=True, verbose_name="EPI obligatoires")
+    urgence = models.TextField(blank=True, verbose_name="Conduite à tenir en cas d'urgence")
+    version = models.PositiveSmallIntegerField(default=1, verbose_name="Version")
+    provisoire = models.BooleanField(default=False, verbose_name="Contenu provisoire (à valider par ETSL)")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON, verbose_name="Statut")
+    publiee_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    publiee_le = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["titre"]
+        verbose_name = "Fiche sécurité"
+        verbose_name_plural = "Fiches sécurité"
+
+    def __str__(self):
+        return f"{self.code} — {self.titre} v{self.version}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = HseSequence.next_for("FS", "FS")
         return super().save(*args, **kwargs)

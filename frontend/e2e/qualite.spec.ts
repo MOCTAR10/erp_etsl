@@ -81,3 +81,22 @@ test.describe("M6 Qualité : écarts M6-A", () => {
     await expect(page.getByTestId("parametres-qualite").getByText("CAPA : délai de clôture (jours calendaires)")).toBeVisible();
   });
 });
+
+// Écarts M6 (lot ecarts-m6m7) : référentiel des organismes agréés (M6.1-09), WPS requis par profil M1.3.
+test.describe("M6 Qualité : organismes agréés et WPS requis", () => {
+  test("un organisme agréé se saisit à l'écran et apparaît comme valide", async ({ page }) => {
+    await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
+    await page.goto("/qualite");
+    const bloc = page.getByTestId("organismes-agrees");
+    const nom = `Organisme e2e ${Date.now()}`;
+    await bloc.getByRole("button", { name: "Ajouter un organisme agréé" }).click();
+    const form = page.getByRole("form", { name: "Ajouter un organisme agréé" });
+    await form.getByLabel("Organisme *", { exact: true }).fill(nom);
+    await form.getByLabel("N° d'agrément *", { exact: true }).fill("AGR-E2E");
+    await form.getByLabel("Agrément valable jusqu'au *", { exact: true }).fill("2030-12-31");
+    await form.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(form.getByRole("status")).toHaveText("Enregistré.");
+    await expect(bloc.getByRole("row", { name: new RegExp(nom) })).toContainText("Agrément valide");
+    await expect(page.getByTestId("wps-requis")).toBeVisible();
+  });
+});

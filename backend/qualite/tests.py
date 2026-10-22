@@ -157,12 +157,18 @@ class WpsTests(M6BaseTest):
 
 class ControleQualiteTests(M6BaseTest):
     def test_controle_creation_with_cnd_organisme(self):
+        from qualite.models import OrganismeAgree
+
         self.auth()
+        organisme = OrganismeAgree.objects.create(
+            nom="Bureau Veritas Gabon", numero_agrement="AGR-1", date_fin_validite=date.today() + timedelta(days=365),
+        )
         resp = self.client.post(
             "/api/qualite/controles/",
             {
                 "type_controle": ControleQualite.TypeControle.CND,
                 "organisme": ControleQualite.OrganismeCnd.ORGANISME_AGREE,
+                "organisme_agree": str(organisme.pk),
                 "organisme_libelle": "Bureau Veritas Gabon",
                 "affaire": str(self.affaire.id),
                 "lot": str(self.lot.id),

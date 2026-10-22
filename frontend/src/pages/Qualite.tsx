@@ -20,6 +20,7 @@ import type {
 import { ClotureM6Section } from "../components/qualite/ClotureM6Section";
 import { EcartsM6Section } from "../components/qualite/EcartsM6Section";
 import { EcartsM6bSection } from "../components/qualite/EcartsM6bSection";
+import { EcartsM6m7Section } from "../components/qualite/EcartsM6m7Section";
 import { SystemeQualiteSection } from "../components/qualite/SystemeQualiteSection";
 import { ItpSection } from "../components/workflow/ItpSection";
 
@@ -343,6 +344,7 @@ export function QualitePage() {
       <ClotureM6Section />
       <EcartsM6Section />
       <EcartsM6bSection />
+      <EcartsM6m7Section />
       <SystemeQualiteSection />
     </>
   );

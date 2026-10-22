@@ -198,6 +198,10 @@ class WpsWpqrViewSet(viewsets.ModelViewSet):
             raise DRFValidationError({"ordre": "OF introuvable."})
         if ordre.status in (OrdreFabrication.Status.CLOTURE, OrdreFabrication.Status.ANNULE):
             raise DRFValidationError({"ordre": f"OF {ordre.code} clos : diffusion inutile."})
+        from .ecarts import controle_wps_profil
+
+        if erreur := controle_wps_profil(wps, ordre.affaire):
+            raise DRFValidationError({"wps": erreur})
         diffusion, _ = DiffusionWps.objects.get_or_create(wps=wps, ordre=ordre, defaults={"diffuse_par": request.user})
         return Response(DiffusionWpsSerializer(diffusion).data, status=status.HTTP_201_CREATED)
 

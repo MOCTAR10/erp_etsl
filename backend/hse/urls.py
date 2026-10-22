@@ -24,6 +24,15 @@ from .views import (
     PlanUrgenceViewSet,
 )
 
+from .views_ecarts import (
+    FicheSecuriteViewSet,
+    ListeHseViewSet,
+    ModeleChecklistHseViewSet,
+    PlanPreventionViewSet,
+    PrestataireDechetViewSet,
+    ReponseChecklistHseViewSet,
+)
+
 router = DefaultRouter()
 router.register("permis", PermisTravailViewSet, basename="permis")
 router.register("incidents", IncidentViewSet, basename="incidents")
@@ -46,6 +55,14 @@ router.register("parametres", ParametreHseViewSet, basename="hse-parametres")
 router.register("consommations", ConsommationEnvironnementViewSet, basename="hse-consommations")
 router.register("plans-reduction", PlanReductionImpactViewSet, basename="hse-plans-reduction")
 router.register("revues-direction", RevueDirectionHseViewSet, basename="hse-revues-direction")
+
+# Écarts M7 (lot ecarts-m6m7)
+router.register("listes", ListeHseViewSet, basename="hse-listes")
+router.register("modeles-checklist", ModeleChecklistHseViewSet, basename="hse-modeles-checklist")
+router.register("reponses-checklist", ReponseChecklistHseViewSet, basename="hse-reponses-checklist")
+router.register("plans-prevention", PlanPreventionViewSet, basename="hse-plans-prevention")
+router.register("prestataires-dechets", PrestataireDechetViewSet, basename="hse-prestataires-dechets")
+router.register("fiches-securite", FicheSecuriteViewSet, basename="hse-fiches-securite")
 
 urlpatterns = [
     path("", include(router.urls)),

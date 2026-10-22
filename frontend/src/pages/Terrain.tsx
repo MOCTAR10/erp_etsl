@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { Badge, PageHeader, SectionCard } from "../components/ui";
+import { FichesSecuriteTerrain } from "../components/hse/FichesSecuriteTerrain";
 import { offlineQueue, submitOffline, syncNow, useOnline, useQueueItems } from "../lib/offline";
 import { useAuth } from "../store/auth";
 
@@ -242,6 +243,7 @@ export function TerrainPage() {
         />
       )}
 
+      <FichesSecuriteTerrain />
       {user ? null : null}
     </>
   );
