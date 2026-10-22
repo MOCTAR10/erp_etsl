@@ -179,8 +179,7 @@ export function DirectionPage() {
         />
         <HeroStat
           label={t("direction.heroDispo")}
-          value={formatNumber(dispo, { decimals: dispo % 1 ? 1 : 0 })}
-          unit="%"
+          value={formatPercent(dispo, { decimals: dispo % 1 ? 1 : 0 })}
           tone={dispoTone}
           status={statut(dispoTone)}
           gauge={{ value: dispo, target: OBJECTIF_DISPO.ok, ok: OBJECTIF_DISPO.ok, warn: OBJECTIF_DISPO.warn, label: t("direction.heroDispo") }}
@@ -199,7 +198,12 @@ export function DirectionPage() {
           unit={jsa === null ? t("direction2.securite.accidents", { count: p.hse.accidents }) : t("direction2.securite.jours", { count: jsa })}
           tone={securiteTone}
           status={statut(securiteTone)}
-          foot={<span>{t("direction2.securite.objectif")}</span>}
+          foot={
+            <>
+              <span>{t("direction2.securite.objectif")}</span>
+              <span className={`dir-delta tone-${securiteTone}`}>{statut(securiteTone)}</span>
+            </>
+          }
           hint={
             jsa === null
               ? t("direction2.securite.aucunAccident", { count: d.hse.incidents_ouverts })
@@ -209,8 +213,7 @@ export function DirectionPage() {
         />
         <HeroStat
           label={t("direction2.cloture.label")}
-          value={formatNumber(clotureTaux)}
-          unit="%"
+          value={formatPercent(clotureTaux)}
           tone={clotureTone}
           status={statut(clotureTone)}
           gauge={{ value: clotureTaux, target: OBJECTIF_CLOTURE.ok, ok: OBJECTIF_CLOTURE.ok, warn: OBJECTIF_CLOTURE.warn, label: t("direction2.cloture.label") }}

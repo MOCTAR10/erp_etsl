@@ -54,6 +54,7 @@ function Serie({ label, values, mois, color, gid }: { label: string; values: num
               axisLine={false}
               interval={0}
               tickMargin={6}
+              padding={{ left: 12, right: 12 }}
               height={22}
             />
             <Tooltip

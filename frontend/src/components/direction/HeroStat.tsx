@@ -2,7 +2,6 @@ import { motion } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { motionTokens } from "../../theme/tokens";
-import { Badge } from "../ui";
 
 export type HeroTone = "ok" | "warn" | "err" | "neutral";
 
@@ -55,7 +54,7 @@ export function HeroStat({
     >
       <header className="dir-hero-head">
         <h3 className="dir-hero-label">{label}</h3>
-        {status ? <Badge tone={tone === "neutral" ? "neutral" : tone}>{status}</Badge> : null}
+        {status ? <span className="sr-only">{status}</span> : null}
       </header>
       <p className={`dir-hero-value${compact ? " is-compact" : ""}`}>
         <span className="dir-hero-number">{value}</span>
@@ -74,7 +73,9 @@ export function HeroStat({
           <span className="dir-gauge-fill" style={{ width: `${pct}%` }} />
           <span className="dir-gauge-target" style={{ left: `${gauge.target}%` }} aria-hidden />
         </div>
-      ) : null}
+      ) : (
+        <span className="dir-gauge-spacer" aria-hidden />
+      )}
       {foot ? <div className="dir-hero-foot">{foot}</div> : null}
       {hint ? <p className="dir-hero-hint">{hint}</p> : null}
     </motion.article>

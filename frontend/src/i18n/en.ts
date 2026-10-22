@@ -3701,6 +3701,7 @@ export const en = {
   },
   kanban2: {
     sub: "Approval workflow tasks",
+    aucune: "No task currently in approval workflows",
     total_one: "{{count}} task in approval workflows",
     total_other: "{{count}} tasks in approval workflows",
     actions: "Actions on “{{titre}}”",

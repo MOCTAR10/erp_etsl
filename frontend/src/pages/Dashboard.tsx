@@ -161,16 +161,11 @@ export function DashboardPage() {
         </SectionCard>
 
         <SectionCard title={t("dashboard.retention")} subtitle={t("dashboard2.retentionSub", { count: data.retention.due.length })}>
-          <DataGrid
-            columns={retentionCols}
-            rows={retentionRows}
-            caption={t("dashboard.retention")}
-            density="compact"
-            maxHeight={360}
-            emptyIcon={Archive}
-            emptyLabel={t("dashboard2.retentionVide")}
-            emptyHint={t("dashboard2.retentionVideHint")}
-          />
+          {retentionRows.length === 0 ? (
+            <EmptyState icon={Archive} label={t("dashboard2.retentionVide")} hint={t("dashboard2.retentionVideHint")} />
+          ) : (
+            <DataGrid columns={retentionCols} rows={retentionRows} caption={t("dashboard.retention")} density="compact" maxHeight={360} />
+          )}
         </SectionCard>
       </div>
     </>

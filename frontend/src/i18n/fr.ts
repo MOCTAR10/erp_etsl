@@ -3701,6 +3701,7 @@ export const fr = {
   },
   kanban2: {
     sub: "Tâches des circuits de validation",
+    aucune: "Aucune tâche en cours dans les circuits de validation",
     total_one: "{{count}} tâche dans les circuits de validation",
     total_other: "{{count}} tâches dans les circuits de validation",
     actions: "Actions sur « {{titre}} »",

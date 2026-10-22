@@ -123,12 +123,21 @@
   }
 
   .dir-delta {
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    color: var(--text-muted);
     font-weight: var(--fw-semibold);
     white-space: nowrap;
   }
-  .dir-delta.tone-ok { color: var(--ok-text); }
-  .dir-delta.tone-warn { color: var(--warn-text); }
-  .dir-delta.tone-err { color: var(--err-text); }
+  .dir-delta.tone-ok { background: var(--ok-soft); color: var(--ok-text); }
+  .dir-delta.tone-warn { background: var(--warn-soft); color: var(--warn-text); }
+  .dir-delta.tone-err { background: var(--err-soft); color: var(--err-text); }
+
+  .dir-gauge-spacer {
+    display: block;
+    height: 6px;
+  }
 
   .dir-hero-hint {
     margin: auto 0 0;
@@ -202,7 +211,7 @@
   }
 
   .dir-trend-chart {
-    height: 92px;
+    height: 116px;
     margin: 0 -6px;
   }
 
@@ -946,7 +955,7 @@
   /* ------------------------------------------------------- Circuits */
   .circ-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 500px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 640px), 1fr));
     gap: var(--space-4);
     align-items: start;
   }

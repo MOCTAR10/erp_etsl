@@ -100,7 +100,7 @@ export function KanbanPage() {
   });
 
   const header = (n?: number) => (
-    <PageHeader title={t("kanban.title")} subtitle={n === undefined ? t("kanban2.sub") : t("kanban2.total", { count: n })} />
+    <PageHeader title={t("kanban.title")} subtitle={n === undefined ? t("kanban2.sub") : n === 0 ? t("kanban2.aucune") : t("kanban2.total", { count: n })} />
   );
   if (isLoading)
     return (
