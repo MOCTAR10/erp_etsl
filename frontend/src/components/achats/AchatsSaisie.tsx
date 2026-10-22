@@ -5,7 +5,7 @@ import { formatDate, formatMoney } from "../../lib/format";
 import { useFiltresListe } from "../../lib/useFiltresListe";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
-import { Badge, FilterBar, PagedDataTable, QuickForm, SectionCard, type ActionDef, type Column } from "../ui";
+import { ActionBar, Badge, FilterBar, PagedDataTable, QuickForm, SectionCard, type ActionDef, type Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 import { useAnalytiques, useRefOptions } from "./refs";
 
