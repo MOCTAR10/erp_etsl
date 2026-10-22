@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { formatBytes, formatDate, formatNumber } from "./format";
+import { formatBytes, formatDate, formatDateShort, formatMoney, formatMoneyCompact, formatNumber, formatPercent } from "./format";
+
+/** Normalise les espaces insécables pour comparer. */
+const sp = (v: string) => v.replace(/\u202f|\u00a0/g, " ");
 
 describe("formatBytes", () => {
   it("renvoie 0 B pour zéro/falsy", () => {
@@ -35,5 +38,51 @@ describe("formatDate", () => {
     const d = formatDate("2026-09-23T10:00:00Z", "fr-FR");
     expect(d).toContain("2026");
     expect(d.toLowerCase()).toContain("sept");
+  });
+});
+
+describe("formatNumber (décimales)", () => {
+  it("applique des décimales fixes à la française", () => {
+    expect(formatNumber(0, { decimals: 2 })).toBe("0,00");
+    expect(sp(formatNumber(1234.5, { decimals: 1 }))).toBe("1 234,5");
+  });
+});
+
+describe("formatMoney", () => {
+  it("formate en FCFA, espaces insécables", () => {
+    expect(sp(formatMoney(25000000))).toBe("25 000 000 FCFA");
+    expect(sp(formatMoney("4500000.00"))).toBe("4 500 000 FCFA");
+    expect(formatMoney(25000000)).not.toContain(" ");
+  });
+
+  it("version compacte à partir du million", () => {
+    expect(sp(formatMoney(25000000, { compact: true }))).toBe("25 M FCFA");
+    expect(sp(formatMoney(1250000000, { compact: true }))).toBe("1,3 Md FCFA");
+    expect(sp(formatMoney(250000, { compact: true }))).toBe("250 000 FCFA");
+    expect(sp(formatMoneyCompact(210000000))).toBe("210 M FCFA");
+  });
+
+  it("laisse passer les montants masqués et absents", () => {
+    expect(formatMoney("—")).toBe("—");
+    expect(formatMoney("••••••")).toBe("••••••");
+    expect(formatMoney(null)).toBe("—");
+    expect(formatMoney(undefined)).toBe("—");
+    expect(formatMoney("")).toBe("—");
+  });
+});
+
+describe("formatPercent", () => {
+  it("points ou ratio", () => {
+    expect(sp(formatPercent(75))).toBe("75 %");
+    expect(sp(formatPercent(0.075, { ratio: true, decimals: 1 }))).toBe("7,5 %");
+    expect(formatPercent(null)).toBe("—");
+  });
+});
+
+describe("formatDate (valeurs absentes)", () => {
+  it("renvoie — si absente ou invalide", () => {
+    expect(formatDate(null)).toBe("—");
+    expect(formatDate("pas une date")).toBe("—");
+    expect(formatDateShort("2026-09-23T10:00:00Z")).toBe("23/09/2026");
   });
 });

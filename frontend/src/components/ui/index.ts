@@ -9,6 +9,7 @@ export { ChartCard } from "./ChartCard";
 export { EmptyState } from "./EmptyState";
 export { ErrorState } from "./ErrorState";
 export { Kpi } from "./Kpi";
+export type { KpiKind } from "./Kpi";
 export { PageHeader } from "./PageHeader";
 export { Pressable } from "./Pressable";
 export { ProgressBar } from "./Progress";

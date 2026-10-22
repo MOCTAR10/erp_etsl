@@ -2,11 +2,14 @@ import type { LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 
-import { formatNumber } from "../../lib/format";
+import { formatMoney, formatMoneyCompact, formatNumber, formatPercent } from "../../lib/format";
 import { motionTokens } from "../../theme/tokens";
 import { AnimatedNumber } from "./AnimatedNumber";
 
 type Tone = "brand" | "ok" | "warn" | "err" | "accent" | "neutral";
+
+/** Nature de la valeur : nombre (défaut), montant FCFA (compact + montant exact en infobulle), pourcentage. */
+export type KpiKind = "number" | "money" | "percent";
 
 type Props = {
   label: string;
@@ -15,37 +18,45 @@ type Props = {
   icon?: LucideIcon;
   tone?: Tone;
   delay?: number;
+  kind?: KpiKind;
+  /** Format explicite (prioritaire sur `kind`) ; doit être une référence stable. */
   format?: (n: number) => string;
 };
 
-/** Carte KPI standard — valeur éventuellement animée (count-up), icône, ton. */
-export function Kpi({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone = "brand",
-  delay = 0,
-  format = formatNumber,
-}: Props) {
+const percent = (n: number) => formatPercent(n);
+const FORMATS: Record<KpiKind, (n: number) => string> = {
+  number: formatNumber,
+  money: formatMoneyCompact,
+  percent,
+};
+
+/** Carte KPI standard — libellé, valeur (count-up si numérique), indication, icône en tonalité douce. */
+export function Kpi({ label, value, hint, icon: Icon, tone = "brand", delay = 0, kind = "number", format }: Props) {
+  const fmt = format ?? FORMATS[kind];
+  // Montant : valeur compacte affichée, montant exact en infobulle ; valeur masquée (« — ») inchangée.
+  const exact = kind === "money" && value !== null && value !== undefined ? formatMoney(value) : undefined;
+  let display: ReactNode;
+  if (typeof value === "number") display = <AnimatedNumber value={value} format={fmt} />;
+  else if (kind === "money") display = formatMoneyCompact(value);
+  else display = value ?? "—";
+
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: motionTokens.distance.xs, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: motionTokens.duration.base, ease: motionTokens.ease.out, delay }}
+      initial={{ opacity: 0, y: motionTokens.distance.xs }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: motionTokens.duration.fast, ease: motionTokens.ease.out, delay }}
       className="card kpi"
     >
       <div className="kpi-head">
         <span className="kpi-label">{label}</span>
         {Icon ? (
-          <span className={`kpi-icon ${tone}`}>
-            <Icon size={16} />
+          <span className={`kpi-icon ${tone}`} aria-hidden>
+            <Icon size={16} strokeWidth={1.75} />
           </span>
         ) : null}
       </div>
-      <span className="kpi-value">
-        {typeof value === "number" ? <AnimatedNumber value={value} format={format} /> : (value ?? "—")}
+      <span className="kpi-value" title={exact}>
+        {display}
       </span>
       {hint ? <span className="kpi-hint">{hint}</span> : null}
     </motion.div>

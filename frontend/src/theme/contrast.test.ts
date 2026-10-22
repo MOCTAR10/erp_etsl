@@ -61,12 +61,21 @@ describe("contraste WCAG AA de la charte", () => {
         ["brand", "brand-soft"],
         ["steel", "steel-soft"],
         ["on-brand", "brand"],
+        ["info-text", "info-soft"],
+        ["text", "surface-2"],
       ];
       const failures = pairs
         .map(([fg, bg]) => [fg, bg, ratio(parse(v[fg], surface), parse(v[bg], surface))] as const)
         .filter(([, , r]) => r < 4.5)
         .map(([fg, bg, r]) => `${fg} sur ${bg} : ${r.toFixed(2)}`);
       expect(failures).toEqual([]);
+    });
+
+    it(`${mode} : texte discret et bordure de champ (non-texte) >= 3:1 / visibles`, () => {
+      const v = { ...vars(":root"), ...vars(selector) };
+      const surface = parse(v.surface);
+      expect(ratio(parse(v["text-subtle"], surface), surface)).toBeGreaterThanOrEqual(3);
+      expect(ratio(parse(v["border-strong"], surface), surface)).toBeGreaterThan(1.3);
     });
   }
 });

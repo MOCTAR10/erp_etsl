@@ -30,7 +30,11 @@ describe("charte ETSL : tokens.ts <-> global.css", () => {
       for (const [key, value] of Object.entries(palette[mode])) {
         const name = kebab(key);
         // `ring` : en CSS c'est un box-shadow complet, pas une couleur — non comparable.
-        if (key === "ring" || !(name in cssVars)) continue;
+        if (key === "ring") continue;
+        if (!(name in cssVars)) {
+          diffs.push(`${name}: absent du CSS`);
+          continue;
+        }
         if (cssVars[name].toLowerCase() !== value.toLowerCase()) {
           diffs.push(`${name}: css=${cssVars[name]} ts=${value}`);
         }
@@ -38,6 +42,14 @@ describe("charte ETSL : tokens.ts <-> global.css", () => {
       expect(diffs).toEqual([]);
     });
   }
+
+  it("échelles d'espacement, de rayons et d'ombres présentes en CSS", () => {
+    const root = vars(":root");
+    for (const name of ["space-1", "space-2", "space-4", "space-6", "space-8", "radius-xs", "radius-lg", "radius-full", "shadow-xs", "shadow-md", "shadow-pop", "fs-h1", "fs-kpi", "fs-body", "control-h"]) {
+      expect(root, name).toHaveProperty(name);
+    }
+    expect(root["radius-lg"]).toBe("12px");
+  });
 
   it("la couleur d'accent est le rouge du logo (pas l'ancien orange)", () => {
     expect(palette.light.accent).toBe("#d4142a");
