@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatBytes, formatDate, formatDateShort, formatMoney, formatMoneyCompact, formatNumber, formatPercent } from "./format";
+import { formatBytes, formatDate, formatDateShort, formatMoney, formatNumber, formatPercent } from "./format";
 
 /** Normalise les espaces insécables pour comparer. */
 const sp = (v: string) => v.replace(/\u202f|\u00a0/g, " ");
@@ -55,11 +55,9 @@ describe("formatMoney", () => {
     expect(formatMoney(25000000)).not.toContain(" ");
   });
 
-  it("version compacte à partir du million", () => {
-    expect(sp(formatMoney(25000000, { compact: true }))).toBe("25 M FCFA");
-    expect(sp(formatMoney(1250000000, { compact: true }))).toBe("1,3 Md FCFA");
-    expect(sp(formatMoney(250000, { compact: true }))).toBe("250 000 FCFA");
-    expect(sp(formatMoneyCompact(210000000))).toBe("210 M FCFA");
+  it("reste exact, jamais abrégé (y compris les grands montants)", () => {
+    expect(sp(formatMoney(1250000000))).toBe("1 250 000 000 FCFA");
+    expect(sp(formatMoney(-4500))).toBe("-4 500 FCFA");
   });
 
   it("laisse passer les montants masqués et absents", () => {

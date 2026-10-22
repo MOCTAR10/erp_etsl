@@ -2,13 +2,13 @@ import type { LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 
-import { formatMoney, formatMoneyCompact, formatNumber, formatPercent } from "../../lib/format";
+import { formatMoney, formatNumber, formatPercent } from "../../lib/format";
 import { motionTokens } from "../../theme/tokens";
 import { AnimatedNumber } from "./AnimatedNumber";
 
 type Tone = "brand" | "ok" | "warn" | "err" | "accent" | "neutral";
 
-/** Nature de la valeur : nombre (défaut), montant FCFA (compact + montant exact en infobulle), pourcentage. */
+/** Nature de la valeur : nombre (défaut), montant FCFA exact (« 25 000 000 FCFA »), pourcentage. */
 export type KpiKind = "number" | "money" | "percent";
 
 type Props = {
@@ -23,22 +23,37 @@ type Props = {
   format?: (n: number) => string;
 };
 
+const money = (n: number) => formatMoney(n);
 const percent = (n: number) => formatPercent(n);
 const FORMATS: Record<KpiKind, (n: number) => string> = {
   number: formatNumber,
-  money: formatMoneyCompact,
+  money,
   percent,
 };
+
+/**
+ * Taille de la valeur selon sa longueur : un montant n'est jamais abrégé,
+ * c'est la police qui se réduit (28 → 22 → 18 px) pour tenir dans la carte.
+ */
+function sizeClass(text: string): string {
+  if (text.length > 16) return " kpi-value-sm";
+  if (text.length > 11) return " kpi-value-md";
+  return "";
+}
 
 /** Carte KPI standard — libellé, valeur (count-up si numérique), indication, icône en tonalité douce. */
 export function Kpi({ label, value, hint, icon: Icon, tone = "brand", delay = 0, kind = "number", format }: Props) {
   const fmt = format ?? FORMATS[kind];
-  // Montant : valeur compacte affichée, montant exact en infobulle ; valeur masquée (« — ») inchangée.
-  const exact = kind === "money" && value !== null && value !== undefined ? formatMoney(value) : undefined;
+  let text: string;
   let display: ReactNode;
-  if (typeof value === "number") display = <AnimatedNumber value={value} format={fmt} />;
-  else if (kind === "money") display = formatMoneyCompact(value);
-  else display = value ?? "—";
+  if (typeof value === "number") {
+    text = fmt(value);
+    display = <AnimatedNumber value={value} format={fmt} />;
+  } else {
+    // Chaîne : montant API formaté si `kind="money"`, sinon telle quelle (« — » masqué inclus).
+    text = kind === "money" ? formatMoney(value) : (value ?? "—");
+    display = text;
+  }
 
   return (
     <motion.div
@@ -55,9 +70,7 @@ export function Kpi({ label, value, hint, icon: Icon, tone = "brand", delay = 0,
           </span>
         ) : null}
       </div>
-      <span className="kpi-value" title={exact}>
-        {display}
-      </span>
+      <span className={`kpi-value${sizeClass(text)}`}>{display}</span>
       {hint ? <span className="kpi-hint">{hint}</span> : null}
     </motion.div>
   );

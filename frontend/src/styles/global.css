@@ -456,6 +456,11 @@ h3 {
   min-width: 0;
 }
 
+/* Un bouton dans une carte garde sa largeur naturelle (pas de barre pleine largeur) */
+.card-body > .btn {
+  align-self: flex-start;
+}
+
 /* En-tête de page */
 .page-header {
   display: flex;
@@ -615,7 +620,17 @@ h3 {
   letter-spacing: -0.015em;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+
+/* Montants longs : la police se réduit, le nombre reste exact (jamais « 25 M ») */
+.kpi-value.kpi-value-md {
+  font-size: 22px;
+  line-height: 28px;
+}
+.kpi-value.kpi-value-sm {
+  font-size: 18px;
+  line-height: 24px;
 }
 
 .kpi-hint {
@@ -865,12 +880,30 @@ a.banner-action:hover {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 
 .task-card > * {
   min-width: 0;
+}
+
+/* Ligne statut / montant : le badge s'ellipse, le montant ne se coupe jamais */
+.task-card .meta {
+  gap: var(--space-1) var(--space-2);
+}
+.task-card .meta > .badge:not(:has(> svg)) {
+  display: inline-block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-card .meta > span:not(.badge),
+.task-card .amount {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: var(--fw-medium);
 }
 
 .task-card:hover {
@@ -1103,6 +1136,24 @@ a.banner-action:hover {
 .empty-state.compact {
   padding: var(--space-3);
   gap: 2px;
+}
+
+/* Colonne de board vide : simple mention discrète, sans icône */
+.board-col .empty-state {
+  padding: var(--space-4) var(--space-2);
+}
+.board-col .empty-state > svg {
+  display: none;
+}
+.board-col .empty-state-title {
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+}
+
+/* Bouton d'action posé juste avant une grille de KPI : respiration de 24 px */
+.btn + :is(.kpis, .kpi-grid),
+.quick-form + :is(.kpis, .kpi-grid) {
+  margin-top: var(--space-6);
 }
 
 .skeleton {
@@ -1373,16 +1424,26 @@ kbd {
   box-shadow: var(--ring);
 }
 
+/* Loupe DANS le champ, aligné sur le bord des cartes */
 .search-field {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 0.75rem;
-  color: var(--text-muted);
+  max-width: 100%;
+  margin-bottom: var(--space-4);
+  color: var(--text-subtle);
+}
+
+.search-field > svg {
+  position: absolute;
+  left: 11px;
+  pointer-events: none;
 }
 
 .search-field input {
-  min-width: min(100%, 260px);
+  width: 320px;
+  max-width: 100%;
+  padding-left: 32px;
 }
 
 } /* fin @layer components */

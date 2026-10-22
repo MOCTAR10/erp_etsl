@@ -54,16 +54,14 @@ export function formatNumber(value: Numeric, options: NumberOptions = {}): strin
 }
 
 export type MoneyOptions = {
-  /** Version compacte pour les KPI : « 25 M FCFA », « 1,2 Md FCFA » (à partir du million). */
-  compact?: boolean;
   /** Libellé de devise (défaut « FCFA »). */
   currency?: string;
 };
 
-const compactFormatter = new Intl.NumberFormat(NUMBER_LOCALE, { notation: "compact" });
-
 /**
- * Montant en FCFA : « 25 000 000 FCFA » ; compact : « 25 M FCFA ».
+ * Montant en FCFA, TOUJOURS exact et complet : « 25 000 000 FCFA » (séparateur de
+ * milliers = espace insécable). Jamais d'abréviation (« 25 M ») — décision ETSL,
+ * y compris dans les KPI : c'est la taille de police qui s'adapte, pas le nombre.
  * Une chaîne non numérique (montant masqué « — » / « •••••• ») est renvoyée telle quelle ;
  * `null` / `undefined` / « » → « — ».
  */
@@ -73,15 +71,9 @@ export function formatMoney(value: Numeric, options: MoneyOptions = {}): string 
     return typeof value === "string" && value.trim() !== "" ? value : EMPTY;
   }
   const currency = options.currency ?? "FCFA";
-  const body =
-    options.compact && Math.abs(n) >= 1_000_000
-      ? compactFormatter.format(n)
-      : n.toLocaleString(NUMBER_LOCALE, { maximumFractionDigits: 0 });
-  return `${body.replace(/ /g, NBSP)}${NBSP}${currency}`;
+  const body = n.toLocaleString(NUMBER_LOCALE, { maximumFractionDigits: 0 });
+  return `${body.replace(/[\u202f ]/g, NBSP)}${NBSP}${currency}`;
 }
-
-/** Variante compacte à référence stable (prop `format` de Kpi / AnimatedNumber). */
-export const formatMoneyCompact = (value: Numeric): string => formatMoney(value, { compact: true });
 
 export type PercentOptions = {
   /** Décimales (défaut 0). */
