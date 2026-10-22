@@ -26,6 +26,7 @@ export const en = {
       empty: "No results",
       loading: "Searching…",
       hint: "Navigate ↑ ↓ · Open ↵ · Close Esc",
+      esc: "Esc",
     },
   },
   app: {

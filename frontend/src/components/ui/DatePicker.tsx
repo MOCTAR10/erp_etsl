@@ -320,8 +320,8 @@ export function DateRangePicker({
           aria-label={aria["aria-label"]}
           aria-describedby={valueId}
         >
-          <CalendarDays size={16} aria-hidden />
           <span id={valueId}>{label}</span>
+          <CalendarDays size={16} aria-hidden />
         </button>
       </RadixPopover.Trigger>
       {nameFrom ? <input type="hidden" name={nameFrom} value={range.from} /> : null}

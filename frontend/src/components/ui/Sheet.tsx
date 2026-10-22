@@ -98,7 +98,7 @@ function SheetBase({ variant, ...p }: SheetProps & { variant: "sheet" | "modal" 
                       </button>
                     </Dialog.Close>
                   </header>
-                  <div className="ui-panel-body">{p.children}</div>
+                  {p.children ? <div className="ui-panel-body">{p.children}</div> : null}
                   {p.footer ? <footer className="ui-panel-foot">{p.footer}</footer> : null}
                 </motion.div>
               </Dialog.Content>

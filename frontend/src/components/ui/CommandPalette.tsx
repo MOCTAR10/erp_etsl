@@ -188,7 +188,7 @@ export function CommandPalette({
               <Search size={17} aria-hidden />
               <Command.Input value={query} onValueChange={setQuery} placeholder={placeholder ?? t("ui.command.placeholder")} />
               {loading ? <Loader2 size={16} className="ui-spin ui-cmd-spinner" aria-hidden /> : null}
-              <kbd className="ui-kbd">Esc</kbd>
+              <kbd className="ui-kbd">{t("ui.command.esc")}</kbd>
             </div>
             <Command.List className="ui-cmd-list">
               {loading ? <Command.Loading label={t("ui.command.loading")}>{null}</Command.Loading> : null}
