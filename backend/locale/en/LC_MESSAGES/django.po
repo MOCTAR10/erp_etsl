@@ -1,7 +1,7 @@
 # Catalogue anglais du serveur ETSL ERP (EX-G-07).
 # msgid = texte français tel qu'écrit dans le code ; msgstr = traduction anglaise.
 # Après modification : `python manage.py compiler_traductions` (compile django.mo, sans msgfmt).
-# Socle (config, GED, signatures, exports) : lot a1. Messages des applications métier : lot a5.
+# Socle (config, GED, signatures, exports) : lot a1. Messages des applications métier et du socle : lot a6.
 msgid ""
 msgstr ""
 "Project-Id-Version: ETSL ERP\n"
@@ -318,3 +318,3503 @@ msgstr "Two-factor authentication not enabled: sign with the code received by e-
 
 msgid "Aucun code valide : demandez un nouveau code."
 msgstr "No valid code: request a new code."
+
+# ── accounting_kernel : messages API et exports (lot a6) ──
+
+#: accounting_kernel/models.py:233
+msgid "Écriture comptabilisée immuable — corrigez par extourne."
+msgstr "Posted entry is immutable — correct it with a reversal."
+
+#: accounting_kernel/models.py:240
+msgid "Statut d'une écriture comptabilisée non modifiable."
+msgstr "The status of a posted entry cannot be changed."
+
+#: accounting_kernel/models.py:246
+msgid "Écriture comptabilisée immuable — pas de suppression."
+msgstr "Posted entry is immutable — it cannot be deleted."
+
+#: accounting_kernel/models.py:320
+msgid "Ligne d'écriture comptabilisée immuable."
+msgstr "Posted entry line is immutable."
+
+#: accounting_kernel/permissions.py:17
+msgid "Rôle non autorisé à comptabiliser."
+msgstr "Role not authorised to post entries."
+
+#: accounting_kernel/serializers.py:137
+msgid "Saisie manuelle autorisée au seul journal des opérations diverses (OD)."
+msgstr "Manual entry is only allowed in the miscellaneous operations journal (OD)."
+
+#: accounting_kernel/serializers.py:140
+msgid "Motif obligatoire pour une écriture manuelle."
+msgstr "A reason is required for a manual entry."
+
+#: accounting_kernel/serializers.py:145
+msgid "Une écriture doit comporter au moins deux lignes."
+msgstr "An entry must have at least two lines."
+
+#: accounting_kernel/serializers.py:80
+msgid "Une ligne ne peut être à la fois débit et crédit."
+msgstr "A line cannot be both debit and credit."
+
+#: accounting_kernel/serializers.py:83
+msgid "Renseignez un débit ou un crédit."
+msgstr "Enter a debit or a credit."
+
+#: accounting_kernel/services.py:31
+msgid "Les montants doivent être positifs."
+msgstr "Amounts must be positive."
+
+#: accounting_kernel/services.py:35
+msgid "Ligne sans montant."
+msgstr "Line without an amount."
+
+#: accounting_kernel/services.py:50
+msgid "Seule une écriture brouillon peut être comptabilisée."
+msgstr "Only a draft entry can be posted."
+
+#: accounting_kernel/services.py:52
+msgid "Journal inactif."
+msgstr "Inactive journal."
+
+#: accounting_kernel/services.py:54
+msgid "Période clôturée — comptabilisation impossible."
+msgstr "Period closed — posting not possible."
+
+#: accounting_kernel/services.py:56
+msgid "Exercice clôturé — comptabilisation impossible."
+msgstr "Fiscal year closed — posting not possible."
+
+#: accounting_kernel/services.py:72
+msgid "Seule une écriture comptabilisée peut être extournée."
+msgstr "Only a posted entry can be reversed."
+
+#: accounting_kernel/services.py:74
+msgid "Écriture déjà extournée."
+msgstr "Entry already reversed."
+
+#: accounting_kernel/views.py:157
+msgid "Année attendue."
+msgstr "Year expected."
+
+#: accounting_kernel/views.py:55
+msgid "Exercice portant des écritures comptabilisées : conservation obligatoire, suppression impossible."
+msgstr "Fiscal year holds posted entries: retention required, deletion not possible."
+
+#: accounting_kernel/views.py:80
+msgid "Clôture et réouverture d'une période : passez par Comptabilité → Clôture mensuelle (contrôles, chrono < 2 h, synthèse Direction) — /api/comptabilite/clotures-mensuelles/."
+msgstr "Closing and reopening a period: use Accounting → Monthly closing (checks, timer < 2 h, Management summary) — /api/comptabilite/clotures-mensuelles/."
+
+# ── achats : messages API et exports (lot a6) ──
+
+#: achats/comptabilisation.py:56
+msgid "Facture déjà comptabilisée."
+msgstr "Invoice already posted."
+
+#: achats/comptabilisation.py:59
+msgid "Facture non rapprochée (3-way BR / BC / facture) : comptabilisation impossible."
+msgstr "Invoice not matched (3-way GRN / PO / invoice): posting not possible."
+
+#: achats/comptabilisation.py:63
+msgid "Facture sans ligne : rien à comptabiliser."
+msgstr "Invoice has no lines: nothing to post."
+
+#: achats/comptabilisation.py:71
+msgid "Aucun taux de TVA actif : paramétrez-le (Comptabilité → TVA)."
+msgstr "No active VAT rate: configure one (Accounting → VAT)."
+
+#: achats/comptabilisation.py:80
+msgid "Journal ACH absent (seed_accounting)."
+msgstr "Purchase journal ACH missing (seed_accounting)."
+
+#: achats/ecarts.py:294
+msgid "Avoir déjà comptabilisé."
+msgstr "Credit note already posted."
+
+#: achats/ecarts.py:297
+msgid "La facture d'origine doit être comptabilisée."
+msgstr "The original invoice must be posted."
+
+#: achats/ecarts.py:300
+msgid "Facture d'origine sans montant."
+msgstr "Original invoice has no amount."
+
+#: achats/ecarts.py:330
+msgid "Écriture d'origine sans ligne fournisseur."
+msgstr "Original entry has no supplier line."
+
+#: achats/ecarts.py:358
+msgid "Une DA brouillon existe déjà pour cette affaire : complétez-la."
+msgstr "A draft purchase requisition already exists for this project: complete it."
+
+#: achats/ecarts.py:390
+msgid "Location GR annulée."
+msgstr "GR rental cancelled."
+
+#: achats/ecarts.py:392
+msgid "Partenaire de la location non marqué GLOBAL RENTAL."
+msgstr "The rental partner is not flagged GLOBAL RENTAL."
+
+#: achats/ecarts.py:56
+msgid "La valeur doit être strictement positive."
+msgstr "The value must be strictly positive."
+
+#: achats/models.py:382
+msgid "Le partenaire doit être marqué GLOBAL RENTAL (intra-groupe)."
+msgstr "The partner must be flagged GLOBAL RENTAL (intra-group)."
+
+#: achats/models.py:386
+msgid "Un BC lié à une location GR est un BC GLOBAL RENTAL (compte 618)."
+msgstr "A PO linked to a GR rental is a GLOBAL RENTAL PO (account 618)."
+
+#: achats/models.py:388
+msgid "Le fournisseur doit être le partenaire GR de la location."
+msgstr "The supplier must be the GR partner of the rental."
+
+#: achats/models.py:841
+msgid "Pièce d'un autre bon de commande."
+msgstr "Item from another purchase order."
+
+#: achats/models.py:952
+msgid "La fin d'agrément doit suivre la date d'évaluation."
+msgstr "The approval end date must follow the evaluation date."
+
+#: achats/models.py:954
+msgid "Note sur 100."
+msgstr "Score out of 100."
+
+#: achats/models.py:993
+msgid "Catégorie d'article ou article requis."
+msgstr "Item category or item required."
+
+#: achats/models.py:995
+msgid "Méthode CND sans CND exigé."
+msgstr "NDT method without NDT required."
+
+#: achats/serializers.py:334
+msgid "N° de certificat MTC / CoC requis."
+msgstr "MTC / CoC certificate number required."
+
+#: achats/serializers.py:336
+msgid "Un certificat matière se rattache à un lot : n° de lot requis."
+msgstr "A material certificate is attached to a batch: batch number required."
+
+#: achats/serializers.py:429
+msgid "Litige résolu : pièce scellée."
+msgstr "Dispute resolved: record sealed."
+
+#: achats/serializers_ecarts.py:105
+msgid "Montant HT strictement positif."
+msgstr "Amount excl. tax must be strictly positive."
+
+#: achats/serializers_ecarts.py:110
+msgid "Avoir comptabilisé : pièce scellée."
+msgstr "Credit note posted: record sealed."
+
+#: achats/serializers_ecarts.py:113
+msgid "Un avoir porte sur une facture comptabilisée."
+msgstr "A credit note relates to a posted invoice."
+
+#: achats/serializers_ecarts.py:116
+msgid "Litige d'un autre bon de commande."
+msgstr "Dispute from another purchase order."
+
+#: achats/serializers_ecarts.py:59
+msgid "Agrément décidé : pièce scellée (nouvelle demande pour renouveler)."
+msgstr "Approval decided: record sealed (submit a new request to renew)."
+
+#: achats/stock_link.py:22
+msgid "Dépôt de réception introuvable ou inactif."
+msgstr "Receiving warehouse not found or inactive."
+
+#: achats/stock_link.py:26
+msgid "Dépôt de réception à préciser (plusieurs dépôts actifs)."
+msgstr "Specify the receiving warehouse (several active warehouses)."
+
+#: achats/stock_link.py:27
+msgid "Aucun dépôt actif : créez un dépôt (Stocks) avant de valider une réception d'articles stockés."
+msgstr "No active warehouse: create one (Stock) before validating a receipt of stocked items."
+
+#: achats/stock_link.py:63
+msgid "Entrée en stock déjà enregistrée pour cette réception."
+msgstr "Stock entry already recorded for this receipt."
+
+#: achats/views.py:149
+msgid "Motif du rejet obligatoire."
+msgstr "A rejection reason is required."
+
+#: achats/views.py:160
+msgid "Visa exceptionnel réservé à la Direction Générale."
+msgstr "Exceptional approval is reserved for General Management."
+
+#: achats/views.py:163
+msgid "Motif du visa exceptionnel obligatoire."
+msgstr "A reason is required for the exceptional approval."
+
+#: achats/views.py:178
+msgid "Affaire introuvable."
+msgstr "Project not found."
+
+#: achats/views.py:219
+msgid "Seule une consultation en brouillon s'ouvre."
+msgstr "Only a draft request for quotation can be opened."
+
+#: achats/views.py:230
+msgid "Seule une consultation ouverte se clôture."
+msgstr "Only an open request for quotation can be closed."
+
+#: achats/views.py:233
+msgid "Retenez une et une seule offre fournisseur avant de clôturer."
+msgstr "Select exactly one supplier quotation before closing."
+
+#: achats/views.py:259
+msgid "Seule une consultation ouverte permet de retenir une offre."
+msgstr "Only an open request for quotation allows a quotation to be selected."
+
+#: achats/views.py:294
+msgid "BC sans ligne : rien à engager."
+msgstr "PO has no lines: nothing to commit."
+
+#: achats/views.py:310
+msgid "Référence DS obligatoire pour un BC GLOBAL RENTAL."
+msgstr "DS reference required for a GLOBAL RENTAL PO."
+
+#: achats/views.py:322
+msgid "Seul un BC brouillon ou confirmé sans réception s'annule."
+msgstr "Only a draft or confirmed PO without receipts can be cancelled."
+
+#: achats/views.py:325
+msgid "Réception enregistrée : annulez d'abord les réceptions."
+msgstr "Receipt recorded: cancel the receipts first."
+
+#: achats/views.py:390
+msgid "Location GR introuvable."
+msgstr "GR rental not found."
+
+#: achats/views.py:436
+msgid "Réception déjà validée ou annulée."
+msgstr "Receipt already validated or cancelled."
+
+#: achats/views.py:456
+msgid "Réception validée : suppression impossible (le stock a été alimenté)."
+msgstr "Receipt validated: deletion not possible (stock has been updated)."
+
+#: achats/views.py:485
+msgid "Litige déjà résolu."
+msgstr "Dispute already resolved."
+
+#: achats/views.py:507
+msgid "Litige déjà escaladé."
+msgstr "Dispute already escalated."
+
+#: achats/views.py:527
+msgid "Résolution obligatoire (avoir, remplacement, abandon…)."
+msgstr "Resolution required (credit note, replacement, write-off…)."
+
+#: achats/views.py:553
+msgid "Réception validée : lignes non modifiables."
+msgstr "Receipt validated: lines cannot be changed."
+
+#: achats/views.py:599
+msgid "Facture sans ligne : rien à rapprocher."
+msgstr "Invoice has no lines: nothing to match."
+
+#: achats/views_ecarts.py:130
+msgid "Agrément déjà décidé."
+msgstr "Approval already decided."
+
+#: achats/views_ecarts.py:160
+msgid "Motif du refus obligatoire."
+msgstr "A refusal reason is required."
+
+#: achats/views_ecarts.py:202
+msgid "Avoir comptabilisé : suppression impossible (contre-passer)."
+msgstr "Credit note posted: deletion not possible (reverse it)."
+
+#: achats/views_ecarts.py:75
+msgid "Confirmation réservée à la direction et à la finance."
+msgstr "Confirmation reserved for management and finance."
+
+# ── analytics : messages API et exports (lot a6) ──
+
+#: analytics/cubes.py:113
+msgid "Période invalide : attendu AAAA-MM."
+msgstr "Invalid period: expected YYYY-MM."
+
+#: analytics/cubes.py:208
+msgid "La période n'est pas terminée : le cube ne peut être archivé qu'après la fin du mois."
+msgstr "The period has not ended: the cube can only be archived after the end of the month."
+
+#: analytics/models.py:120
+msgid "Une archive de cube est immuable."
+msgstr "A cube archive is immutable."
+
+#: analytics/models.py:124
+msgid "Une archive de cube ne peut pas être supprimée (conservation légale)."
+msgstr "A cube archive cannot be deleted (legal retention)."
+
+#: analytics/models.py:160
+msgid "Un scellé de mart est immuable."
+msgstr "A mart seal is immutable."
+
+#: analytics/models.py:164
+msgid "Un scellé de mart ne peut pas être supprimé avant la fin de sa conservation."
+msgstr "A mart seal cannot be deleted before the end of its retention period."
+
+#: analytics/serializers.py:37
+msgid "Valeur attendue : 0 ou une valeur positive (0/1 pour un interrupteur)."
+msgstr "Expected value: 0 or a positive value (0/1 for a switch)."
+
+#: analytics/serializers.py:47
+msgid "Ce paramètre n'a pas de valeur texte."
+msgstr "This setting has no text value."
+
+#: analytics/serializers.py:54
+msgid "Au moins un rôle destinataire est requis."
+msgstr "At least one recipient role is required."
+
+#: analytics/views.py:132
+msgid "Confirmation des paramètres de la Couche D réservée à la Direction."
+msgstr "Confirmation of Layer D settings is reserved for Management."
+
+#: analytics/views.py:227
+msgid "Les paramètres sont prédéfinis : modifiez leur valeur."
+msgstr "Settings are predefined: change their value."
+
+#: analytics/views.py:35
+msgid "Export attendu : xlsx ou pdf."
+msgstr "Expected export: xlsx or pdf."
+
+# ── commercial : messages API et exports (lot a6) ──
+
+#: commercial/ecarts_m1.py:336
+msgid "Étape inconnue."
+msgstr "Unknown stage."
+
+#: commercial/ecarts_m1.py:338
+msgid "Opportunité close (gagnée / perdue) : étape figée."
+msgstr "Opportunity closed (won / lost): stage frozen."
+
+#: commercial/ecarts_m1.py:340
+msgid "L'opportunité est déjà à cette étape."
+msgstr "The opportunity is already at this stage."
+
+#: commercial/ecarts_m1.py:673
+msgid "Contrat sans affaire : échéancier impossible."
+msgstr "Contract without a project: schedule not possible."
+
+#: commercial/ecarts_m1.py:676
+msgid "Échéancier déjà généré pour ce contrat."
+msgstr "Schedule already generated for this contract."
+
+#: commercial/ecarts_m1.py:679
+msgid "Durée du contrat inconnue (fin ou nombre de mois)."
+msgstr "Contract duration unknown (end date or number of months)."
+
+#: commercial/ecarts_m1.py:778
+msgid "Seule une affaire confirmée ou en cours génère ses besoins d'achat."
+msgstr "Only a confirmed or in-progress project generates its purchasing needs."
+
+#: commercial/ecarts_m1.py:781
+msgid "Aucune offre gagnée liée à l'affaire (via son opportunité)."
+msgstr "No won quotation linked to the project (through its opportunity)."
+
+#: commercial/ecarts_m1.py:784
+msgid "L'offre gagnée n'a aucune ligne achetable (fourniture, sous-traitance, équipement)."
+msgstr "The won quotation has no purchasable line (supply, subcontracting, equipment)."
+
+#: commercial/ecarts_m1.py:787
+msgid "Besoins d'achat déjà générés pour cette affaire."
+msgstr "Purchasing needs already generated for this project."
+
+#: commercial/ecarts_m1.py:889
+msgid "Formulaire RAO déjà archivé en GED."
+msgstr "Tender review form already archived in the EDMS."
+
+#: commercial/ecarts_m1.py:901
+msgid "Revue de commande déjà archivée en GED."
+msgstr "Order review already archived in the EDMS."
+
+#: commercial/models.py:1037
+msgid "Indiquez un contrat ou un profil contractuel."
+msgstr "Specify a contract or a contract profile."
+
+#: commercial/models.py:572
+msgid "La date de fin doit être postérieure au début."
+msgstr "The end date must be after the start date."
+
+#: commercial/models.py:862
+msgid "Un avenant porte sur un contrat signé (actif ou suspendu)."
+msgstr "An amendment relates to a signed contract (active or suspended)."
+
+#: commercial/models.py:864
+msgid "La nouvelle échéance précède le début du contrat."
+msgstr "The new end date is before the contract start."
+
+#: commercial/serializers.py:105
+msgid "Changement d'étape par l'action « changer-etape » uniquement."
+msgstr "Stage change only through the \"changer-etape\" action."
+
+#: commercial/serializers.py:159
+msgid "Offre émise : version scellée. Utilisez « réviser » pour créer une nouvelle version."
+msgstr "Quotation issued: version sealed. Use \"revise\" to create a new version."
+
+#: commercial/serializers.py:167
+msgid "Offre émise : version scellée (options et lignes non modifiables). Révisez l'offre."
+msgstr "Quotation issued: version sealed (options and lines cannot be changed). Revise the quotation."
+
+#: commercial/serializers.py:254
+msgid "Liste de critères attendue : [{libelle, poids, note}]."
+msgstr "List of criteria expected: [{libelle, poids, note}]."
+
+#: commercial/serializers.py:441
+msgid "Avenant signé : pièce scellée."
+msgstr "Amendment signed: record sealed."
+
+#: commercial/serializers.py:514
+msgid "Montant de l'offre strictement positif requis."
+msgstr "A strictly positive quotation amount is required."
+
+#: commercial/serializers.py:534
+msgid "Texte obligatoire pour ce paramètre."
+msgstr "Text is required for this setting."
+
+#: commercial/serializers.py:544
+msgid "Le poids d'un critère est positif (0 = critère retiré)."
+msgstr "A criterion weight is positive (0 = criterion removed)."
+
+#: commercial/serializers.py:568
+msgid "Mot-clé requis."
+msgstr "Keyword required."
+
+#: commercial/views.py:200
+msgid "Offre émise : non supprimable (traçabilité des versions)."
+msgstr "Quotation issued: cannot be deleted (version traceability)."
+
+#: commercial/views.py:221
+msgid "Offre non chiffrée : ajoutez au moins une option ou une ligne."
+msgstr "Quotation not priced: add at least one option or line."
+
+#: commercial/views.py:230
+msgid "Seule une offre soumise se révise (un brouillon se modifie directement)."
+msgstr "Only a submitted quotation can be revised (a draft is edited directly)."
+
+#: commercial/views.py:249
+msgid "Motif de perte obligatoire (retour d'expérience commercial)."
+msgstr "A loss reason is required (commercial lessons learned)."
+
+#: commercial/views.py:272
+msgid "Offre émise : version scellée."
+msgstr "Quotation issued: version sealed."
+
+#: commercial/views.py:328
+msgid "Revue déjà soumise ou archivée."
+msgstr "Review already submitted or archived."
+
+#: commercial/views.py:330
+msgid "Notez les critères de la revue avant de soumettre."
+msgstr "Score the review criteria before submitting."
+
+#: commercial/views.py:491
+msgid "Seul un contrat en brouillon s'active."
+msgstr "Only a draft contract can be activated."
+
+#: commercial/views.py:520
+msgid "Seul un contrat signé (actif) reçoit un échéancier."
+msgstr "Only a signed (active) contract receives a schedule."
+
+#: commercial/views.py:574
+msgid "Avenant déjà signé."
+msgstr "Amendment already signed."
+
+#: commercial/views.py:581
+msgid "Le contrat n'est plus en vigueur."
+msgstr "The contract is no longer in force."
+
+#: commercial/views.py:650
+msgid "Revue de commande déjà tranchée : non modifiable."
+msgstr "Order review already decided: cannot be changed."
+
+#: commercial/views.py:659
+msgid "Revue déjà tranchée."
+msgstr "Review already decided."
+
+#: commercial/views.py:669
+msgid "Revue complète : commentaire de revue obligatoire."
+msgstr "Full review: a review comment is required."
+
+#: commercial/views.py:708
+msgid "Confirmation réservée à la Direction."
+msgstr "Confirmation reserved for Management."
+
+#: commercial/views.py:77
+msgid "Nombre entier attendu."
+msgstr "Integer expected."
+
+# ── comptabilite : messages API et exports (lot a6) ──
+
+#: comptabilite/bancaire.py:153
+msgid "montant absent"
+msgstr "amount missing"
+
+#: comptabilite/cloture.py:113
+msgid "Période déjà clôturée."
+msgstr "Period already closed."
+
+#: comptabilite/cloture.py:115
+msgid "La clôture de cette période est déjà démarrée."
+msgstr "Closing of this period has already started."
+
+#: comptabilite/cloture.py:181
+msgid "La période n'est pas clôturée : rien à envoyer à la Direction."
+msgstr "The period is not closed: nothing to send to Management."
+
+#: comptabilite/cloture.py:183
+msgid "La synthèse a déjà été envoyée à la Direction."
+msgstr "The summary has already been sent to Management."
+
+#: comptabilite/cloture.py:186
+msgid "Aucun destinataire Direction (PDG, DGA ou Direction actif)."
+msgstr "No Management recipient (active CEO, Deputy CEO or Management)."
+
+#: comptabilite/cloture.py:217
+msgid "Seule une période clôturée peut être rouverte."
+msgstr "Only a closed period can be reopened."
+
+#: comptabilite/cloture.py:219
+msgid "Le motif de réouverture est obligatoire."
+msgstr "A reopening reason is required."
+
+#: comptabilite/devises.py:112
+msgid "Le XAF est la devise de tenue : pas de cours."
+msgstr "XAF is the accounting currency: no exchange rate."
+
+#: comptabilite/devises.py:115
+msgid "Le cours doit être strictement positif."
+msgstr "The exchange rate must be strictly positive."
+
+#: comptabilite/devises.py:137
+msgid "Fichier vide."
+msgstr "Empty file."
+
+#: comptabilite/devises.py:200
+msgid "Le montant en devise doit être strictement positif."
+msgstr "The foreign currency amount must be strictly positive."
+
+#: comptabilite/devises.py:202
+msgid "Pièce en XAF : saisissez-la dans les modules habituels (pas d'écart de change)."
+msgstr "Document in XAF: enter it in the usual modules (no exchange difference)."
+
+#: comptabilite/devises.py:212
+msgid "Opération déjà comptabilisée."
+msgstr "Transaction already posted."
+
+#: comptabilite/devises.py:242
+msgid "Seule une opération comptabilisée et non réglée peut être réglée."
+msgstr "Only a posted, unsettled transaction can be settled."
+
+#: comptabilite/devises.py:244
+msgid "Le règlement ne peut précéder la pièce."
+msgstr "The settlement cannot precede the document."
+
+#: comptabilite/devises.py:272
+msgid "Seule une opération comptabilisée et non réglée se réévalue."
+msgstr "Only a posted, unsettled transaction can be revalued."
+
+#: comptabilite/devises.py:274
+msgid "La date de réévaluation ne peut précéder la pièce."
+msgstr "The revaluation date cannot precede the document."
+
+#: comptabilite/devises.py:71
+msgid "Devise inconnue."
+msgstr "Unknown currency."
+
+#: comptabilite/facturation.py:107
+msgid "Seule une situation validée peut être facturée."
+msgstr "Only a validated progress statement can be invoiced."
+
+#: comptabilite/facturation.py:109
+msgid "La situation n'a pas de montant."
+msgstr "The progress statement has no amount."
+
+#: comptabilite/facturation.py:111
+msgid "La situation n'est rattachée à aucune affaire : le client est inconnu."
+msgstr "The progress statement is not linked to any project: the customer is unknown."
+
+#: comptabilite/facturation.py:113
+msgid "Une facture est déjà en préparation pour cette situation."
+msgstr "An invoice is already being prepared for this progress statement."
+
+#: comptabilite/facturation.py:133
+msgid "Un avoir se rattache à une facture émise."
+msgstr "A credit note relates to an issued invoice."
+
+#: comptabilite/facturation.py:137
+msgid "Le montant de l'avoir doit être strictement positif."
+msgstr "The credit note amount must be strictly positive."
+
+#: comptabilite/facturation.py:155
+msgid "Facture déjà émise : corrigez-la par un avoir."
+msgstr "Invoice already issued: correct it with a credit note."
+
+#: comptabilite/facturation.py:158
+msgid "Une facture doit comporter au moins une ligne."
+msgstr "An invoice must have at least one line."
+
+#: comptabilite/facturation.py:161
+msgid "Le montant de la facture doit être strictement positif."
+msgstr "The invoice amount must be strictly positive."
+
+#: comptabilite/facturation.py:163
+msgid "Le tiers facturé n'est pas un client."
+msgstr "The invoiced party is not a customer."
+
+#: comptabilite/facturation.py:165
+msgid "Taux de TVA manquant."
+msgstr "VAT rate missing."
+
+#: comptabilite/facturation.py:171
+msgid "Les avoirs cumulés dépassent le montant de la facture d'origine."
+msgstr "Cumulative credit notes exceed the original invoice amount."
+
+#: comptabilite/facturation.py:175
+msgid "Journal des ventes VTE absent (seed_accounting)."
+msgstr "Sales journal VTE missing (seed_accounting)."
+
+#: comptabilite/facturation.py:77
+msgid "L'affaire n'a pas de client (tiers) : rattachez-en un avant de facturer."
+msgstr "The project has no customer (third party): link one before invoicing."
+
+#: comptabilite/facturation.py:87
+msgid "Le jalon n'est pas réalisé : il n'est pas facturable."
+msgstr "The milestone has not been achieved: it cannot be invoiced."
+
+#: comptabilite/facturation.py:89
+msgid "Le jalon n'a pas de montant facturable."
+msgstr "The milestone has no invoiceable amount."
+
+#: comptabilite/facturation.py:91
+msgid "Ce jalon est déjà facturé (ou une facture est en préparation)."
+msgstr "This milestone is already invoiced (or an invoice is being prepared)."
+
+#: comptabilite/fiscal.py:126
+msgid "Autofacture déjà émise."
+msgstr "Self-invoice already issued."
+
+#: comptabilite/fiscal.py:128
+msgid "Le montant HT doit être strictement positif."
+msgstr "The amount excl. tax must be strictly positive."
+
+#: comptabilite/fiscal.py:130
+msgid "Le compte d'imputation doit être un compte de charge (6) ou d'immobilisation (2)."
+msgstr "The allocation account must be an expense (6) or fixed asset (2) account."
+
+#: comptabilite/fiscal.py:133
+msgid "Le taux de TVA doit porter ses comptes collectée (443) et déductible (445)."
+msgstr "The VAT rate must carry its output (443) and input (445) VAT accounts."
+
+#: comptabilite/fiscal.py:138
+msgid "Journal des achats ACH absent (seed_accounting)."
+msgstr "Purchase journal ACH missing (seed_accounting)."
+
+#: comptabilite/gr.py:58
+msgid "Seule une location GR terminée (retour enregistré) est comptabilisée."
+msgstr "Only a completed GR rental (return recorded) is posted."
+
+#: comptabilite/gr.py:60
+msgid "Le partenaire n'est pas GLOBAL RENTAL : pas d'imputation au compte 618."
+msgstr "The partner is not GLOBAL RENTAL: no allocation to account 618."
+
+#: comptabilite/gr.py:62
+msgid "La prestation n'est pas imputée au compte 618."
+msgstr "The service is not allocated to account 618."
+
+#: comptabilite/gr.py:64
+msgid "Location GR déjà comptabilisée."
+msgstr "GR rental already posted."
+
+#: comptabilite/gr.py:67
+msgid "Location rattachée à un bon de commande GLOBAL RENTAL : la charge 618 passe par sa facture d'achat (M2)."
+msgstr "Rental linked to a GLOBAL RENTAL purchase order: the 618 expense goes through its purchase invoice (M2)."
+
+#: comptabilite/gr.py:71
+msgid "Montant de la prestation nul : rien à comptabiliser (tarif ou compteurs manquants)."
+msgstr "Service amount is zero: nothing to post (rate or meter readings missing)."
+
+#: comptabilite/models.py:608
+msgid "Référence invalide — attendue 'proc. 4.x'."
+msgstr "Invalid reference — expected 'proc. 4.x'."
+
+#: comptabilite/permissions.py:12
+msgid "Confirmation des paramètres comptables réservée au DAF (Finance) et à la Direction."
+msgstr "Confirmation of accounting settings is reserved for the CFO (Finance) and Management."
+
+#: comptabilite/permissions.py:26
+msgid "Rôle non autorisé à modifier les taux de TVA."
+msgstr "Role not authorised to change VAT rates."
+
+#: comptabilite/retenues.py:138
+msgid "Aucune retenue de garantie à libérer sur cette affaire."
+msgstr "No retention to release on this project."
+
+#: comptabilite/retenues.py:144
+msgid "Date de libération inconnue (contrat sans fin) : motif obligatoire."
+msgstr "Release date unknown (contract without end date): a reason is required."
+
+#: comptabilite/serializers.py:181
+msgid "Le montant doit être strictement positif."
+msgstr "The amount must be strictly positive."
+
+#: comptabilite/serializers.py:348
+msgid "La valeur ne peut pas être négative."
+msgstr "The value cannot be negative."
+
+#: comptabilite/serializers.py:430
+msgid "La quantité doit être strictement positive."
+msgstr "The quantity must be strictly positive."
+
+#: comptabilite/serializers.py:432
+msgid "Le prix ne peut pas être négatif."
+msgstr "The price cannot be negative."
+
+#: comptabilite/services.py:126
+msgid "Paiement déjà comptabilisé."
+msgstr "Payment already posted."
+
+#: comptabilite/services.py:128
+msgid "Paiement annulé — comptabilisation impossible."
+msgstr "Payment cancelled — posting not possible."
+
+#: comptabilite/services.py:130
+msgid "Le montant du paiement doit être strictement positif."
+msgstr "The payment amount must be strictly positive."
+
+#: comptabilite/services.py:136
+msgid "Engagement non approuvé — paiement impossible (proc. 4.3)."
+msgstr "Commitment not approved — payment not possible (proc. 4.3)."
+
+#: comptabilite/services.py:182
+msgid "Retenue à la source supérieure ou égale au montant du paiement."
+msgstr "Withholding tax greater than or equal to the payment amount."
+
+#: comptabilite/services.py:299
+msgid "Un lettrage porte sur au moins deux lignes."
+msgstr "A reconciliation (matching) covers at least two lines."
+
+#: comptabilite/services.py:305
+msgid "Toutes les lignes doivent appartenir au même compte."
+msgstr "All lines must belong to the same account."
+
+#: comptabilite/services.py:310
+msgid "Seules les lignes d'écritures comptabilisées sont lettrables."
+msgstr "Only lines of posted entries can be matched."
+
+#: comptabilite/services.py:312
+msgid "Une des lignes est déjà lettrée."
+msgstr "One of the lines is already matched."
+
+#: comptabilite/services.py:314
+msgid "Toutes les lignes doivent concerner le même tiers."
+msgstr "All lines must relate to the same third party."
+
+#: comptabilite/services.py:329
+msgid "Lettrage déjà annulé."
+msgstr "Matching already cancelled."
+
+#: comptabilite/services.py:331
+msgid "Le motif du dé-lettrage est obligatoire."
+msgstr "A reason is required to unmatch."
+
+#: comptabilite/services.py:416
+msgid "Ce fichier a déjà été importé pour ce compte bancaire."
+msgstr "This file has already been imported for this bank account."
+
+#: comptabilite/services.py:89
+msgid "Rôle non autorisé à comptabiliser un paiement."
+msgstr "Role not authorised to post a payment."
+
+#: comptabilite/views.py:1013
+msgid "Location inconnue."
+msgstr "Unknown rental."
+
+#: comptabilite/views.py:1054
+msgid "Affaire inconnue."
+msgstr "Unknown project."
+
+#: comptabilite/views.py:134
+msgid "Compte bancaire inconnu : fournissez `compte_bancaire`."
+msgstr "Unknown bank account: provide `compte_bancaire`."
+
+#: comptabilite/views.py:139
+msgid "Fichier trop volumineux (5 Mo maximum)."
+msgstr "File too large (5 MB maximum)."
+
+#: comptabilite/views.py:147
+msgid "Fournissez le fichier (`fichier`) ou son texte (`contenu`)."
+msgstr "Provide the file (`fichier`) or its text (`contenu`)."
+
+#: comptabilite/views.py:156
+msgid "Relevé déjà validé — lignes verrouillées."
+msgstr "Statement already validated — lines locked."
+
+#: comptabilite/views.py:159
+msgid "Fournissez une liste `lignes` non vide."
+msgstr "Provide a non-empty `lignes` list."
+
+#: comptabilite/views.py:161
+msgid "Chaque ligne doit être un objet {date, libelle, debit|credit}."
+msgstr "Each line must be an object {date, libelle, debit|credit}."
+
+#: comptabilite/views.py:177
+msgid "Relevé déjà validé."
+msgstr "Statement already validated."
+
+#: comptabilite/views.py:179
+msgid "Ajoutez au moins une ligne avant de valider."
+msgstr "Add at least one line before validating."
+
+#: comptabilite/views.py:216
+msgid "Rapprochement déjà validé."
+msgstr "Reconciliation already validated."
+
+#: comptabilite/views.py:219
+msgid "Fournissez une liste `lignes` d'ids."
+msgstr "Provide a list of `lignes` ids."
+
+#: comptabilite/views.py:241
+msgid "Rapprochez au moins une ligne avant de valider."
+msgstr "Reconcile at least one line before validating."
+
+#: comptabilite/views.py:255
+msgid "Pièce figée : modification et suppression impossibles."
+msgstr "Record frozen: cannot be changed or deleted."
+
+#: comptabilite/views.py:277
+msgid "Engagement soumis, approuvé ou annulé : non modifiable (proc. 4.3)."
+msgstr "Commitment submitted, approved or cancelled: cannot be changed (proc. 4.3)."
+
+#: comptabilite/views.py:300
+msgid "Seul un brouillon peut être soumis."
+msgstr "Only a draft can be submitted."
+
+#: comptabilite/views.py:309
+msgid "Seul un engagement soumis peut être approuvé (RF-ERP-W1)."
+msgstr "Only a submitted commitment can be approved (RF-ERP-W1)."
+
+#: comptabilite/views.py:325
+msgid "Engagement approuvé ou déjà annulé."
+msgstr "Commitment approved or already cancelled."
+
+#: comptabilite/views.py:338
+msgid "Paiement validé ou annulé : non modifiable (écriture comptable liée)."
+msgstr "Payment validated or cancelled: cannot be changed (linked accounting entry)."
+
+#: comptabilite/views.py:383
+msgid "Paiement déjà validé — extourne via le noyau (RF-ERP-90)."
+msgstr "Payment already validated — reverse it through the accounting kernel (RF-ERP-90)."
+
+#: comptabilite/views.py:395
+msgid "Déclaration déposée : non modifiable ni supprimable."
+msgstr "Return filed: cannot be changed or deleted."
+
+#: comptabilite/views.py:401
+msgid "Déclaration déjà déposée — recalcul impossible."
+msgstr "Return already filed — recalculation not possible."
+
+#: comptabilite/views.py:409
+msgid "Déjà déposée."
+msgstr "Already filed."
+
+#: comptabilite/views.py:411
+msgid "Calculez d'abord la déclaration."
+msgstr "Calculate the return first."
+
+#: comptabilite/views.py:429
+msgid "Contrôle déjà réalisé."
+msgstr "Check already performed."
+
+#: comptabilite/views.py:441
+msgid "Contrôle déjà clôturé."
+msgstr "Check already closed."
+
+#: comptabilite/views.py:502
+msgid "Identifiant de ligne invalide."
+msgstr "Invalid line identifier."
+
+#: comptabilite/views.py:504
+msgid "Ligne d'écriture introuvable."
+msgstr "Entry line not found."
+
+#: comptabilite/views.py:514
+msgid "Compte inconnu : fournissez `compte`."
+msgstr "Unknown account: provide `compte`."
+
+#: comptabilite/views.py:558
+msgid "Le modèle est unique : modifiez-le."
+msgstr "The template is unique: edit it."
+
+#: comptabilite/views.py:597
+msgid "Facture émise : non modifiable, corrigez-la par un avoir."
+msgstr "Invoice issued: cannot be changed, correct it with a credit note."
+
+#: comptabilite/views.py:626
+msgid "Rôle non autorisé à consulter les montants."
+msgstr "Role not authorised to view amounts."
+
+#: comptabilite/views.py:636
+msgid "Ce champ est obligatoire."
+msgstr "This field is required."
+
+#: comptabilite/views.py:686
+msgid "Période inconnue."
+msgstr "Unknown period."
+
+#: comptabilite/views.py:746
+msgid "Formats acceptés : xlsx, pdf."
+msgstr "Accepted formats: xlsx, pdf."
+
+#: comptabilite/views.py:759
+msgid "Rôle non autorisé à consulter les montants (RF-59)."
+msgstr "Role not authorised to view amounts (RF-59)."
+
+#: comptabilite/views.py:769
+msgid "Année attendue (AAAA)."
+msgstr "Year expected (YYYY)."
+
+#: comptabilite/views.py:780
+msgid "Numéro (ou début de numéro) de compte attendu."
+msgstr "Account number (or start of account number) expected."
+
+#: comptabilite/views.py:813
+msgid "clients ou fournisseurs."
+msgstr "customers or suppliers."
+
+#: comptabilite/views.py:861
+msgid "Nombre de semaines attendu."
+msgstr "Number of weeks expected."
+
+#: comptabilite/views.py:912
+msgid "Autofacture émise : non modifiable ni supprimable."
+msgstr "Self-invoice issued: cannot be changed or deleted."
+
+#: comptabilite/views.py:958
+msgid "JSON invalide."
+msgstr "Invalid JSON."
+
+#: comptabilite/views.py:960
+msgid "Objet JSON attendu."
+msgstr "JSON object expected."
+
+#: comptabilite/views_a2.py:127
+msgid "Créance : compte de produit (classe 7) ; dette : compte de charge ou d'immobilisation (classe 6 ou 2)."
+msgstr "Receivable: income account (class 7); payable: expense or fixed asset account (class 6 or 2)."
+
+#: comptabilite/views_a2.py:151
+msgid "Opération comptabilisée : non supprimable (corrigez par extourne)."
+msgstr "Transaction posted: cannot be deleted (correct it with a reversal)."
+
+# ── controle_gestion : messages API et exports (lot a6) ──
+
+#: controle_gestion/ecarts_m11.py:204
+msgid "Exercice sans périodes comptables."
+msgstr "Fiscal year without accounting periods."
+
+#: controle_gestion/ecarts_m11.py:217
+msgid "Pipe vide pour cet exercice : aucune opportunité active à pondérer."
+msgstr "Empty pipeline for this fiscal year: no active opportunity to weight."
+
+#: controle_gestion/ecarts_m11.py:381
+msgid "Type de reporting : « j4 » ou « j6 »."
+msgstr "Reporting type: \"j4\" or \"j6\"."
+
+#: controle_gestion/ecarts_m11.py:436
+msgid "La clôture de gestion doit être réalisée avant d'archiver le reporting."
+msgstr "The management closing must be completed before archiving the reporting."
+
+#: controle_gestion/ecarts_m11.py:438
+msgid "Reporting déjà archivé pour ce mois et cet horizon."
+msgstr "Reporting already archived for this month and horizon."
+
+#: controle_gestion/ecarts_m11.py:471
+msgid "Revue déjà tenue (PV archivé)."
+msgstr "Review already held (minutes archived)."
+
+#: controle_gestion/ecarts_m11.py:473
+msgid "Décisions de la revue obligatoires."
+msgstr "Review decisions are required."
+
+#: controle_gestion/ecarts_m11.py:546
+msgid "Affaire sans montant contractuel : marge non validable."
+msgstr "Project without a contract amount: margin cannot be validated."
+
+#: controle_gestion/ecarts_m11.py:637
+msgid "Provision déjà passée à cette date d'arrêté."
+msgstr "Accrual already posted at this cut-off date."
+
+#: controle_gestion/ecarts_m11.py:644
+msgid "Aucune réception non facturée à cette date : rien à provisionner."
+msgstr "No uninvoiced receipts at this date: nothing to accrue."
+
+#: controle_gestion/ecarts_m11.py:648
+msgid "Journal OD absent (seed_accounting)."
+msgstr "OD journal missing (seed_accounting)."
+
+#: controle_gestion/ecarts_m11.py:685
+msgid "Provision déjà extournée."
+msgstr "Accrual already reversed."
+
+#: controle_gestion/ecarts_m11.py:688
+msgid "L'extourne doit être datée après la date d'arrêté."
+msgstr "The reversal must be dated after the cut-off date."
+
+#: controle_gestion/serializers.py:33
+msgid "La période comptable doit appartenir à l'exercice du budget."
+msgstr "The accounting period must belong to the budget's fiscal year."
+
+#: controle_gestion/serializers.py:40
+msgid "Une ligne de budget existe déjà pour cette période."
+msgstr "A budget line already exists for this period."
+
+#: controle_gestion/services.py:75
+msgid "Confirmation des paramètres de contrôle de gestion réservée au DAF (Finance) et à la Direction."
+msgstr "Confirmation of management control settings is reserved for the CFO (Finance) and Management."
+
+#: controle_gestion/services.py:87
+msgid "Rôle non autorisé à approuver un budget ou une clôture."
+msgstr "Role not authorised to approve a budget or a closing."
+
+#: controle_gestion/views.py:120
+msgid "Budget approuvé (version scellée) : modification par révision R1-R4 uniquement."
+msgstr "Budget approved (sealed version): changes only through revisions R1-R4."
+
+#: controle_gestion/views.py:125
+msgid "Budget approuvé ou clôturé (version scellée) : suppression interdite."
+msgstr "Budget approved or closed (sealed version): deletion not allowed."
+
+#: controle_gestion/views.py:134
+msgid "Seul un budget brouillon peut être approuvé."
+msgstr "Only a draft budget can be approved."
+
+#: controle_gestion/views.py:149
+msgid "Seul un budget approuvé peut être clôturé."
+msgstr "Only an approved budget can be closed."
+
+#: controle_gestion/views.py:171
+msgid "Budget approuvé (version scellée) : lignes mensuelles non modifiables."
+msgstr "Budget approved (sealed version): monthly lines cannot be changed."
+
+#: controle_gestion/views.py:209
+msgid "Budget clôturé : aucune révision possible."
+msgstr "Budget closed: no revision possible."
+
+#: controle_gestion/views.py:213
+msgid "Au plus 4 révisions budgétaires annuelles par budget (R1-R4, RF-ERP-A1)."
+msgstr "At most 4 annual budget revisions per budget (R1-R4, RF-ERP-A1)."
+
+#: controle_gestion/views.py:231
+msgid "Révision déjà appliquée ou annulée."
+msgstr "Revision already applied or cancelled."
+
+#: controle_gestion/views.py:234
+msgid "Budget clôturé : révision non applicable."
+msgstr "Budget closed: revision cannot be applied."
+
+#: controle_gestion/views.py:283
+msgid "Paramètre `fiscal_year` doit être un entier."
+msgstr "Parameter `fiscal_year` must be an integer."
+
+#: controle_gestion/views.py:296
+msgid "Clôture déjà réalisée."
+msgstr "Closing already completed."
+
+#: controle_gestion/views.py:302
+msgid "`date_cloture` doit être une date ISO."
+msgstr "`date_cloture` must be an ISO date."
+
+#: controle_gestion/views.py:318
+msgid "La clôture de gestion doit être réalisée avant la publication."
+msgstr "The management closing must be completed before publication."
+
+#: controle_gestion/views.py:320
+msgid "Reporting déjà publié."
+msgstr "Reporting already published."
+
+#: controle_gestion/views.py:359
+msgid "Paramètre `fiscal_year` requis."
+msgstr "Parameter `fiscal_year` is required."
+
+#: controle_gestion/views.py:365
+msgid "Paramètre `axis` doit être un entier (id d'axe)."
+msgstr "Parameter `axis` must be an integer (axis id)."
+
+#: controle_gestion/views.py:367
+msgid "Paramètre `analytic` doit être un entier (id de compte analytique)."
+msgstr "Parameter `analytic` must be an integer (analytic account id)."
+
+#: controle_gestion/views.py:430
+msgid "Analyse déjà rendue."
+msgstr "Analysis already submitted."
+
+#: controle_gestion/views.py:433
+msgid "Explication de l'écart obligatoire."
+msgstr "An explanation of the variance is required."
+
+#: controle_gestion/views.py:570
+msgid "Paramètre `periode` (AAAA-MM) requis."
+msgstr "Parameter `periode` (YYYY-MM) is required."
+
+#: controle_gestion/views.py:62
+msgid "Préciser le visa apposé : « daf » ou « cg »."
+msgstr "Specify the approval given: \"daf\" or \"cg\"."
+
+#: controle_gestion/views.py:67
+msgid "Double visa : le second visa doit être apposé par une autre personne."
+msgstr "Dual approval: the second approval must be given by another person."
+
+#: controle_gestion/views_m11.py:153
+msgid "Paramètre `axis` doit être un entier."
+msgstr "Parameter `axis` must be an integer."
+
+#: controle_gestion/views_m11.py:199
+msgid "Exercice requis."
+msgstr "Fiscal year required."
+
+#: controle_gestion/views_m11.py:320
+msgid "Plan d'action sur un budget approuvé uniquement."
+msgstr "Action plan on an approved budget only."
+
+#: controle_gestion/views_m11.py:329
+msgid "Plan d'action clos : non modifiable."
+msgstr "Action plan closed: cannot be changed."
+
+#: controle_gestion/views_m11.py:337
+msgid "Seul un plan ouvert peut être démarré."
+msgstr "Only an open plan can be started."
+
+#: controle_gestion/views_m11.py:347
+msgid "Plan d'action déjà clos."
+msgstr "Action plan already closed."
+
+#: controle_gestion/views_m11.py:350
+msgid "Résultat du plan d'action obligatoire."
+msgstr "The action plan result is required."
+
+#: controle_gestion/views_m11.py:388
+msgid "Clôture de gestion introuvable."
+msgstr "Management closing not found."
+
+#: controle_gestion/views_m11.py:45
+msgid "Date requise (AAAA-MM-JJ)."
+msgstr "Date required (YYYY-MM-DD)."
+
+#: controle_gestion/views_m11.py:457
+msgid "Revue tenue : PV archivé, non modifiable."
+msgstr "Review held: minutes archived, cannot be changed."
+
+#: controle_gestion/views_m11.py:64
+msgid "Le montant révisé ne peut pas être négatif."
+msgstr "The revised amount cannot be negative."
+
+#: controle_gestion/views_m11.py:71
+msgid "Révision visée ou appliquée : lignes non modifiables."
+msgstr "Revision approved or applied: lines cannot be changed."
+
+#: controle_gestion/views_m11.py:73
+msgid "La période doit appartenir à l'exercice du budget."
+msgstr "The period must belong to the budget's fiscal year."
+
+#: controle_gestion/views_m11.py:78
+msgid "Cette période est déjà révisée dans cette révision : modifiez la ligne."
+msgstr "This period is already revised in this revision: edit the line."
+
+# ── documents : messages API et exports (lot a6) ──
+
+#: documents/views.py:601
+msgid "Horodatage"
+msgstr "Timestamp"
+
+#: documents/views.py:601
+msgid "Utilisateur"
+msgstr "User"
+
+#: documents/views.py:601
+msgid "Action"
+msgstr "Action"
+
+#: documents/views.py:601
+msgid "Objet"
+msgstr "Object"
+
+#: documents/views.py:602
+msgid "Identifiant"
+msgstr "Identifier"
+
+#: documents/views.py:602
+msgid "Adresse IP"
+msgstr "IP address"
+
+#: documents/views.py:602
+msgid "Détail (avant / après)"
+msgstr "Detail (before / after)"
+
+#: documents/views.py:613
+msgid "Piste d'audit ETSL"
+msgstr "ETSL audit trail"
+
+# ── hse : messages API et exports (lot a6) ──
+
+#: hse/ecarts_m6m7.py:83
+msgid "Type inconnu ou désactivé dans la liste paramétrée HSE."
+msgstr "Type unknown or disabled in the HSE configured list."
+
+#: hse/models.py:1035
+msgid "Un exercice ne peut pas être daté dans le futur."
+msgstr "A drill cannot be dated in the future."
+
+#: hse/models.py:1037
+msgid "Observations obligatoires pour un exercice insuffisant."
+msgstr "Observations are required for an unsatisfactory drill."
+
+#: hse/models.py:1067
+msgid "La validité doit suivre la date de visite."
+msgstr "The validity date must follow the visit date."
+
+#: hse/models.py:1069
+msgid "Préciser les restrictions."
+msgstr "Specify the restrictions."
+
+#: hse/models.py:1140
+msgid "La quantité ne peut pas être négative."
+msgstr "The quantity cannot be negative."
+
+#: hse/models.py:1142
+msgid "Le mois relevé ne peut pas être futur."
+msgstr "The reading month cannot be in the future."
+
+#: hse/models.py:1187
+msgid "Un objectif chiffré exige l'année de référence et la réduction visée."
+msgstr "A quantified target requires the reference year and the targeted reduction."
+
+#: hse/models.py:1189
+msgid "L'année cible doit suivre l'année de référence."
+msgstr "The target year must follow the reference year."
+
+#: hse/models.py:1191
+msgid "La réduction visée est comprise entre 0 et 100 %."
+msgstr "The targeted reduction is between 0 and 100 %."
+
+#: hse/models.py:1283
+msgid "Code en minuscules, chiffres et « _ » seulement."
+msgstr "Code in lowercase letters, digits and \"_\" only."
+
+#: hse/models.py:1291
+msgid "Rôle utilisateur inconnu."
+msgstr "Unknown user role."
+
+#: hse/models.py:1413
+msgid "La date de fin doit suivre la date de début."
+msgstr "The end date must follow the start date."
+
+#: hse/models.py:190
+msgid "La date de fin doit être postérieure à la date de début."
+msgstr "The end date must be after the start date."
+
+#: hse/models.py:292
+msgid "Probabilité entre 1 et 5."
+msgstr "Probability between 1 and 5."
+
+#: hse/models.py:294
+msgid "Gravité entre 1 et 5."
+msgstr "Severity between 1 and 5."
+
+#: hse/models.py:495
+msgid "La description est requise."
+msgstr "The description is required."
+
+#: hse/models.py:498
+msgid "Des jours d'arrêt supposent une conséquence « arrêt de travail » ou « décès »."
+msgstr "Days of lost time imply a \"lost time\" or \"fatality\" consequence."
+
+#: hse/serializers.py:134
+msgid "DUER approuvé : scellé, créer une nouvelle version."
+msgstr "Risk assessment (DUER) approved: sealed, create a new version."
+
+#: hse/serializers.py:343
+msgid "Audit clôturé : ses constats sont scellés."
+msgstr "Audit closed: its findings are sealed."
+
+#: hse/serializers.py:372
+msgid "Audit clôturé : modification impossible."
+msgstr "Audit closed: changes not possible."
+
+#: hse/serializers.py:457
+msgid "Valeur attendue : 1 (oui) ou 0 (non)."
+msgstr "Expected value: 1 (yes) or 0 (no)."
+
+#: hse/views.py:1005
+msgid "DUER déjà approuvé."
+msgstr "Risk assessment (DUER) already approved."
+
+#: hse/views.py:1008
+msgid "Aucun risque évalué : approbation impossible."
+msgstr "No risk assessed: approval not possible."
+
+#: hse/views.py:1123
+msgid "Confirmation réservée au HSE et à la hiérarchie."
+msgstr "Confirmation reserved for HSE and line management."
+
+#: hse/views.py:1204
+msgid "Revue validée : scellée, non modifiable."
+msgstr "Review validated: sealed, cannot be changed."
+
+#: hse/views.py:1224
+msgid "Revue validée : bilan figé."
+msgstr "Review validated: report frozen."
+
+#: hse/views.py:1238
+msgid "Revue déjà validée."
+msgstr "Review already validated."
+
+#: hse/views.py:129
+msgid "Salarié requis."
+msgstr "Employee required."
+
+#: hse/views.py:151
+msgid "Fichier requis."
+msgstr "File required."
+
+#: hse/views.py:155
+msgid "Fichier trop volumineux (10 Mo au plus)."
+msgstr "File too large (10 MB maximum)."
+
+#: hse/views.py:178
+msgid "Le permis n'est plus en attente de validation."
+msgstr "The permit is no longer awaiting validation."
+
+#: hse/views.py:183
+msgid "Circuit de validation déjà complet."
+msgstr "Validation workflow already complete."
+
+#: hse/views.py:192
+msgid "Le demandeur ne peut pas valider son propre permis."
+msgstr "The requester cannot validate their own permit."
+
+#: hse/views.py:226
+msgid "Seul un permis validé peut être démarré."
+msgstr "Only a validated permit can be started."
+
+#: hse/views.py:237
+msgid "Permis expiré : sa date de fin est dépassée."
+msgstr "Permit expired: its end date has passed."
+
+#: hse/views.py:272
+msgid "Test gaz possible uniquement sur un permis validé ou actif."
+msgstr "Gas test possible only on a validated or active permit."
+
+#: hse/views.py:278
+msgid "Résultat attendu : conforme ou non_conforme."
+msgstr "Expected result: conforme or non_conforme."
+
+#: hse/views.py:308
+msgid "Le permis n'est pas clôturable."
+msgstr "The permit cannot be closed."
+
+#: hse/views.py:423
+msgid "La fin doit suivre le début."
+msgstr "The end must follow the start."
+
+#: hse/views.py:450
+msgid "Incident clôturé : enquête impossible."
+msgstr "Incident closed: investigation not possible."
+
+#: hse/views.py:455
+msgid "Réservé au HSE et à la hiérarchie."
+msgstr "Reserved for HSE and line management."
+
+#: hse/views.py:472
+msgid "Le plan d'action suit l'enquête."
+msgstr "The action plan follows the investigation."
+
+#: hse/views.py:476
+msgid "Cause profonde requise pour arrêter le plan d'action."
+msgstr "A root cause is required to set the action plan."
+
+#: hse/views.py:478
+msgid "Au moins une action corrective ou préventive est requise."
+msgstr "At least one corrective or preventive action is required."
+
+#: hse/views.py:495
+msgid "Description de l'écart requise."
+msgstr "Description of the deviation required."
+
+#: hse/views.py:498
+msgid "Gravité inconnue."
+msgstr "Unknown severity."
+
+#: hse/views.py:550
+msgid "Incident déjà clôturé."
+msgstr "Incident already closed."
+
+#: hse/views.py:555
+msgid "Clôture réservée au HSE et à la hiérarchie."
+msgstr "Closing reserved for HSE and line management."
+
+#: hse/views.py:567
+msgid "Retour d'expérience obligatoire pour clôturer un presque-accident."
+msgstr "Lessons learned are required to close a near miss."
+
+#: hse/views.py:585
+msgid "Rapport d'enquête obligatoire pour clôturer un accident ou un événement majeur/critique."
+msgstr "An investigation report is required to close an accident or a major/critical event."
+
+#: hse/views.py:694
+msgid "Action déjà clôturée."
+msgstr "Action already closed."
+
+#: hse/views.py:749
+msgid "Ajouter les participants avant de valider la session."
+msgstr "Add the participants before validating the session."
+
+#: hse/views.py:827
+msgid "Transition impossible depuis ce statut."
+msgstr "Transition not possible from this status."
+
+#: hse/views.py:833
+msgid "N° de BSD requis à l'émission."
+msgstr "Waste tracking form (BSD) number required on issue."
+
+#: hse/views.py:851
+msgid "BSD déjà émis : prestataire figé."
+msgstr "Waste tracking form (BSD) already issued: contractor frozen."
+
+#: hse/views.py:854
+msgid "Prestataire requis."
+msgstr "Contractor required."
+
+#: hse/views.py:892
+msgid "BSD archivé : conservé 10 ans, suppression interdite."
+msgstr "Waste tracking form (BSD) archived: kept for 10 years, deletion not allowed."
+
+#: hse/views.py:919
+msgid "Seul un audit planifié peut être réalisé."
+msgstr "Only a planned audit can be carried out."
+
+#: hse/views.py:923
+msgid "Check-list incomplète : évaluer tous les points avant de réaliser l'audit."
+msgstr "Incomplete checklist: assess all items before carrying out the audit."
+
+#: hse/views.py:944
+msgid "Seul un audit réalisé peut être clôturé."
+msgstr "Only a completed audit can be closed."
+
+#: hse/views.py:964
+msgid "Check-list applicable à un audit planifié seulement."
+msgstr "Checklist applicable to a planned audit only."
+
+#: hse/views.py:967
+msgid "Modèle de check-list requis."
+msgstr "Checklist template required."
+
+#: hse/views.py:969
+msgid "Check-list déjà appliquée à cet audit."
+msgstr "Checklist already applied to this audit."
+
+#: hse/views_ecarts.py:127
+msgid "Plan de prévention validé : scellé (créer un nouveau plan)."
+msgstr "Prevention plan validated: sealed (create a new plan)."
+
+#: hse/views_ecarts.py:270
+msgid "Audit clôturé : check-list scellée."
+msgstr "Audit closed: checklist sealed."
+
+#: hse/views_ecarts.py:273
+msgid "Réponse attendue : conforme, non_conforme ou sans_objet."
+msgstr "Expected answer: conforme, non_conforme or sans_objet."
+
+#: hse/views_ecarts.py:278
+msgid "Gravité attendue : mineur, majeur ou critique."
+msgstr "Expected severity: mineur, majeur or critique."
+
+#: hse/views_ecarts.py:323
+msgid "Plan validé : scellé."
+msgstr "Plan validated: sealed."
+
+#: hse/views_ecarts.py:326
+msgid "Risque requis."
+msgstr "Risk required."
+
+#: hse/views_ecarts.py:335
+msgid "Validation réservée au HSE et à la hiérarchie."
+msgstr "Validation reserved for HSE and line management."
+
+#: hse/views_ecarts.py:338
+msgid "Plan déjà validé ou clos."
+msgstr "Plan already validated or closed."
+
+#: hse/views_ecarts.py:340
+msgid "Inspection commune préalable non renseignée."
+msgstr "Prior joint inspection not recorded."
+
+#: hse/views_ecarts.py:343
+msgid "Aucun risque d'interférence analysé : validation impossible."
+msgstr "No interference risk analysed: validation not possible."
+
+#: hse/views_ecarts.py:371
+msgid "Seul un plan validé se clôt."
+msgstr "Only a validated plan can be closed."
+
+#: hse/views_ecarts.py:416
+msgid "Fiche déjà dans cet état."
+msgstr "Record already in this state."
+
+#: hse/views_ecarts.py:45
+msgid "Code et catégorie figés : désactiver puis créer une nouvelle valeur."
+msgstr "Code and category frozen: deactivate, then create a new value."
+
+#: hse/views_ecarts.py:49
+msgid "Ce code existe déjà dans la catégorie."
+msgstr "This code already exists in the category."
+
+#: hse/views_ecarts.py:67
+msgid "Liste de questions (textes) attendue."
+msgstr "List of questions (texts) expected."
+
+#: hse/views_ecarts.py:76
+msgid "Au moins une question (une par ligne)."
+msgstr "At least one question (one per line)."
+
+# ── integrations : messages API et exports (lot a6) ──
+
+#: integrations/auth.py:65
+msgid "Droit (scope) insuffisant pour cette opération."
+msgstr "Insufficient scope for this operation."
+
+#: integrations/export_sage.py:101
+msgid "Aucune écriture comptabilisée à exporter sur la période (ou toutes déjà exportées)."
+msgstr "No posted entries to export for the period (or all already exported)."
+
+#: integrations/export_sage.py:50
+msgid "La date de fin précède la date de début."
+msgstr "The end date is before the start date."
+
+#: integrations/gabarits.py:93
+msgid "XML avec DTD ou entités refusé (sécurité)."
+msgstr "XML with DTD or entities rejected (security)."
+
+#: integrations/gr.py:43
+msgid "URL invalide : schéma https requis."
+msgstr "Invalid URL: https scheme required."
+
+#: integrations/gr.py:45
+msgid "HTTPS obligatoire (http n'est toléré qu'en développement)."
+msgstr "HTTPS required (http is only tolerated in development)."
+
+#: integrations/gr.py:53
+msgid "Nom d'hôte introuvable."
+msgstr "Host name not found."
+
+#: integrations/gr_views.py:109
+msgid "La prestation n'est pas active."
+msgstr "The service is not active."
+
+#: integrations/gr_views.py:140
+msgid "Caractères autorisés : lettres, chiffres, . _ / - et espace (40 max)."
+msgstr "Allowed characters: letters, digits, . _ / - and space (40 max)."
+
+#: integrations/gr_views.py:226
+msgid "Liste de sujets attendue (ex. gr.location.demarree)."
+msgstr "List of topics expected (e.g. gr.location.demarree)."
+
+#: integrations/gr_views.py:265
+msgid "Déjà livrée."
+msgstr "Already delivered."
+
+#: integrations/gr_views.py:90
+msgid "Date de relevé dans le futur."
+msgstr "Reading date in the future."
+
+#: integrations/importers.py:106
+msgid "montant doit être strictement positif."
+msgstr "amount must be strictly positive."
+
+#: integrations/importers.py:57
+msgid "code et name sont requis."
+msgstr "code and name are required."
+
+#: integrations/importers_migration.py:338
+msgid "date_sortie obligatoire pour un salarié sorti."
+msgstr "date_sortie is required for an employee who has left."
+
+#: integrations/importers_migration.py:367
+msgid "contrat_debut obligatoire quand contrat_numero est renseigné."
+msgstr "contrat_debut is required when contrat_numero is filled in."
+
+#: integrations/importers_migration.py:391
+msgid "période future : seul l'historique est repris."
+msgstr "future period: only history is migrated."
+
+#: integrations/importers_migration.py:434
+msgid "wpqr_support ne concerne qu'un WPS."
+msgstr "wpqr_support only applies to a WPS."
+
+#: integrations/importers_migration.py:505
+msgid "affaire GLOBAL RENTAL : le client doit être un tiers is_global_rental (compte 618)."
+msgstr "GLOBAL RENTAL project: the customer must be an is_global_rental third party (account 618)."
+
+#: integrations/importers_migration.py:546
+msgid "contrat GLOBAL RENTAL : le client doit être un tiers is_global_rental (compte 618)."
+msgstr "GLOBAL RENTAL contract: the customer must be an is_global_rental third party (account 618)."
+
+#: integrations/importers_migration.py:592
+msgid "quantite doit être strictement positive."
+msgstr "quantite must be strictly positive."
+
+#: integrations/importers_migration.py:853
+msgid "lot GED : archive ZIP attendue."
+msgstr "EDMS batch: ZIP archive expected."
+
+#: integrations/importers_migration.py:856
+msgid "lot GED : 20 000 fichiers maximum par archive."
+msgstr "EDMS batch: 20,000 files maximum per archive."
+
+#: integrations/importers_migration.py:86
+msgid "XML refusé : DTD / entités interdites."
+msgstr "XML rejected: DTD / entities not allowed."
+
+#: integrations/importers_migration.py:861
+msgid "lot GED : manifeste.csv (ou manifeste.xml) absent de l'archive."
+msgstr "EDMS batch: manifeste.csv (or manifeste.xml) missing from the archive."
+
+#: integrations/importers_migration.py:907
+msgid "date obligatoire (1er jour de l'exercice)."
+msgstr "date is required (first day of the fiscal year)."
+
+#: integrations/models.py:77
+msgid "En erreur"
+msgstr "In error"
+
+#: integrations/opening.py:102
+msgid "Journal OD (opérations diverses) absent."
+msgstr "OD journal (miscellaneous operations) missing."
+
+#: integrations/opening.py:60
+msgid "Date invalide (attendu AAAA-MM-JJ)."
+msgstr "Invalid date (expected YYYY-MM-DD)."
+
+#: integrations/opening.py:96
+msgid "Total de contrôle invalide."
+msgstr "Invalid control total."
+
+#: integrations/serializers.py:62
+msgid "Encodage inconnu (ex. cp1252, utf-8, latin-1)."
+msgstr "Unknown encoding (e.g. cp1252, utf-8, latin-1)."
+
+#: integrations/serializers.py:71
+msgid "Format de date invalide (ex. %d/%m/%Y)."
+msgstr "Invalid date format (e.g. %d/%m/%Y)."
+
+#: integrations/serializers.py:73
+msgid "Le format doit contenir le jour, le mois et l'année."
+msgstr "The format must contain the day, month and year."
+
+#: integrations/serializers.py:80
+msgid "Objet attendu : {champ ERP : nom de colonne}."
+msgstr "Object expected: {ERP field: column name}."
+
+#: integrations/views.py:55
+msgid "fichier requis (champ « file »)."
+msgstr "file required (\"file\" field)."
+
+#: integrations/views.py:64
+msgid "gabarit inconnu."
+msgstr "unknown template."
+
+#: integrations/views_export.py:41
+msgid "Date de début obligatoire."
+msgstr "Start date required."
+
+#: integrations/views_migration.py:130
+msgid "Gabarit non autorisé pour votre fonction."
+msgstr "Template not allowed for your role."
+
+#: integrations/views_migration.py:136
+msgid "mode attendu : blanc ou reel."
+msgstr "expected mode: blanc or reel."
+
+#: integrations/views_migration.py:203
+msgid "La valeur ne peut être négative."
+msgstr "The value cannot be negative."
+
+#: integrations/views_migration.py:205
+msgid "Un taux est compris entre 0 et 100 %."
+msgstr "A rate is between 0 and 100 %."
+
+#: integrations/views_migration.py:36
+msgid "Rôle non autorisé à la reprise de données."
+msgstr "Role not authorised for data migration."
+
+#: integrations/views_migration.py:45
+msgid "Réservé au cercle comptable (administrateur, comptable, finance, direction)."
+msgstr "Reserved for the accounting circle (administrator, accountant, finance, management)."
+
+#: integrations/views_migration.py:84
+msgid "gabarit inconnu ou non autorisé."
+msgstr "unknown or unauthorised template."
+
+#: integrations/views_migration.py:87
+msgid "type attendu : csv ou xml."
+msgstr "expected type: csv or xml."
+
+# ── juridique : messages API et exports (lot a6) ──
+
+#: juridique/ecarts.py:119
+msgid "Valeur entière attendue."
+msgstr "Integer value expected."
+
+#: juridique/ecarts.py:125
+msgid "Liste de rôles non vide attendue (rôles ERP existants)."
+msgstr "Non-empty list of roles expected (existing ERP roles)."
+
+#: juridique/ecarts.py:132
+msgid "Paliers attendus : entiers entre 0 et 365."
+msgstr "Thresholds expected: integers between 0 and 365."
+
+#: juridique/ecarts.py:135
+msgid "Probabilités attendues entre 0 et 100."
+msgstr "Probabilities expected between 0 and 100."
+
+#: juridique/ecarts.py:137
+msgid "Délai strictement positif attendu."
+msgstr "Strictly positive lead time expected."
+
+#: juridique/ecarts.py:156
+msgid "Type de dossier inconnu."
+msgstr "Unknown case file type."
+
+#: juridique/ecarts.py:162
+msgid "Dossier introuvable."
+msgstr "Case file not found."
+
+#: juridique/models.py:147
+msgid "Enregistrez le courrier avant de l'archiver."
+msgstr "Save the letter before archiving it."
+
+#: juridique/models.py:248
+msgid "Seule une convention brouillon / en signature peut être signée."
+msgstr "Only a draft / in-signature agreement can be signed."
+
+#: juridique/models.py:254
+msgid "Convention déjà clôturée."
+msgstr "Agreement already closed."
+
+#: juridique/models.py:348
+msgid "Contentieux déjà traité."
+msgstr "Litigation already handled."
+
+#: juridique/models.py:354
+msgid "Contentieux déjà clôturé."
+msgstr "Litigation already closed."
+
+#: juridique/models.py:361
+msgid "Issue attendue : gagne / perdu / transaction."
+msgstr "Expected outcome: gagne / perdu / transaction."
+
+#: juridique/models.py:455
+msgid "Seule une caution en cours peut être levée / restituée."
+msgstr "Only an active guarantee can be released / returned."
+
+#: juridique/models.py:461
+msgid "Seule une caution en cours peut être appelée."
+msgstr "Only an active guarantee can be called."
+
+#: juridique/models.py:552
+msgid "Police résiliée : souscrivez une nouvelle police plutôt que de la renouveler."
+msgstr "Policy terminated: take out a new policy rather than renewing it."
+
+#: juridique/models.py:554
+msgid "La nouvelle échéance doit être postérieure à l'échéance en cours."
+msgstr "The new expiry date must be after the current expiry date."
+
+#: juridique/models.py:562
+msgid "Assurance déjà résiliée."
+msgstr "Insurance already terminated."
+
+#: juridique/models.py:659
+msgid "Réunion déjà tenue / clôturée."
+msgstr "Meeting already held / closed."
+
+#: juridique/models.py:667
+msgid "Réunion déjà clôturée."
+msgstr "Meeting already closed."
+
+#: juridique/models.py:749
+msgid "Le partenaire doit être flaggé GLOBAL RENTAL (RF-ERP-B4)."
+msgstr "The partner must be flagged GLOBAL RENTAL (RF-ERP-B4)."
+
+#: juridique/models.py:755
+msgid "Seul un dossier ouvert peut être clôturé."
+msgstr "Only an open case file can be closed."
+
+#: juridique/serializers.py:158
+msgid "Juridiction hors de la liste paramétrée (paramètres M12)."
+msgstr "Jurisdiction not in the configured list (M12 settings)."
+
+#: juridique/serializers.py:410
+msgid "Document inaccessible."
+msgstr "Document not accessible."
+
+#: juridique/serializers.py:418
+msgid "Ce document est déjà lié à cet objet."
+msgstr "This document is already linked to this object."
+
+#: juridique/serializers.py:491
+msgid "Cette pièce est déjà versée au dossier."
+msgstr "This document is already in the file."
+
+#: juridique/services.py:101
+msgid "Validation réservée à la Direction Générale (CDC M12 §14.8)."
+msgstr "Validation reserved for General Management (CDC M12 §14.8)."
+
+#: juridique/services.py:110
+msgid "Rôle non autorisé à réaliser cette action d'engagement."
+msgstr "Role not authorised to perform this commitment action."
+
+#: juridique/services.py:272
+msgid "Objet métier introuvable."
+msgstr "Business object not found."
+
+#: juridique/views.py:224
+msgid "Juridiction ou probabilité attendue."
+msgstr "Jurisdiction or probability expected."
+
+#: juridique/views.py:234
+msgid "Phase inconnue."
+msgstr "Unknown phase."
+
+#: juridique/views.py:238
+msgid "Contentieux traité : phase figée."
+msgstr "Litigation handled: phase frozen."
+
+#: juridique/views.py:240
+msgid "Le contentieux est déjà dans cette phase."
+msgstr "The litigation is already in this phase."
+
+#: juridique/views.py:281
+msgid "Déjà validée par la Direction Générale."
+msgstr "Already validated by General Management."
+
+#: juridique/views.py:470
+msgid "Date de fin du mandat obligatoire."
+msgstr "Mandate end date required."
+
+#: juridique/views.py:474
+msgid "Dossier clôturé."
+msgstr "Case file closed."
+
+#: juridique/views.py:630
+msgid "Paramètre déjà confirmé."
+msgstr "Setting already confirmed."
+
+#: juridique/views.py:664
+msgid "Jalon déjà réalisé ou annulé."
+msgstr "Milestone already achieved or cancelled."
+
+# ── logistique : messages API et exports (lot a6) ──
+
+#: logistique/models.py:190
+msgid "La fin souhaitée doit être postérieure au début."
+msgstr "The requested end must be after the start."
+
+#: logistique/models.py:275
+msgid "Équipement en location (GR) ou hors service : non affectable."
+msgstr "Equipment on rental (GR) or out of service: cannot be assigned."
+
+#: logistique/models.py:278
+msgid "La fin doit être postérieure au début."
+msgstr "The end must be after the start."
+
+#: logistique/models.py:435
+msgid "Le tarif ne peut être négatif."
+msgstr "The rate cannot be negative."
+
+#: logistique/models.py:439
+msgid "Le compteur de retour doit être ≥ au compteur de départ."
+msgstr "The return meter reading must be ≥ the departure reading."
+
+#: logistique/models.py:528
+msgid "La pénalité ne peut être négative."
+msgstr "The penalty cannot be negative."
+
+#: logistique/models.py:625
+msgid "La valeur du compteur ne peut être négative."
+msgstr "The meter value cannot be negative."
+
+#: logistique/models.py:723
+msgid "Historique inaltérable : modification interdite."
+msgstr "Tamper-proof history: changes not allowed."
+
+#: logistique/models.py:727
+msgid "Historique inaltérable : suppression interdite."
+msgstr "Tamper-proof history: deletion not allowed."
+
+#: logistique/models.py:769
+msgid "Audit scellé : modification interdite."
+msgstr "Audit sealed: changes not allowed."
+
+#: logistique/models.py:775
+msgid "Audit conservé (durée de conservation) : suppression interdite."
+msgstr "Audit retained (retention period): deletion not allowed."
+
+#: logistique/models.py:806
+msgid "Le prix ne peut être négatif."
+msgstr "The price cannot be negative."
+
+#: logistique/models.py:874
+msgid "Archive scellée : modification interdite."
+msgstr "Archive sealed: changes not allowed."
+
+#: logistique/models.py:878
+msgid "Archive scellée : suppression interdite."
+msgstr "Archive sealed: deletion not allowed."
+
+#: logistique/serializers.py:421
+msgid "Photo attendue (jpg, png, webp, heic)."
+msgstr "Photo expected (jpg, png, webp, heic)."
+
+#: logistique/serializers.py:444
+msgid "Lignes du BC figées après émission du BC / GR."
+msgstr "PO lines frozen once the PO / GR is issued."
+
+#: logistique/serializers.py:446
+msgid "Une ligne ne change pas de prestation."
+msgstr "A line cannot change service."
+
+#: logistique/serializers.py:73
+msgid "Le plafond doit être strictement positif."
+msgstr "The ceiling must be strictly positive."
+
+#: logistique/services.py:273
+msgid "Seule une prestation en brouillon peut être émise."
+msgstr "Only a draft service can be issued."
+
+#: logistique/services.py:275
+msgid "BC / GR déjà émis."
+msgstr "PO / GR already issued."
+
+#: logistique/services.py:344
+msgid "Période attendue au format AAAA-MM."
+msgstr "Period expected in YYYY-MM format."
+
+#: logistique/services.py:454
+msgid "Un relevé plus récent existe déjà."
+msgstr "A more recent reading already exists."
+
+#: logistique/services.py:508
+msgid "Seule une commande GR en brouillon, non émise, se valide."
+msgstr "Only a draft, unissued GR order can be validated."
+
+#: logistique/services.py:513
+msgid "Rôle non habilité à cette validation."
+msgstr "Role not authorised for this validation."
+
+#: logistique/services.py:515
+msgid "La validation Achats (M2) précède la validation Direction (DR)."
+msgstr "Purchasing validation (M2) comes before Management validation (DR)."
+
+#: logistique/services.py:517
+msgid "Déjà validée à ce niveau."
+msgstr "Already validated at this level."
+
+#: logistique/services.py:574
+msgid "La facture doit porter sur un BC intra-groupe GLOBAL RENTAL (compte 618)."
+msgstr "The invoice must relate to an intra-group GLOBAL RENTAL PO (account 618)."
+
+#: logistique/services.py:576
+msgid "Le fournisseur de la facture doit être le partenaire GR de la prestation."
+msgstr "The invoice supplier must be the GR partner of the service."
+
+#: logistique/services.py:578
+msgid "La facture ne porte pas sur le BC achats lié à la prestation."
+msgstr "The invoice does not relate to the purchase PO linked to the service."
+
+#: logistique/services.py:580
+msgid "Facture annulée."
+msgstr "Invoice cancelled."
+
+#: logistique/services.py:582
+msgid "Facture déjà rapprochée d'une autre prestation."
+msgstr "Invoice already matched to another service."
+
+#: logistique/services.py:678
+msgid "Prestation terminée ou annulée : réception impossible."
+msgstr "Service completed or cancelled: receipt not possible."
+
+#: logistique/services.py:680
+msgid "Référence du BL requise."
+msgstr "Delivery note reference required."
+
+#: logistique/views.py:151
+msgid "Équipement introuvable."
+msgstr "Equipment not found."
+
+#: logistique/views.py:155
+msgid "Affectation en cours : terminez-la pour libérer l'équipement."
+msgstr "Assignment in progress: end it to release the equipment."
+
+#: logistique/views.py:157
+msgid "Location GLOBAL RENTAL active : clôturez-la pour libérer l'équipement."
+msgstr "Active GLOBAL RENTAL rental: close it to release the equipment."
+
+#: logistique/views.py:228
+msgid "Affectation déjà terminée : modifiable via retour."
+msgstr "Assignment already ended: can be changed through return."
+
+#: logistique/views.py:316
+msgid "BC achats requis."
+msgstr "Purchase PO required."
+
+#: logistique/views.py:329
+msgid "Facture requise."
+msgstr "Invoice required."
+
+#: logistique/views.py:350
+msgid "Motif du litige requis."
+msgstr "Dispute reason required."
+
+#: logistique/views.py:382
+msgid "Seule une prestation en brouillon peut démarrer (déjà active, terminée ou annulée)."
+msgstr "Only a draft service can start (already active, completed or cancelled)."
+
+#: logistique/views.py:386
+msgid "Compteur de départ requis."
+msgstr "Departure meter reading required."
+
+#: logistique/views.py:390
+msgid "Compteur numérique attendu."
+msgstr "Numeric meter reading expected."
+
+#: logistique/views.py:392
+msgid "Le compteur ne peut pas être négatif."
+msgstr "The meter reading cannot be negative."
+
+#: logistique/views.py:422
+msgid "Seule une location active peut être clôturée."
+msgstr "Only an active rental can be closed."
+
+#: logistique/views.py:425
+msgid "Compteur de retour requis."
+msgstr "Return meter reading required."
+
+#: logistique/views.py:432
+msgid "Compteur de retour inférieur au compteur de départ."
+msgstr "Return meter reading lower than the departure reading."
+
+#: logistique/views.py:435
+msgid "Le retour ne peut précéder le début de la location."
+msgstr "The return cannot precede the start of the rental."
+
+#: logistique/views.py:622
+msgid "Prestation terminée ou annulée."
+msgstr "Service completed or cancelled."
+
+# ── maintenance : messages API et exports (lot a6) ──
+
+#: maintenance/ecarts_correctif.py:34
+msgid "Seul un OT sur un équipement GLOBAL RENTAL (ou signé 618) se rattache à un BC GR."
+msgstr "Only a work order on GLOBAL RENTAL equipment (or flagged 618) can be linked to a GR PO."
+
+#: maintenance/ecarts_correctif.py:40
+msgid "BC introuvable."
+msgstr "PO not found."
+
+#: maintenance/ecarts_m5m8.py:89
+msgid "Compte 618 : aucun partenaire GLOBAL RENTAL au référentiel."
+msgstr "Account 618: no GLOBAL RENTAL partner in the master data."
+
+#: maintenance/models.py:142
+msgid "Un actif GLOBAL RENTAL doit référencer l'équipement lié."
+msgstr "A GLOBAL RENTAL asset must reference the linked equipment."
+
+#: maintenance/models.py:437
+msgid "Un plan préventif exige une périodicité calendaire et / ou un intervalle compteur."
+msgstr "A preventive plan requires a calendar frequency and / or a meter interval."
+
+#: maintenance/models.py:440
+msgid "La périodicité doit être d'au moins 1 jour."
+msgstr "The frequency must be at least 1 day."
+
+#: maintenance/models.py:443
+msgid "L'intervalle doit être strictement positif."
+msgstr "The interval must be strictly positive."
+
+#: maintenance/models.py:445
+msgid "Cet équipement n'a pas de compteur."
+msgstr "This equipment has no meter."
+
+#: maintenance/models.py:566
+msgid "La prochaine inspection doit être postérieure à l'inspection."
+msgstr "The next inspection must be after the inspection."
+
+#: maintenance/serializers.py:144
+msgid "OT clôturé ou archivé : pièce scellée, non modifiable."
+msgstr "Work order closed or archived: record sealed, cannot be changed."
+
+#: maintenance/serializers.py:148
+msgid "Coût pièces calculé depuis les sorties de stock : saisie libre interdite."
+msgstr "Parts cost calculated from stock issues: manual entry not allowed."
+
+#: maintenance/serializers.py:229
+msgid "Mot-clé trop court."
+msgstr "Keyword too short."
+
+#: maintenance/serializers.py:55
+msgid "Centre de coût attendu (axe AX-CC)."
+msgstr "Cost centre expected (axis AX-CC)."
+
+#: maintenance/services.py:205
+msgid "Période invalide : format AAAA-MM attendu."
+msgstr "Invalid period: YYYY-MM format expected."
+
+#: maintenance/services.py:250
+msgid "Les pièces se sortent sur un OT planifié ou en cours."
+msgstr "Parts are issued on a planned or in-progress work order."
+
+#: maintenance/views.py:109
+msgid "Compteur GLOBAL RENTAL en lecture seule : le relevé se saisit en logistique (M4)."
+msgstr "GLOBAL RENTAL meter is read-only: the reading is entered in logistics (M4)."
+
+#: maintenance/views.py:169
+msgid "OT clôturé ou archivé : pièce scellée, non supprimable."
+msgstr "Work order closed or archived: record sealed, cannot be deleted."
+
+#: maintenance/views.py:184
+msgid "Seul un OT demandé peut être qualifié."
+msgstr "Only a requested work order can be qualified."
+
+#: maintenance/views.py:189
+msgid "Diagnostic de qualification requis."
+msgstr "Qualification diagnosis required."
+
+#: maintenance/views.py:230
+msgid "Seul un OT demandé peut être planifié."
+msgstr "Only a requested work order can be scheduled."
+
+#: maintenance/views.py:254
+msgid "L'OT doit être planifié ou demandé pour démarrer."
+msgstr "The work order must be scheduled or requested to start."
+
+#: maintenance/views.py:277
+msgid "Seul un OT en cours peut être terminé."
+msgstr "Only an in-progress work order can be completed."
+
+#: maintenance/views.py:306
+msgid "L'OT n'est pas clôturable."
+msgstr "The work order cannot be closed."
+
+#: maintenance/views.py:357
+msgid "Coûts de maintenance réservés aux rôles habilités aux montants."
+msgstr "Maintenance costs are reserved for roles authorised to view amounts."
+
+#: maintenance/views.py:361
+msgid "Année sur 4 chiffres attendue."
+msgstr "4-digit year expected."
+
+#: maintenance/views.py:387
+msgid "Seul un OT clôturé peut être archivé."
+msgstr "Only a closed work order can be archived."
+
+#: maintenance/views.py:392
+msgid "Rapport d'intervention requis avant archivage."
+msgstr "Intervention report required before archiving."
+
+#: maintenance/views.py:413
+msgid "Article et dépôt requis."
+msgstr "Item and warehouse required."
+
+#: maintenance/views.py:433
+msgid "L'OT est déjà clos ou annulé."
+msgstr "The work order is already closed or cancelled."
+
+#: maintenance/views.py:500
+msgid "Seule une inspection planifiée peut être réalisée."
+msgstr "Only a planned inspection can be carried out."
+
+#: maintenance/views.py:527
+msgid "L'inspection doit être réalisée pour générer un OT."
+msgstr "The inspection must be carried out to generate a work order."
+
+#: maintenance/views.py:532
+msgid "Un OT a déjà été généré pour cette inspection."
+msgstr "A work order has already been generated for this inspection."
+
+#: maintenance/views.py:537
+msgid "Un OT correctif ne se génère que depuis une inspection non conforme ou sous réserve."
+msgstr "A corrective work order can only be generated from a non-compliant or reserved inspection."
+
+# ── operations : messages API et exports (lot a6) ──
+
+#: operations/cloture.py:17
+msgid "Seul un pointage saisi peut être validé."
+msgstr "Only an entered timesheet can be validated."
+
+#: operations/cloture.py:19
+msgid "Séparation des tâches : le saisisseur ne peut pas valider son propre pointage."
+msgstr "Segregation of duties: the person who entered the timesheet cannot validate it."
+
+#: operations/cloture.py:34
+msgid "Seul un pointage validé peut être transféré en paie."
+msgstr "Only a validated timesheet can be transferred to payroll."
+
+#: operations/cloture.py:37
+msgid "Opérateur sans fiche salarié : transfert en paie impossible (rattacher le compte à une fiche RH)."
+msgstr "Operator without an employee record: transfer to payroll not possible (link the account to an HR record)."
+
+#: operations/models.py:229
+msgid "La fin prévue doit être postérieure au début."
+msgstr "The planned end must be after the start."
+
+#: operations/models.py:329
+msgid "Le nombre d'heures doit être strictement positif."
+msgstr "The number of hours must be strictly positive."
+
+#: operations/models.py:332
+msgid "Le pointage doit être rattaché à un opérateur ou un nom libre."
+msgstr "The timesheet must be linked to an operator or a free-text name."
+
+#: operations/models.py:413
+msgid "La fin de période doit être postérieure au début."
+msgstr "The period end must be after the start."
+
+#: operations/models.py:415
+msgid "L'avancement ne peut dépasser 100 %."
+msgstr "Progress cannot exceed 100 %."
+
+#: operations/models.py:460
+msgid "Dossier opérationnel scellé : non modifiable."
+msgstr "Operational file sealed: cannot be changed."
+
+#: operations/models.py:464
+msgid "Dossier opérationnel scellé : suppression interdite."
+msgstr "Operational file sealed: deletion not allowed."
+
+#: operations/models.py:555
+msgid "L'effectif doit être d'au moins 1."
+msgstr "Headcount must be at least 1."
+
+#: operations/models.py:591
+msgid "Un motif est obligatoire pour une absence ou un retard."
+msgstr "A reason is required for an absence or a late arrival."
+
+#: operations/serializers.py:190
+msgid "Un pointage ne peut dépasser 24 h."
+msgstr "A timesheet cannot exceed 24 h."
+
+#: operations/serializers.py:199
+msgid "La fiche salarié ne correspond pas à l'opérateur."
+msgstr "The employee record does not match the operator."
+
+#: operations/serializers.py:353
+msgid "La capacité doit être strictement positive."
+msgstr "The capacity must be strictly positive."
+
+#: operations/serializers.py:404
+msgid "Équipe inactive : affectation impossible."
+msgstr "Inactive team: assignment not possible."
+
+#: operations/serializers.py:437
+msgid "Présence déjà relevée pour ce salarié, cet OF et ce jour."
+msgstr "Attendance already recorded for this employee, this production order and this day."
+
+#: operations/serializers.py:487
+msgid "La valeur doit être positive ou nulle."
+msgstr "The value must be positive or zero."
+
+#: operations/serializers.py:489
+msgid "Valeur attendue : 0 ou 1."
+msgstr "Expected value: 0 or 1."
+
+#: operations/serializers.py:491
+msgid "Méthode attendue : 1, 2 ou 3."
+msgstr "Expected method: 1, 2 or 3."
+
+#: operations/serializers.py:493
+msgid "Entre 1 et 7 jours."
+msgstr "Between 1 and 7 days."
+
+#: operations/serializers.py:512
+msgid "OF clos ou annulé : préparation impossible."
+msgstr "Production order closed or cancelled: preparation not possible."
+
+#: operations/serializers.py:517
+msgid "Une fiche de préparation existe déjà pour cet OF."
+msgstr "A preparation sheet already exists for this production order."
+
+#: operations/serializers.py:541
+msgid "OF terminé, clos ou annulé : besoin matière non modifiable."
+msgstr "Production order completed, closed or cancelled: material requirement cannot be changed."
+
+#: operations/serializers.py:570
+msgid "Rapport possible seulement sur un OF lancé, en cours ou terminé."
+msgstr "Report possible only on a released, in-progress or completed production order."
+
+#: operations/serializers.py:589
+msgid "Au moins un point de contrôle est requis."
+msgstr "At least one checkpoint is required."
+
+#: operations/serializers.py:593
+msgid "Chaque point doit avoir un libellé."
+msgstr "Each checkpoint must have a label."
+
+#: operations/serializers.py:615
+msgid "Au moins une ligne (désignation, quantité) est requise."
+msgstr "At least one line (description, quantity) is required."
+
+#: operations/serializers.py:619
+msgid "Chaque ligne doit avoir une désignation."
+msgstr "Each line must have a description."
+
+#: operations/serializers.py:623
+msgid "Quantité invalide."
+msgstr "Invalid quantity."
+
+#: operations/serializers.py:625
+msgid "Quantité strictement positive attendue."
+msgstr "Strictly positive quantity expected."
+
+#: operations/serializers.py:631
+msgid "OF prévu ou annulé : aucun transfert vers le chantier."
+msgstr "Production order planned or cancelled: no transfer to the site."
+
+#: operations/serializers.py:651
+msgid "La quantité métrée doit être strictement positive."
+msgstr "The measured quantity must be strictly positive."
+
+#: operations/serializers.py:653
+msgid "Prix positif attendu."
+msgstr "Positive price expected."
+
+#: operations/serializers.py:656
+msgid "Situation validée ou facturée : rattachement impossible."
+msgstr "Progress statement validated or invoiced: linking not possible."
+
+#: operations/serializers.py:675
+msgid "Multi-affaires désactivé (paramètre MULTI_AFFAIRES_ACTIF = 0)."
+msgstr "Multi-project disabled (setting MULTI_AFFAIRES_ACTIF = 0)."
+
+#: operations/serializers.py:678
+msgid "Part entre 0 et 100 %."
+msgstr "Share between 0 and 100 %."
+
+#: operations/serializers.py:685
+msgid "Affaire déjà répartie sur cet OF."
+msgstr "Project already allocated on this production order."
+
+#: operations/terrain_a3.py:164
+msgid "Champ obligatoire."
+msgstr "Required field."
+
+#: operations/terrain_a3.py:38
+msgid "Horodatage de saisie dans le futur : vérifier l'horloge de l'appareil."
+msgstr "Entry timestamp in the future: check the device clock."
+
+#: operations/terrain_a3.py:84
+msgid "Consommation possible seulement sur un OF lancé ou en cours."
+msgstr "Consumption possible only on a released or in-progress production order."
+
+#: operations/terrain_a3.py:86
+msgid "La quantité consommée doit être strictement positive."
+msgstr "The consumed quantity must be strictly positive."
+
+#: operations/terrain_a3.py:88
+msgid "Ce lot n'appartient pas à l'article choisi."
+msgstr "This batch does not belong to the selected item."
+
+#: operations/views.py:1038
+msgid "Identifiant d'affaire invalide."
+msgstr "Invalid project identifier."
+
+#: operations/views.py:141
+msgid "OF clôturé ou annulé : scellé (conservation des données opérationnelles)."
+msgstr "Production order closed or cancelled: sealed (retention of operational data)."
+
+#: operations/views.py:148
+msgid "OF lancé ou déjà pointé : suppression interdite (conservation 10 ans) — l'annuler à la place."
+msgstr "Production order released or already timesheeted: deletion not allowed (10-year retention) — cancel it instead."
+
+#: operations/views.py:230
+msgid "Seul un OF prévu, lancé ou en cours peut être replanifié."
+msgstr "Only a planned, released or in-progress production order can be rescheduled."
+
+#: operations/views.py:236
+msgid "Nombre entier de jours attendu."
+msgstr "Integer number of days expected."
+
+#: operations/views.py:238
+msgid "OF sans date de début : saisir les nouvelles dates."
+msgstr "Production order without a start date: enter the new dates."
+
+#: operations/views.py:248
+msgid "Le motif de replanification est obligatoire."
+msgstr "A rescheduling reason is required."
+
+#: operations/views.py:278
+msgid "Montants restreints : publication réservée."
+msgstr "Restricted amounts: publication reserved."
+
+#: operations/views.py:325
+msgid "hebdo ou mensuel."
+msgstr "weekly or monthly."
+
+#: operations/views.py:368
+msgid "Affectation mobilisée ou terminée : non modifiable ni supprimable."
+msgstr "Assignment mobilised or ended: cannot be changed or deleted."
+
+#: operations/views.py:384
+msgid "Seule une affectation planifiée peut être mobilisée."
+msgstr "Only a planned assignment can be mobilised."
+
+#: operations/views.py:403
+msgid "Seule une affectation mobilisée peut être terminée."
+msgstr "Only a mobilised assignment can be ended."
+
+#: operations/views.py:489
+msgid "Pointage validé ou transféré en paie : non modifiable ni supprimable."
+msgstr "Timesheet validated or transferred to payroll: cannot be changed or deleted."
+
+#: operations/views.py:498
+msgid "OF terminé ou clôturé : pointage conservé (conservation 10 ans)."
+msgstr "Production order completed or closed: timesheet retained (10-year retention)."
+
+#: operations/views.py:543
+msgid "Situation validée ou facturée : non modifiable ni supprimable."
+msgstr "Progress statement validated or invoiced: cannot be changed or deleted."
+
+#: operations/views.py:559
+msgid "Seule une situation en brouillon peut être soumise."
+msgstr "Only a draft progress statement can be submitted."
+
+#: operations/views.py:570
+msgid "Séparation des tâches : le créateur d'une situation ne peut pas la valider."
+msgstr "Segregation of duties: the creator of a progress statement cannot validate it."
+
+#: operations/views.py:575
+msgid "Situation déjà validée ou facturée."
+msgstr "Progress statement already validated or invoiced."
+
+#: operations/views.py:600
+msgid "Reçu client obligatoire avant facturation (paramètre provisoire)."
+msgstr "Customer receipt required before invoicing (provisional setting)."
+
+#: operations/views.py:602
+msgid "La référence de la facture est obligatoire."
+msgstr "The invoice reference is required."
+
+#: operations/views.py:616
+msgid "Seule une situation validée peut être reçue par le client."
+msgstr "Only a validated progress statement can be received by the customer."
+
+#: operations/views.py:618
+msgid "Reçu client déjà enregistré."
+msgstr "Customer receipt already recorded."
+
+#: operations/views.py:620
+msgid "Le nom du signataire client est obligatoire."
+msgstr "The customer signatory's name is required."
+
+#: operations/views.py:634
+msgid "Situation validée ou facturée : montant figé."
+msgstr "Progress statement validated or invoiced: amount frozen."
+
+#: operations/views.py:637
+msgid "Aucun attachement signé rattaché à la situation."
+msgstr "No signed measurement sheet linked to the progress statement."
+
+#: operations/views.py:792
+msgid "Confirmation réservée à la direction des opérations et au-dessus."
+msgstr "Confirmation reserved for operations management and above."
+
+#: operations/views.py:827
+msgid "Fiche déjà validée."
+msgstr "Sheet already validated."
+
+#: operations/views.py:889
+msgid "Rapport déjà validé."
+msgstr "Report already validated."
+
+#: operations/views.py:946
+msgid "Seul un bon préparé peut être expédié."
+msgstr "Only a prepared note can be shipped."
+
+#: operations/views.py:958
+msgid "Seul un bon expédié peut être réceptionné."
+msgstr "Only a shipped note can be received."
+
+#: operations/views.py:996
+msgid "Attachement déjà signé."
+msgstr "Measurement sheet already signed."
+
+# ── qualite : messages API et exports (lot a6) ──
+
+#: qualite/ecarts_a3.py:177
+msgid "Coût déjà comptabilisé."
+msgstr "Cost already posted."
+
+#: qualite/ecarts_a3.py:179
+msgid "Coût nul : rien à comptabiliser."
+msgstr "Zero cost: nothing to post."
+
+#: qualite/ecarts_a3.py:182
+msgid "Journal OD absent : comptabilisation impossible."
+msgstr "OD journal missing: posting not possible."
+
+#: qualite/ecarts_a3.py:258
+msgid "Rebut : quantité rebutée requise."
+msgstr "Scrap: scrapped quantity required."
+
+#: qualite/ecarts_a3.py:260
+msgid "Reprise / réparation : heures requises."
+msgstr "Rework / repair: hours required."
+
+#: qualite/ecarts_a3.py:262
+msgid "Frais externes requis."
+msgstr "External costs required."
+
+#: qualite/ecarts_a3.py:298
+msgid "Comptabilisation réservée aux rôles comptables / finance."
+msgstr "Posting reserved for accounting / finance roles."
+
+#: qualite/ecarts_a3.py:45
+msgid "Lot matière obligatoire : l'OF a consommé des lots tracés (coulée reprise du lot)."
+msgstr "Material batch required: the production order consumed traced batches (heat number taken from the batch)."
+
+#: qualite/models.py:1044
+msgid "Renseigner un minimum et/ou un maximum."
+msgstr "Enter a minimum and/or a maximum."
+
+#: qualite/models.py:1046
+msgid "Le maximum doit être supérieur au minimum."
+msgstr "The maximum must be greater than the minimum."
+
+#: qualite/models.py:1197
+msgid "Un plan qualité se rattache à une affaire."
+msgstr "A quality plan is linked to a project."
+
+#: qualite/models.py:1251
+msgid "Un audit fournisseur désigne le fournisseur audité."
+msgstr "A supplier audit designates the audited supplier."
+
+#: qualite/models.py:1382
+msgid "Profil contractuel inconnu."
+msgstr "Unknown contract profile."
+
+#: qualite/models.py:1384
+msgid "Seul un WPS (procédure) peut être exigé."
+msgstr "Only a WPS (procedure) can be required."
+
+#: qualite/models.py:157
+msgid "La date de validité doit être postérieure à la qualification."
+msgstr "The validity date must be after the qualification."
+
+#: qualite/models.py:397
+msgid "La méthode (RT/UT/PT/MT) est réservée aux contrôles de type CND."
+msgstr "The method (RT/UT/PT/MT) is reserved for NDT inspections."
+
+#: qualite/models.py:534
+msgid "La description de la non-conformité est requise."
+msgstr "The non-conformity description is required."
+
+#: qualite/models.py:536
+msgid "Une NCR-SD (soudage) se rattache à un joint soudé."
+msgstr "An NCR-SD (welding) is linked to a welded joint."
+
+#: qualite/models.py:538
+msgid "Une NCR-HSE se rattache à un événement HSE ou à un écart d'audit HSE."
+msgstr "An NCR-HSE is linked to an HSE event or an HSE audit finding."
+
+#: qualite/models.py:730
+msgid "Des points d'inspection se rattachent à un contrôle de type ITP."
+msgstr "Inspection points are linked to an ITP-type inspection."
+
+#: qualite/models.py:785
+msgid "L'échéance précède la date d'étalonnage."
+msgstr "The due date is before the calibration date."
+
+#: qualite/serializers.py:113
+msgid "Le support d'un WPS est un WPQR (PQR)."
+msgstr "The support of a WPS is a WPQR (PQR)."
+
+#: qualite/serializers.py:115
+msgid "Un WPS ne peut pas être son propre WPQR."
+msgstr "A WPS cannot be its own WPQR."
+
+#: qualite/serializers.py:182
+msgid "ITP non validable : au moins un point d'arrêt n'est pas levé."
+msgstr "ITP cannot be validated: at least one hold point has not been released."
+
+#: qualite/serializers.py:187
+msgid "Instrument hors échéance d'étalonnage ou bloqué : utilisation interdite."
+msgstr "Instrument out of calibration or blocked: use not allowed."
+
+#: qualite/serializers.py:203
+msgid "Un traitement thermique se trace avec un four TTH validé."
+msgstr "A heat treatment is recorded with a validated PWHT furnace."
+
+#: qualite/serializers.py:289
+msgid "NC clôturée : ouvrir une nouvelle NC pour une nouvelle action."
+msgstr "NC closed: open a new NC for a new action."
+
+#: qualite/serializers.py:353
+msgid "ITP approuvé : plan figé (aucun point ajouté ni modifié)."
+msgstr "ITP approved: plan frozen (no point added or changed)."
+
+#: qualite/serializers.py:355
+msgid "ITP validé ou annulé : plan figé."
+msgstr "ITP validated or cancelled: plan frozen."
+
+#: qualite/serializers.py:407
+msgid "Aucun ITP approuvé pour cet OF : soudage interdit."
+msgstr "No approved ITP for this production order: welding not allowed."
+
+#: qualite/serializers.py:409
+msgid "Soudeur sans qualification valide (ISO 9606-1 / ASME IX)."
+msgstr "Welder without a valid qualification (ISO 9606-1 / ASME IX)."
+
+#: qualite/serializers.py:413
+msgid "WPS obligatoire : un joint se soude selon une procédure qualifiée."
+msgstr "WPS required: a joint is welded according to a qualified procedure."
+
+#: qualite/serializers.py:443
+msgid "Les images d'archive se rattachent à un contrôle CND."
+msgstr "Archive images are linked to an NDT inspection."
+
+#: qualite/serializers.py:462
+msgid "Instrument hors échéance d'étalonnage ou bloqué."
+msgstr "Instrument out of calibration or blocked."
+
+#: qualite/serializers.py:494
+msgid "Une réserve se rattache à un ITP."
+msgstr "A punch item is linked to an ITP."
+
+#: qualite/serializers.py:496
+msgid "ITP d'un autre OF."
+msgstr "ITP of another production order."
+
+#: qualite/serializers.py:605
+msgid "Audit clôturé : constats scellés."
+msgstr "Audit closed: findings sealed."
+
+#: qualite/views.py:165
+msgid "Un WPS se valide sur un WPQR (PQR) validé : renseignez le WPQR support."
+msgstr "A WPS is validated against a validated WPQR (PQR): enter the supporting WPQR."
+
+#: qualite/views.py:179
+msgid "Seule une procédure validée devient obsolète."
+msgstr "Only a validated procedure can become obsolete."
+
+#: qualite/views.py:182
+msgid "Motif d'obsolescence obligatoire."
+msgstr "A reason for obsolescence is required."
+
+#: qualite/views.py:196
+msgid "Seul un WPS validé se diffuse vers un OF."
+msgstr "Only a validated WPS can be issued to a production order."
+
+#: qualite/views.py:199
+msgid "OF introuvable."
+msgstr "Production order not found."
+
+#: qualite/views.py:215
+msgid "Fichier attendu (PDF ou image)."
+msgstr "File expected (PDF or image)."
+
+#: qualite/views.py:217
+msgid "Formats acceptés : PDF, JPG, PNG."
+msgstr "Accepted formats: PDF, JPG, PNG."
+
+#: qualite/views.py:258
+msgid "Approbation réservée à QA/QC et à la hiérarchie."
+msgstr "Approval reserved for QA/QC and line management."
+
+#: qualite/views.py:262
+msgid "Seul un contrôle de type ITP s'approuve."
+msgstr "Only an ITP-type inspection can be approved."
+
+#: qualite/views.py:264
+msgid "ITP déjà approuvé."
+msgstr "ITP already approved."
+
+#: qualite/views.py:266
+msgid "ITP sans point d'inspection : rien à approuver."
+msgstr "ITP without inspection points: nothing to approve."
+
+#: qualite/views.py:284
+msgid "Mesures structurées : contrôles peinture, génie civil, électricité, essai ou TTH."
+msgstr "Structured measurements: painting, civil works, electrical, test or PWHT inspections."
+
+#: qualite/views.py:286
+msgid "Contrôle conclu : mesures scellées."
+msgstr "Inspection concluded: measurements sealed."
+
+#: qualite/views.py:291
+msgid "Critère inconnu pour ce type de contrôle."
+msgstr "Unknown criterion for this type of inspection."
+
+#: qualite/views.py:295
+msgid "Valeur numérique attendue."
+msgstr "Numeric value expected."
+
+#: qualite/views.py:311
+msgid "Contrôle déjà conclu."
+msgstr "Inspection already concluded."
+
+#: qualite/views.py:313
+msgid "Aucune mesure saisie."
+msgstr "No measurement entered."
+
+#: qualite/views.py:348
+msgid "NC clôturée : traitement impossible (ouvrir une nouvelle NC)."
+msgstr "NC closed: treatment not possible (open a new NC)."
+
+#: qualite/views.py:353
+msgid "Traitement invalide."
+msgstr "Invalid treatment."
+
+#: qualite/views.py:380
+msgid "NCR-SD : renseignez le re-CND (contrôle CND de recontrôle)."
+msgstr "NCR-SD: enter the re-NDT (NDT re-inspection)."
+
+#: qualite/views.py:387
+msgid "Le re-CND doit être un contrôle CND validé et conforme."
+msgstr "The re-NDT must be a validated and compliant NDT inspection."
+
+#: qualite/views.py:455
+msgid "Réservé au QA/QC et à la hiérarchie."
+msgstr "Reserved for QA/QC and line management."
+
+#: qualite/views.py:460
+msgid "PV rejeté : levée de réserve impossible."
+msgstr "Report rejected: punch item cannot be lifted."
+
+#: qualite/views.py:518
+msgid "Point déjà traité : non modifiable ni supprimable."
+msgstr "Point already processed: cannot be changed or deleted."
+
+#: qualite/views.py:533
+msgid "Point déjà levé ou déclaré non conforme."
+msgstr "Point already released or declared non-compliant."
+
+#: qualite/views.py:536
+msgid "Attendu : conforme ou non_conforme."
+msgstr "Expected: conforme or non_conforme."
+
+#: qualite/views.py:543
+msgid "Levez d'abord les points d'arrêt précédents (l'ITP se déroule dans l'ordre)."
+msgstr "Release the previous hold points first (the ITP is carried out in order)."
+
+#: qualite/views.py:569
+msgid "Nombre de jours attendu."
+msgstr "Number of days expected."
+
+#: qualite/views.py:584
+msgid "Nouvelle échéance requise pour un étalonnage conforme."
+msgstr "New due date required for a compliant calibration."
+
+#: qualite/views.py:587
+msgid "L'échéance doit être postérieure à aujourd'hui."
+msgstr "The due date must be after today."
+
+#: qualite/views.py:673
+msgid "Épreuve conclue : relevés scellés."
+msgstr "Test concluded: readings sealed."
+
+#: qualite/views.py:687
+msgid "Relevé attendu : minute, pression, temperature (nombres)."
+msgstr "Reading expected: minute, pression, temperature (numbers)."
+
+#: qualite/views.py:689
+msgid "Les relevés se saisissent par minute croissante."
+msgstr "Readings are entered in increasing minute order."
+
+#: qualite/views.py:700
+msgid "Au moins deux relevés P/T sont nécessaires."
+msgstr "At least two P/T readings are required."
+
+#: qualite/views.py:739
+msgid "Réserve déjà levée."
+msgstr "Punch item already lifted."
+
+#: qualite/views_m6m7.py:58
+msgid "Ce WPS est déjà exigé pour ce profil / contrat."
+msgstr "This WPS is already required for this profile / contract."
+
+#: qualite/views_systeme.py:101
+msgid "Version approuvée : scellée."
+msgstr "Approved version: sealed."
+
+#: qualite/views_systeme.py:104
+msgid "Fichier attendu : PDF, Word ou Excel."
+msgstr "File expected: PDF, Word or Excel."
+
+#: qualite/views_systeme.py:114
+msgid "Seul un brouillon s'approuve."
+msgstr "Only a draft can be approved."
+
+#: qualite/views_systeme.py:117
+msgid "La politique et le manuel qualité s'approuvent par la direction générale."
+msgstr "The quality policy and quality manual are approved by General Management."
+
+#: qualite/views_systeme.py:119
+msgid "Approbation réservée au QA/QC et à la hiérarchie."
+msgstr "Approval reserved for QA/QC and line management."
+
+#: qualite/views_systeme.py:127
+msgid "Seule la version en vigueur se révise."
+msgstr "Only the current version can be revised."
+
+#: qualite/views_systeme.py:129
+msgid "Une révision est déjà en cours pour ce document."
+msgstr "A revision is already in progress for this document."
+
+#: qualite/views_systeme.py:132
+msgid "Indiquer l'objet de la révision."
+msgstr "Specify the purpose of the revision."
+
+#: qualite/views_systeme.py:143
+msgid "Document déjà obsolète."
+msgstr "Document already obsolete."
+
+#: qualite/views_systeme.py:164
+msgid "Audit clôturé : scellé."
+msgstr "Audit closed: sealed."
+
+#: qualite/views_systeme.py:264
+msgid "La revue de direction se valide par la direction générale."
+msgstr "The management review is validated by General Management."
+
+#: qualite/views_systeme.py:93
+msgid "Version approuvée ou obsolète : scellée, créer une révision."
+msgstr "Approved or obsolete version: sealed, create a revision."
+
+# ── registres : messages API et exports (lot a6) ──
+
+#: registres/views.py:90
+msgid "format invalide (csv/xlsx)"
+msgstr "invalid format (csv/xlsx)"
+
+# ── reports : messages API et exports (lot a6) ──
+
+#: reports/views.py:31
+msgid "format invalide (csv/xlsx/pdf)"
+msgstr "invalid format (csv/xlsx/pdf)"
+
+# ── rh_paie : messages API et exports (lot a6) ──
+
+#: rh_paie/compta_m9b.py:120
+msgid "Provision des congés payés déjà passée pour ce mois."
+msgstr "Paid leave accrual already posted for this month."
+
+#: rh_paie/compta_m9b.py:125
+msgid "Aucun bulletin validé ce mois : rien à provisionner."
+msgstr "No validated payslip this month: nothing to accrue."
+
+#: rh_paie/compta_m9b.py:132
+msgid "Journal de paie PAI absent (seed_accounting)."
+msgstr "Payroll journal PAI missing (seed_accounting)."
+
+#: rh_paie/formation_m9c.py:107
+msgid "Seule une formation prévue peut être marquée réalisée."
+msgstr "Only a planned training can be marked as completed."
+
+#: rh_paie/formation_m9c.py:228
+msgid "Bulletin déjà signé ou en cours de signature."
+msgstr "Payslip already signed or being signed."
+
+#: rh_paie/models.py:1033
+msgid "Un ordre de virement généré est scellé."
+msgstr "A generated transfer order is sealed."
+
+#: rh_paie/models.py:1090
+msgid "Une déclaration générée est scellée."
+msgstr "A generated return is sealed."
+
+#: rh_paie/models.py:1136
+msgid "Le salaire de base doit être positif."
+msgstr "The base salary must be positive."
+
+#: rh_paie/models.py:1169
+msgid "Un élément fixe porte sur une rubrique de gain."
+msgstr "A fixed element relates to an earnings item."
+
+#: rh_paie/models.py:1171
+msgid "Renseigner soit un montant, soit un taux (l'un ou l'autre)."
+msgstr "Enter either an amount or a rate (one or the other)."
+
+#: rh_paie/models.py:1224
+msgid "L'historique de carrière est inaltérable."
+msgstr "Career history is tamper-proof."
+
+#: rh_paie/models.py:1328
+msgid "Jour entre 1 et 31."
+msgstr "Day between 1 and 31."
+
+#: rh_paie/models.py:1330
+msgid "Mois (1 à 12) requis pour une échéance annuelle."
+msgstr "Month (1 to 12) required for an annual due date."
+
+#: rh_paie/models.py:1397
+msgid "Une provision passée est scellée (extourne en comptabilité)."
+msgstr "A posted accrual is sealed (reversal in accounting)."
+
+#: rh_paie/models.py:1460
+msgid "Année hors plage (2000-2100)."
+msgstr "Year out of range (2000-2100)."
+
+#: rh_paie/models.py:1462
+msgid "Le budget ne peut être négatif."
+msgstr "The budget cannot be negative."
+
+#: rh_paie/models.py:505
+msgid "Cette période chevauche un autre congé de l'employé."
+msgstr "This period overlaps another leave of the employee."
+
+#: rh_paie/models.py:700
+msgid "La date de fin précède la date d'effet."
+msgstr "The end date is before the effective date."
+
+#: rh_paie/models.py:725
+msgid "L'historique des barèmes est inaltérable."
+msgstr "The scale history is tamper-proof."
+
+#: rh_paie/models.py:821
+msgid "Au moins une tranche est requise."
+msgstr "At least one bracket is required."
+
+#: rh_paie/models.py:830
+msgid "La dernière tranche doit être sans plafond (null)."
+msgstr "The last bracket must have no ceiling (null)."
+
+#: rh_paie/models.py:835
+msgid "Plafonds strictement croissants requis."
+msgstr "Strictly increasing ceilings required."
+
+#: rh_paie/paie_m9a.py:105
+msgid "Seul un bulletin brouillon peut être préparé."
+msgstr "Only a draft payslip can be prepared."
+
+#: rh_paie/paie_m9a.py:115
+msgid "Salaire de base nul : renseigner le contrat ou sa position dans la grille de salaires."
+msgstr "Base salary is zero: fill in the contract or its position in the salary grid."
+
+#: rh_paie/paie_m9a.py:181
+msgid "Aucun contrat en vigueur à cette date : la grille ou le salaire ne peut être appliqué."
+msgstr "No contract in force at this date: the grid or salary cannot be applied."
+
+#: rh_paie/serializers.py:219
+msgid "Thème obligatoire (ou formation du catalogue)."
+msgstr "Topic required (or a training from the catalogue)."
+
+#: rh_paie/serializers.py:88
+msgid "Rattachement d'un compte à une fiche salarié : cercle paie uniquement (RF-33)."
+msgstr "Linking an account to an employee record: payroll circle only (RF-33)."
+
+#: rh_paie/serializers.py:90
+msgid "Coordonnées bancaires : cercle paie uniquement (RF-33)."
+msgstr "Bank details: payroll circle only (RF-33)."
+
+#: rh_paie/services.py:199
+msgid "La date d'effet de la nouvelle version doit être postérieure à l'actuelle."
+msgstr "The effective date of the new version must be after the current one."
+
+#: rh_paie/services.py:201
+msgid "La version actuelle est déjà close avant cette date."
+msgstr "The current version is already closed before this date."
+
+#: rh_paie/services.py:233
+msgid "Seul un bulletin brouillon peut être recalculé."
+msgstr "Only a draft payslip can be recalculated."
+
+#: rh_paie/services.py:325
+msgid "Bulletin déjà comptabilisé."
+msgstr "Payslip already posted."
+
+#: rh_paie/services.py:327
+msgid "Seul un bulletin validé ou clôturé peut être comptabilisé."
+msgstr "Only a validated or closed payslip can be posted."
+
+#: rh_paie/services.py:418
+msgid "Seul un bulletin validé ou clôturé peut être archivé."
+msgstr "Only a validated or closed payslip can be archived."
+
+#: rh_paie/services.py:420
+msgid "Bulletin déjà archivé en GED (document scellé)."
+msgstr "Payslip already archived in the EDMS (sealed document)."
+
+#: rh_paie/services.py:498
+msgid "Compte émetteur inactif."
+msgstr "Issuing account inactive."
+
+#: rh_paie/services.py:507
+msgid "Aucun bulletin validé à virer pour cette période (ou déjà viré)."
+msgstr "No validated payslip to transfer for this period (or already transferred)."
+
+#: rh_paie/services.py:598
+msgid "Seul un bulletin brouillon peut recevoir les heures des pointages."
+msgstr "Only a draft payslip can receive hours from timesheets."
+
+#: rh_paie/services.py:728
+msgid "La période de fin précède la période de début."
+msgstr "The end period is before the start period."
+
+#: rh_paie/services.py:730
+msgid "Type de déclaration inconnu."
+msgstr "Unknown return type."
+
+#: rh_paie/services.py:738
+msgid "Aucun bulletin validé sur cette période : rien à déclarer."
+msgstr "No validated payslip in this period: nothing to declare."
+
+#: rh_paie/views.py:105
+msgid "Salarié sorti : réembauche par une nouvelle fiche et un nouveau contrat."
+msgstr "Employee has left: rehire through a new record and a new contract."
+
+#: rh_paie/views.py:207
+msgid "Statut inconnu."
+msgstr "Unknown status."
+
+#: rh_paie/views.py:277
+msgid "Inscription possible seulement sur une session prévue."
+msgstr "Enrolment possible only on a planned session."
+
+#: rh_paie/views.py:289
+msgid "Seule une formation prévue peut être annulée."
+msgstr "Only a planned training can be cancelled."
+
+#: rh_paie/views.py:325
+msgid "Demande instruite : non modifiable. Annulez-la et ressaisissez-la."
+msgstr "Request processed: cannot be changed. Cancel it and enter it again."
+
+#: rh_paie/views.py:412
+msgid "Seul un constat peut être mis en instruction."
+msgstr "Only a finding can be put under investigation."
+
+#: rh_paie/views.py:426
+msgid "Seule une sanction en instruction peut faire l'objet d'une décision."
+msgstr "Only a sanction under investigation can be decided."
+
+#: rh_paie/views.py:440
+msgid "Seule une sanction décidée peut être archivée."
+msgstr "Only a decided sanction can be archived."
+
+#: rh_paie/views.py:472
+msgid "Cette saisie a déjà été transférée en paie."
+msgstr "This entry has already been transferred to payroll."
+
+#: rh_paie/views.py:556
+msgid "Seul un bulletin brouillon peut être validé."
+msgstr "Only a draft payslip can be validated."
+
+#: rh_paie/views.py:623
+msgid "Seul un bulletin validé ou clôturé peut être diffusé."
+msgstr "Only a validated or closed payslip can be distributed."
+
+#: rh_paie/views.py:643
+msgid "Seul un bulletin validé peut être clôturé."
+msgstr "Only a validated payslip can be closed."
+
+#: rh_paie/views.py:655
+msgid "Le bulletin est déjà clôturé ou annulé."
+msgstr "The payslip is already closed or cancelled."
+
+#: rh_paie/views.py:728
+msgid "Valeur déjà utilisée par un bulletin validé : créer une nouvelle version (action « reviser »)."
+msgstr "Value already used by a validated payslip: create a new version (\"reviser\" action)."
+
+#: rh_paie/views.py:739
+msgid "Valeur utilisée par un bulletin validé : suppression interdite."
+msgstr "Value used by a validated payslip: deletion not allowed."
+
+#: rh_paie/views.py:788
+msgid "Aucune fiche salarié n'est liée à ce compte."
+msgstr "No employee record is linked to this account."
+
+#: rh_paie/views.py:865
+msgid "Seule une demande en attente peut être annulée par le salarié."
+msgstr "Only a pending request can be cancelled by the employee."
+
+#: rh_paie/views_m9a.py:119
+msgid "Absence déjà retenue sur un bulletin validé : régulariser sur le mois suivant."
+msgstr "Absence already deducted on a validated payslip: adjust it in the following month."
+
+#: rh_paie/views_m9a.py:30
+msgid "Valeur confirmée : créer une nouvelle version datée."
+msgstr "Confirmed value: create a new dated version."
+
+# ── stocks : messages API et exports (lot a6) ──
+
+#: stocks/cloture.py:37
+msgid "La période n'est pas encore commencée."
+msgstr "The period has not started yet."
+
+#: stocks/models.py:199
+msgid "La quantité brute ne peut être négative."
+msgstr "The gross quantity cannot be negative."
+
+#: stocks/models.py:289
+msgid "N° de certificat requis."
+msgstr "Certificate number required."
+
+#: stocks/models.py:465
+msgid "Le prix unitaire ne peut être négatif."
+msgstr "The unit price cannot be negative."
+
+#: stocks/models.py:468
+msgid "Le mouvement doit avoir au moins un dépôt source ou destination."
+msgstr "The movement must have at least a source or destination warehouse."
+
+#: stocks/models.py:472
+msgid "Un transfert exige un dépôt source ET destination."
+msgstr "A transfer requires a source AND a destination warehouse."
+
+#: stocks/models.py:477
+msgid "Mouvement exécuté : suppression interdite (passez un mouvement inverse)."
+msgstr "Movement executed: deletion not allowed (post a reverse movement)."
+
+#: stocks/models.py:610
+msgid "La quantité réelle ne peut être négative."
+msgstr "The actual quantity cannot be negative."
+
+#: stocks/models.py:646
+msgid "Périodicité et nombre d'articles par passage doivent être positifs."
+msgstr "Frequency and number of items per count must be positive."
+
+#: stocks/reservations.py:98
+msgid "Réservation déjà soldée ou libérée."
+msgstr "Reservation already settled or released."
+
+#: stocks/services.py:318
+msgid "Des lignes de l'inventaire n'ont pas encore été comptées : clôture impossible."
+msgstr "Some inventory lines have not been counted yet: closing not possible."
+
+#: stocks/services.py:474
+msgid "Lot obligatoire pour cet article (traçabilité client pétrolier) : renseigner le lot."
+msgstr "Batch required for this item (oil client traceability): enter the batch."
+
+#: stocks/views.py:114
+msgid "Lot mouvementé ou certifié : conservé au registre, suppression interdite."
+msgstr "Batch moved or certified: kept in the register, deletion not allowed."
+
+#: stocks/views.py:124
+msgid "Motif de quarantaine requis."
+msgstr "Quarantine reason required."
+
+#: stocks/views.py:126
+msgid "Lot déjà en quarantaine."
+msgstr "Batch already in quarantine."
+
+#: stocks/views.py:135
+msgid "Le lot n'est pas en quarantaine."
+msgstr "The batch is not in quarantine."
+
+#: stocks/views.py:173
+msgid "Certificat validé : pièce scellée, non modifiable."
+msgstr "Certificate validated: record sealed, cannot be changed."
+
+#: stocks/views.py:178
+msgid "Certificat validé ou numérisé : conservé (traçabilité 10 ans)."
+msgstr "Certificate validated or scanned: retained (10-year traceability)."
+
+#: stocks/views.py:187
+msgid "Certificat déjà validé."
+msgstr "Certificate already validated."
+
+#: stocks/views.py:203
+msgid "Un document est déjà joint à ce certificat."
+msgstr "A document is already attached to this certificate."
+
+#: stocks/views.py:265
+msgid "Bon de sortie : consommation ou transfert seulement."
+msgstr "Issue note: consumption or transfer only."
+
+#: stocks/views.py:276
+msgid "Une pièce est déjà jointe à ce mouvement."
+msgstr "A document is already attached to this movement."
+
+#: stocks/views.py:297
+msgid "Paramètre `article` ou `lot` requis."
+msgstr "Parameter `article` or `lot` required."
+
+#: stocks/views.py:335
+msgid "Paramètres `depot` et `article` (identifiants) requis."
+msgstr "Parameters `depot` and `article` (identifiers) required."
+
+#: stocks/views.py:386
+msgid "Inventaire clôturé ou annulé : comptage impossible."
+msgstr "Inventory closed or cancelled: counting not possible."
+
+#: stocks/views.py:389
+msgid "Liste des lignes comptées attendue."
+msgstr "List of counted lines expected."
+
+#: stocks/views.py:410
+msgid "Validation réservée à la direction des opérations, à la finance et au-dessus."
+msgstr "Validation reserved for operations management, finance and above."
+
+#: stocks/views.py:414
+msgid "Inventaire clôturé ou annulé."
+msgstr "Inventory closed or cancelled."
+
+#: stocks/views.py:416
+msgid "Comptage incomplet : validation impossible."
+msgstr "Incomplete count: validation not possible."
+
+#: stocks/views.py:468
+msgid "Aucun article en stock dans ce dépôt."
+msgstr "No item in stock in this warehouse."
+
+#: stocks/views.py:88
+msgid "Booléen attendu."
+msgstr "Boolean expected."
+
+#: stocks/views.py:94
+msgid "Fichier requis (PDF ou image)."
+msgstr "File required (PDF or image)."
+
+#: stocks/views.py:96
+msgid "Fichier trop volumineux (15 Mo maximum)."
+msgstr "File too large (15 MB maximum)."
+
+# ── users : messages API et exports (lot a6) ──
+
+#: users/authentication.py:18
+msgid "Changement de mot de passe obligatoire avant de continuer."
+msgstr "Password change required before continuing."
+
+#: users/models.py:147
+msgid "Journal des accès inaltérable : aucune modification."
+msgstr "Tamper-proof access log: no changes."
+
+#: users/models.py:151
+msgid "Journal des accès inaltérable : aucune suppression."
+msgstr "Tamper-proof access log: no deletion."
+
+#: users/models.py:17
+msgid "L'adresse email est obligatoire"
+msgstr "The email address is required"
+
+#: users/motdepasse.py:109
+msgid "Mot de passe actuel incorrect."
+msgstr "Current password incorrect."
+
+#: users/motdepasse.py:112
+msgid "Le nouveau mot de passe doit être différent de l'actuel."
+msgstr "The new password must be different from the current one."
+
+#: users/motdepasse.py:117
+msgid "Mot de passe modifié. Les autres sessions sont déconnectées."
+msgstr "Password changed. Other sessions have been signed out."
+
+#: users/motdepasse.py:171
+msgid "Lien invalide, expiré ou déjà utilisé : refaites une demande."
+msgstr "Invalid, expired or already used link: please request a new one."
+
+#: users/motdepasse.py:178
+msgid "Mot de passe réinitialisé : connectez-vous avec le nouveau mot de passe."
+msgstr "Password reset: sign in with the new password."
+
+#: users/motdepasse.py:34
+msgid "Si un compte actif correspond à cette adresse, un lien de réinitialisation vient d'être envoyé."
+msgstr "If an active account matches this address, a reset link has just been sent."
+
+#: users/motdepasse.py:36
+msgid "L'envoi de courriels n'est pas encore configuré : contactez votre administrateur, qui réinitialisera votre mot de passe (vous le changerez à la connexion)."
+msgstr "Email sending is not configured yet: contact your administrator, who will reset your password (you will change it at sign-in)."
+
+#: users/motdepasse.py:82
+msgid "Nouveau mot de passe obligatoire."
+msgstr "New password required."
+
+#: users/motdepasse.py:84
+msgid "La confirmation ne correspond pas au nouveau mot de passe."
+msgstr "The confirmation does not match the new password."
+
+#: users/parametres.py:102
+msgid "Valeur texte obligatoire."
+msgstr "Text value required."
+
+#: users/parametres.py:70
+msgid "Paramètres transverses : modification réservée à l'administrateur et à la Direction Générale."
+msgstr "Cross-functional settings: changes reserved for the administrator and General Management."
+
+#: users/serializers.py:72
+msgid "Vous ne pouvez pas désactiver votre propre compte."
+msgstr "You cannot deactivate your own account."
+
+#: users/serializers.py:74
+msgid "Vous ne pouvez pas modifier votre propre rôle."
+msgstr "You cannot change your own role."
+
+#: users/views.py:166
+msgid "Email"
+msgstr "Email"
+
+#: users/views.py:166
+msgid "Nom"
+msgstr "Name"
+
+#: users/views.py:166
+msgid "Rôle"
+msgstr "Role"
+
+#: users/views.py:166
+msgid "Actif"
+msgstr "Active"
+
+#: users/views.py:166
+msgid "MFA activée"
+msgstr "MFA enabled"
+
+#: users/views.py:167
+msgid "Modules lisibles"
+msgstr "Readable modules"
+
+#: users/views.py:167
+msgid "Dernière connexion"
+msgstr "Last sign-in"
+
+#: users/views.py:172
+msgid "Utilisateurs et droits ETSL"
+msgstr "ETSL users and access rights"
+
+#: users/views.py:176
+msgid "Vous ne pouvez pas supprimer votre propre compte."
+msgstr "You cannot delete your own account."
+
+#: users/views.py:83
+msgid "Jeton MFA invalide ou expiré : reconnectez-vous."
+msgstr "Invalid or expired MFA token: sign in again."
+
+#: users/views.py:94
+msgid "MFA déjà activée pour ce compte."
+msgstr "MFA already enabled for this account."
+
+# ── workflow : messages API et exports (lot a6) ──
+
+#: workflow/models.py:201
+msgid "On ne se délègue pas à soi-même."
+msgstr "You cannot delegate to yourself."
+
+#: workflow/models.py:205
+msgid "Le délégataire doit être un compte actif."
+msgstr "The delegate must be an active account."
+
+#: workflow/models.py:212
+msgid "Une délégation de ce titulaire couvre déjà cette période."
+msgstr "A delegation from this holder already covers this period."
+
+#: workflow/serializers.py:155
+msgid "Aucun compte actif avec cette adresse."
+msgstr "No active account with this address."
+
+#: workflow/serializers.py:158
+msgid "Délégataire obligatoire."
+msgstr "Delegate required."
+
+#: workflow/serializers.py:36
+msgid "Le code d'un circuit ne se modifie pas (types de documents liés)."
+msgstr "The code of a workflow cannot be changed (linked document types)."
+
+#: workflow/serializers.py:38
+msgid "Ce code de circuit existe déjà."
+msgstr "This workflow code already exists."
+
+#: workflow/serializers.py:43
+msgid "Délai attendu entre 1 et 365 jours."
+msgstr "Lead time expected between 1 and 365 days."
+
+#: workflow/services.py:100
+msgid "Cette tâche n'est pas en attente."
+msgstr "This task is not pending."
+
+#: workflow/services.py:117
+msgid "Document officiel : signature avancée achevée sur la version courante requise avant archivage."
+msgstr "Official document: a completed advanced signature on the current version is required before archiving."
+
+#: workflow/services.py:134
+msgid "Le motif de rejet est obligatoire (RF-39)."
+msgstr "A rejection reason is required (RF-39)."
+
+#: workflow/services.py:156
+msgid "Seule une tâche en attente peut être déléguée."
+msgstr "Only a pending task can be delegated."
+
+#: workflow/services.py:159
+msgid "L'utilisateur destinataire est obligatoire."
+msgstr "The recipient user is required."
+
+#: workflow/services.py:73
+msgid "Seul un document brouillon peut être soumis au circuit."
+msgstr "Only a draft document can be submitted to the workflow."
+
+#: workflow/services.py:80
+msgid "Aucun circuit de validation n'est configuré."
+msgstr "No validation workflow is configured."
+
+#: workflow/views.py:124
+msgid "« haut » ou « bas » attendu."
+msgstr "\"haut\" or \"bas\" expected."
+
+#: workflow/views.py:150
+msgid "Étape déjà utilisée par des tâches : modifiez-la plutôt que la retirer."
+msgstr "Step already used by tasks: edit it rather than removing it."
+
+#: workflow/views.py:152
+msgid "Un circuit garde au moins une étape."
+msgstr "A workflow keeps at least one step."
+
+#: workflow/views.py:165
+msgid "Modification des circuits réservée à l'administrateur et à la Direction Générale."
+msgstr "Changes to workflows are reserved for the administrator and General Management."
+
+#: workflow/views.py:210
+msgid "Réservé à l'administration."
+msgstr "Reserved for administration."
+
+#: workflow/views.py:236
+msgid "Vous n'avez pas le droit de soumettre ce document."
+msgstr "You are not allowed to submit this document."
+
+#: workflow/views.py:275
+msgid "Circuit terminé, document archivé."
+msgstr "Workflow completed, document archived."
+
+#: workflow/views.py:302
+msgid "Document rejeté."
+msgstr "Document rejected."
+
+#: workflow/views.py:314
+msgid "Utilisateur introuvable."
+msgstr "User not found."
+
+#: workflow/views.py:404
+msgid "Seul le titulaire ou l'administrateur annule une délégation."
+msgstr "Only the holder or the administrator can cancel a delegation."
+
+#: workflow/views.py:406
+msgid "Délégation déjà annulée."
+msgstr "Delegation already cancelled."
+
+#: workflow/views.py:65
+msgid "Étape inconnue pour ce circuit."
+msgstr "Unknown step for this workflow."
+
+#: workflow/views.py:73
+msgid "Nom de l'étape obligatoire."
+msgstr "Step name required."
+
+#: workflow/views.py:78
+msgid "Rôle inconnu."
+msgstr "Unknown role."
+
+#: workflow/views.py:84
+msgid "Nombre de jours entier attendu."
+msgstr "Integer number of days expected."
