@@ -7,6 +7,9 @@ import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, Kpi, QuickForm, SectionCard } from "../ui";
 
+/** Code de rôle → libellé lisible (« chef_atelier » → « Chef atelier »). */
+const roleLisible = (r: string) => (r ? r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, " ") : "");
+
 interface Utilisateur {
   id: string;
   nom: string;
@@ -119,7 +122,7 @@ export function SystemeQualiteSection() {
     retry: 0,
   }).data ?? [];
   const processus = useListe<Processus>("processus", "/api/qualite/processus/");
-  const userOpts = utilisateurs.map((u) => ({ value: u.id, label: `${u.nom} · ${u.role}` }));
+  const userOpts = utilisateurs.map((u) => ({ value: u.id, label: `${u.nom} · ${roleLisible(u.role)}` }));
   const procOpts = processus.map((p) => ({ value: p.id, label: `${p.code} · ${p.libelle}` }));
   return (
     <>

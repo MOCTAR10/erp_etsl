@@ -108,8 +108,8 @@
     margin-bottom: var(--space-4);
   }
   .filter-bar-search {
-    flex: 1 1 280px;
-    max-width: 360px;
+    flex: 1 1 240px;
+    max-width: 320px;
     min-width: 0;
   }
   .filter-bar-search .search-field,
@@ -126,11 +126,11 @@
     padding-left: 34px;
   }
   .filter-bar-item {
-    flex: 0 1 190px;
-    min-width: 150px;
+    flex: 0 1 180px;
+    min-width: 140px;
   }
   .filter-bar-item--date {
-    flex-basis: 230px;
+    flex-basis: 210px;
   }
   .filter-bar :is(select, input).filter-control,
   .param-toolbar select.filter-control {
@@ -198,7 +198,13 @@
   }
 
   /* ── GED ── */
+  /* la 1re colonne de DataGrid est en nowrap (primitives) : on rétablit le retour à la ligne */
+  .ged-title,
+  .param-cell {
+    white-space: normal;
+  }
   .ged-title {
+    min-width: 220px;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -380,6 +386,7 @@
   /* ── Paramètres ETSL ── */
   .param-banner { margin-bottom: var(--space-5); }
   .param-banner > svg { color: var(--warn-text); }
+  .param-banner .banner-body { flex-direction: column; align-items: flex-start; }
   .param-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -429,7 +436,6 @@
     align-items: center;
     gap: var(--space-3);
   }
-  .param-progress { width: 120px; }
   .param-cell {
     display: flex;
     flex-direction: column;
@@ -453,9 +459,9 @@
     font-family: var(--font-mono);
     font-size: var(--fs-2xs);
     color: var(--text-muted);
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
-  .param-value { overflow-wrap: anywhere; }
+  .param-value { display: inline-block; min-width: 9ch; overflow-wrap: break-word; }
   .param-value.is-json .num {
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
@@ -501,7 +507,7 @@
   .param-edit-meta dd {
     margin: 0;
     text-align: right;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     min-width: 0;
   }
   .param-edit-meta code {
@@ -518,7 +524,6 @@
     color: var(--text-muted);
   }
   @media (max-width: 700px) {
-    .param-group-side .param-progress { display: none; }
     .param-toolbar select.filter-control { flex: 1 1 100%; }
     .segmented { width: 100%; }
     .segmented button { flex: 1; }

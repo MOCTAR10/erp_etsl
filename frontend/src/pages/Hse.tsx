@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
-import { formatDate } from "../lib/format";
+import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   IndicateursHse,
@@ -350,8 +350,8 @@ export function HsePage() {
         <Kpi label={t("hse.epiRenouveler")} value={s.epi_a_renouveler} hint={`${t("hse.formationsPrevues")} · ${s.formations_prevues} · ${t("hse.bsdAttente")} · ${s.bsd_en_attente}`} icon={Activity} tone="warn" delay={0.15} />
         <Kpi
           label={t("hse.trir")}
-          value={frequence.data?.trir ?? "—"}
-          hint={`LTIR ${frequence.data?.ltir ?? "—"} · LTIFR ${frequence.data?.ltifr ?? "—"} · ${t("hse.joursPerdus")} ${frequence.data?.jours_perdus ?? 0}`}
+          value={frequence.data ? formatNumber(frequence.data.trir, { decimals: 2 }) : "—"}
+          hint={`LTIR ${formatNumber(frequence.data?.ltir, { decimals: 2 })} · LTIFR ${formatNumber(frequence.data?.ltifr, { decimals: 2 })} · ${t("hse.joursPerdus")} ${frequence.data?.jours_perdus ?? 0}`}
           icon={Gauge}
           tone="brand"
           delay={0.2}

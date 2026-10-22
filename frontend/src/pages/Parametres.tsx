@@ -14,7 +14,6 @@ import {
   KpiGridSkeleton,
   notify,
   PageHeader,
-  ProgressBar,
   SearchField,
   SectionCard,
   Sheet,
@@ -335,13 +334,6 @@ export function ParametresPage() {
               subtitle={t("formulaires.parametres.compte", { count: g.rows.length, provisoires: nbProv })}
               actions={
                 <div className="param-group-side">
-                  <ProgressBar
-                    value={g.rows.length - nbProv}
-                    max={g.rows.length}
-                    tone={nbProv ? "warn" : "ok"}
-                    label={t("formulaires.parametres.avancement", { label: g.label })}
-                    className="param-progress"
-                  />
                   {ecran ? (
                     <button type="button" className="btn ghost sm" onClick={() => navigate(ecran)}>
                       <ExternalLink size={14} aria-hidden="true" /> {t("formulaires.parametres.ouvrirModule")}
