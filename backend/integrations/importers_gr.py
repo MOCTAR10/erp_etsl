@@ -156,7 +156,7 @@ GABARITS_GR = [
         C("location", True, "Code de la prestation GR", "LGR-0001"), C("numero", True, "N° de facture GR", "FGR-2026-0412"),
         C("date", True, "Date de facture AAAA-MM-JJ", "2026-11-30"), C("montant_ht", True, "Montant HT", "4500000"),
     ], _gr_factures, cercle="compta",
-        note=NOTE_D25 + "Facture fournisseur créée sur le BC GLOBAL RENTAL de la prestation (tiers is_global_rental, "
+        note=NOTE_D25 + "Facture fournisseur créée sur le BC GLOBAL RENTAL de la prestation (tiers marqué GLOBAL RENTAL, "
                         "compte 618), rapprochée du montant attendu (tolérance paramétrée) ; comptabilisation par le "
                         "circuit habituel des Achats / de la Comptabilité."),
 ]

@@ -1958,12 +1958,12 @@ msgid "wpqr_support ne concerne qu'un WPS."
 msgstr "wpqr_support only applies to a WPS."
 
 #: integrations/importers_migration.py:505
-msgid "affaire GLOBAL RENTAL : le client doit être un tiers is_global_rental (compte 618)."
-msgstr "GLOBAL RENTAL project: the customer must be an is_global_rental third party (account 618)."
+msgid "affaire GLOBAL RENTAL : le client doit être un tiers marqué GLOBAL RENTAL (compte 618)."
+msgstr "GLOBAL RENTAL project: the customer must be a third party flagged GLOBAL RENTAL (account 618)."
 
 #: integrations/importers_migration.py:546
-msgid "contrat GLOBAL RENTAL : le client doit être un tiers is_global_rental (compte 618)."
-msgstr "GLOBAL RENTAL contract: the customer must be an is_global_rental third party (account 618)."
+msgid "contrat GLOBAL RENTAL : le client doit être un tiers marqué GLOBAL RENTAL (compte 618)."
+msgstr "GLOBAL RENTAL contract: the customer must be a third party flagged GLOBAL RENTAL (account 618)."
 
 #: integrations/importers_migration.py:592
 msgid "quantite doit être strictement positive."
@@ -4855,8 +4855,8 @@ msgstr "Invalid API key."
 msgid "date_validite antérieure à date_obtention."
 msgstr "date_validite earlier than date_obtention."
 
-msgid "équipement GLOBAL RENTAL : le propriétaire doit être un tiers is_global_rental (compte 618)."
-msgstr "GLOBAL RENTAL equipment: the owner must be an is_global_rental third party (account 618)."
+msgid "équipement GLOBAL RENTAL : le propriétaire doit être un tiers marqué GLOBAL RENTAL (compte 618)."
+msgstr "GLOBAL RENTAL equipment: the owner must be a third party flagged GLOBAL RENTAL (account 618)."
 
 msgid "date_releve obligatoire quand compteur est renseigné."
 msgstr "date_releve required when compteur is filled in."
