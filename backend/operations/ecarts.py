@@ -40,8 +40,15 @@ PARAMETRES_OPERATIONS_DEFAUT = {
         "1", "0 / 1"),
     "RECU_CLIENT_OBLIGATOIRE": (
         "Facturation d'une situation : 1 = reçu client obligatoire avant facturation, 0 = facultatif", "0", "0 / 1"),
+    # Lot a3 (hors ligne, CL-OM-08) : périmètre provisoire = toutes les saisies terrain du CDC.
+    "TERRAIN_DELAI_SYNCHRO_JOURS": (
+        "Hors ligne : une saisie synchronisée plus de N jours après sa saisie est mise en conflit (0 = sans limite)",
+        "7", "jours"),
+    "TERRAIN_DOUBLON_CONFLIT": (
+        "Hors ligne : 1 = un pointage identique (OF, opérateur, jour, heures) déjà au serveur est mis en conflit, "
+        "0 = accepté", "1", "0 / 1"),
 }
-PARAMETRES_BOOLEENS = ("MULTI_AFFAIRES_ACTIF", "RECU_CLIENT_OBLIGATOIRE")
+PARAMETRES_BOOLEENS = ("MULTI_AFFAIRES_ACTIF", "RECU_CLIENT_OBLIGATOIRE", "TERRAIN_DOUBLON_CONFLIT")
 ACTIFS = (OrdreFabrication.Status.PREVU, OrdreFabrication.Status.LANCE, OrdreFabrication.Status.EN_COURS)
 CLOS = (OrdreFabrication.Status.CLOTURE, OrdreFabrication.Status.ANNULE)
 ZERO = Decimal("0")

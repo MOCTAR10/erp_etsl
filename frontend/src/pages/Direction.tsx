@@ -23,6 +23,7 @@ import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { api } from "../api/client";
+import { EcartsA4Section } from "../components/direction/EcartsA4Section";
 import { EcartsCdSection } from "../components/direction/EcartsCdSection";
 import { CubesSection } from "../components/workflow/CubesSection";
 import { ChartCard, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, ProgressBar, SectionTitle, Sparkline } from "../components/ui";
@@ -320,6 +321,7 @@ function DirectionInner() {
       <CubesSection />
 
       <EcartsCdSection />
+      <EcartsA4Section />
 
       <section id="echeances">
         <SectionTitle>{`${t("direction.alertes")} · ${a.total}`}</SectionTitle>

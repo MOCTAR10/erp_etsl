@@ -1,0 +1,9 @@
+{
+  "_statut": "provisoire — à confirmer ou modifier par ETSL (CDC §8.2, CL-OM-01)",
+  "volumetrie": {"salaries": 400, "affaires": 80, "ecritures_mois": 15000, "utilisateurs_simultanes": 25},
+  "consultation_p95_ms": 3000,
+  "taux_erreur_max_pct": 1,
+  "traitement_lourd_s": 30,
+  "paie_complete_s": 1800,
+  "bulletins_pdf_s": 900
+}

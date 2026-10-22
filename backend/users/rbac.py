@@ -102,6 +102,7 @@ ROLE_MODULES: dict[str, tuple[str, ...]] = {
         "maintenance",
         "operations",
         "stocks",
+        "qualite",  # coût de non-qualité : comptabilisation (CNQ_VALIDATION_ROLES, lot a3)
     ),
     _R.COMPTABLE: (
         "comptabilite",
@@ -114,6 +115,7 @@ ROLE_MODULES: dict[str, tuple[str, ...]] = {
         "maintenance",
         "operations",
         "stocks",
+        "qualite",  # coût de non-qualité : comptabilisation (CNQ_VALIDATION_ROLES, lot a3)
     ),
     _R.QAQC: ("qualite", "operations", "achats"),
     _R.HSE: ("hse", "operations", "qualite", "maintenance", "achats"),
@@ -144,6 +146,31 @@ ROLE_MODULES: dict[str, tuple[str, ...]] = {
         "achats",
         "hse",
         "logistique",
+        "rh_paie",
+    ),
+    # — Consommateurs de la Couche D (écarts a4). Lecture seule : aucun tuple d'écriture des modules ne les cite
+    #   encore (à ouvrir par chaque module si ETSL le demande). Périmètre PROVISOIRE, à confirmer par ETSL.
+    # Chargé d'affaires : suit ses affaires de l'offre à la livraison (M1 pipe / contrats, M3 OF, M2 achats de
+    # l'affaire, M4 parc mobilisé, M6 qualité livrée, M12 contrats) ; montants selon les cercles de chaque module.
+    _R.CHARGE_AFFAIRES: (
+        "commercial",
+        "operations",
+        "achats",
+        "logistique",
+        "qualite",
+        "juridique",
+    ),
+    # Contrôleur de gestion : M11 (budgets, marges, clôture de gestion) et ses sources de coûts (M10, M1, M2, M3,
+    # M4, M5, M8, M9 — salaires masqués hors `CanManagePaie`).
+    _R.CONTROLEUR_GESTION: (
+        "controle_gestion",
+        "comptabilite",
+        "commercial",
+        "achats",
+        "operations",
+        "logistique",
+        "stocks",
+        "maintenance",
         "rh_paie",
     ),
     # Rôle hérité « Direction » : présent dans les 12 tuples d'écriture, il

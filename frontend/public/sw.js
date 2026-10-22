@@ -10,7 +10,7 @@
  * Le cache d'API est vidé à la déconnexion (message `clear-api-cache`) : une session suivante sur le même
  * téléphone ne retrouve pas les données du précédent utilisateur.
  */
-const VERSION = "v1";
+const VERSION = "v2"; // v2 (lot a3) : cache descendant étendu
 const SHELL_CACHE = `etls-shell-${VERSION}`;
 const ASSET_CACHE = `etls-assets-${VERSION}`;
 const API_CACHE = `etls-api-${VERSION}`;
@@ -27,6 +27,10 @@ const API_WHITELIST = [
   /\/api\/hse\/fiches-securite\/$/, // fiches sécurité publiées (CDC M7-08), lecture seule
   /\/api\/qualite\/controles\/$/,
   /\/api\/rh-paie\/mon-espace\/profil\/$/,
+  // Lot a3 : cache descendant étendu (lots / dépôts / lots sortis sur OF : traçabilité matière sur le terrain)
+  /\/api\/stocks\/lots\/$/,
+  /\/api\/stocks\/depots\/$/,
+  /\/api\/qualite\/joints\/lots-consommes\/$/,
 ];
 
 self.addEventListener("install", (event) => {

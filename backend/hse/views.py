@@ -92,11 +92,19 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
             return [CanManageHse()]
         return super().get_permissions()
 
+    @idempotent
+    def create(self, request, *args, **kwargs):  # demande de permis saisie sur le terrain, rejouable (hors ligne)
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         # Le demandeur est toujours l'auteur de la demande : sinon la séparation des tâches (le demandeur ne valide
         # pas son propre permis) se contourne en créant le permis « au nom » d'un collègue.
         from .services import notifier_niveau_suivant
 
+        if saisi_le := serializer.validated_data.get("saisi_le"):  # demande saisie hors ligne (CL-OM-08)
+            from operations.terrain_a3 import controler_synchro
+
+            controler_synchro(saisi_le, self.request, None, "Demande de permis")
         permis = serializer.save(demandeur=self.request.user)
         notifier_niveau_suivant(permis)
         if permis.site_gr:
@@ -270,9 +278,19 @@ class PermisTravailViewSet(viewsets.ModelViewSet):
                 {"detail": "Résultat attendu : conforme ou non_conforme."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        from operations.terrain_a3 import ConflitSaisie, as_bool, controler_synchro, saisi_le_input
+
+        saisi_le = saisi_le_input(request.data.get("saisi_le"))
+        if saisi_le is not None:  # mesure faite hors ligne : horodatée à la saisie, pas à la synchronisation
+            controler_synchro(saisi_le, request, None, "Test gaz")
+            if permis.test_gaz_date and permis.test_gaz_date > saisi_le and not as_bool(request.data.get("forcer")):
+                raise ConflitSaisie(
+                    f"Un test gaz plus récent ({timezone.localtime(permis.test_gaz_date):%d/%m/%Y %H:%M}) est déjà "
+                    "enregistré : forcer pour le remplacer, ou abandonner."
+                )
         permis.test_gaz_resultat = resultat
         permis.test_gaz_valeur = str(request.data.get("valeur", ""))[:120]
-        permis.test_gaz_date = timezone.now()
+        permis.test_gaz_date = saisi_le or timezone.now()
         permis.test_gaz_par = request.user
         if resultat == "non_conforme" and permis.statut == PermisTravail.Statut.ACTIF:
             permis.statut = PermisTravail.Statut.VALIDE
@@ -366,7 +384,15 @@ class IncidentViewSet(viewsets.ModelViewSet):
     search_fields = ("code", "lieu",)
     permission_classes = [CanManageHse]
 
+    @idempotent
+    def create(self, request, *args, **kwargs):  # signalement terrain rejouable (hors ligne)
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
+        if saisi_le := serializer.validated_data.get("saisi_le"):  # signalement saisi hors ligne (CL-OM-08)
+            from operations.terrain_a3 import controler_synchro
+
+            controler_synchro(saisi_le, self.request, None, "Signalement")
         incident = serializer.save(declared_by=self.request.user)
         escalader_si_grave(incident)
         if incident.zone == "site_gr":

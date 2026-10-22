@@ -51,6 +51,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         LOGISTIQUE = "logistique", "Logistique & Magasin"
         MAINTENANCE = "maintenance", "Maintenance"
         CHEF_ATELIER = "chef_atelier", "Chef d'atelier / chantier"
+        # Consommateurs de la Couche D (CDC : DG, DAF, CG, responsable projet, chargé d'affaires).
+        CHARGE_AFFAIRES = "charge_affaires", "Chargé d'affaires"
+        CONTROLEUR_GESTION = "controleur_gestion", "Contrôleur de gestion"
         # Codes hérités (rétro-compatibilité des données existantes).
         DIRECTION = "direction", "Direction (hérité)"
         CHEF_SERVICE = "chef_service", "Chef de service (hérité)"

@@ -167,12 +167,18 @@ class PointageChantierSerializer(ModelCleanMixin, serializers.ModelSerializer):
             "status_label",
             "validated_by",
             "validated_at",
+            "saisi_le",
             "saisie_temps",
             "created_by",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "code", "status", "validated_by", "validated_at", "saisie_temps", "created_by", "created_at", "updated_at"]
+
+    def validate_saisi_le(self, value):
+        from .terrain_a3 import verifier_saisi_le
+
+        return verifier_saisi_le(value)
 
     def validate(self, attrs):
         # `clean()` du modèle n'est pas appelé par DRF : sans cela un pointage à 0 h ou sans opérateur passait.

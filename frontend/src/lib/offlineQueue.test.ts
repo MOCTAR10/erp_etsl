@@ -136,4 +136,55 @@ describe("file d'attente hors-ligne", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(seen.length).toBeGreaterThan(0);
   });
+
+  it("un conflit (409) est signalé puis levé par « Forcer » (même clé, drapeau force)", async () => {
+    const vus: QueuedRequest[] = [];
+    const { q, add } = make(async (i) => {
+      vus.push(i);
+      if (!i.force) throw new HttpError(409, { detail: "Pointage identique déjà enregistré (doublon probable)" });
+    });
+    const item = await add("a");
+    const r = await q.flush("u1");
+    expect(r).toMatchObject({ sent: 0, failed: 0, conflicts: 1, stopped: false });
+    const [c] = await q.list("u1");
+    expect(c.status).toBe("conflict");
+    expect(c.error).toContain("doublon");
+    await q.force(item.id);
+    expect((await q.flush("u1")).sent).toBe(1);
+    expect(vus[0].key).toBe(vus[1].key);
+    expect(q.lastSyncAt()).not.toBeNull();
+  });
+
+  it("une photo attend la saisie parente puis reçoit son identifiant ({ref})", async () => {
+    const envoyes: { path: string; body: unknown }[] = [];
+    const q = createQueue(memoryStorage(), async (i) => {
+      envoyes.push({ path: i.path, body: i.body });
+      return i.path === "/api/hse/permis/" ? { id: "P-42" } : {};
+    });
+    const parent = await q.enqueue({ owner: "u1", path: "/api/hse/permis/", body: { emplacement: "Rack" }, label: "permis" });
+    await q.enqueue({
+      owner: "u1", path: "/api/hse/permis/{ref}/joindre-photo/", body: { legende: "zone" }, label: "photo",
+      dependsOn: parent.key, files: [{ field: "fichier", name: "zone.jpg", type: "image/jpeg", blob: new Blob(["x"]) }],
+    });
+    await q.enqueue({ owner: "u1", path: "/api/qualite/images-controle/", body: { controle: "{ref}" }, label: "img",
+      dependsOn: parent.key });
+    const r = await q.flush("u1");
+    expect(r.sent).toBe(3);
+    expect(envoyes[1].path).toBe("/api/hse/permis/P-42/joindre-photo/");
+    expect(envoyes[2].body).toEqual({ controle: "P-42" });
+  });
+
+  it("la photo d'une saisie en échec attend ; abandonner la saisie abandonne sa photo", async () => {
+    const q = createQueue(memoryStorage(), async (i) => {
+      if (i.label === "permis") throw new HttpError(400, { detail: "refus" });
+    });
+    const parent = await q.enqueue({ owner: "u1", path: "/api/hse/permis/", body: {}, label: "permis" });
+    await q.enqueue({ owner: "u1", path: "/api/hse/permis/{ref}/joindre-photo/", body: {}, label: "photo",
+      dependsOn: parent.key });
+    const r = await q.flush("u1");
+    expect(r).toMatchObject({ sent: 0, failed: 1, remaining: 2 });
+    expect((await q.list("u1"))[1].status).toBe("pending");
+    await q.discard(parent.id);
+    expect(await q.list("u1")).toHaveLength(0);
+  });
 });

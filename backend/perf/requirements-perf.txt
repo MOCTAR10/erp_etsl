@@ -1,0 +1,3 @@
+# Outils de la campagne de performance (backend/perf/) — HORS image Docker et hors requirements*.lock :
+# installé uniquement par le job `perf` de regression.yml (nocturne / manuel, non bloquant).
+locust==2.32.4

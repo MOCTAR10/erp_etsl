@@ -12,6 +12,7 @@ from .views import (
     CubeAlimenterView,
     CubeArchiveViewSet,
     CubeView,
+    EtatCoucheDView,
     DashboardDirectionView,
     ParametreCubeViewSet,
     ReportingPetrolierView,
@@ -32,6 +33,7 @@ urlpatterns = [
     path("pilotage/", PilotageDirectionView.as_view(), name="analytics-pilotage"),
     path("pilotage/controler-seuils/", ControlerSeuilsView.as_view(), name="analytics-controler-seuils"),
     path("alertes-calendaires/", AlertesCalendairesView.as_view(), name="analytics-alertes-calendaires"),
+    path("etat-bi/", EtatCoucheDView.as_view(), name="analytics-etat-bi"),
     path("cubes/alimenter/", CubeAlimenterView.as_view(), name="analytics-cube-alimenter"),
     path("", include(router.urls)),
 ]

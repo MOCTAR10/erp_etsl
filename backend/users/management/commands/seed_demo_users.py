@@ -25,6 +25,9 @@ class Command(BaseCommand):
         ("logistique@etls.local", "Logistique", "Magasin", User.Role.LOGISTIQUE, False),
         ("maintenance@etls.local", "Maintenance", "ETSL", User.Role.MAINTENANCE, False),
         ("atelier@etls.local", "Chef", "Atelier", User.Role.CHEF_ATELIER, False),
+        # Consommateurs Couche D (écarts a4)
+        ("affaires@etls.local", "Chargé", "Affaires", User.Role.CHARGE_AFFAIRES, False),
+        ("cg@etls.local", "Contrôleur", "Gestion", User.Role.CONTROLEUR_GESTION, False),
         # Codes hérités (rétro-compatibilité de la matrice RBAC)
         ("direction@etls.local", "Direction", "ETSL", User.Role.DIRECTION, False),
         ("service@etls.local", "Chef", "Service", User.Role.CHEF_SERVICE, False),
