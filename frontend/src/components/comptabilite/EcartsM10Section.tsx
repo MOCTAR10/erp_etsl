@@ -6,8 +6,9 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
 
 interface Colonne {
   key: string;
@@ -113,6 +114,21 @@ type LigneGr =
   | { id: string; kind: "a"; ref: string; code: string; equipement: string; affaire: string | null; date: string | null; montant: string | null }
   | { id: string; kind: "e"; numero: string; location: string; libelle: string; date: string; montant: string | null };
 
+/** Paramètres d'un gabarit lisibles : la note en clair, puis « Seuil : 0 · Comptes : 632, 622 » (jamais de JSON brut). */
+function parametresLisibles(p: Record<string, unknown>, t: (k: string, o?: Record<string, unknown>) => string) {
+  const valeur = (v: unknown): string =>
+    Array.isArray(v) ? v.map(valeur).join(", ") : v !== null && typeof v === "object" ? Object.values(v as object).map(valeur).join(", ") : String(v ?? "—");
+  const autres = Object.entries(p)
+    .filter(([k]) => k !== "note")
+    .map(([k, v]) => `${t(`revueR3.gabarit.${k}`, { defaultValue: k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, " ") })} : ${valeur(v)}`);
+  return (
+    <>
+      {typeof p.note === "string" ? p.note : null}
+      {autres.length > 0 ? <span className="cell-sub">{autres.join(" · ")}</span> : null}
+    </>
+  );
+}
+
 /** Cellule d'état : montants complets en FCFA, lignes de total en gras. */
 function cellule(col: Colonne, l: LigneEtat) {
   const v = l[col.key];
@@ -144,8 +160,11 @@ export function EcartsM10Section() {
     setExportError(null);
     api.download(`${url}&export=${fmt}`, `${code}.${fmt}`).catch((e) => setExportError(describeError(e)));
   };
-  const provisoire = <Badge tone="warn">{t("ecarts_m10.provisoire")}</Badge>;
-  const actionsHeader = <span className="sr-only">{t("ui.actions")}</span>;
+  const provisoire = (
+    <Badge tone="warn" title={t("ecarts_m10.provisoire")}>
+      {t("revueR3.provisoire")}
+    </Badge>
+  );
 
   const colsTreso: Column<Semaine & { id: string }>[] = [
     { key: "semaine", header: t("ecarts_m10.treso.semaine"), render: (r) => `S${r.numero} · ${formatDate(r.semaine)}`, sortValue: (r) => r.numero },
@@ -209,46 +228,40 @@ export function EcartsM10Section() {
     { key: "retour", header: t("ecarts_m10.gr.retour"), render: (l) => formatDate(l.date) },
     { key: "montant", header: t("ecarts_m10.gr.montant"), num: true, render: (l) => fcfa(l.montant) },
     {
-      key: "actions",
-      header: actionsHeader,
-      render: (l) =>
-        l.kind === "a" ? (
-          <ActionBar actions={[{ label: t("ecarts_m10.gr.comptabiliser"), path: `/api/comptabilite/locations-gr/${l.ref}/comptabiliser/`, confirm: t("ecarts_m10.gr.confirm") }]} />
-        ) : (
-          <Badge tone="ok">{l.numero}</Badge>
-        ),
+      key: "ecriture",
+      header: t("ecarts_m10.autof.ecriture"),
+      render: (l) => (l.kind === "e" ? <Badge tone="ok">{l.numero}</Badge> : "—"),
     },
+    actionsColumn<LigneGr>(t("ui.actions"), (l) =>
+      l.kind === "a"
+        ? [{ label: t("ecarts_m10.gr.comptabiliser"), path: `/api/comptabilite/locations-gr/${l.ref}/comptabiliser/`, confirm: t("ecarts_m10.gr.confirm"), tone: "ghost" }]
+        : [],
+    ),
   ];
 
   const colsGabarits: Column<Gabarit>[] = [
     {
       key: "gabarit",
       header: t("ecarts_m10.gabarits.gabarit"),
-      render: (g) => (
-        <>
-          {g.label} {g.est_provisoire ? provisoire : <Badge tone="ok">{t("ecarts_m10.confirme")}</Badge>}
-        </>
-      ),
+      render: (g) => g.label,
+      width: 260,
     },
-    { key: "parametres", header: t("ecarts_m10.gabarits.parametres"), render: (g) => <code>{JSON.stringify(g.parametres)}</code> },
+    { key: "parametres", header: t("ecarts_m10.gabarits.parametres"), render: (g) => parametresLisibles(g.parametres, t) },
     {
-      key: "actions",
-      header: actionsHeader,
-      render: (g) => (
-        <ActionBar
-          actions={[
-            { label: t("ecarts_m10.gabarits.modifier"), path: `/api/comptabilite/gabarits/${g.id}/modifier/`, tone: "ghost", prompt: { name: "parametres", label: t("ecarts_m10.gabarits.prompt") } },
-            ...(g.est_provisoire ? [{ label: t("ecarts_m10.gabarits.confirmer"), path: `/api/comptabilite/gabarits/${g.id}/confirmer/` }] : []),
-          ]}
-        />
-      ),
+      key: "statut",
+      header: t("revueR3.statut"),
+      render: (g) => (g.est_provisoire ? provisoire : <Badge tone="ok">{t("ecarts_m10.confirme")}</Badge>),
     },
+    actionsColumn<Gabarit>(t("ui.actions"), (g) => [
+      ...(g.est_provisoire ? [{ label: t("ecarts_m10.gabarits.confirmer"), path: `/api/comptabilite/gabarits/${g.id}/confirmer/`, tone: "ghost" as const }] : []),
+      { label: t("ecarts_m10.gabarits.modifier"), path: `/api/comptabilite/gabarits/${g.id}/modifier/`, tone: "ghost", prompt: { name: "parametres", label: t("ecarts_m10.gabarits.prompt") } },
+    ]),
   ];
 
   return (
     <>
       <SectionCard title={t("ecarts_m10.etats.title")} subtitle={t("ecarts_m10.etats.subtitle")}>
-        <div className="action-bar-buttons">
+        <div className="r3-toolbar">
           <label className="field">
             <span>{t("ecarts_m10.etats.etat")}</span>
             <select value={code} onChange={(e) => setCode(e.target.value as EtatCode)} aria-label={t("ecarts_m10.etats.etat")}>
@@ -266,14 +279,14 @@ export function EcartsM10Section() {
             </label>
           ) : (
             <>
-              <label className="field">
-                <span>{t("ecarts_m10.etats.du")}</span>
-                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-              </label>
-              <label className="field">
-                <span>{t("ecarts_m10.etats.au")}</span>
-                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-              </label>
+              <div className="field">
+                <label htmlFor="m10-du">{t("ecarts_m10.etats.du")}</label>
+                <DatePicker id="m10-du" value={from} onChange={setFrom} />
+              </div>
+              <div className="field">
+                <label htmlFor="m10-au">{t("ecarts_m10.etats.au")}</label>
+                <DatePicker id="m10-au" value={to} onChange={setTo} />
+              </div>
             </>
           )}
           {code === "grand-livre" && (

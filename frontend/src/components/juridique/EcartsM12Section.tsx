@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatMoney } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
@@ -148,26 +148,45 @@ function useListe<T>(key: string, path: string): T[] {
   return useQuery({ queryKey: ["m12e", key], queryFn: () => api.listAll<T>(path), retry: 0 }).data ?? [];
 }
 
+type Tr = (k: string, o?: Record<string, unknown>) => string;
+
+/** Code de pièce ou de clé (« convention_signee ») → libellé lisible (« Convention signée »), jamais le code brut. */
+function libellePiece(code: string, t: Tr): string {
+  const brut = code.replace(/^_/, "").replace(/_/g, " ");
+  return t(`revueR3.pieces.${code.replace(/^_/, "")}`, { defaultValue: brut.charAt(0).toUpperCase() + brut.slice(1) });
+}
+
+/** Texte serveur rendu lisible : codes de pièces traduits, renvois de module « (M4) » retirés. */
+function texteLisible(texte: string, t: Tr): string {
+  return texte.replace(/\s*\(M\d+\)/g, "").replace(/\b[a-z]+(?:_[a-z0-9]+)+\b/g, (code) => libellePiece(code, t));
+}
+
 function CompletudeCell({ c }: { c: Completude }) {
   const { t } = useTranslation();
   return (
     <>
-      <Badge tone={c.complet ? "ok" : "warn"}>{c.taux_pct} %</Badge>{" "}
-      {c.manquantes.length > 0 && <span className="muted">{t("ecarts_m12.manquantes")} : {c.manquantes.join(", ")}</span>}
+      <Badge tone={c.complet ? "ok" : "warn"}>{formatNumber(c.taux_pct)} %</Badge>
+      {c.manquantes.length > 0 && (
+        <span className="cell-sub">
+          {t("ecarts_m12.manquantes")} : {c.manquantes.map((m) => libellePiece(m, t)).join(", ")}
+        </span>
+      )}
     </>
   );
 }
 
-/** Valeur d'un paramètre lisible (liste, dictionnaire ou scalaire), sans JSON brut à l'écran. */
-function valeurLisible(v: unknown): string {
+/** Valeur d'un paramètre lisible (liste, dictionnaire ou scalaire), sans JSON brut ni code à l'écran. */
+function valeurLisible(v: unknown, t: Tr): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (Array.isArray(v)) return v.map(valeurLisible).join(", ");
+  if (typeof v === "boolean") return t(v ? "revueR3.oui" : "revueR3.non");
+  if (typeof v === "number") return formatNumber(v);
+  if (Array.isArray(v)) return v.map((x) => valeurLisible(x, t)).join(", ");
   if (typeof v === "object") {
     return Object.entries(v as Record<string, unknown>)
-      .map(([k, x]) => `${k} : ${valeurLisible(x)}`)
+      .map(([k, x]) => `${libellePiece(k, t)} : ${valeurLisible(x, t)}`)
       .join(" · ");
   }
-  return String(v);
+  return typeof v === "string" && /^[a-z]+(_[a-z0-9]+)+$/.test(v) ? libellePiece(v, t) : String(v);
 }
 
 /** Ligne de la grille « dossiers » : contentieux (qualifiables) et conventions (complétude seule). */
@@ -198,6 +217,11 @@ export function EcartsM12Section() {
   );
   const juridictions = (params.find((p) => p.cle === "juridictions")?.valeur as string[] | undefined) ?? [];
   const provisoires = params.filter((p) => p.provisoire).length;
+  const provisoireBadge = (
+    <Badge tone="warn" title={t("ecarts_m12.provisoire")}>
+      {t("revueR3.provisoire")}
+    </Badge>
+  );
   const contOpts = contentieux.map((c) => ({ value: c.id, label: `${c.code} · ${c.objet}` }));
   const dossierOpts = [
     ...contentieux.map((c) => ({ value: `contentieux:${c.id}`, label: `${t("ecarts_m12.dossiers.contentieux")} ${c.code}` })),
@@ -217,12 +241,16 @@ export function EcartsM12Section() {
 
   return (
     <div data-testid="ecarts-m12">
-      <SectionCard title={t("ecarts_m12.parametres.title")}>
+      <SectionCard title={t("ecarts_m12.parametres.title")} subtitle={t("revueR3.juridique.parametresSub")}>
         {provisoires > 0 && (
-          <p className="action-error" role="note" data-testid="m12-provisoire">
+          <p className="r3-note" role="note" data-testid="m12-provisoire">
             {t("ecarts_m12.parametres.bandeau", { count: provisoires })}
           </p>
         )}
+        <details className="r3-repli">
+          <summary>
+            {t("revueR3.juridique.voirParametres", { count: params.length })}
+          </summary>
         <div data-testid="m12-parametres">
           <DataTable
             caption={t("ecarts_m12.parametres.title")}
@@ -230,11 +258,11 @@ export function EcartsM12Section() {
             density="compact"
             columns={[
               { key: "libelle", header: t("tableaux.juridique.parametre"), render: (p) => p.libelle, sortValue: (p) => p.libelle },
-              { key: "valeur", header: t("tableaux.juridique.valeur"), render: (p) => <span className="muted">{valeurLisible(p.valeur)}</span> },
+              { key: "valeur", header: t("tableaux.juridique.valeur"), render: (p) => <span className="muted">{valeurLisible(p.valeur, t)}</span> },
               {
                 key: "statut",
                 header: t("tableaux.juridique.statut"),
-                render: (p) => <Badge tone={p.provisoire ? "warn" : "ok"}>{p.provisoire ? t("ecarts_m12.provisoire") : t("ecarts_m12.confirme")}</Badge>,
+                render: (p) => (p.provisoire ? provisoireBadge : <Badge tone="ok">{t("ecarts_m12.confirme")}</Badge>),
               },
               actionsColumn<Parametre>(t("ui.actions"), (p) => [
                 { label: t("ecarts_m12.parametres.modifier"), path: `/api/juridique/parametres/${p.id}/modifier/`, tone: "ghost" as const, prompt: { name: "valeur", label: t("ecarts_m12.parametres.json") } },
@@ -245,6 +273,7 @@ export function EcartsM12Section() {
             ]}
           />
         </div>
+        </details>
       </SectionCard>
 
       <SectionCard
@@ -291,11 +320,11 @@ export function EcartsM12Section() {
             caption={t("ecarts_m12.contentieux.title")}
             rows={dossiers}
             columns={[
-              { key: "dossier", header: t("ecarts_m12.contentieux.dossier"), render: (d) => d.libelle, sortValue: (d) => d.libelle },
+              { key: "dossier", header: t("ecarts_m12.contentieux.dossier"), render: (d) => d.libelle, sortValue: (d) => d.libelle, width: 280 },
               {
                 key: "juridiction",
                 header: t("ecarts_m12.contentieux.juridiction"),
-                render: (d) => (d.contentieux ? d.contentieux.juridiction || "—" : <span className="muted">{t("ecarts_m12.dossiers.convention")}</span>),
+                render: (d) => (d.contentieux ? d.contentieux.juridiction || "—" : "—"),
               },
               { key: "phase", header: t("ecarts_m12.contentieux.phase"), render: (d) => d.contentieux?.phase_label ?? "—" },
               { key: "probabilite", header: t("ecarts_m12.contentieux.probabilite"), render: (d) => (d.contentieux?.probabilite ? d.contentieux.probabilite_label : "—") },
@@ -445,7 +474,7 @@ export function EcartsM12Section() {
             initialSort={{ id: "echeance", desc: false }}
             columns={[
               { key: "type", header: t("ecarts_m12.contentieux.type"), render: (a) => t(`ecarts_m12.alertes.types.${a.type}`) },
-              { key: "objet", header: t("tableaux.juridique.objet"), render: (a) => `${a.code} · ${a.libelle}` },
+              { key: "objet", header: t("tableaux.juridique.objet"), render: (a) => (a.libelle.startsWith(a.code) ? a.libelle : `${a.code} · ${a.libelle}`) },
               {
                 key: "echeance",
                 header: t("tableaux.juridique.echeance"),
@@ -484,7 +513,7 @@ export function EcartsM12Section() {
                 render: (d) => (
                   <>
                     <Badge tone={d.controle.a_jour ? "ok" : "warn"}>{d.controle.a_jour ? t("ecarts_m12.gr.aJour") : t("ecarts_m12.gr.pasAJour")}</Badge>{" "}
-                    <span className="muted">{d.controle.motifs.join(" ")}</span>
+                    <span className="cell-sub">{texteLisible(d.controle.motifs.join(" "), t)}</span>
                   </>
                 ),
               },
@@ -519,7 +548,7 @@ export function EcartsM12Section() {
               {
                 key: "statut",
                 header: t("tableaux.juridique.statut"),
-                render: (ty) => <Badge tone={ty.retention_provisoire ? "warn" : "ok"}>{ty.retention_provisoire ? t("ecarts_m12.provisoire") : t("ecarts_m12.confirme")}</Badge>,
+                render: (ty) => (ty.retention_provisoire ? provisoireBadge : <Badge tone="ok">{t("ecarts_m12.confirme")}</Badge>),
               },
               actionsColumn<TypeDoc>(t("ui.actions"), (ty) => [
                 { label: t("ecarts_m12.archivage.modifier"), path: `/api/documents/types/${ty.id}/definir-retention/`, tone: "ghost" as const, prompt: { name: "retention_years", label: t("ecarts_m12.archivage.duree") } },

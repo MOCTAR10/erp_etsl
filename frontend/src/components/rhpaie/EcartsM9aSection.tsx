@@ -128,8 +128,8 @@ export function EcartsM9aSection() {
     },
   ];
   const colEcheances: Column<LigneEcheance>[] = [
-    { key: "limite", header: t("m9a.echeances.limite"), sortValue: (e) => e.date_limite, render: (e) => formatDate(e.date_limite) },
-    { key: "libelle", header: t("m9a.f.libelle"), render: (e) => <>{e.libelle} {e.provisoire && <Badge tone="warn">{t("m9a.provisoire")}</Badge>}</> },
+    { key: "limite", header: t("m9a.echeances.limite"), sortValue: (e) => e.date_limite, render: (e) => <span className="r3-nowrap">{formatDate(e.date_limite)}</span> },
+    { key: "libelle", header: t("m9a.f.libelle"), render: (e) => e.libelle },
     {
       key: "periode",
       header: t("m9a.f.periode"),
@@ -185,7 +185,7 @@ export function EcartsM9aSection() {
   return (
     <>
       <SectionCard title={t("m9a.saisies.title")}>
-        <div data-testid="saisies-m9">
+        <div data-testid="saisies-m9" className="r3-saisies">
           <SectionActions>
             <QuickForm
               title={t("m9a.saisies.employe")}
@@ -288,25 +288,42 @@ export function EcartsM9aSection() {
         <p className="muted">{t("m9a.saisies.note")}</p>
       </SectionCard>
 
-      <SectionCard title={`${t("m9a.absences.title")} · ${absences.length}`}>
-        <div data-testid="absences-m9">
-          <DataTable columns={colAbsences} rows={absences} caption={t("m9a.absences.title")} />
-        </div>
-      </SectionCard>
+      {absences.length > 0 ? (
+        <SectionCard title={`${t("m9a.absences.title")} · ${absences.length}`}>
+          <div data-testid="absences-m9">
+            <DataTable columns={colAbsences} rows={absences} caption={t("m9a.absences.title")} />
+          </div>
+        </SectionCard>
+      ) : null}
 
-      <SectionCard title={t("m9a.echeances.title")}>
+      <SectionCard
+        title={
+          <span className="r3-badges">
+            {t("m9a.echeances.title")}
+            {echeances.some((e) => e.provisoire) ? (
+              <Badge tone="warn" title={t("revueR3.rh.echeancesProvisoires")}>
+                {t("revueR3.provisoire")}
+              </Badge>
+            ) : null}
+          </span>
+        }
+      >
         <div data-testid="echeances-m9">
           <DataTable columns={colEcheances} rows={echeances} caption={t("m9a.echeances.title")} />
         </div>
       </SectionCard>
 
-      <SectionCard title={t("m9a.grilles.title")}>
-        <DataTable columns={colGrilles} rows={grilles} caption={t("m9a.grilles.title")} />
-      </SectionCard>
+      {grilles.length > 0 ? (
+        <SectionCard title={t("m9a.grilles.title")}>
+          <DataTable columns={colGrilles} rows={grilles} caption={t("m9a.grilles.title")} />
+        </SectionCard>
+      ) : null}
 
-      <SectionCard title={t("m9a.carriere.title")}>
-        <DataTable columns={colCarriere} rows={carriere} caption={t("m9a.carriere.title")} />
-      </SectionCard>
+      {carriere.length > 0 ? (
+        <SectionCard title={t("m9a.carriere.title")}>
+          <DataTable columns={colCarriere} rows={carriere} caption={t("m9a.carriere.title")} />
+        </SectionCard>
+      ) : null}
     </>
   );
 }

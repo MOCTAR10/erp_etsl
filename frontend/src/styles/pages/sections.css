@@ -1,0 +1,124 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Écrans Finance, RH & QHSE (revue R3) : comptabilité, contrôle de gestion, RH & paie,
+ * qualité, HSE, juridique. Compléments locaux au kit, couche `pages`.
+ * ═════════════════════════════════════════════════════════════════════════ */
+@layer pages {
+
+/* Dates et montants courts d'une cellule : jamais coupés sur deux lignes. */
+.r3-nowrap {
+  white-space: nowrap;
+}
+
+/* Statut + pastilles secondaires d'une ligne : alignés, avec un léger écart. */
+.r3-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Paramétrage avancé replié par défaut : le tableau ne s'ouvre qu'à la demande. */
+.r3-repli {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+.r3-repli > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) 0;
+}
+.r3-repli > summary::-webkit-details-marker {
+  display: none;
+}
+.r3-repli > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.r3-repli[open] > summary::before {
+  transform: rotate(45deg);
+}
+.r3-repli > summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.r3-repli > summary .muted {
+  font-weight: var(--fw-regular);
+}
+.r3-repli[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+/* Bandeau d'avertissement unique (taux provisoires…) au-dessus d'une liste. */
+.r3-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+}
+
+/* Barre d'outils de section (champs + actions) alignée sur la grille de 8 px. */
+.r3-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.r3-toolbar .field {
+  margin: 0;
+  min-width: 160px;
+}
+.r3-toolbar .muted {
+  margin: 0;
+  align-self: center;
+}
+
+}
+
+@layer pages {
+/* Boutons de saisie RH : alignés à gauche, dans le flux de lecture. */
+.r3-saisies .section-actions {
+  justify-content: flex-start;
+}
+}
+
+@layer pages {
+/* Actions d'une carte d'incident : boutons sur une même ligne, retour à la ligne propre. */
+.r3-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.r3-card-actions > * {
+  margin: 0;
+}
+
+/* Cinq indicateurs courts (HSE) : une seule rangée sur grand écran. */
+@media (min-width: 1200px) {
+  .kpi-grid.r3-kpi-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+}

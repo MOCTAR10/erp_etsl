@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Activity, Flame, Gauge, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
@@ -186,23 +187,32 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
   const { t } = useTranslation();
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        {inc.code} <span className="muted">· {t(`hse.incident_types.${inc.type_incident}`, { defaultValue: inc.type_label })}</span>
-      </div>
-      <div className="meta">{inc.lieu} · {formatDate(inc.date_evenement)}</div>
-      <div className="meta">{inc.description}</div>
-      <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className={`badge ${inc.gravite === "critique" ? "err" : inc.gravite === "majeure" ? "warn" : "brand"}`}>
-          {t(`hse.incident_gravite.${inc.gravite}`)}
-        </span>
-        <span className="muted">
-          {inc.enqueteur_name ? `${t("hse.enqueteur")} · ${inc.enqueteur_name}` : ""}
-          {inc.actions_count > 0 ? ` · ${t("hse.actions")} ×${inc.actions_count}` : ""}
+      <div className="card-top">
+        <span className="card-code">
+          {inc.code} · {t(`hse.incident_types.${inc.type_incident}`, { defaultValue: inc.type_label })}
         </span>
       </div>
-      {inc.zone && <div className="meta muted">{t(`m7e.zones.${inc.zone}`)}</div>}
-      {inc.ncr_hse.length > 0 && <div className="meta">NCR-HSE : {inc.ncr_hse.join(", ")}</div>}
-      {inc.document_titre && <div className="meta muted">{t("m7e.inc.archive")}</div>}
+      <div className="title">{inc.description}</div>
+      <div className="meta">
+        {inc.lieu} · {formatDate(inc.date_evenement)}
+        {inc.zone ? ` · ${t(`m7e.zones.${inc.zone}`)}` : ""}
+      </div>
+      {inc.enqueteur_name || inc.actions_count > 0 ? (
+        <div className="meta muted">
+          {inc.enqueteur_name ? `${t("hse.enqueteur")} : ${inc.enqueteur_name}` : ""}
+          {inc.enqueteur_name && inc.actions_count > 0 ? " · " : ""}
+          {inc.actions_count > 0 ? t("revueR3.hse.actions", { count: inc.actions_count }) : ""}
+        </div>
+      ) : null}
+      <div className="card-foot">
+        <Badge tone={inc.gravite === "critique" ? "err" : inc.gravite === "majeure" ? "warn" : "neutral"}>{t(`hse.incident_gravite.${inc.gravite}`)}</Badge>
+        <span className="meta">
+          {inc.ncr_hse.length > 0 ? `NCR-HSE ${inc.ncr_hse.join(", ")}` : ""}
+          {inc.ncr_hse.length > 0 && inc.document_titre ? " · " : ""}
+          {inc.document_titre ? t("m7e.inc.archive") : ""}
+        </span>
+      </div>
+      <div className="r3-card-actions">
       <ActionBar
         actions={[
           ...(inc.statut === "declare"
@@ -235,6 +245,7 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
       <button type="button" className="btn ghost sm" onClick={() => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`)}>
         {t("m7e.inc.pdf")}
       </button>
+      </div>
     </BoardCard>
   );
 }
@@ -346,9 +357,9 @@ export function HsePage() {
         }
       />
 
-      <div className="kpi-grid">
+      <div className="kpi-grid r3-kpi-5">
         <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? t("tableaux.entetes.aucunAccident")} hint={`${s.incidents_ouverts} ${t("hse.incidentsOuverts")}`} icon={ShieldAlert} tone="ok" delay={0} />
-        <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${s.risques_critiques} ${t("hse.risquesCritiques")}`} icon={ShieldCheck} tone="brand" delay={0.05} />
+        <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={t("revueR3.hse.risquesCritiques", { count: s.risques_critiques })} icon={ShieldCheck} tone="brand" delay={0.05} />
         <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${s.actions_ouvertes} ${t("hse.actionsOuvertes")}`} icon={Flame} tone="warn" delay={0.1} />
         <Kpi label={t("hse.epiRenouveler")} value={s.epi_a_renouveler} hint={`${s.formations_prevues} ${t("hse.formationsPrevues")} · ${s.bsd_en_attente} ${t("hse.bsdAttente")}`} icon={Activity} tone="warn" delay={0.15} />
         <Kpi
@@ -361,35 +372,20 @@ export function HsePage() {
         />
       </div>
 
+      <h3 className="section-heading">{t("revueR3.hse.incidents")}</h3>
       <SearchField value={incSearch} onChange={setIncSearch} placeholder={t("hse.searchIncidents")} />
 
-      <div style={{ overflowX: "auto" }}>
-        <Board>
-          {INC_ORDER.map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={t(`hse.incident_statut.${st}`)}
-              count={groups[st].length}
-              tone={INC_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={260}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <EmptyState icon={Inbox} label={t("common.empty")} />
-              ) : (
-                groups[st].map((inc, i) => <IncidentCard key={inc.id} inc={inc} index={i} />)
-              )}
-            </BoardColumn>
-          ))}
-        </Board>
-      </div>
+      <Board label={t("revueR3.hse.incidents")}>
+        {INC_ORDER.map((st, ci) => (
+          <BoardColumn key={st} title={t(`hse.incident_statut.${st}`)} count={groups[st].length} tone={INC_BADGE[st]} delay={ci * 0.05} limit={6}>
+            {groups[st].map((inc, i) => (
+              <IncidentCard key={inc.id} inc={inc} index={i} />
+            ))}
+          </BoardColumn>
+        ))}
+      </Board>
 
-      {ouvertNonClos > 0 ? (
-        <p className="muted" style={{ marginTop: "0.5rem" }}>
-          {t("hse.pendingNote")}
-        </p>
-      ) : null}
+      {ouvertNonClos > 0 ? <p className="muted">{t("hse.pendingNote")}</p> : null}
 
       <DemandePermisForm />
       {permis.count > 0 || permis.search ? (
