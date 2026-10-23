@@ -396,12 +396,12 @@ export function HsePage() {
 
       {ouvertNonClos > 0 ? <p className="muted">{t("hse.pendingNote")}</p> : null}
 
-      <DemandePermisForm />
+      <div className="r3-heading-row">
+        <h3 className="section-heading">{t("hse.permis")}</h3>
+        <DemandePermisForm />
+      </div>
       {permis.count > 0 || permis.search ? (
         <>
-          <h3 className="section-heading">
-            {t("hse.permis")}
-          </h3>
           <SearchField value={permis.search} onChange={permis.setSearch} placeholder={t("hse.searchPermis")} />
           {permisAll.length === 0 ? (
             <EmptyState icon={Inbox} label={t("common.empty")} />

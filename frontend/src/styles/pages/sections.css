@@ -161,3 +161,30 @@
   flex-wrap: nowrap;
 }
 }
+
+@layer pages {
+/* Titre de bloc + action de création (secondaire : le seul bouton plein reste celui de l'en-tête de page). */
+.r3-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin: var(--space-8) 0 var(--space-3);
+}
+.r3-heading-row > .section-heading {
+  margin: 0;
+}
+.r3-heading-row .btn.primary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+.r3-heading-row .btn.primary:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.r3-permis-top .badge {
+  flex-shrink: 0;
+}
+}
