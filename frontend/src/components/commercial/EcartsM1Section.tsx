@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -145,13 +147,16 @@ interface Rao {
   tender_ref: string;
   score: string | null;
   decision_rao: string;
+  review_status?: string;
   review_status_label: string;
   document: string | null;
 }
 interface Rc {
   id: string;
   affaire_code: string;
+  type_revue?: string;
   type_label: string;
+  statut?: string;
   statut_label: string;
   document: string | null;
 }
@@ -163,6 +168,26 @@ const liste = <T,>(path: string) => () => api.listAll<T>(path);
 /** Décimal API (« 12.50 ») au format français, décimales seulement si utiles. */
 const dec = (v: string | number | null | undefined) => formatNumber(v, { decimals: Number.isInteger(Number(v)) ? 0 : 2 });
 const taux = (v: string | number | null | undefined) => formatPercent(v, { decimals: Number.isInteger(Number(v)) ? 0 : 1 });
+/** Codes de pièce : jamais coupés en fin de ligne. */
+const NOWRAP: CSSProperties = { whiteSpace: "nowrap" };
+/** Valeur d'un champ de saisie sans zéros inutiles (« 5.00 » → « 5 », « 0.15 » inchangé) ; le point reste celui de l'API. */
+const saisieBrute = (v: string) => (v.includes(".") ? v.replace(/\.?0+$/, "") : v);
+/** Unités des paramètres (libellés serveur) → clés traduites ; « % », « 0/1 »… restent tels quels. */
+const UNITE_CLE: Record<string, string> = { jours: "jours", mois: "mois", ans: "ans", pts: "pts", "‰ / jour": "permilleJour" };
+/** Segment client : le serveur renvoie le libellé français (ou un code hérité) → code de traduction. */
+const SEGMENT_CODE: Record<string, string> = {
+  "Pétrole & Gaz": "petrole_gaz", petrole_gaz: "petrole_gaz", petrolier: "petrole_gaz",
+  Industrie: "industrie", industrie: "industrie", "BTP / Construction": "construction", construction: "construction",
+  Mines: "mines", mines: "mines", "Administration publique": "admin_pub", admin_pub: "admin_pub",
+  Particulier: "particulier", particulier: "particulier", Autre: "autre", autre: "autre",
+};
+/** Étape d'opportunité (libellé serveur) → clé `pipeline.*`. */
+const ETAPE_CODE: Record<string, string> = {
+  Prospection: "prospection", Qualification: "qualification", "Offre soumise": "offre", Offre: "offre",
+  "Négociation": "negociation", "Gagnée": "gagne", Perdue: "perdu",
+};
+/** Premier nombre d'un libellé serveur (« … depuis 90 jours » → 90). */
+const nombreDans = (s: string) => Number(/\d+/.exec(s)?.[0] ?? 0);
 
 function ParametresM1() {
   const { t } = useTranslation();
@@ -188,37 +213,45 @@ function ParametresM1() {
   });
   const lignes = params.data ?? [];
   const provisoires = lignes.filter((p) => p.est_provisoire).length;
+  const unite = (u: string) => (UNITE_CLE[u] ? t(`revueR2.pipeline.unites.${UNITE_CLE[u]}`) : u);
   const modifie = (p: Parametre) => (saisie[p.id] !== undefined && saisie[p.id] !== p.valeur) || (saisieTexte[p.id] !== undefined && saisieTexte[p.id] !== p.texte);
   const cols: Column<Parametre>[] = [
     { key: "libelle", header: t("ecarts_m1.params.libelle"), render: (p) => p.label, sortValue: (p) => p.label },
     {
       key: "valeur",
       header: t("ecarts_m1.params.valeur"),
-      render: (p) => (
-        <>
-          {p.unite !== "texte" && (
-            <span className="action-bar-buttons" style={{ alignItems: "center" }}>
-              <input
+      width: 340,
+      render: (p) => {
+        const texte = saisieTexte[p.id] ?? p.texte ?? "";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {p.unite !== "texte" && (
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <input
+                  className="control"
+                  inputMode="decimal"
+                  style={{ width: "7rem", textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+                  aria-label={p.label}
+                  value={saisie[p.id] ?? saisieBrute(p.valeur)}
+                  onChange={(e) => setSaisie({ ...saisie, [p.id]: e.target.value })}
+                />
+                <span className="muted">{unite(p.unite)}</span>
+              </span>
+            )}
+            {p.texte !== undefined && p.texte !== "" && (
+              <textarea
                 className="control"
-                style={{ width: "7rem" }}
-                aria-label={p.label}
-                value={saisie[p.id] ?? p.valeur}
-                onChange={(e) => setSaisie({ ...saisie, [p.id]: e.target.value })}
+                // Hauteur ajustée au texte : la définition reste lisible sans défilement interne.
+                rows={Math.min(8, Math.max(2, Math.ceil(texte.length / 42)))}
+                style={{ width: "100%", resize: "vertical" }}
+                aria-label={`${p.label} — ${t("ecarts_suivi.texte")}`}
+                value={texte}
+                onChange={(e) => setSaisieTexte({ ...saisieTexte, [p.id]: e.target.value })}
               />
-              <span className="muted">{p.unite}</span>
-            </span>
-          )}
-          {p.texte !== undefined && p.texte !== "" && (
-            <textarea
-              className="control"
-              rows={2}
-              aria-label={`${p.label} — ${t("ecarts_suivi.texte")}`}
-              value={saisieTexte[p.id] ?? p.texte}
-              onChange={(e) => setSaisieTexte({ ...saisieTexte, [p.id]: e.target.value })}
-            />
-          )}
-        </>
-      ),
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "statut",
@@ -229,7 +262,7 @@ function ParametresM1() {
       key: "actions",
       header: <span className="sr-only">{t("ui.actions")}</span>,
       render: (p) => (
-        <div className="action-bar-buttons">
+        <div className="action-bar-buttons" style={{ flexWrap: "nowrap", justifyContent: "flex-end" }}>
           {modifie(p) && (
             <button
               type="button"
@@ -257,9 +290,12 @@ function ParametresM1() {
   return (
     <SectionCard title={t("ecarts_m1.params.title")}>
       {provisoires > 0 && (
-        <p className="action-error" role="note" data-testid="alerte-provisoire-m1">
-          {t("ecarts_m1.params.warn", { count: provisoires })}
-        </p>
+        <div className="banner warn" role="note" data-testid="alerte-provisoire-m1" style={{ marginBottom: "var(--space-3)" }}>
+          <SlidersHorizontal size={18} aria-hidden />
+          <div className="banner-body">
+            <span className="banner-title">{t("ecarts_m1.params.warn", { count: provisoires })}</span>
+          </div>
+        </div>
       )}
       {erreur && (
         <p className="action-error" role="alert">
@@ -289,8 +325,24 @@ function Clients360() {
   });
   const cols: Column<ClientSignal>[] = [
     { key: "client", header: t("ecarts_m1.clients.client"), render: (c) => c.client, sortValue: (c) => c.client },
-    { key: "segment", header: t("ecarts_m1.clients.segment"), render: (c) => c.segment },
-    { key: "score", header: t("ecarts_m1.clients.score"), num: true, render: (c) => `${c.score_calcule} (${c.score_enregistre})`, sortValue: (c) => c.score_calcule },
+    {
+      key: "segment",
+      header: t("ecarts_m1.clients.segment"),
+      render: (c) => (SEGMENT_CODE[c.segment] ? t(`revueR2.pipeline.segments.${SEGMENT_CODE[c.segment]}`) : c.segment || "—"),
+    },
+    {
+      key: "score",
+      header: t("ecarts_m1.clients.score"),
+      num: true,
+      sortValue: (c) => c.score_calcule,
+      // Score calculé en valeur principale ; le score enregistré (fiche client) en ligne secondaire.
+      render: (c) => (
+        <>
+          {c.score_calcule}
+          <span className="cell-sub">{t("revueR2.pipeline.scoreEnregistre", { n: c.score_enregistre })}</span>
+        </>
+      ),
+    },
     { key: "contact", header: t("ecarts_m1.clients.dernierContact"), render: (c) => formatDate(c.dernier_contact), sortValue: (c) => c.dernier_contact },
     {
       key: "signaux",
@@ -300,7 +352,7 @@ function Clients360() {
           <span className="action-bar-buttons">
             {c.signaux.map((s) => (
               <Badge key={s.code} tone="warn">
-                {s.libelle}
+                {t(`revueR2.pipeline.signaux.${s.code}`, { n: nombreDans(s.libelle), defaultValue: s.libelle })}
               </Badge>
             ))}
           </span>
@@ -317,7 +369,7 @@ function Clients360() {
     >
       {signaux.data?.provisoire && <p className="muted">{t("ecarts_m1.provisoireNote")}</p>}
       <DataTable rows={lignes} columns={cols} caption={t("ecarts_m1.clients.title")} />
-      <label className="field" style={{ marginTop: "0.5rem" }}>
+      <label className="field" style={{ marginTop: "var(--space-4)", maxWidth: 420 }}>
         {t("ecarts_m1.clients.vue360")}
         <select value={client} onChange={(e) => setClient(e.target.value)} aria-label={t("ecarts_m1.clients.vue360")}>
           <option value="">—</option>
@@ -366,37 +418,49 @@ function AlertesEcheances() {
     queryFn: () => api.get<{ lignes: (Echeance & { cle?: string })[]; paliers: number[]; provisoire: boolean }>("/api/commercial/pilotage/echeances/"),
     retry: 0,
   });
+  /** Motif serveur (français) → libellé traduit ; repli sur le texte reçu. */
+  const motif = (m: string) =>
+    m.startsWith("Sans mouvement")
+      ? t("revueR2.pipeline.motifs.sansMouvement", { n: nombreDans(m) })
+      : m.startsWith("Date de clôture")
+        ? t("revueR2.pipeline.motifs.clotureDepassee")
+        : m;
+  /** Palier d'échéance (« depassee », « j15 ») → « Dépassée », « J-15 ». */
+  const palier = (p: string | null) =>
+    !p ? "—" : p === "depassee" ? t("revueR2.pipeline.palierDepasse") : /^j\d+$/.test(p) ? t("revueR2.pipeline.palierJ", { n: p.slice(1) }) : p;
   return (
     <SectionCard
       title={t("ecarts_m1.alertes.title")}
       actions={<ActionBar actions={[{ label: t("ecarts_m1.alertes.relancer"), path: "/api/commercial/pilotage/relancer/", tone: "ghost" }]} />}
     >
-      <h4>{t("ecarts_m1.alertes.opportunites", { jours: opp.data?.jours ?? "" })}</h4>
+      <h4>{t("ecarts_m1.alertes.opportunites", { jours: opp.data ? dec(opp.data.jours) : "" })}</h4>
       <DataTable
         rows={opp.data?.lignes ?? []}
-        caption={t("ecarts_m1.alertes.opportunites", { jours: opp.data?.jours ?? "" })}
+        caption={t("ecarts_m1.alertes.opportunites", { jours: opp.data ? dec(opp.data.jours) : "" })}
         columns={[
-          { key: "code", header: t("commercial.col.code"), render: (o) => o.code, sortValue: (o) => o.code },
+          { key: "code", header: t("commercial.col.code"), render: (o) => <span style={NOWRAP}>{o.code}</span>, sortValue: (o) => o.code },
           { key: "objet", header: t("commercial.col.titre"), render: (o) => o.objet },
-          { key: "etape", header: t("ecarts_m1.alertes.etape"), render: (o) => o.etape },
+          { key: "etape", header: t("ecarts_m1.alertes.etape"), render: (o) => (ETAPE_CODE[o.etape] ? t(`pipeline.${ETAPE_CODE[o.etape]}`) : o.etape) },
           { key: "client", header: t("commercial.col.client"), render: (o) => o.client ?? "—" },
-          { key: "motifs", header: t("ecarts_m1.alertes.motifs"), render: (o) => o.motifs.join(" · ") },
+          { key: "motifs", header: t("ecarts_m1.alertes.motifs"), render: (o) => o.motifs.map(motif).join(" · ") },
         ]}
       />
-      <h4>{t("ecarts_m1.alertes.echeances", { paliers: (ech.data?.paliers ?? []).filter((p) => p > 0).map((p) => `J-${p}`).join(" / ") })}</h4>
+      <h4>{t("ecarts_m1.alertes.echeances", { paliers: (ech.data?.paliers ?? []).filter((p) => p > 0).map((p) => t("revueR2.pipeline.palierJ", { n: p })).join(" / ") })}</h4>
       {ech.data?.provisoire && <p className="muted">{t("ecarts_m1.provisoireNote")}</p>}
       <DataTable
         rows={(ech.data?.lignes ?? []).map((e) => ({ ...e, id: `${e.type}-${e.id}` }))}
         caption={t("ecarts_m1.alertes.echeancesCaption")}
         columns={[
           { key: "type", header: t("ecarts_m1.alertes.type"), render: (e) => t(`ecarts_m1.alertes.types.${e.type}`) },
-          { key: "code", header: t("commercial.col.code"), render: (e) => e.code },
+          { key: "code", header: t("commercial.col.code"), render: (e) => <span style={NOWRAP}>{e.code}</span> },
           { key: "lib", header: t("ecarts_m1.alertes.objet"), render: (e) => e.libelle },
-          { key: "date", header: t("ecarts_m1.alertes.date"), render: (e) => formatDate(e.date_echeance), sortValue: (e) => e.date_echeance },
+          { key: "date", header: t("ecarts_m1.alertes.date"), render: (e) => <span style={NOWRAP}>{formatDate(e.date_echeance)}</span>, sortValue: (e) => e.date_echeance },
           {
             key: "palier",
             header: t("ecarts_m1.alertes.palier"),
-            render: (e) => <Badge tone={e.jours <= 30 ? "err" : e.jours <= 60 ? "warn" : "brand"}>{e.palier ?? "—"}</Badge>,
+            sortValue: (e) => e.jours,
+            // Rouge réservé au dépassement ; un palier à venir reste un avertissement.
+            render: (e) => <Badge tone={e.jours < 0 ? "err" : e.jours <= 30 ? "warn" : "neutral"}>{palier(e.palier)}</Badge>,
           },
         ]}
       />
@@ -419,7 +483,7 @@ function PipeProfilIndicateurs() {
         <div className="kpi-grid">
           <Kpi label={t("ecarts_m1.indic.prixMoyen")} value={montant(i.prix_moyen)} hint={i.definition_prix_moyen} tone="brand" />
           <Kpi label={t("ecarts_m1.indic.transformation")} value={taux(i.taux_transformation_pct)} tone="accent" />
-          <Kpi label={t("ecarts_m1.indic.scoreMoyen")} value={i.score_moyen === null ? "—" : dec(i.score_moyen)} tone="ok" />
+          <Kpi label={t("ecarts_m1.indic.scoreMoyen")} value={i.score_moyen === null ? "—" : formatNumber(i.score_moyen, { decimals: 1 })} tone="ok" />
           <Kpi label={t("ecarts_m1.indic.sousSeuil")} value={i.clients_sous_seuil} tone="warn" />
         </div>
       )}
@@ -427,7 +491,7 @@ function PipeProfilIndicateurs() {
         rows={(profils.data?.lignes ?? []).map((l) => ({ ...l, id: l.profil }))}
         caption={t("ecarts_m1.profil.title")}
         columns={[
-          { key: "p", header: t("ecarts_m1.profil.profil"), render: (l) => l.libelle },
+          { key: "p", header: t("ecarts_m1.profil.profil"), render: (l) => t(`revueR2.pipeline.profils.${l.profil || "nonRenseigne"}`, { defaultValue: l.libelle }) },
           { key: "n", header: t("ecarts_m1.profil.nombre"), num: true, render: (l) => formatNumber(l.nombre), sortValue: (l) => l.nombre },
           { key: "m", header: t("ecarts_m1.profil.montant"), num: true, render: (l) => montant(l.montant), sortValue: (l) => Number(l.montant ?? 0) },
           { key: "pp", header: t("ecarts_m1.profil.pondere"), num: true, render: (l) => montant(l.pondere) },
@@ -488,7 +552,7 @@ function Chiffrage() {
         </SectionActions>
       }
     >
-      <label className="field">
+      <label className="field" style={{ maxWidth: 520 }}>
         {t("ecarts_m1.chiffrage.offre")}
         <select value={offre} onChange={(e) => setOffre(e.target.value)} aria-label={t("ecarts_m1.chiffrage.choisirOffre")}>
           <option value="">—</option>
@@ -518,12 +582,21 @@ function Chiffrage() {
           )}
         </>
       )}
-      <h4>{t("ecarts_m1.derive.title", { seuil: derives.data?.seuil_pct ?? "" })}</h4>
+      <h4>{t("ecarts_m1.derive.title", { seuil: derives.data ? dec(derives.data.seuil_pct) : "" })}</h4>
       <DataTable
         rows={derives.data?.lignes ?? []}
         caption={t("ecarts_m1.derive.caption")}
         columns={[
-          { key: "code", header: t("commercial.col.code"), render: (d) => `${d.code} · ${d.titre}`, sortValue: (d) => d.code },
+          {
+            key: "code",
+            header: t("commercial.col.code"),
+            sortValue: (d) => d.code,
+            render: (d) => (
+              <>
+                <span style={NOWRAP}>{d.code}</span> · {d.titre}
+              </>
+            ),
+          },
           { key: "av", header: t("ecarts_m1.derive.avancement"), num: true, render: (d) => formatPercent(d.avancement_pct) },
           { key: "prevu", header: t("ecarts_m1.derive.prevu"), num: true, render: (d) => montant(d.cout_prevu_a_date) },
           { key: "reel", header: t("ecarts_m1.derive.reel"), num: true, render: (d) => montant(d.cout_reel) },
@@ -586,7 +659,7 @@ function ProfilsContrats() {
         </SectionActions>
       }
     >
-      <div className="action-bar-buttons">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0 var(--space-4)", alignItems: "end" }}>
         <label className="field">
           {t("ecarts_m1.contrats.contrat")}
           <select value={contrat} onChange={(e) => setContrat(e.target.value)} aria-label={t("ecarts_m1.contrats.choisir")}>
@@ -676,10 +749,11 @@ function RaoRc() {
     <SectionCard title={t("ecarts_m1.rao.title")}>
       {criteres.data && (
         <p className="muted">
-          {t("ecarts_m1.rao.criteres", { go: criteres.data.seuil_go, reserve: criteres.data.seuil_reserve })} :{" "}
+          {t("ecarts_m1.rao.criteres", { go: dec(criteres.data.seuil_go), reserve: dec(criteres.data.seuil_reserve) })} :{" "}
           {criteres.data.criteres.map((c) => `${c.libelle} (${dec(c.poids)})`).join(" · ")}
         </p>
       )}
+      <h4>{t("ecarts_m1.rao.raos")}</h4>
       <DataTable
         rows={raos.data ?? []}
         caption={t("ecarts_m1.rao.raos")}
@@ -687,18 +761,31 @@ function RaoRc() {
           { key: "ref", header: t("ecarts_m1.rao.ref"), render: (r) => r.tender_ref || "—" },
           { key: "score", header: t("ecarts_m1.rao.note"), num: true, render: (r) => taux(r.score), sortValue: (r) => (r.score === null ? null : Number(r.score)) },
           { key: "dec", header: t("ecarts_m1.rao.decision"), render: (r) => (r.decision_rao ? t(`ecarts_m1.rao.decisions.${r.decision_rao}`) : "—") },
-          { key: "st", header: t("commercial.col.statut"), render: (r) => r.review_status_label },
+          {
+            key: "st",
+            header: t("commercial.col.statut"),
+            render: (r) => (r.review_status ? t(`revueR2.pipeline.statutsRao.${r.review_status}`, { defaultValue: r.review_status_label }) : r.review_status_label),
+          },
           { key: "doc", header: t("ecarts_m1.rao.ged"), render: (r) => doc(r.document) },
           actionsColumn<Rao>(t("ui.actions"), (r) => (r.document ? [] : [{ label: t("ecarts_m1.rao.archiver"), path: `/api/commercial/tender-reviews/${r.id}/archiver/`, tone: "ghost" }])),
         ]}
       />
+      <h4>{t("ecarts_m1.rao.rcs")}</h4>
       <DataTable
         rows={rcs.data ?? []}
         caption={t("ecarts_m1.rao.rcs")}
         columns={[
-          { key: "aff", header: t("commercial.col.affaire"), render: (r) => r.affaire_code },
-          { key: "type", header: t("ecarts_m1.rao.typeRevue"), render: (r) => r.type_label },
-          { key: "st", header: t("commercial.col.statut"), render: (r) => r.statut_label },
+          { key: "aff", header: t("commercial.col.affaire"), render: (r) => <span style={NOWRAP}>{r.affaire_code}</span> },
+          {
+            key: "type",
+            header: t("ecarts_m1.rao.typeRevue"),
+            render: (r) => (r.type_revue ? t(`revueR2.pipeline.typesRc.${r.type_revue}`, { defaultValue: r.type_label }) : r.type_label),
+          },
+          {
+            key: "st",
+            header: t("commercial.col.statut"),
+            render: (r) => (r.statut ? t(`revueR2.pipeline.statutsRc.${r.statut}`, { defaultValue: r.statut_label }) : r.statut_label),
+          },
           { key: "doc", header: t("ecarts_m1.rao.ged"), render: (r) => doc(r.document) },
           actionsColumn<Rc>(t("ui.actions"), (r) => (r.document ? [] : [{ label: t("ecarts_m1.rao.archiver"), path: `/api/commercial/revues-commande/${r.id}/archiver/`, tone: "ghost" }])),
         ]}

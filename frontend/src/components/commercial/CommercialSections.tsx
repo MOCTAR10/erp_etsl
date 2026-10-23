@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -37,6 +38,7 @@ interface Contrat {
   profile_label: string;
   client_name: string | null;
   affaire_title: string | null;
+  profile?: string;
   montant_actuel: string | null;
   end_date: string | null;
   expiry_status: string;
@@ -70,14 +72,25 @@ const TON: Record<string, "ok" | "warn" | "err" | "brand" | "neutral"> = {
 };
 
 const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
+/** Codes de pièce (« EST00001 · v1 », « AFF-00001 ») : jamais coupés en fin de ligne. */
+const NOWRAP: CSSProperties = { whiteSpace: "nowrap" };
 /** Bande d'échéance du contrat (OK / J90…J0 / EXPIRED) → badge lisible, rien si le contrat n'approche pas de son terme. */
 function Expiration({ status }: { status: string }) {
   const { t } = useTranslation();
   if (!status || status === "OK") return null;
-  if (status === "EXPIRED") return <Badge tone="err">{t("tableaux.commercial.expire")}</Badge>;
+  if (status === "EXPIRED")
+    return (
+      <span className="cell-sub">
+        <Badge tone="err">{t("tableaux.commercial.expire")}</Badge>
+      </span>
+    );
   const jours = Number(status.replace(/^J/, ""));
   if (Number.isNaN(jours)) return null;
-  return <Badge tone={jours <= 15 ? "err" : "warn"}>{t("tableaux.commercial.echeanceDans", { n: jours })}</Badge>;
+  return (
+    <span className="cell-sub">
+      <Badge tone={jours <= 15 ? "err" : "warn"}>{t("tableaux.commercial.echeanceDans", { n: jours })}</Badge>
+    </span>
+  );
 }
 
 function actionsOffre(o: Offre, t: (k: string) => string): ActionDef[] {
@@ -126,29 +139,46 @@ export function CommercialSections() {
     select: (d) => d.lignes.map((l) => ({ ...l, id: l.cle })),
   });
 
-  const statut = (s: string, label: string) => <Badge tone={TON[s] ?? "brand"}>{label}</Badge>;
+  // Statut traduit d'après son code (le libellé serveur, en français, ne sert que de repli).
+  const statut = (famille: "statutsOffre" | "statutsAffaire" | "statutsContrat", s: string, label: string) => (
+    <Badge tone={TON[s] ?? "brand"}>{t(`revueR2.pipeline.${famille}.${s}`, { defaultValue: label })}</Badge>
+  );
 
   const colOffres: Column<Offre>[] = [
-    { key: "code", header: t("commercial.col.code"), render: (o) => `${o.code} · v${o.version}`, sortValue: (o) => o.code },
+    { key: "code", header: t("commercial.col.code"), render: (o) => <span style={NOWRAP}>{`${o.code} · v${o.version}`}</span>, sortValue: (o) => o.code },
     { key: "titre", header: t("commercial.col.titre"), render: (o) => o.title },
     { key: "client", header: t("commercial.col.client"), render: (o) => o.client_name ?? "—" },
     { key: "montant", header: t("commercial.col.montant"), num: true, render: (o) => montant(o.montant_offre), sortValue: (o) => (o.montant_offre === null ? null : Number(o.montant_offre)) },
-    { key: "statut", header: t("commercial.col.statut"), render: (o) => statut(o.status, o.status_label) },
+    { key: "statut", header: t("commercial.col.statut"), render: (o) => statut("statutsOffre", o.status, o.status_label) },
     actionsColumn<Offre>(t("ui.actions"), (o) => actionsOffre(o, t)),
   ];
   const colAffaires: Column<Affaire>[] = [
-    { key: "code", header: t("commercial.col.code"), render: (a) => a.code, sortValue: (a) => a.code },
+    { key: "code", header: t("commercial.col.code"), render: (a) => <span style={NOWRAP}>{a.code}</span>, sortValue: (a) => a.code },
     { key: "titre", header: t("commercial.col.titre"), render: (a) => a.title },
     { key: "client", header: t("commercial.col.client"), render: (a) => a.client_name ?? "—" },
     { key: "resp", header: t("commercial.col.responsable"), render: (a) => a.responsable_email ?? "—" },
-    { key: "statut", header: t("commercial.col.statut"), render: (a) => statut(a.status, a.status_label) },
+    { key: "statut", header: t("commercial.col.statut"), render: (a) => statut("statutsAffaire", a.status, a.status_label) },
     actionsColumn<Affaire>(t("ui.actions"), (a) => actionsAffaire(a, t)),
   ];
   const colContrats: Column<Contrat>[] = [
-    { key: "code", header: t("commercial.col.code"), render: (c) => c.code, sortValue: (c) => c.code },
-    { key: "profil", header: t("commercial.col.profil"), render: (c) => c.profile_label },
-    { key: "client", header: t("commercial.col.client"), render: (c) => c.client_name ?? "—" },
-    { key: "affaire", header: t("commercial.col.affaire"), render: (c) => c.affaire_title ?? "—" },
+    { key: "code", header: t("commercial.col.code"), render: (c) => <span style={NOWRAP}>{c.code}</span>, sortValue: (c) => c.code },
+    {
+      key: "profil",
+      header: t("commercial.col.profil"),
+      render: (c) => (c.profile ? t(`revueR2.pipeline.profils.${c.profile}`, { defaultValue: c.profile_label }) : c.profile_label),
+    },
+    // Client et affaire regroupés : l'intitulé d'affaire (long) passe en ligne secondaire au lieu d'écraser une colonne.
+    {
+      key: "client",
+      header: t("revueR2.pipeline.clientAffaire"),
+      sortValue: (c) => c.client_name,
+      render: (c) => (
+        <>
+          {c.client_name ?? "—"}
+          {c.affaire_title ? <span className="cell-sub">{c.affaire_title}</span> : null}
+        </>
+      ),
+    },
     { key: "montant", header: t("commercial.col.montantActuel"), num: true, render: (c) => montant(c.montant_actuel), sortValue: (c) => (c.montant_actuel === null ? null : Number(c.montant_actuel)) },
     {
       key: "fin",
@@ -157,14 +187,15 @@ export function CommercialSections() {
       render: (c) =>
         c.end_date ? (
           <>
-            {formatDate(c.end_date)} <Expiration status={c.expiry_status} />
+            <span style={NOWRAP}>{formatDate(c.end_date)}</span>
+            <Expiration status={c.expiry_status} />
           </>
         ) : (
           "—"
         ),
     },
     { key: "avenants", header: t("commercial.col.avenants"), num: true, render: (c) => formatNumber(c.avenants_total) },
-    { key: "statut", header: t("commercial.col.statut"), render: (c) => statut(c.status, c.status_label) },
+    { key: "statut", header: t("commercial.col.statut"), render: (c) => statut("statutsContrat", c.status, c.status_label) },
     actionsColumn<Contrat>(t("ui.actions"), (c) => actionsContrat(c, t)),
   ];
   const colMarges: Column<LigneMarge & { id: string }>[] = [
@@ -180,13 +211,13 @@ export function CommercialSections() {
   return (
     <>
       <SectionCard title={`${t("commercial.offres")} · ${offres.count}`}>
-        <PagedDataTable list={offres} columns={colOffres} caption={t("commercial.offres")} searchPlaceholder={t("commercial.searchOffres")} />
+        <PagedDataTable list={offres} columns={colOffres} maxHeight="none" caption={t("commercial.offres")} searchPlaceholder={t("commercial.searchOffres")} />
       </SectionCard>
       <SectionCard title={`${t("commercial.affaires")} · ${affaires.count}`}>
-        <PagedDataTable list={affaires} columns={colAffaires} caption={t("commercial.affaires")} searchPlaceholder={t("commercial.searchAffaires")} />
+        <PagedDataTable list={affaires} columns={colAffaires} maxHeight="none" caption={t("commercial.affaires")} searchPlaceholder={t("commercial.searchAffaires")} />
       </SectionCard>
       <SectionCard title={`${t("commercial.contrats")} · ${contrats.count}`}>
-        <PagedDataTable list={contrats} columns={colContrats} caption={t("commercial.contrats")} searchPlaceholder={t("commercial.searchContrats")} />
+        <PagedDataTable list={contrats} columns={colContrats} maxHeight="none" caption={t("commercial.contrats")} searchPlaceholder={t("commercial.searchContrats")} />
       </SectionCard>
       <SectionCard
         title={t("commercial.marges")}

@@ -185,7 +185,7 @@ export function StocksPage() {
     { key: "value", header: t("stocks.col.value"), num: true, render: (q) => (q.stock_value === null ? t("stocks.demi") : formatMoney(q.stock_value)) },
   ];
   const mvtColumns: Column<MouvementStock>[] = [
-    { key: "code", header: t("stocks.col.code"), render: (m) => m.code },
+    { key: "code", header: t("stocks.col.code"), render: (m) => <span style={{ whiteSpace: "nowrap" }}>{m.code}</span> },
     { key: "type", header: t("stocks.col.type"), render: (m) => t(`stocks.type_labels.${m.type_mouvement}`) },
     { key: "article", header: t("stocks.col.article"), render: (m) => m.article_code ?? "—" },
     { key: "qty", header: t("stocks.col.qty"), num: true, sortValue: (m) => Number(m.quantite), render: (m) => formatNumber(Number(m.quantite), { decimals: Number(m.quantite) % 1 ? 2 : 0 }) },
@@ -194,8 +194,10 @@ export function StocksPage() {
       header: t("stocks.col.flow"),
       render: (m) => (
         <>
-          {m.source_code ?? t("stocks.reserved")} → {m.destination_code ?? "—"}
-          {m.ordre_code ? <span className="cell-sub">{m.ordre_code}</span> : null}
+          <span style={{ whiteSpace: "nowrap" }}>
+            {m.source_code ?? t("revueR2.stocks.exterieur")} → {m.destination_code ?? m.ordre_code ?? t("revueR2.stocks.exterieur")}
+          </span>
+          {m.ordre_code && m.destination_code ? <span className="cell-sub">{m.ordre_code}</span> : null}
         </>
       ),
     },
@@ -211,7 +213,7 @@ export function StocksPage() {
             title={m.document_titre || undefined}
             onClick={() => void api.download(`/api/stocks/mouvements/${m.id}/bon-de-sortie/`, `BS-${m.code}.pdf`)}
           >
-            <FileDown size={14} aria-hidden /> {t("m5e.mvt.bonSortie")}
+            <FileDown size={14} aria-hidden /> <span style={{ whiteSpace: "nowrap" }}>{t("m5e.mvt.bonSortie")}</span>
           </button>
         ) : m.document_titre ? (
           <span className="cell-sub">{m.document_titre}</span>
@@ -461,7 +463,7 @@ export function StocksPage() {
         title={t("stocks.valoMensuelle")}
         actions={
           <ActionBar
-            actions={[{ label: t("stocks.figer"), path: "/api/stocks/valorisations/figer/", confirm: t("stocks.figerConfirm"), prompt: { name: "periode", label: t("stocks.figerPrompt") } }]}
+            actions={[{ label: t("stocks.figer"), path: "/api/stocks/valorisations/figer/", tone: "ghost", confirm: t("stocks.figerConfirm"), prompt: { name: "periode", label: t("stocks.figerPrompt") } }]}
           />
         }
       >

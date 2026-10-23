@@ -39,8 +39,23 @@ const VALID_STATUSES = new Set<EquipementStatut>([
 ]);
 const BOARD_ORDER: EquipementStatut[] = ["disponible", "affecte", "en_location", "maintenance", "hors_service"];
 
+/** Libellé traduit d'un code de l'API, avec le libellé serveur en repli (jamais de code brut à l'écran). */
+type Lbl = (key: string, fallback: string) => string;
+function useLbl(): Lbl {
+  const { t } = useTranslation();
+  return (key, fallback) => String(t(key, { defaultValue: fallback }));
+}
+
+/** Compteur lisible : « 68 500 km », « 4 200 h moteur » ; « Sans compteur » pour un forfait. */
+function compteurTexte(lbl: Lbl, type: string, value: string | null, typeLabel: string): string {
+  const unite = lbl(`revueR2.logistique.unite.${type}`, typeLabel);
+  if (type === "forfait") return unite;
+  return `${formatNumber(Number(value ?? 0))} ${unite}`;
+}
+
 function EquipementCard({ eq, index }: { eq: EquipementParc; index: number }) {
   const { t } = useTranslation();
+  const lbl = useLbl();
   // Statut porté par la colonne ; la carte montre l'identité, la catégorie, le compteur et la localisation.
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
@@ -55,12 +70,12 @@ function EquipementCard({ eq, index }: { eq: EquipementParc; index: number }) {
         ) : null}
       </div>
       <div className="title">{eq.label}</div>
-      <div className="meta">{[eq.categorie_label, eq.registration].filter(Boolean).join(" · ")}</div>
+      <div className="meta">
+        {[lbl(`revueR2.logistique.categorie.${eq.categorie}`, eq.categorie_label), eq.registration].filter(Boolean).join(" · ")}
+      </div>
       <div className="card-foot">
         <span>{[eq.site, eq.proprietaire_code].filter(Boolean).join(" · ")}</span>
-        <span className="amount" title={eq.compteur_type_label}>
-          {formatNumber(Number(eq.compteur_value))} {eq.compteur_type_label.toLowerCase()}
-        </span>
+        <span className="amount">{compteurTexte(lbl, eq.compteur_type, eq.compteur_value, eq.compteur_type_label)}</span>
       </div>
     </BoardCard>
   );
@@ -68,12 +83,23 @@ function EquipementCard({ eq, index }: { eq: EquipementParc; index: number }) {
 
 type T = (key: string) => string;
 
-function locationColumns(t: T): Column<LocationGR>[] {
+const NOWRAP = { whiteSpace: "nowrap" } as const;
+
+function locationColumns(t: T, lbl: Lbl): Column<LocationGR>[] {
   return [
-    { key: "code", header: t("logistique.col.code"), sortValue: (l) => l.code, render: (l) => l.code },
-    { key: "equip", header: t("logistique.col.equipement"), render: (l) => l.equipement_code },
-    { key: "partner", header: t("logistique.col.partenaire"), render: (l) => l.partenaire_name },
-    { key: "period", header: t("logistique.col.periodicite"), render: (l) => l.periodicite_label },
+    { key: "code", header: t("logistique.col.code"), sortValue: (l) => l.code, render: (l) => <span style={NOWRAP}>{l.code}</span> },
+    {
+      key: "equip",
+      header: t("logistique.col.equipement"),
+      render: (l) => (
+        <>
+          <span style={NOWRAP}>{l.equipement_code}</span>
+          {l.equipement_label ? <span className="cell-sub">{l.equipement_label}</span> : null}
+        </>
+      ),
+    },
+    { key: "partner", header: t("logistique.col.partenaire"), render: (l) => l.partenaire_name ?? "—" },
+    { key: "period", header: t("logistique.col.periodicite"), render: (l) => <span style={NOWRAP}>{lbl(`revueR2.logistique.periodicite.${l.periodicite}`, l.periodicite_label)}</span> },
     {
       key: "conso",
       header: t("logistique.col.consommation"),
@@ -91,10 +117,16 @@ function locationColumns(t: T): Column<LocationGR>[] {
       key: "statut",
       header: t("logistique.col.statut"),
       render: (l) => (
-        <>
-          <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>{l.statut_label}</Badge>
-          {l.imputation_618 && <Badge tone="neutral">618</Badge>}
-        </>
+        <span style={NOWRAP}>
+          <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
+            {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
+          </Badge>
+          {l.imputation_618 && (
+            <Badge tone="neutral" title={t("tableaux.logistique.compte618")}>
+              618
+            </Badge>
+          )}
+        </span>
       ),
     },
     actionsColumn<LocationGR>(t("listes.col.actions"), (l) => [
@@ -111,9 +143,9 @@ function locationColumns(t: T): Column<LocationGR>[] {
   ];
 }
 
-function demandeColumns(t: T): Column<DemandeMobilisation>[] {
+function demandeColumns(t: T, lbl: Lbl): Column<DemandeMobilisation>[] {
   return [
-    { key: "code", header: t("logistique.col.code"), render: (d) => d.code },
+    { key: "code", header: t("logistique.col.code"), render: (d) => <span style={NOWRAP}>{d.code}</span> },
     { key: "label", header: t("logistique.col.besoin"), render: (d) => d.label },
     { key: "dept", header: t("logistique.col.departement"), render: (d) => d.departement || "—" },
     { key: "debut", header: t("logistique.debut"), sortValue: (d) => d.date_debut, render: (d) => formatDate(d.date_debut) },
@@ -121,7 +153,11 @@ function demandeColumns(t: T): Column<DemandeMobilisation>[] {
     {
       key: "statut",
       header: t("logistique.col.statut"),
-      render: (d) => <Badge tone={d.statut === "soumise" ? "warn" : d.statut === "brouillon" ? "neutral" : "ok"}>{d.statut_label}</Badge>,
+      render: (d) => (
+        <Badge tone={d.statut === "soumise" ? "warn" : d.statut === "brouillon" || d.statut === "annulee" ? "neutral" : "ok"}>
+          {lbl(`revueR2.logistique.statutDemande.${d.statut}`, d.statut_label)}
+        </Badge>
+      ),
     },
     actionsColumn<DemandeMobilisation>(t("listes.col.actions"), (d) => [
       ...(d.statut === "brouillon"
@@ -134,6 +170,7 @@ function demandeColumns(t: T): Column<DemandeMobilisation>[] {
 
 export function LogistiquePage() {
   const { t } = useTranslation();
+  const lbl = useLbl();
 
   const [eqSearch, setEqSearch] = useState("");
   const [eqSite, setEqSite] = useState("");
@@ -226,7 +263,7 @@ export function LogistiquePage() {
 
       {(locations.count > 0 || locations.search) && (
         <SectionCard title={`${t("listes.logistique.locationsTitle")} · ${locations.count}`}>
-          <PagedDataTable list={locations} columns={locationColumns(t)} caption={t("listes.logistique.locationsTitle")} searchPlaceholder={t("logistique.searchLocations")} />
+          <PagedDataTable list={locations} columns={locationColumns(t, lbl)} caption={t("listes.logistique.locationsTitle")} searchPlaceholder={t("logistique.searchLocations")} />
         </SectionCard>
       )}
       <GrAffairesSection />
@@ -235,7 +272,7 @@ export function LogistiquePage() {
       <EcartsM4Section />
       {(demandes.count > 0 || demandes.search) && (
         <SectionCard title={`${t("logistique.demandes")} · ${demandes.count}`}>
-          <PagedDataTable list={demandes} columns={demandeColumns(t)} caption={t("logistique.demandes")} searchPlaceholder={t("logistique.searchDemandes")} />
+          <PagedDataTable list={demandes} columns={demandeColumns(t, lbl)} caption={t("logistique.demandes")} searchPlaceholder={t("logistique.searchDemandes")} />
         </SectionCard>
       )}
     </div>

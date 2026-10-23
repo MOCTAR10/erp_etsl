@@ -1,12 +1,12 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 
@@ -14,6 +14,7 @@ interface Equipement {
   id: string;
   code: string;
   label: string;
+  compteur_type: string;
   compteur_type_label: string;
   compteur_value: string;
   plafond_compteur: string | null;
@@ -24,6 +25,7 @@ interface Releve {
   equipement_code: string;
   date: string;
   valeur: string;
+  source?: string;
   source_label: string;
   saisi_par_name: string | null;
 }
@@ -41,6 +43,7 @@ interface Audit {
   code: string;
   equipement_code: string;
   date_audit: string;
+  etat?: string;
   etat_label: string;
   photo: string | null;
   photo_sha256: string;
@@ -127,9 +130,30 @@ type Suivi = Location & { g: Glissant | undefined };
 type LigneReporting = Reporting["rows"][number] & { id: string };
 type LigneFlux = Flux["rows"][number] & { id: string };
 
-const num = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatNumber(Number(v)));
+/** Nombre exact : entier sans décimales, sinon deux décimales (taux par jour). */
+const num = (v: string | null | undefined) => {
+  if (v === null || v === undefined) return "—";
+  const n = Number(v);
+  return Number.isInteger(n) ? formatNumber(n) : formatNumber(n, { decimals: 2 });
+};
+const NOWRAP = { whiteSpace: "nowrap" } as const;
+/** Code (sur une ligne) et libellé en dessous : la colonne ne se fragmente plus mot à mot sur mobile. */
+const codeLibelle = (code: string, libelle?: string | null) => (
+  <>
+    <span style={NOWRAP}>{code}</span>
+    {libelle ? <span className="cell-sub">{libelle}</span> : null}
+  </>
+);
 const fcfa = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 const moisCourant = () => new Date().toISOString().slice(0, 7);
+/** Les 12 derniers mois (AAAA-MM), du plus récent au plus ancien : un choix lisible dans la langue de l'interface. */
+const derniersMois = () => {
+  const d = new Date();
+  return Array.from({ length: 12 }, (_, i) => {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
+  });
+};
 const ETATS = ["bon", "usage", "degrade", "hors_service"];
 
 function useListe<T>(key: string, path: string): T[] {
@@ -138,7 +162,14 @@ function useListe<T>(key: string, path: string): T[] {
 
 /** Écarts M4 : parc (plafond, historique, audit photo), commandes GR (validation, lignes, BL, 618), compteurs GR, reporting, plan de charge. */
 export function EcartsM4Section() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lbl = (key: string, fallback: string) => String(t(key, { defaultValue: fallback }));
+  const unite = (e: Equipement) => lbl(`revueR2.logistique.unite.${e.compteur_type}`, e.compteur_type_label);
+  const moisLabel = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    const txt = new Date(y, m - 1, 1).toLocaleDateString(i18n.language || "fr", { month: "long", year: "numeric" });
+    return txt.charAt(0).toUpperCase() + txt.slice(1);
+  };
   const qc = useQueryClient();
   const equipements = useListe<Equipement>("equipements", "/api/logistique/equipements/");
   const releves = useListe<Releve>("releves", "/api/logistique/releves-parc/");
@@ -172,12 +203,14 @@ export function EcartsM4Section() {
   // Audit photo : formulaire multipart (la photo est hachée SHA-256 côté serveur).
   const [audit, setAudit] = useState({ equipement: "", date_audit: new Date().toISOString().slice(0, 10), etat: "bon", observations: "" });
   const [photo, setPhoto] = useState<File | null>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const [auditMsg, setAuditMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const envoyerAudit = useMutation({
     mutationFn: () => api.upload("/api/logistique/audits/", photo as File, "photo", audit),
     onSuccess: () => {
       setAuditMsg({ ok: true, text: t("quickForm.created") });
       setPhoto(null);
+      if (photoRef.current) photoRef.current.value = "";
       void qc.invalidateQueries({ queryKey: ["m4e"] });
     },
     onError: (e) => setAuditMsg({ ok: false, text: describeError(e) }),
@@ -196,7 +229,7 @@ export function EcartsM4Section() {
   const suivis: Suivi[] = actives.map((l, i) => ({ ...l, g: glissants[i]?.data }));
 
   const colsParc: Column<Equipement>[] = [
-    { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (e) => e.code, render: (e) => `${e.code} · ${e.label}` },
+    { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (e) => e.code, render: (e) => codeLibelle(e.code, e.label) },
     {
       key: "compteur",
       header: t("ecarts_m4.parc.compteur"),
@@ -204,7 +237,13 @@ export function EcartsM4Section() {
       sortValue: (e) => Number(e.compteur_value),
       render: (e) => (
         <>
-          {num(e.compteur_value)} <span className="muted">{e.compteur_type_label}</span>
+          {e.compteur_type === "forfait" ? (
+            <span className="muted">{unite(e)}</span>
+          ) : (
+            <span style={NOWRAP}>
+              {num(e.compteur_value)} <span className="muted">{unite(e)}</span>
+            </span>
+          )}
         </>
       ),
     },
@@ -213,10 +252,10 @@ export function EcartsM4Section() {
       header: t("ecarts_m4.parc.plafond"),
       num: true,
       render: (e) => (
-        <>
+        <span style={NOWRAP}>
           {num(e.plafond_compteur)}{" "}
           {e.plafond_pct !== null && <Badge tone={Number(e.plafond_pct) >= 90 ? "warn" : "ok"}>{formatNumber(Number(e.plafond_pct))} %</Badge>}
-        </>
+        </span>
       ),
     },
     actionsColumn<Equipement>(actionsHeader, (e) => [
@@ -227,7 +266,13 @@ export function EcartsM4Section() {
     { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (r) => r.equipement_code, render: (r) => r.equipement_code },
     { key: "date", header: t("ecarts_m4.date"), sortValue: (r) => r.date, render: (r) => formatDate(r.date) },
     { key: "valeur", header: t("ecarts_m4.parc.valeur"), num: true, render: (r) => num(r.valeur) },
-    { key: "source", header: t("ecarts_m4.parc.source"), render: (r) => `${r.source_label}${r.saisi_par_name ? ` · ${r.saisi_par_name}` : ""}` },
+    { key: "source", header: t("ecarts_m4.parc.source"), render: (r) => (
+        <>
+          {r.source ? lbl(`revueR2.logistique.sourceReleve.${r.source}`, r.source_label) : r.source_label}
+          {r.saisi_par_name ? <span className="cell-sub">{r.saisi_par_name}</span> : null}
+        </>
+      ),
+    },
   ];
   const colsAudits: Column<Audit>[] = [
     {
@@ -236,7 +281,9 @@ export function EcartsM4Section() {
       sortValue: (a) => a.code,
       render: (a) => (
         <>
-          {a.code} · {a.equipement_code}{" "}
+          <span style={NOWRAP}>
+            {a.code} · {a.equipement_code}
+          </span>{" "}
           {a.photo && (
             <a href={a.photo} target="_blank" rel="noreferrer">
               {t("ecarts_m4.audit.voirPhoto")}
@@ -246,7 +293,7 @@ export function EcartsM4Section() {
       ),
     },
     { key: "date", header: t("ecarts_m4.date"), sortValue: (a) => a.date_audit, render: (a) => formatDate(a.date_audit) },
-    { key: "etat", header: t("ecarts_m4.audit.etat"), render: (a) => a.etat_label },
+    { key: "etat", header: t("ecarts_m4.audit.etat"), render: (a) => (a.etat ? lbl(`revueR2.logistique.etatAudit.${a.etat}`, a.etat_label) : a.etat_label) },
     { key: "empreinte", header: t("ecarts_m4.audit.empreinte"), render: (a) => <code title={a.photo_sha256}>{a.photo_sha256.slice(0, 12)}…</code> },
     { key: "conservation", header: t("ecarts_m4.audit.conservation"), sortValue: (a) => a.conserver_jusqu_au, render: (a) => formatDate(a.conserver_jusqu_au) },
   ];
@@ -262,9 +309,12 @@ export function EcartsM4Section() {
       header: t("ecarts_m4.location"),
       sortValue: (l) => l.code,
       render: (l) => (
-        <>
-          {l.code} · {l.equipement_code} <Badge tone="brand">{l.statut_label}</Badge>
-        </>
+        <span style={NOWRAP}>
+          {l.code} · {l.equipement_code}{" "}
+          <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
+            {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
+          </Badge>
+        </span>
       ),
     },
     {
@@ -282,7 +332,7 @@ export function EcartsM4Section() {
       key: "achats",
       header: t("ecarts_m4.commandes.achats"),
       render: (l) => (
-        <>
+        <span style={NOWRAP}>
           {l.bon_commande_code ?? "—"} / {l.facture_code ?? "—"}{" "}
           {l.facture_conforme !== null && (
             <Badge tone={l.facture_conforme ? "ok" : "err"}>{l.facture_conforme ? t("ecarts_m4.commandes.conforme") : t("ecarts_m4.commandes.ecart")}</Badge>
@@ -290,7 +340,7 @@ export function EcartsM4Section() {
           <Badge tone="neutral" title={t("tableaux.logistique.compte618")}>
             618
           </Badge>
-        </>
+        </span>
       ),
     },
     {
@@ -368,9 +418,9 @@ export function EcartsM4Section() {
       header: t("ecarts_m4.location"),
       sortValue: (l) => l.code,
       render: (l) => (
-        <>
+        <span style={NOWRAP}>
           {l.code} · {l.equipement_code} {l.g?.provisoire && <Badge tone="warn">{t("ecarts_m4.provisoire")}</Badge>}
-        </>
+        </span>
       ),
     },
     { key: "dernier", header: t("ecarts_m4.compteurs.dernier"), num: true, render: (l) => num(l.g?.dernier_releve) },
@@ -399,7 +449,10 @@ export function EcartsM4Section() {
       sortValue: (r) => r.equipement,
       render: (r) => (
         <>
-          {r.equipement} · {r.label} {r.gr && <Badge tone="warn">GR</Badge>}
+          <span style={NOWRAP}>
+            {r.equipement} {r.gr && <Badge tone="brand">GR</Badge>}
+          </span>
+          <span className="cell-sub">{r.label}</span>
         </>
       ),
     },
@@ -408,7 +461,7 @@ export function EcartsM4Section() {
     { key: "economies", header: t("ecarts_m4.reporting.economies"), num: true, render: (r) => (r.gr ? "—" : fcfa(r.economie)) },
   ];
   const colsFlux: Column<LigneFlux>[] = [
-    { key: "affaire", header: t("ecarts_m4.flux.affaire"), sortValue: (r) => r.affaire ?? r.titre, render: (r) => (r.affaire ? `${r.affaire} — ${r.titre}` : r.titre) },
+    { key: "affaire", header: t("ecarts_m4.flux.affaire"), sortValue: (r) => r.affaire ?? r.titre, render: (r) => (r.affaire ? codeLibelle(r.affaire, r.titre) : lbl("revueR2.logistique.sansAffaire", r.titre)) },
     {
       key: "machines",
       header: t("ecarts_m4.flux.machines"),
@@ -466,7 +519,7 @@ export function EcartsM4Section() {
             <div className="quick-form-grid">
               <div className="field">
                 <label htmlFor="m4-audit-eq">{t("ecarts_m4.equipement")} *</label>
-                <select id="m4-audit-eq" required value={audit.equipement} onChange={(e) => setAudit({ ...audit, equipement: e.target.value })}>
+                <select id="m4-audit-eq" className="control" required value={audit.equipement} onChange={(e) => setAudit({ ...audit, equipement: e.target.value })}>
                   <option value="">—</option>
                   {eqOpts.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -477,11 +530,11 @@ export function EcartsM4Section() {
               </div>
               <div className="field">
                 <label htmlFor="m4-audit-date">{t("ecarts_m4.date")} *</label>
-                <input id="m4-audit-date" type="date" required value={audit.date_audit} onChange={(e) => setAudit({ ...audit, date_audit: e.target.value })} />
+                <DatePicker id="m4-audit-date" required value={audit.date_audit} onChange={(iso) => setAudit({ ...audit, date_audit: iso })} />
               </div>
               <div className="field">
                 <label htmlFor="m4-audit-etat">{t("ecarts_m4.audit.etat")}</label>
-                <select id="m4-audit-etat" value={audit.etat} onChange={(e) => setAudit({ ...audit, etat: e.target.value })}>
+                <select id="m4-audit-etat" className="control" value={audit.etat} onChange={(e) => setAudit({ ...audit, etat: e.target.value })}>
                   {ETATS.map((v) => (
                     <option key={v} value={v}>
                       {t(`ecarts_m4.audit.etats.${v}`)}
@@ -491,15 +544,32 @@ export function EcartsM4Section() {
               </div>
               <div className="field">
                 <label htmlFor="m4-audit-photo">{t("ecarts_m4.audit.photo")} *</label>
-                <input id="m4-audit-photo" type="file" accept="image/*" required onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+                {/* Champ fichier natif masqué (son « Choose File » suit la langue du navigateur) : bouton + nom du fichier dans la langue de l'interface. */}
+                <input
+                  ref={photoRef}
+                  id="m4-audit-photo"
+                  className="sr-only"
+                  type="file"
+                  accept="image/*"
+                  tabIndex={-1}
+                  onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                />
+                <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0, minHeight: "var(--control-h)" }}>
+                  <button type="button" className="btn ghost sm" style={{ flex: "none" }} onClick={() => photoRef.current?.click()}>
+                    {t("revueR2.logistique.choisirPhoto")}
+                  </button>
+                  <span className="muted" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {photo ? photo.name : t("revueR2.logistique.aucunePhoto")}
+                  </span>
+                </span>
               </div>
               <div className="field wide">
                 <label htmlFor="m4-audit-obs">{t("ecarts_m4.audit.observations")}</label>
-                <textarea id="m4-audit-obs" rows={2} value={audit.observations} onChange={(e) => setAudit({ ...audit, observations: e.target.value })} />
+                <textarea id="m4-audit-obs" className="control" rows={3} value={audit.observations} onChange={(e) => setAudit({ ...audit, observations: e.target.value })} />
               </div>
             </div>
             <div className="quick-form-actions">
-              <button type="submit" className="btn primary" disabled={envoyerAudit.isPending}>
+              <button type="submit" className="btn primary" disabled={envoyerAudit.isPending || !photo || !audit.equipement}>
                 {t("ecarts_m4.audit.enregistrer")}
               </button>
               {auditMsg && (
@@ -588,18 +658,26 @@ export function EcartsM4Section() {
         <div data-testid="m4-reporting">
           <div className="field" style={{ maxWidth: 220 }}>
             <label htmlFor="m4-reporting-mois">{t("ecarts_m4.reporting.mois")}</label>
-            <input id="m4-reporting-mois" className="control" type="month" value={periode} onChange={(e) => setPeriode(e.target.value)} />
+            <select id="m4-reporting-mois" className="control" value={periode} onChange={(e) => setPeriode(e.target.value)}>
+              {derniersMois().map((m) => (
+                <option key={m} value={m}>
+                  {moisLabel(m)}
+                </option>
+              ))}
+            </select>
           </div>
           {reporting?.provisoire && (
-            <p className="action-error" role="note">
-              {t("ecarts_m4.reporting.warnProvisoire")}
+            <p className="muted" role="note">
+              <Badge tone="warn">{t("revueR2.logistique.provisoire")}</Badge> {t("ecarts_m4.reporting.warnProvisoire")}
             </p>
           )}
           {reporting && (
             <>
               <p>
-                {t("ecarts_m4.reporting.utilisation")} : <strong className="num">{formatNumber(Number(reporting.utilisation_moyenne_pct))} %</strong> ·{" "}
-                {t("ecarts_m4.reporting.economies")} : <strong className="amount">{fcfa(reporting.economies)}</strong> · {t("ecarts_m4.reporting.rentabilite")} :{" "}
+                <span className="muted">{t("ecarts_m4.reporting.utilisation")}</span>{" "}
+                <strong className="num">{formatNumber(Number(reporting.utilisation_moyenne_pct))} %</strong>
+                <span className="muted"> · {t("ecarts_m4.reporting.economies")}</span> <strong className="amount">{fcfa(reporting.economies)}</strong>
+                <span className="muted"> · {t("ecarts_m4.reporting.rentabilite")}</span>{" "}
                 <strong className="num">{reporting.rentabilite_pct === null ? "—" : `${formatNumber(Number(reporting.rentabilite_pct))} %`}</strong>
               </p>
               <p className="muted">{t("ecarts_m4.reporting.formules")}</p>
@@ -618,7 +696,7 @@ export function EcartsM4Section() {
         title={t("ecarts_m4.flux.title")}
         actions={
           <SectionActions>
-            <ActionBar actions={[{ label: t("ecarts_m4.flux.proposer"), path: "/api/logistique/demandes/proposer/" }]} />
+            <ActionBar actions={[{ label: t("ecarts_m4.flux.proposer"), path: "/api/logistique/demandes/proposer/", tone: "ghost" }]} />
           </SectionActions>
         }
       >

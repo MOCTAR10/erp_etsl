@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -79,6 +80,7 @@ export function CoutsMaintenanceSection() {
   const qc = useQueryClient();
   const [annee, setAnnee] = useState(String(new Date().getFullYear()));
   const [error, setError] = useState<string | null>(null);
+  const [toutesMachines, setToutesMachines] = useState(false);
   const couts = useQuery({
     queryKey: ["m5m8", "couts-maint", annee],
     queryFn: () => api.get<Couts>(`/api/maintenance/ordres/couts-annuels/?annee=${annee}`),
@@ -118,8 +120,9 @@ export function CoutsMaintenanceSection() {
         r.nb_ot === null ? (
           <strong>{r.centre}</strong>
         ) : (
-          <span title={r.libelle}>
-            {r.centre} <span className="muted">· {t("tableaux.maintenance.nbOt", { count: r.nb_ot })}</span>
+          <span title={r.libelle} style={{ whiteSpace: "nowrap" }}>
+            {r.centre}
+            <span className="cell-sub">{t("tableaux.maintenance.nbOt", { count: r.nb_ot })}</span>
           </span>
         ),
     },
@@ -128,7 +131,17 @@ export function CoutsMaintenanceSection() {
   ];
 
   const colsMachines: Column<LigneMachine & { id: string }>[] = [
-    { key: "machine", header: t("ecarts_m5m8.maint.machine"), render: (r) => `${r.actif} · ${r.designation}`, sortValue: (r) => r.actif },
+    {
+      key: "machine",
+      header: t("ecarts_m5m8.maint.machine"),
+      render: (r) => (
+        <>
+          <span style={{ whiteSpace: "nowrap" }}>{r.actif}</span>
+          <span className="cell-sub">{r.designation}</span>
+        </>
+      ),
+      sortValue: (r) => r.actif,
+    },
     { key: "centre", header: t("ecarts_m5m8.maint.centre"), render: (r) => r.centre, sortValue: (r) => r.centre },
     { key: "compte", header: t("ecarts_m5m8.maint.compte"), render: (r) => r.compte },
     { key: "ot", header: t("tableaux.maintenance.ot"), num: true, render: (r) => formatNumber(r.nb_ot), sortValue: (r) => r.nb_ot },
@@ -150,7 +163,17 @@ export function CoutsMaintenanceSection() {
   ];
 
   const colsAffectation: Column<ActifCentre>[] = [
-    { key: "machine", header: t("ecarts_m5m8.maint.machine"), render: (a) => `${a.code} · ${a.designation}`, sortValue: (a) => a.code },
+    {
+      key: "machine",
+      header: t("ecarts_m5m8.maint.machine"),
+      render: (a) => (
+        <>
+          <span style={{ whiteSpace: "nowrap" }}>{a.code}</span>
+          <span className="cell-sub">{a.designation}</span>
+        </>
+      ),
+      sortValue: (a) => a.code,
+    },
     {
       key: "centre",
       header: t("ecarts_m5m8.maint.centre"),
@@ -179,23 +202,25 @@ export function CoutsMaintenanceSection() {
           <Badge tone="warn">{t("ecarts_m5m8.provisoire")}</Badge> {t("ecarts_m5m8.maint.provisoireNote")}
         </p>
         {error && <p className="action-error" role="alert">{error}</p>}
-        <div className="action-bar-buttons">
-          <label>
-            {t("ecarts_m5m8.annee")} <input type="number" min={2000} max={2100} value={annee} onChange={(ev) => setAnnee(ev.target.value)} style={{ width: "6rem" }} />
-          </label>
+        <div className="list-toolbar">
+          <div className="field" style={{ flex: "0 0 120px" }}>
+            <label htmlFor="couts-maint-annee">{t("ecarts_m5m8.annee")}</label>
+            <input id="couts-maint-annee" className="control" type="number" min={2000} max={2100} value={annee} onChange={(ev) => setAnnee(ev.target.value)} />
+          </div>
           {c && (
-            <>
+            <div className="list-toolbar-end" style={{ alignSelf: "flex-end" }}>
               <button type="button" className="btn ghost sm" onClick={() => void exporter("xlsx")}>{t("ecarts_m5m8.exportXlsx")}</button>
               <button type="button" className="btn ghost sm" onClick={() => void exporter("pdf")}>{t("ecarts_m5m8.exportPdf")}</button>
-            </>
+            </div>
           )}
         </div>
         {couts.isError && <p className="muted">{t("ecarts_m5m8.maint.reserve")}</p>}
         {c && (
           <>
             <p>
-              {t("ecarts_m5m8.maint.total")} : <strong>{formatMoney(c.total, { currency: c.devise || "FCFA" })}</strong> · {t("tableaux.maintenance.gr618")} : {fcfa(c.totaux.gr_618)} · {t("ecarts_m5m8.maint.horsGr")} : {fcfa(c.totaux.hors_gr)}{" "}
-              {c.provisoire && <Badge tone="warn">{t("ecarts_m5m8.provisoire")}</Badge>}
+              <span className="muted">{t("ecarts_m5m8.maint.total")}</span> <strong className="amount">{fcfa(c.total)}</strong>
+              <span className="muted"> · {t("tableaux.maintenance.gr618")}</span> <span className="amount">{fcfa(c.totaux.gr_618)}</span>
+              <span className="muted"> · {t("ecarts_m5m8.maint.horsGr")}</span> <span className="amount">{fcfa(c.totaux.hors_gr)}</span>
             </p>
             <div data-testid="couts-centres">
               <DataTable caption={t("ecarts_m5m8.maint.title")} density="compact" columns={colsMatrice} rows={lignesMatrice} />
@@ -213,7 +238,13 @@ export function CoutsMaintenanceSection() {
 
         <h4>{t("ecarts_m5m8.maint.affectation")}</h4>
         <div data-testid="centres-machines">
-          <DataTable caption={t("ecarts_m5m8.maint.affectation")} columns={colsAffectation} rows={actifs} />
+          <DataTable caption={t("ecarts_m5m8.maint.affectation")} columns={colsAffectation} rows={toutesMachines ? actifs : actifs.slice(0, 8)} />
+          {actifs.length > 8 && (
+            <button type="button" className="btn ghost sm" aria-expanded={toutesMachines} onClick={() => setToutesMachines((v) => !v)} style={{ marginTop: "var(--space-2)" }}>
+              <ChevronDown size={14} aria-hidden style={{ transform: toutesMachines ? "rotate(180deg)" : undefined }} />
+              {toutesMachines ? t("revueR2.maintenance.reduire") : t("revueR2.maintenance.voirTout", { n: actifs.length })}
+            </button>
+          )}
         </div>
       </div>
     </SectionCard>
