@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { APP_NAV_KEY, ROUTE_APP, appForRoute, canSeeApp } from "./modules";
+import { APP_NAV_KEY, ROUTE_APP, appForRoute, canSeeApp, sansCode } from "./modules";
 
 describe("canSeeApp", () => {
   it("filtre sur les modules du rôle", () => {
@@ -34,5 +34,13 @@ describe("ROUTE_APP", () => {
     expect(appForRoute("/comptabilite")).toBe("comptabilite");
     expect(appForRoute("/controle-gestion")).toBe("controle_gestion");
     expect(appForRoute("/inconnu")).toBeUndefined();
+  });
+});
+
+describe("sansCode", () => {
+  it("retire le code de module des libellés de menu", () => {
+    expect(sansCode("Commandes M2")).toBe("Commandes");
+    expect(sansCode("RH & Paie M9")).toBe("RH & Paie");
+    expect(sansCode("Comptabilité")).toBe("Comptabilité");
   });
 });

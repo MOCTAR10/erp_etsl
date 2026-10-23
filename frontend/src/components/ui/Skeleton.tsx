@@ -6,17 +6,17 @@ export function Skeleton({ className = "", style }: { className?: string; style?
 
 export function KpiSkeleton() {
   return (
-    <div className="card kpi">
+    <div className="card kpi" aria-hidden>
       <Skeleton style={{ height: 12, width: "55%" }} />
-      <Skeleton style={{ height: 26, width: "45%" }} />
-      <Skeleton style={{ height: 12, width: "70%" }} />
+      <Skeleton style={{ height: 28, width: "45%" }} />
+      <Skeleton style={{ height: 12, width: "70%", marginTop: "auto" }} />
     </div>
   );
 }
 
 export function KpiGridSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="kpi-grid">
+    <div className="kpi-grid" aria-busy="true">
       {Array.from({ length: count }, (_, i) => (
         <KpiSkeleton key={i} />
       ))}
@@ -26,12 +26,12 @@ export function KpiGridSkeleton({ count = 4 }: { count?: number }) {
 
 export function BoardSkeleton({ cols = 4, rows = 3 }: { cols?: number; rows?: number }) {
   return (
-    <div className="board">
+    <div className="board" aria-busy="true">
       {Array.from({ length: cols }, (_, c) => (
         <div className="board-col" key={c}>
-          <Skeleton style={{ height: 14, width: "60%", marginBottom: "0.4rem" }} />
+          <Skeleton style={{ height: 14, width: "60%", marginBottom: 4 }} />
           {Array.from({ length: rows }, (_, r) => (
-            <div className="task-card" key={r} style={{ boxShadow: "none" }}>
+            <div className="task-card" key={r} aria-hidden>
               <Skeleton style={{ height: 13, width: "80%" }} />
               <Skeleton style={{ height: 12, width: "55%" }} />
             </div>

@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { AptitudeMedicale, ExigenceHabilitationHse, FormationSecurite, ParametreStock, PasseportSecurite, PersonnelHse } from "../../types";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 import { useListeHse } from "./listesHse";
 
 const TYPES_EPI = ["casque", "lunettes", "ecran_facial", "protection_auditive", "gants", "chaussures", "veste_haute_visibilite", "harnais", "masque", "baudrier"];
@@ -15,7 +17,15 @@ function usePersonnel() {
   return useQuery({ queryKey: ["hse-personnel"], queryFn: () => api.listAll<PersonnelHse>("/api/hse/personnel/"), retry: 0 });
 }
 
-/** Personnel et sécurité (CDC M7-04 / M7-05 / §9.6) : passeport sécurité, dotation EPI, aptitudes médicales. */
+/** Valeur exacte d'un paramètre (décimales significatives conservées, séparateurs français). */
+const valeurExacte = (v: string) => {
+  const dec = (String(Number(v)).split(".")[1] ?? "").length;
+  return formatNumber(v, { decimals: Math.min(dec, 4) });
+};
+
+type LignePasseport = { id: string; element: ReactNode; debut: string | null; fin: ReactNode };
+
+/** Personnel et sécurité : passeport sécurité, dotation EPI, aptitudes médicales. */
 export function PersonnelHseSection() {
   const { t } = useTranslation();
   const personnel = usePersonnel();
@@ -29,10 +39,32 @@ export function PersonnelHseSection() {
   if (personnel.isError) return null;
   const options = (personnel.data ?? []).map((p) => ({ value: p.id, label: `${p.code} · ${p.nom_complet}` }));
   const p = passeport.data;
+  const lignes: LignePasseport[] = p
+    ? [
+        ...p.qualifications.map((q) => ({
+          id: `q-${q.intitule}-${q.obtention ?? ""}`,
+          element: q.intitule,
+          debut: q.obtention,
+          fin: <Badge tone={q.valide ? "ok" : "err"}>{q.validite ? formatDate(q.validite) : t("m7e.perso.sansEcheance")}</Badge>,
+        })),
+        ...p.epi.map((e) => ({
+          id: `e-${e.code}`,
+          element: `EPI · ${t(`hse.epi_types.${e.type}`, { defaultValue: e.type })} — ${e.designation}`,
+          debut: e.dotation,
+          fin: e.renouvellement ? formatDate(e.renouvellement) : "—",
+        })),
+      ]
+    : [];
+  const colPasseport: Column<LignePasseport>[] = [
+    { key: "element", header: t("tableaux.hse.element"), render: (l) => l.element },
+    { key: "debut", header: t("tableaux.hse.obtention"), sortValue: (l) => l.debut, render: (l) => (l.debut ? formatDate(l.debut) : "—") },
+    { key: "fin", header: t("tableaux.hse.validite"), render: (l) => l.fin },
+  ];
   return (
-    <SectionCard title={t("m7e.perso.title")}>
-      <div data-testid="personnel-hse">
-        <div className="action-bar-buttons">
+    <SectionCard
+      title={t("m7e.perso.title")}
+      actions={
+        <SectionActions>
           <QuickForm
             title={t("m7e.perso.doterEpi")}
             endpoint="/api/hse/epis/"
@@ -59,53 +91,39 @@ export function PersonnelHseSection() {
               { name: "medecin", label: t("m7e.perso.medecin") },
             ]}
           />
-        </div>
-        <label>
-          {t("m7e.perso.salarie")}{" "}
-          <select aria-label={t("m7e.perso.passeportDe")} value={employe} onChange={(e) => setEmploye(e.target.value)}>
+        </SectionActions>
+      }
+    >
+      <div data-testid="personnel-hse">
+        <div className="field">
+          <label htmlFor="passeport-salarie">{t("m7e.perso.salarie")}</label>
+          <select id="passeport-salarie" className="control" aria-label={t("m7e.perso.passeportDe")} value={employe} onChange={(e) => setEmploye(e.target.value)} style={{ maxWidth: 420 }}>
             <option value="">{t("m7e.perso.choisir")}</option>
             {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-        </label>
+        </div>
         {employe && (
-          <>
-            {" "}
+          <div className="action-bar-buttons">
             <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/personnel/${employe}/passeport/?export=pdf`, "passeport-securite.pdf")}>
               {t("m7e.perso.passeportPdf")}
-            </button>{" "}
+            </button>
             <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/epis/fiche-dotation/?employe=${employe}&export=pdf`, "dotation-epi.pdf")}>
               {t("m7e.perso.dotationPdf")}
             </button>
-          </>
+          </div>
         )}
         {p && (
           <div data-testid="passeport-securite">
             <p>
               {p.aptitude ? (
-                <Badge tone={p.aptitude.valide ? "ok" : "err"}>{t("m7e.perso.aptitudeEtat", { resultat: p.aptitude.resultat })}</Badge>
+                <Badge tone={p.aptitude.valide ? "ok" : "err"}>
+                  {t("m7e.perso.aptitudeEtat", { resultat: t(`m7e.perso.resultats.${p.aptitude.resultat}`, { defaultValue: p.aptitude.resultat }) })}
+                </Badge>
               ) : (
                 <span className="muted">{t("m7e.perso.aptitudeInconnue")}</span>
               )}
             </p>
-            <table className="table">
-              <caption className="sr-only">{t("m7e.perso.passeport")}</caption>
-              <tbody>
-                {p.qualifications.map((q) => (
-                  <tr key={`${q.intitule}-${q.obtention}`}>
-                    <td>{q.intitule}</td>
-                    <td>{q.obtention ? formatDate(q.obtention) : "—"}</td>
-                    <td><Badge tone={q.valide ? "ok" : "err"}>{q.validite ? formatDate(q.validite) : t("m7e.perso.sansEcheance")}</Badge></td>
-                  </tr>
-                ))}
-                {p.epi.map((e) => (
-                  <tr key={e.code}>
-                    <td>EPI · {e.type} — {e.designation}</td>
-                    <td>{formatDate(e.dotation)}</td>
-                    <td>{e.renouvellement ? formatDate(e.renouvellement) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable columns={colPasseport} rows={lignes} caption={t("m7e.perso.passeport")} emptyLabel={t("tableaux.hse.aucunePasseport")} />
           </div>
         )}
       </div>
@@ -113,7 +131,7 @@ export function PersonnelHseSection() {
   );
 }
 
-/** Formations HSE nominatives (CDC M7-05) : participants, validation de la session → qualification RH (recyclage). */
+/** Formations HSE nominatives : participants, validation de la session → qualification RH (recyclage). */
 export function FormationsNominativesSection() {
   const { t } = useTranslation();
   const personnel = usePersonnel();
@@ -121,52 +139,59 @@ export function FormationsNominativesSection() {
   if (q.isError) return null;
   const options = (personnel.data ?? []).map((p) => ({ value: p.id, label: `${p.code} · ${p.nom_complet}` }));
   const rows = (q.data ?? []).filter((f) => f.statut !== "annulee");
-  return (
-    <SectionCard title={t("m7e.form.title")}>
-      <div data-testid="formations-nominatives">
-        <p className="muted">{t("m7e.form.hint")}</p>
-        <QuickForm
-          title={t("m7e.form.nouvelle")}
-          endpoint="/api/hse/formations/"
-          fields={[
-            {
-              name: "type_session", label: t("m7e.form.type"), type: "select", required: true, defaultValue: "formation",
-              options: ["formation", "demonstration", "causerie", "exercice", "campagne", "recyclage"].map((v) => ({ value: v, label: t(`m7e.form.types.${v}`) })),
-            },
-            { name: "theme", label: t("m7e.form.theme"), required: true },
-            { name: "date_session", label: t("m7e.form.date"), type: "date", required: true },
-            { name: "validite_mois", label: t("m7e.form.validite"), type: "number", min: 1, step: "1" },
-            { name: "organisme", label: t("m7e.form.organisme") },
+  const columns: Column<FormationSecurite>[] = [
+    { key: "session", header: t("tableaux.hse.session"), sortValue: (f) => f.code, render: (f) => <><strong>{f.code}</strong> · {f.theme}</> },
+    {
+      key: "date",
+      header: t("tableaux.hse.date"),
+      sortValue: (f) => f.date_session,
+      render: (f) => `${formatDate(f.date_session)}${f.validite_mois ? ` · ${t("m7e.form.recyclage", { n: f.validite_mois })}` : ""}`,
+    },
+    { key: "participants", header: t("tableaux.hse.participants"), render: (f) => (f.participants_noms ?? []).join(", ") || "—" },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (f) => (
+        <ActionBar
+          actions={[
+            ...(f.statut !== "realisee" ? [{ label: t("m7e.form.realiser"), path: `/api/hse/formations/${f.id}/realiser/` }] : []),
+            { label: t("m7e.form.ajouter"), path: `/api/hse/formations/${f.id}/ajouter-participant/`, tone: "ghost" as const, prompt: { name: "employe", label: t("m7e.form.participant"), options } },
           ]}
         />
-        {rows.length > 0 && (
-          <table className="table">
-            <caption className="sr-only">{t("m7e.form.title")}</caption>
-            <tbody>
-              {rows.map((f) => (
-                <tr key={f.id}>
-                  <td><strong>{f.code}</strong> · {f.theme}</td>
-                  <td>{formatDate(f.date_session)}{f.validite_mois ? ` · ${t("m7e.form.recyclage", { n: f.validite_mois })}` : ""}</td>
-                  <td>{(f.participants_noms ?? []).join(", ") || "—"}</td>
-                  <td>
-                    <ActionBar
-                      actions={[
-                        { label: t("m7e.form.ajouter"), path: `/api/hse/formations/${f.id}/ajouter-participant/`, tone: "ghost", prompt: { name: "employe", label: t("m7e.form.participant"), options } },
-                        ...(f.statut !== "realisee" ? [{ label: t("m7e.form.realiser"), path: `/api/hse/formations/${f.id}/realiser/` }] : []),
-                      ]}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      ),
+    },
+  ];
+  return (
+    <SectionCard
+      title={t("m7e.form.title")}
+      actions={
+        <SectionActions>
+          <QuickForm
+            title={t("m7e.form.nouvelle")}
+            endpoint="/api/hse/formations/"
+            fields={[
+              {
+                name: "type_session", label: t("m7e.form.type"), type: "select", required: true, defaultValue: "formation",
+                options: ["formation", "demonstration", "causerie", "exercice", "campagne", "recyclage"].map((v) => ({ value: v, label: t(`m7e.form.types.${v}`) })),
+              },
+              { name: "theme", label: t("m7e.form.theme"), required: true },
+              { name: "date_session", label: t("m7e.form.date"), type: "date", required: true },
+              { name: "validite_mois", label: t("m7e.form.validite"), type: "number", min: 1, step: "1" },
+              { name: "organisme", label: t("m7e.form.organisme") },
+            ]}
+          />
+        </SectionActions>
+      }
+    >
+      <div data-testid="formations-nominatives">
+        <p className="muted">{t("m7e.form.hint")}</p>
+        {rows.length > 0 && <DataTable columns={columns} rows={rows} caption={t("m7e.form.title")} />}
       </div>
     </SectionCard>
   );
 }
 
-/** Habilitations exigées par type de permis (CDC M7-09) : donnée ETSL, contrôlée au démarrage du permis. */
+/** Habilitations exigées par type de permis : donnée ETSL, contrôlée au démarrage du permis. */
 export function ExigencesPermisSection() {
   const { t } = useTranslation();
   const typesPermis = useListeHse("type_permis");
@@ -183,39 +208,39 @@ export function ExigencesPermisSection() {
   });
   if (q.isError) return null;
   const rows = q.data ?? [];
+  const columns: Column<ExigenceHabilitationHse>[] = [
+    { key: "type", header: t("m7e.exig.typePermis"), render: (r) => t(`hse.permis_types.${r.type_permis}`) },
+    { key: "motCle", header: t("m7e.exig.motCle"), sortValue: (r) => r.mot_cle, render: (r) => <strong>{r.mot_cle}</strong> },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (r) => (
+        <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("m7e.exig.confirmSupprimer")) && supprimer.mutate(r.id)}>
+          {t("m7e.exig.supprimer")}
+        </button>
+      ),
+    },
+  ];
   return (
-    <SectionCard title={`${t("m7e.exig.title")} · ${rows.length}`}>
+    <SectionCard
+      title={`${t("m7e.exig.title")} · ${rows.length}`}
+      actions={
+        <SectionActions>
+          <QuickForm
+            title={t("m7e.exig.nouvelle")}
+            endpoint="/api/hse/exigences-habilitation/"
+            fields={[
+              { name: "type_permis", label: t("m7e.exig.typePermis"), type: "select", required: true, options: typesPermis },
+              { name: "mot_cle", label: t("m7e.exig.motCle"), required: true },
+            ]}
+          />
+        </SectionActions>
+      }
+    >
       <div data-testid="exigences-permis">
         <p className="muted">{t("m7e.exig.hint")}</p>
-        <QuickForm
-          title={t("m7e.exig.nouvelle")}
-          endpoint="/api/hse/exigences-habilitation/"
-          fields={[
-            { name: "type_permis", label: t("m7e.exig.typePermis"), type: "select", required: true, options: typesPermis },
-            { name: "mot_cle", label: t("m7e.exig.motCle"), required: true },
-          ]}
-        />
         {error && <p className="action-error" role="alert">{error}</p>}
-        {rows.length === 0 ? (
-          <p className="muted">{t("m7e.exig.aucune")}</p>
-        ) : (
-          <table className="table">
-            <caption className="sr-only">{t("m7e.exig.title")}</caption>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{t(`hse.permis_types.${r.type_permis}`)}</td>
-                  <td><strong>{r.mot_cle}</strong></td>
-                  <td>
-                    <button type="button" className="btn ghost" onClick={() => window.confirm(t("m7e.exig.confirmSupprimer")) && supprimer.mutate(r.id)}>
-                      {t("m7e.exig.supprimer")}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable columns={columns} rows={rows} caption={t("m7e.exig.title")} emptyLabel={t("m7e.exig.aucune")} />
       </div>
     </SectionCard>
   );
@@ -226,21 +251,21 @@ export function AptitudesSection() {
   const { t } = useTranslation();
   const q = useQuery({ queryKey: ["hse-aptitudes"], queryFn: () => api.listAll<AptitudeMedicale>("/api/hse/aptitudes/"), retry: 0 });
   if (q.isError || !q.data || q.data.length === 0) return null;
+  const columns: Column<AptitudeMedicale>[] = [
+    { key: "salarie", header: t("m7e.perso.salarie"), sortValue: (a) => a.employe_nom, render: (a) => a.employe_nom },
+    { key: "visite", header: t("m7e.perso.visite"), sortValue: (a) => a.date_visite, render: (a) => formatDate(a.date_visite) },
+    {
+      key: "resultat",
+      header: t("m7e.perso.resultat"),
+      render: (a) => <Badge tone={a.resultat === "inapte" ? "err" : a.resultat === "apte" ? "ok" : "warn"}>{a.resultat_label}</Badge>,
+    },
+    { key: "validite", header: t("m7e.perso.validite"), sortValue: (a) => a.date_validite, render: (a) => (a.date_validite ? formatDate(a.date_validite) : "—") },
+  ];
   return (
     <SectionCard title={`${t("m7e.perso.aptitudes")} · ${q.data.length}`}>
-      <table className="table" data-testid="aptitudes">
-        <caption className="sr-only">{t("m7e.perso.aptitudes")}</caption>
-        <tbody>
-          {q.data.map((a) => (
-            <tr key={a.id}>
-              <td>{a.employe_nom}</td>
-              <td>{formatDate(a.date_visite)}</td>
-              <td><Badge tone={a.resultat === "inapte" ? "err" : a.resultat === "apte" ? "ok" : "warn"}>{a.resultat_label}</Badge></td>
-              <td>{a.date_validite ? formatDate(a.date_validite) : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div data-testid="aptitudes">
+        <DataTable columns={columns} rows={q.data} caption={t("m7e.perso.aptitudes")} />
+      </div>
     </SectionCard>
   );
 }
@@ -260,36 +285,42 @@ export function ParametresHseSection() {
     onError: (e) => setError(describeError(e)),
   });
   if (q.isError || !q.data) return null;
+  const columns: Column<ParametreStock>[] = [
+    { key: "parametre", header: t("tableaux.hse.parametre"), sortValue: (p) => p.label, render: (p) => p.label },
+    { key: "valeur", header: t("tableaux.hse.valeur"), num: true, sortValue: (p) => Number(p.valeur), render: (p) => `${valeurExacte(p.valeur)} ${p.unite}` },
+    {
+      key: "statut",
+      header: t("tableaux.hse.statut"),
+      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("m5e.params.provisoire") : t("m5e.params.confirme")}</Badge>,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) => (
+        <div className="permis-actions">
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => {
+              const v = window.prompt(p.label, p.valeur);
+              if (v !== null) modifier.mutate({ id: p.id, valeur: v });
+            }}
+          >
+            {t("m5e.params.modifier")}
+          </button>
+          {p.est_provisoire && (
+            <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/hse/parametres/${p.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer") }]} />
+          )}
+        </div>
+      ),
+    },
+  ];
   return (
     <SectionCard title={t("m7e.params.title")}>
-      <table className="table" data-testid="parametres-hse">
-        <caption className="sr-only">{t("m7e.params.title")}</caption>
-        <tbody>
-          {q.data.map((p) => (
-            <tr key={p.id}>
-              <td>{p.label}</td>
-              <td className="num">{formatNumber(Number(p.valeur))} {p.unite}</td>
-              <td><Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("m5e.params.provisoire") : t("m5e.params.confirme")}</Badge></td>
-              <td>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => {
-                    const v = window.prompt(p.label, p.valeur);
-                    if (v !== null) modifier.mutate({ id: p.id, valeur: v });
-                  }}
-                >
-                  {t("m5e.params.modifier")}
-                </button>{" "}
-                {p.est_provisoire && (
-                  <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/hse/parametres/${p.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer") }]} />
-                )}
-                {error && <span className="action-error" role="alert"> {error}</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {error && <p className="action-error" role="alert">{error}</p>}
+      <div data-testid="parametres-hse">
+        <DataTable columns={columns} rows={q.data} caption={t("m7e.params.title")} />
+      </div>
     </SectionCard>
   );
 }

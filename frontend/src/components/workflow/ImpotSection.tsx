@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { BaremeImpot } from "../../types";
 import { Badge } from "../ui";
@@ -108,7 +108,7 @@ export function ImpotSection({ onChanged }: { onChanged: () => void }) {
                 <tbody>
                   {b.tranches.map((tr, i) => (
                     <tr key={i}>
-                      <td>{tr.plafond === null ? t("baremes.derniere") : `≤ ${formatNumber(tr.plafond)} F`}</td>
+                      <td>{tr.plafond === null ? t("baremes.derniere") : `≤ ${formatMoney(tr.plafond)}`}</td>
                       <td>{tr.taux} %</td>
                     </tr>
                   ))}

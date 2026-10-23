@@ -3,8 +3,12 @@ import { FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
-import { ActionBar, Badge, Kpi, QuickForm, SectionCard } from "../ui";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, Kpi, Menu, QuickForm, SectionCard } from "../ui";
+import type { ActionDef, Column } from "../ui";
+import { CardActions } from "../ui/Board";
+import { actionsColumn } from "../ui/DataTable";
 
 interface Parametre {
   id: string;
@@ -184,15 +188,32 @@ interface Option {
   nom_complet?: string;
 }
 
-const fcfa = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null) => formatMoney(v);
 const pct = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} %`);
 const q = <T,>(key: string, path: string) => ({ queryKey: ["ecarts-m3", key], queryFn: () => api.listAll<T>(path), retry: 0 });
 
-function Pdf({ path, name, label }: { path: string; name: string; label: string }) {
+type AffaireLigne = AffaireSuivi & { id: string };
+type ChargeLigne = ChargeJour & { id: string };
+
+/** Nombre de décimales significatives d'une valeur décimale DRF (« 5.50 » → 1, « 12.00 » → 0), plafonné à 3. */
+const decimales = (v: string) => {
+  const frac = (v.split(".")[1] ?? "").replace(/0+$/, "");
+  return Math.min(frac.length, 3);
+};
+const qte = (v: string) => formatNumber(Number(v), { decimals: decimales(v) });
+const nombre = (v: string | null) => (v === null ? null : Number(v));
+const telecharger = (path: string, name: string) => void api.download(path, name).catch(() => undefined);
+
+/** Actions d'une ligne : action principale + menu (CardActions), puis export PDF du document. */
+function LigneActions({ actions, pdf }: { actions: ActionDef[]; pdf: { path: string; name: string } }) {
+  const { t } = useTranslation();
   return (
-    <button type="button" className="btn ghost" onClick={() => void api.download(path, name).catch(() => undefined)}>
-      <FileDown size={14} aria-hidden="true" /> {label}
-    </button>
+    <div className="action-bar-buttons" style={{ justifyContent: "flex-end", flexWrap: "nowrap", alignItems: "center" }}>
+      {actions.length > 0 && <CardActions actions={actions} align="end" />}
+      <button type="button" className="btn ghost sm" onClick={() => telecharger(pdf.path, pdf.name)} aria-label={t("tableaux.operations.pdfDe", { nom: pdf.name.replace(/\.pdf$/, "") })}>
+        <FileDown size={14} aria-hidden="true" /> {t("ecarts_m3.pdf")}
+      </button>
+    </div>
   );
 }
 
@@ -235,451 +256,571 @@ export function EcartsM3Section() {
   const provisoires = parametres.filter((p) => p.est_provisoire).length;
   const lignesSurcharge = (charge?.lignes ?? []).filter((l) => Number(l.planned_hours) > 0);
 
+  const actionsHeader = t("ui.actions");
+  const perimetre = (scope: string) => (scope === "atelier" || scope === "chantier" ? t(`tableaux.operations.scope.${scope}`) : scope);
+
+  const colsParametres: Column<Parametre>[] = [
+    {
+      key: "libelle",
+      header: k("parametres.libelle"),
+      sortValue: (p) => p.label,
+      render: (p) => (
+        <>
+          {p.label}
+          <br />
+          <span className="muted">{p.code}</span>
+        </>
+      ),
+    },
+    { key: "valeur", header: k("parametres.valeur"), num: true, render: (p) => `${formatNumber(Number(p.valeur), { decimals: decimales(p.valeur) })} ${p.unite}` },
+    {
+      key: "statut",
+      header: k("parametres.statut"),
+      sortValue: (p) => p.est_provisoire,
+      render: (p) => (p.est_provisoire ? <Badge tone="warn">{t("tableaux.operations.provisoire")}</Badge> : <Badge tone="ok">{k("confirme")}</Badge>),
+    },
+    actionsColumn<Parametre>(
+      actionsHeader,
+      (p) => [
+        { label: k("parametres.modifier"), path: `/api/operations/parametres/${p.id}/modifier/`, prompt: { name: "valeur", label: k("parametres.valeur") } },
+        ...(p.est_provisoire ? [{ label: k("parametres.confirmer"), path: `/api/operations/parametres/${p.id}/confirmer/`, confirm: k("parametres.confirmerQ") }] : []),
+      ],
+      (p) => (p.est_provisoire ? k("parametres.confirmer") : undefined),
+    ),
+  ];
+  const colsFiches: Column<Fiche>[] = [
+    { key: "code", header: k("code"), sortValue: (f) => f.code, render: (f) => f.code },
+    { key: "of", header: k("of"), sortValue: (f) => f.ordre_code, render: (f) => f.ordre_code },
+    { key: "outillage", header: k("preparation.outillage"), render: (f) => f.outillage || "—" },
+    {
+      key: "statut",
+      header: k("statut"),
+      sortValue: (f) => f.statut_label,
+      render: (f) => (
+        <>
+          <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{f.statut_label}</Badge> {f.valide_par_nom ?? ""}
+        </>
+      ),
+    },
+    {
+      key: "__actions",
+      header: <span className="sr-only">{actionsHeader}</span>,
+      render: (f) => (
+        <LigneActions
+          actions={f.statut === "brouillon" ? [{ label: k("preparation.valider"), path: `/api/operations/fiches-preparation/${f.id}/valider/` }] : []}
+          pdf={{ path: `/api/operations/fiches-preparation/${f.id}/?export=pdf`, name: `${f.code}.pdf` }}
+        />
+      ),
+    },
+  ];
+  const colsBesoins: Column<Besoin>[] = [
+    { key: "of", header: k("of"), sortValue: (b) => b.ordre_code, render: (b) => b.ordre_code },
+    { key: "article", header: k("preparation.article"), sortValue: (b) => b.article_code, render: (b) => `${b.article_code} · ${b.article_label}` },
+    { key: "quantite", header: k("preparation.quantite"), num: true, sortValue: (b) => Number(b.quantite), render: (b) => qte(b.quantite) },
+    { key: "disponible", header: k("preparation.disponible"), num: true, render: (b) => (b.disponible === null ? "—" : qte(b.disponible)) },
+    {
+      key: "statut",
+      header: k("statut"),
+      sortValue: (b) => b.statut_label,
+      render: (b) => <Badge tone={b.statut === "rupture" ? "err" : b.statut === "reserve" || b.statut === "servi" ? "ok" : "warn"}>{b.statut_label}</Badge>,
+    },
+    { key: "da", header: k("preparation.da"), render: (b) => b.demande_achat_code ?? "—" },
+  ];
+  const colsRapports: Column<Rapport>[] = [
+    { key: "code", header: k("code"), sortValue: (r) => r.code, render: (r) => r.code },
+    { key: "of", header: k("of"), sortValue: (r) => r.ordre_code, render: (r) => r.ordre_code },
+    { key: "type", header: k("rapports.type"), render: (r) => r.type_label },
+    { key: "date", header: k("date"), sortValue: (r) => r.date, render: (r) => formatDate(r.date) },
+    { key: "realise", header: k("rapports.realise"), num: true, render: (r) => qte(r.quantite_realisee) },
+    { key: "rebut", header: k("rapports.rebut"), num: true, render: (r) => qte(r.quantite_rebut) },
+    { key: "pct", header: k("rapports.pct"), num: true, sortValue: (r) => r.avancement, render: (r) => (r.avancement === null ? "—" : `${formatNumber(r.avancement)} %`) },
+    { key: "statut", header: k("statut"), sortValue: (r) => r.statut_label, render: (r) => <Badge tone={r.statut === "valide" ? "ok" : "warn"}>{r.statut_label}</Badge> },
+    {
+      key: "__actions",
+      header: <span className="sr-only">{actionsHeader}</span>,
+      render: (r) => (
+        <LigneActions
+          actions={r.statut === "brouillon" ? [{ label: k("rapports.valider"), path: `/api/operations/rapports/${r.id}/valider/` }] : []}
+          pdf={{ path: `/api/operations/rapports/${r.id}/?export=pdf`, name: `${r.code}.pdf` }}
+        />
+      ),
+    },
+  ];
+  const colsControles: Column<FicheControle>[] = [
+    { key: "code", header: k("code"), sortValue: (c) => c.code, render: (c) => c.code },
+    { key: "of", header: k("of"), sortValue: (c) => c.ordre_code, render: (c) => c.ordre_code },
+    { key: "date", header: k("date"), sortValue: (c) => c.date, render: (c) => formatDate(c.date) },
+    { key: "objet", header: k("controle.objet"), render: (c) => c.objet },
+    {
+      key: "resultat",
+      header: k("controle.resultat"),
+      sortValue: (c) => c.conforme,
+      render: (c) => (
+        <>
+          <Badge tone={c.conforme ? "ok" : "err"}>{c.conforme ? k("controle.conforme") : k("controle.nonConforme")}</Badge> {c.controle_par_nom ?? ""}
+        </>
+      ),
+    },
+  ];
+  const colsTransferts: Column<Transfert>[] = [
+    {
+      key: "code",
+      header: k("code"),
+      sortValue: (b) => b.code,
+      render: (b) => (
+        <>
+          {b.code} <span className="muted">{b.type_label}</span>
+        </>
+      ),
+    },
+    { key: "of", header: k("of"), sortValue: (b) => b.ordre_code, render: (b) => b.ordre_code },
+    { key: "destination", header: k("transferts.destination"), render: (b) => b.destination },
+    { key: "lignes", header: t("tableaux.operations.contenu"), render: (b) => b.lignes.map((l) => `${l.designation} × ${qte(l.quantite)}`).join(", ") },
+    {
+      key: "statut",
+      header: k("statut"),
+      sortValue: (b) => b.statut_label,
+      render: (b) => (
+        <>
+          <Badge tone={b.statut === "receptionne" ? "ok" : "warn"}>{b.statut_label}</Badge> {b.reserves}
+        </>
+      ),
+    },
+    {
+      key: "__actions",
+      header: <span className="sr-only">{actionsHeader}</span>,
+      render: (b) => (
+        <LigneActions
+          actions={[
+            ...(b.statut === "prepare" ? [{ label: k("transferts.expedier"), path: `/api/operations/transferts/${b.id}/expedier/` }] : []),
+            ...(b.statut === "expedie"
+              ? [{ label: k("transferts.receptionner"), path: `/api/operations/transferts/${b.id}/receptionner/`, prompt: { name: "reserves", label: k("transferts.reserves") } }]
+              : []),
+          ]}
+          pdf={{ path: `/api/operations/transferts/${b.id}/?export=pdf`, name: `${b.code}.pdf` }}
+        />
+      ),
+    },
+  ];
+  const colsAttachements: Column<AttachementRow>[] = [
+    {
+      key: "code",
+      header: k("code"),
+      sortValue: (a) => a.code,
+      render: (a) => (
+        <>
+          {a.code} {a.situation_code ? <span className="muted">· {a.situation_code}</span> : null}
+        </>
+      ),
+    },
+    { key: "of", header: k("of"), sortValue: (a) => a.ordre_code, render: (a) => a.ordre_code },
+    { key: "designation", header: k("attachements.designation"), render: (a) => a.designation },
+    { key: "quantite", header: k("attachements.quantite"), num: true, render: (a) => `${qte(a.quantite)} ${a.unite}` },
+    { key: "montant", header: k("attachements.montant"), num: true, sortValue: (a) => (a.montant === null ? null : Number(a.montant)), render: (a) => fcfa(a.montant) },
+    {
+      key: "statut",
+      header: k("statut"),
+      sortValue: (a) => a.statut_label,
+      render: (a) => (
+        <>
+          <Badge tone={a.statut === "signe" ? "ok" : "warn"}>{a.statut_label}</Badge> {a.signataire_client}
+        </>
+      ),
+    },
+    actionsColumn<AttachementRow>(actionsHeader, (a) =>
+      a.statut === "brouillon"
+        ? [{ label: k("attachements.signer"), path: `/api/operations/attachements/${a.id}/signer/`, prompt: { name: "signataire_client", label: k("attachements.signataire") } }]
+        : [],
+    ),
+  ];
+  const colsSituations: Column<Situation>[] = [
+    {
+      key: "situation",
+      header: k("attachements.situation"),
+      sortValue: (s) => s.code,
+      render: (s) => (
+        <>
+          {s.code} · {s.label} <Badge tone={s.status === "facturee" || s.status === "validee" ? "ok" : "warn"}>{s.status_label}</Badge>
+        </>
+      ),
+    },
+    { key: "montant", header: k("attachements.montant"), num: true, sortValue: (s) => (s.amount === null ? null : Number(s.amount)), render: (s) => fcfa(s.amount) },
+    { key: "montantAtt", header: k("attachements.montantAtt"), num: true, render: (s) => fcfa(s.montant_attachements) },
+    { key: "recu", header: k("attachements.recu"), sortValue: (s) => s.recue_le, render: (s) => (s.recue_le ? `${formatDate(s.recue_le)} · ${s.recue_signataire}` : "—") },
+    actionsColumn<Situation>(actionsHeader, (s) => [
+      ...(s.status === "brouillon" || s.status === "soumise"
+        ? [{ label: k("attachements.valoriser"), path: `/api/operations/situations/${s.id}/valoriser-attachements/` }]
+        : []),
+      ...((s.status === "validee" || s.status === "facturee") && !s.recue_le
+        ? [{ label: k("attachements.accuser"), path: `/api/operations/situations/${s.id}/accuser-reception/`, prompt: { name: "recue_signataire", label: k("attachements.signataire") } }]
+        : []),
+    ]),
+  ];
+  const colsPointages: Column<Pointage>[] = [
+    { key: "code", header: k("code"), sortValue: (p) => p.code, render: (p) => p.code },
+    { key: "of", header: k("of"), sortValue: (p) => p.ordre_code, render: (p) => p.ordre_code },
+    { key: "salarie", header: k("pointages.salarie"), sortValue: (p) => p.worker_name_filled, render: (p) => p.worker_name_filled ?? "—" },
+    { key: "date", header: k("date"), sortValue: (p) => p.date, render: (p) => formatDate(p.date) },
+    {
+      key: "heures",
+      header: k("pointages.heures"),
+      num: true,
+      sortValue: (p) => Number(p.hours),
+      render: (p) => (
+        <>
+          {formatNumber(Number(p.hours), { decimals: decimales(p.hours) })} h <span className="muted">{p.hours_type_label}</span>
+        </>
+      ),
+    },
+    { key: "nature", header: k("pointages.nature"), render: (p) => p.nature_mo_label },
+    { key: "statut", header: k("statut"), sortValue: (p) => p.status_label, render: (p) => <Badge tone={p.status === "saisi" ? "warn" : "ok"}>{p.status_label}</Badge> },
+    actionsColumn<Pointage>(actionsHeader, (p) => [
+      ...(p.status === "saisi" ? [{ label: k("pointages.valider"), path: `/api/operations/pointages/${p.id}/valider/` }] : []),
+      ...(p.status === "valide" ? [{ label: k("pointages.transferer"), path: `/api/operations/pointages/${p.id}/transferer-paie/` }] : []),
+    ]),
+  ];
+  const colsMarges: Column<AffaireLigne>[] = [
+    { key: "affaire", header: k("affaire"), sortValue: (a) => a.affaire_code, render: (a) => `${a.affaire_code} · ${a.affaire_label}` },
+    { key: "avancement", header: k("suivi.avancement"), num: true, sortValue: (a) => nombre(a.avancement_pct), render: (a) => pct(a.avancement_pct) },
+    { key: "ca", header: k("suivi.ca"), num: true, sortValue: (a) => nombre(a.chiffre_affaires), render: (a) => fcfa(a.chiffre_affaires) },
+    { key: "engage", header: k("suivi.engage"), num: true, sortValue: (a) => nombre(a.couts_engages), render: (a) => fcfa(a.couts_engages) },
+    { key: "cat", header: k("suivi.cat"), num: true, sortValue: (a) => nombre(a.cout_a_terminaison), render: (a) => fcfa(a.cout_a_terminaison) },
+    {
+      key: "marge",
+      header: k("suivi.marge"),
+      num: true,
+      sortValue: (a) => nombre(a.marge_a_terminaison),
+      render: (a) => (
+        <>
+          {fcfa(a.marge_a_terminaison)} {a.marge_pct !== null && <span className="muted">({pct(a.marge_pct)})</span>}
+        </>
+      ),
+    },
+  ];
+  const colsOrdres: Column<Of>[] = [
+    { key: "of", header: k("of"), sortValue: (o) => o.code, render: (o) => `${o.code} · ${o.label}` },
+    { key: "statut", header: k("statut"), sortValue: (o) => o.status_label, render: (o) => o.status_label },
+    {
+      key: "avancement",
+      header: k("suivi.avancement"),
+      num: true,
+      render: (o) => pct(suivi?.ordres.find((x) => x.ordre === o.id)?.avancement_pct ?? null),
+    },
+    {
+      key: "periode",
+      header: k("suivi.periode"),
+      sortValue: (o) => o.planned_start,
+      render: (o) => (
+        <>
+          {o.planned_start ? formatDate(o.planned_start) : "—"} → {o.planned_end ? formatDate(o.planned_end) : "—"}
+          {o.motif_replanification ? <span className="muted"> · {o.motif_replanification}</span> : null}
+        </>
+      ),
+    },
+    {
+      key: "__actions",
+      header: <span className="sr-only">{actionsHeader}</span>,
+      render: (o) => {
+        const actif = o.status === "prevu" || o.status === "lance" || o.status === "en_cours";
+        return (
+          <LigneActions
+            actions={
+              actif
+                ? [
+                    { label: k("suivi.verifier"), path: `/api/operations/ordres/${o.id}/verifier-besoins/` },
+                    {
+                      label: k("suivi.replanifier"),
+                      path: `/api/operations/ordres/${o.id}/replanifier/`,
+                      body: { motif: k("suivi.motifReplan") },
+                      prompt: { name: "decalage_jours", label: k("suivi.decalage") },
+                    },
+                  ]
+                : []
+            }
+            pdf={{ path: `/api/operations/ordres/${o.id}/?export=pdf`, name: `${o.code}.pdf` }}
+          />
+        );
+      },
+    },
+  ];
+  const colsCharge: Column<ChargeLigne>[] = [
+    { key: "date", header: k("date"), sortValue: (l) => l.date, render: (l) => formatDate(l.date) },
+    { key: "perimetre", header: k("charge.perimetre"), sortValue: (l) => l.scope, render: (l) => perimetre(l.scope) },
+    { key: "ressource", header: k("charge.ressource"), render: (l) => k(`charge.${l.resource}`) },
+    {
+      key: "planifie",
+      header: k("charge.planifie"),
+      num: true,
+      sortValue: (l) => Number(l.planned_hours),
+      render: (l) => (
+        <>
+          {l.overload && <Badge tone="err">{k("charge.surcharge")}</Badge>} {formatNumber(Number(l.planned_hours))} h
+        </>
+      ),
+    },
+    { key: "capacite", header: k("charge.capacite"), num: true, render: (l) => (l.capacity === null ? "—" : `${formatNumber(Number(l.capacity))} h`) },
+  ];
+  const colsRegistre: Column<Registre>[] = [
+    {
+      key: "document",
+      header: k("registre.document"),
+      sortValue: (d) => d.titre,
+      render: (d) => (
+        <>
+          {d.titre} <span className="muted">{d.reference}</span>
+        </>
+      ),
+    },
+    { key: "type", header: k("registre.type"), render: (d) => d.type ?? "—" },
+    { key: "objet", header: k("registre.objet"), render: (d) => d.objet },
+    { key: "date", header: k("date"), sortValue: (d) => d.lie_le, render: (d) => formatDate(d.lie_le) },
+  ];
+  const colsDossiers: Column<Dossier>[] = [
+    { key: "dossier", header: k("registre.dossier"), sortValue: (d) => d.ordre_code, render: (d) => d.ordre_code },
+    { key: "empreinte", header: k("registre.empreinte"), render: (d) => <code title={d.sha256}>{d.sha256.slice(0, 16)}…</code> },
+    { key: "conservation", header: k("registre.conservation"), num: true, render: (d) => t("ecarts_m3.registre.ans", { n: d.retention_years }) },
+    { key: "date", header: k("date"), sortValue: (d) => d.created_at, render: (d) => formatDate(d.created_at) },
+  ];
+
   return (
     <>
-      <SectionCard title={`${k("parametres.title")} · ${parametres.length}`}>
+      <SectionCard title={k("parametres.title")} subtitle={t("tableaux.operations.nbParametres", { count: parametres.length })}>
         {provisoires > 0 && (
           <p data-testid="m3-provisoire">
-            <Badge tone="warn">{k("provisoire")}</Badge> {t("ecarts_m3.parametres.bandeau", { n: provisoires })}
+            <Badge tone="warn">{t("tableaux.operations.provisoire")}</Badge> {t("ecarts_m3.parametres.bandeau", { n: provisoires })}
           </p>
         )}
-        <table className="table" data-testid="m3-parametres">
-          <thead>
-            <tr>
-              <th>{k("parametres.libelle")}</th>
-              <th>{k("parametres.valeur")}</th>
-              <th>{k("parametres.statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {parametres.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <span className="muted">{p.code}</span>
-                  <br />
-                  {p.label}
-                </td>
-                <td>
-                  {formatNumber(Number(p.valeur))} {p.unite}
-                </td>
-                <td>{p.est_provisoire ? <Badge tone="warn">{k("provisoire")}</Badge> : <Badge tone="ok">{k("confirme")}</Badge>}</td>
-                <td>
-                  <ActionBar
-                    actions={[
-                      { label: k("parametres.modifier"), path: `/api/operations/parametres/${p.id}/modifier/`, tone: "ghost" as const, prompt: { name: "valeur", label: k("parametres.valeur") } },
-                      ...(p.est_provisoire ? [{ label: k("parametres.confirmer"), path: `/api/operations/parametres/${p.id}/confirmer/`, confirm: k("parametres.confirmerQ") }] : []),
-                    ]}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="m3-parametres">
+          <DataTable columns={colsParametres} rows={parametres} caption={k("parametres.title")} emptyLabel={t("tableaux.operations.aucunParametre")} />
+        </div>
       </SectionCard>
 
-      <SectionCard title={k("preparation.title")}>
-        <div className="action-bar-buttons">
-          <QuickForm
-            title={k("preparation.fiche")}
-            endpoint="/api/operations/fiches-preparation/"
-            fields={[
-              { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-              { name: "outillage", label: k("preparation.outillage"), type: "textarea" },
-              { name: "consignes", label: k("preparation.consignes"), type: "textarea" },
-            ]}
-          />
-          <QuickForm
-            title={k("preparation.besoin")}
-            endpoint="/api/operations/besoins-matiere/"
-            fields={[
-              { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-              { name: "article", label: k("preparation.article"), type: "select", options: articleOpts, required: true },
-              { name: "quantite", label: k("preparation.quantite"), type: "number", min: 0, step: "0.01", required: true },
-            ]}
-          />
+      <SectionCard
+        title={k("preparation.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={k("preparation.fiche")}
+              endpoint="/api/operations/fiches-preparation/"
+              fields={[
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                { name: "outillage", label: k("preparation.outillage"), type: "textarea" },
+                { name: "consignes", label: k("preparation.consignes"), type: "textarea" },
+              ]}
+            />
+            <QuickForm
+              title={k("preparation.besoin")}
+              endpoint="/api/operations/besoins-matiere/"
+              fields={[
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                { name: "article", label: k("preparation.article"), type: "select", options: articleOpts, required: true },
+                { name: "quantite", label: k("preparation.quantite"), type: "number", min: 0, step: "0.01", required: true },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
+        <h4>{t("tableaux.operations.fichesPreparation")}</h4>
+        <div data-testid="m3-fiches-preparation">
+          <DataTable columns={colsFiches} rows={fiches} caption={t("tableaux.operations.fichesPreparation")} emptyLabel={t("tableaux.operations.aucuneFiche")} />
         </div>
-        <table className="table" data-testid="m3-fiches-preparation">
-          <thead>
-            <tr>
-              <th>{k("code")}</th>
-              <th>{k("of")}</th>
-              <th>{k("preparation.outillage")}</th>
-              <th>{k("statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {fiches.map((f) => (
-              <tr key={f.id}>
-                <td>{f.code}</td>
-                <td>{f.ordre_code}</td>
-                <td>{f.outillage || "—"}</td>
-                <td>
-                  <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{f.statut_label}</Badge> {f.valide_par_nom ?? ""}
-                </td>
-                <td>
-                  {f.statut === "brouillon" && <ActionBar actions={[{ label: k("preparation.valider"), path: `/api/operations/fiches-preparation/${f.id}/valider/` }]} />}
-                  <Pdf path={`/api/operations/fiches-preparation/${f.id}/?export=pdf`} name={`${f.code}.pdf`} label={k("pdf")} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <table className="table" data-testid="m3-besoins">
-          <thead>
-            <tr>
-              <th>{k("of")}</th>
-              <th>{k("preparation.article")}</th>
-              <th>{k("preparation.quantite")}</th>
-              <th>{k("preparation.disponible")}</th>
-              <th>{k("statut")}</th>
-              <th>{k("preparation.da")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {besoins.map((b) => (
-              <tr key={b.id}>
-                <td>{b.ordre_code}</td>
-                <td>
-                  {b.article_code} · {b.article_label}
-                </td>
-                <td>{formatNumber(Number(b.quantite))}</td>
-                <td>{b.disponible === null ? "—" : formatNumber(Number(b.disponible))}</td>
-                <td>
-                  <Badge tone={b.statut === "rupture" ? "err" : b.statut === "reserve" || b.statut === "servi" ? "ok" : "warn"}>{b.statut_label}</Badge>
-                </td>
-                <td>{b.demande_achat_code ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h4>{t("tableaux.operations.besoinsMatiere")}</h4>
+        <div data-testid="m3-besoins">
+          <DataTable columns={colsBesoins} rows={besoins} caption={t("tableaux.operations.besoinsMatiere")} emptyLabel={t("tableaux.operations.aucunBesoin")} />
+        </div>
         <p className="muted">{k("preparation.note")}</p>
       </SectionCard>
 
-      <SectionCard title={k("rapports.title")}>
-        <div className="action-bar-buttons">
-          <QuickForm
-            title={k("rapports.ajouter")}
-            endpoint="/api/operations/rapports/"
-            fields={[
-              { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-              {
-                name: "type", label: k("rapports.type"), type: "select", required: true, defaultValue: "execution",
-                options: [
-                  { value: "execution", label: k("rapports.execution") },
-                  { value: "avancement", label: k("rapports.avancement") },
-                ],
-              },
-              { name: "date", label: k("date"), type: "date", required: true },
-              { name: "quantite_realisee", label: k("rapports.realise"), type: "number", min: 0, step: "0.01" },
-              { name: "quantite_rebut", label: k("rapports.rebut"), type: "number", min: 0, step: "0.01" },
-              { name: "avancement", label: k("rapports.pct"), type: "number", min: 0 },
-              { name: "observations", label: k("rapports.observations"), type: "textarea" },
-            ]}
-          />
-          <QuickForm
-            title={k("controle.ajouter")}
-            endpoint="/api/operations/fiches-controle/"
-            fields={[
-              { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-              { name: "date", label: k("date"), type: "date", required: true },
-              { name: "objet", label: k("controle.objet"), required: true },
-              { name: "points", label: k("controle.points"), type: "textarea", required: true },
-            ]}
-            transform={(v) => ({
-              ...v,
-              points: (v.points ?? "")
-                .split("\n")
-                .map((l) => l.trim())
-                .filter(Boolean)
-                .map((l) => ({ libelle: l.replace(/^!\s*/, ""), conforme: !l.startsWith("!") })),
-            })}
-          />
+      <SectionCard
+        title={k("rapports.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={k("rapports.ajouter")}
+              endpoint="/api/operations/rapports/"
+              fields={[
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                {
+                  name: "type", label: k("rapports.type"), type: "select", required: true, defaultValue: "execution",
+                  options: [
+                    { value: "execution", label: k("rapports.execution") },
+                    { value: "avancement", label: k("rapports.avancement") },
+                  ],
+                },
+                { name: "date", label: k("date"), type: "date", required: true },
+                { name: "quantite_realisee", label: k("rapports.realise"), type: "number", min: 0, step: "0.01" },
+                { name: "quantite_rebut", label: k("rapports.rebut"), type: "number", min: 0, step: "0.01" },
+                { name: "avancement", label: k("rapports.pct"), type: "number", min: 0 },
+                { name: "observations", label: k("rapports.observations"), type: "textarea" },
+              ]}
+            />
+            <QuickForm
+              title={k("controle.ajouter")}
+              endpoint="/api/operations/fiches-controle/"
+              fields={[
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                { name: "date", label: k("date"), type: "date", required: true },
+                { name: "objet", label: k("controle.objet"), required: true },
+                { name: "points", label: k("controle.points"), type: "textarea", required: true },
+              ]}
+              transform={(v) => ({
+                ...v,
+                points: (v.points ?? "")
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter(Boolean)
+                  .map((l) => ({ libelle: l.replace(/^!\s*/, ""), conforme: !l.startsWith("!") })),
+              })}
+            />
+          </SectionActions>
+        }
+      >
+        <h4>{t("tableaux.operations.rapports")}</h4>
+        <div data-testid="m3-rapports">
+          <DataTable columns={colsRapports} rows={rapports} caption={t("tableaux.operations.rapports")} emptyLabel={t("tableaux.operations.aucunRapport")} />
         </div>
-        <table className="table" data-testid="m3-rapports">
-          <thead>
-            <tr>
-              <th>{k("code")}</th>
-              <th>{k("of")}</th>
-              <th>{k("rapports.type")}</th>
-              <th>{k("date")}</th>
-              <th>{k("rapports.realise")}</th>
-              <th>{k("rapports.rebut")}</th>
-              <th>{k("rapports.pct")}</th>
-              <th>{k("statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rapports.map((r) => (
-              <tr key={r.id}>
-                <td>{r.code}</td>
-                <td>{r.ordre_code}</td>
-                <td>{r.type_label}</td>
-                <td>{formatDate(r.date)}</td>
-                <td>{formatNumber(Number(r.quantite_realisee))}</td>
-                <td>{formatNumber(Number(r.quantite_rebut))}</td>
-                <td>{r.avancement === null ? "—" : `${r.avancement} %`}</td>
-                <td>
-                  <Badge tone={r.statut === "valide" ? "ok" : "warn"}>{r.statut_label}</Badge>
-                </td>
-                <td>
-                  {r.statut === "brouillon" && <ActionBar actions={[{ label: k("rapports.valider"), path: `/api/operations/rapports/${r.id}/valider/` }]} />}
-                  <Pdf path={`/api/operations/rapports/${r.id}/?export=pdf`} name={`${r.code}.pdf`} label={k("pdf")} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <table className="table" data-testid="m3-fiches-controle">
-          <thead>
-            <tr>
-              <th>{k("code")}</th>
-              <th>{k("of")}</th>
-              <th>{k("date")}</th>
-              <th>{k("controle.objet")}</th>
-              <th>{k("controle.resultat")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {controles.map((c) => (
-              <tr key={c.id}>
-                <td>{c.code}</td>
-                <td>{c.ordre_code}</td>
-                <td>{formatDate(c.date)}</td>
-                <td>{c.objet}</td>
-                <td>
-                  <Badge tone={c.conforme ? "ok" : "err"}>{c.conforme ? k("controle.conforme") : k("controle.nonConforme")}</Badge> {c.controle_par_nom ?? ""}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h4>{t("tableaux.operations.fichesControle")}</h4>
+        <div data-testid="m3-fiches-controle">
+          <DataTable columns={colsControles} rows={controles} caption={t("tableaux.operations.fichesControle")} emptyLabel={t("tableaux.operations.aucunControle")} />
+        </div>
         <p className="muted">{k("rapports.note")}</p>
       </SectionCard>
 
-      <SectionCard title={k("transferts.title")}>
-        <QuickForm
-          title={k("transferts.ajouter")}
-          endpoint="/api/operations/transferts/"
-          fields={[
-            {
-              name: "type", label: k("transferts.type"), type: "select", required: true, defaultValue: "bl",
-              options: [
-                { value: "bl", label: k("transferts.bl") },
-                { value: "transfert", label: k("transferts.fiche") },
-              ],
-            },
-            { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-            { name: "destination", label: k("transferts.destination"), required: true },
-            { name: "transporteur", label: k("transferts.transporteur") },
-            { name: "lignes", label: k("transferts.lignes"), type: "textarea", required: true },
-          ]}
-          transform={(v) => ({
-            ...v,
-            lignes: (v.lignes ?? "")
-              .split("\n")
-              .map((l) => l.trim())
-              .filter(Boolean)
-              .map((l) => {
-                const [designation, quantite] = l.split(";").map((x) => x.trim());
-                return { designation, quantite: quantite || "1" };
-              }),
-          })}
-        />
-        <table className="table" data-testid="m3-transferts">
-          <thead>
-            <tr>
-              <th>{k("code")}</th>
-              <th>{k("of")}</th>
-              <th>{k("transferts.destination")}</th>
-              <th>{k("transferts.lignes")}</th>
-              <th>{k("statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {transferts.map((b) => (
-              <tr key={b.id}>
-                <td>
-                  {b.code} <span className="muted">{b.type_label}</span>
-                </td>
-                <td>{b.ordre_code}</td>
-                <td>{b.destination}</td>
-                <td>{b.lignes.map((l) => `${l.designation} × ${l.quantite}`).join(", ")}</td>
-                <td>
-                  <Badge tone={b.statut === "receptionne" ? "ok" : "warn"}>{b.statut_label}</Badge> {b.reserves}
-                </td>
-                <td>
-                  {b.statut === "prepare" && <ActionBar actions={[{ label: k("transferts.expedier"), path: `/api/operations/transferts/${b.id}/expedier/` }]} />}
-                  {b.statut === "expedie" && (
-                    <ActionBar
-                      actions={[{ label: k("transferts.receptionner"), path: `/api/operations/transferts/${b.id}/receptionner/`, prompt: { name: "reserves", label: k("transferts.reserves") } }]}
-                    />
-                  )}
-                  <Pdf path={`/api/operations/transferts/${b.id}/?export=pdf`} name={`${b.code}.pdf`} label={k("pdf")} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </SectionCard>
-
-      <SectionCard title={k("attachements.title")}>
-        <div className="action-bar-buttons">
-          <QuickForm
-            title={k("attachements.ajouter")}
-            endpoint="/api/operations/attachements/"
-            fields={[
-              { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-              { name: "situation", label: k("attachements.situation"), type: "select", options: situationOpts },
-              { name: "date", label: k("date"), type: "date", required: true },
-              { name: "designation", label: k("attachements.designation"), required: true },
-              { name: "unite", label: k("attachements.unite"), defaultValue: "ml" },
-              { name: "quantite", label: k("attachements.quantite"), type: "number", min: 0, step: "0.001", required: true },
-              { name: "prix_unitaire", label: k("attachements.prix"), type: "number", min: 0 },
-            ]}
-          />
-          <QuickForm
-            title={k("attachements.repartition")}
-            endpoint="/api/operations/repartitions/"
-            fields={[
-              { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-              { name: "affaire", label: k("affaire"), type: "select", options: affaireOpts, required: true },
-              { name: "part_pct", label: k("attachements.part"), type: "number", min: 1, required: true },
-            ]}
-          />
+      <SectionCard
+        title={k("transferts.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={k("transferts.ajouter")}
+              endpoint="/api/operations/transferts/"
+              fields={[
+                {
+                  name: "type", label: k("transferts.type"), type: "select", required: true, defaultValue: "bl",
+                  options: [
+                    { value: "bl", label: k("transferts.bl") },
+                    { value: "transfert", label: k("transferts.fiche") },
+                  ],
+                },
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                { name: "destination", label: k("transferts.destination"), required: true },
+                { name: "transporteur", label: k("transferts.transporteur") },
+                { name: "lignes", label: k("transferts.lignes"), type: "textarea", required: true },
+              ]}
+              transform={(v) => ({
+                ...v,
+                lignes: (v.lignes ?? "")
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter(Boolean)
+                  .map((l) => {
+                    const [designation, quantite] = l.split(";").map((x) => x.trim());
+                    return { designation, quantite: quantite || "1" };
+                  }),
+              })}
+            />
+          </SectionActions>
+        }
+      >
+        <div data-testid="m3-transferts">
+          <DataTable columns={colsTransferts} rows={transferts} caption={k("transferts.title")} emptyLabel={t("tableaux.operations.aucunTransfert")} />
         </div>
-        <table className="table" data-testid="m3-attachements">
-          <thead>
-            <tr>
-              <th>{k("code")}</th>
-              <th>{k("of")}</th>
-              <th>{k("attachements.designation")}</th>
-              <th>{k("attachements.quantite")}</th>
-              <th>{k("attachements.montant")}</th>
-              <th>{k("statut")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {attachements.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  {a.code} {a.situation_code ? <span className="muted">· {a.situation_code}</span> : null}
-                </td>
-                <td>{a.ordre_code}</td>
-                <td>{a.designation}</td>
-                <td>
-                  {formatNumber(Number(a.quantite))} {a.unite}
-                </td>
-                <td>{fcfa(a.montant)}</td>
-                <td>
-                  <Badge tone={a.statut === "signe" ? "ok" : "warn"}>{a.statut_label}</Badge> {a.signataire_client}
-                  {a.statut === "brouillon" && (
-                    <ActionBar
-                      actions={[{ label: k("attachements.signer"), path: `/api/operations/attachements/${a.id}/signer/`, prompt: { name: "signataire_client", label: k("attachements.signataire") } }]}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <table className="table" data-testid="m3-situations-recu">
-          <thead>
-            <tr>
-              <th>{k("attachements.situation")}</th>
-              <th>{k("attachements.montant")}</th>
-              <th>{k("attachements.montantAtt")}</th>
-              <th>{k("attachements.recu")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {situations.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  {s.code} · {s.label} <Badge tone={s.status === "facturee" || s.status === "validee" ? "ok" : "warn"}>{s.status_label}</Badge>
-                </td>
-                <td>{fcfa(s.amount)}</td>
-                <td>{fcfa(s.montant_attachements)}</td>
-                <td>{s.recue_le ? `${formatDate(s.recue_le)} · ${s.recue_signataire}` : "—"}</td>
-                <td>
-                  {(s.status === "brouillon" || s.status === "soumise") && (
-                    <ActionBar actions={[{ label: k("attachements.valoriser"), path: `/api/operations/situations/${s.id}/valoriser-attachements/`, tone: "ghost" as const }]} />
-                  )}
-                  {(s.status === "validee" || s.status === "facturee") && !s.recue_le && (
-                    <ActionBar
-                      actions={[{ label: k("attachements.accuser"), path: `/api/operations/situations/${s.id}/accuser-reception/`, prompt: { name: "recue_signataire", label: k("attachements.signataire") } }]}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </SectionCard>
 
-      <SectionCard title={k("pointages.title")}>
-        <QuickForm
-          title={k("pointages.ajouter")}
-          endpoint="/api/operations/pointages/"
-          fields={[
-            { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
-            { name: "employe", label: k("pointages.salarie"), type: "select", options: employeOpts },
-            { name: "worker_name", label: k("pointages.nomLibre") },
-            { name: "date", label: k("date"), type: "date", required: true },
-            { name: "hours", label: k("pointages.heures"), type: "number", min: 0, step: "0.25", required: true },
-            {
-              name: "hours_type", label: k("pointages.type"), type: "select", defaultValue: "normal",
-              options: ["normal", "supplementaire", "nuit", "astreinte"].map((v) => ({ value: v, label: k(`pointages.types.${v}`) })),
-            },
-            {
-              name: "nature_mo", label: k("pointages.nature"), type: "select", defaultValue: "directe",
-              options: [
-                { value: "directe", label: k("pointages.directe") },
-                { value: "indirecte", label: k("pointages.indirecte") },
-              ],
-            },
-          ]}
-        />
-        <table className="table" data-testid="m3-pointages">
-          <thead>
-            <tr>
-              <th>{k("code")}</th>
-              <th>{k("of")}</th>
-              <th>{k("pointages.salarie")}</th>
-              <th>{k("date")}</th>
-              <th>{k("pointages.heures")}</th>
-              <th>{k("pointages.nature")}</th>
-              <th>{k("statut")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pointages.slice(0, 50).map((p) => (
-              <tr key={p.id}>
-                <td>{p.code}</td>
-                <td>{p.ordre_code}</td>
-                <td>{p.worker_name_filled ?? "—"}</td>
-                <td>{formatDate(p.date)}</td>
-                <td>
-                  {formatNumber(Number(p.hours))} h <span className="muted">{p.hours_type_label}</span>
-                </td>
-                <td>{p.nature_mo_label}</td>
-                <td>
-                  <Badge tone={p.status === "saisi" ? "warn" : "ok"}>{p.status_label}</Badge>
-                  {p.status === "saisi" && <ActionBar actions={[{ label: k("pointages.valider"), path: `/api/operations/pointages/${p.id}/valider/` }]} />}
-                  {p.status === "valide" && <ActionBar actions={[{ label: k("pointages.transferer"), path: `/api/operations/pointages/${p.id}/transferer-paie/` }]} />}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <SectionCard
+        title={k("attachements.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={k("attachements.ajouter")}
+              endpoint="/api/operations/attachements/"
+              fields={[
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                { name: "situation", label: k("attachements.situation"), type: "select", options: situationOpts },
+                { name: "date", label: k("date"), type: "date", required: true },
+                { name: "designation", label: k("attachements.designation"), required: true },
+                { name: "unite", label: k("attachements.unite"), defaultValue: "ml" },
+                { name: "quantite", label: k("attachements.quantite"), type: "number", min: 0, step: "0.001", required: true },
+                { name: "prix_unitaire", label: k("attachements.prix"), type: "number", min: 0 },
+              ]}
+            />
+            <QuickForm
+              title={k("attachements.repartition")}
+              endpoint="/api/operations/repartitions/"
+              fields={[
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                { name: "affaire", label: k("affaire"), type: "select", options: affaireOpts, required: true },
+                { name: "part_pct", label: k("attachements.part"), type: "number", min: 1, required: true },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
+        <h4>{t("tableaux.operations.attachements")}</h4>
+        <div data-testid="m3-attachements">
+          <DataTable columns={colsAttachements} rows={attachements} caption={t("tableaux.operations.attachements")} emptyLabel={t("tableaux.operations.aucunAttachement")} />
+        </div>
+        <h4>{t("tableaux.operations.situations")}</h4>
+        <div data-testid="m3-situations-recu">
+          <DataTable columns={colsSituations} rows={situations} caption={t("tableaux.operations.situations")} emptyLabel={t("tableaux.operations.aucuneSituation")} />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title={k("pointages.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={k("pointages.ajouter")}
+              endpoint="/api/operations/pointages/"
+              fields={[
+                { name: "ordre", label: k("of"), type: "select", options: ofActifs, required: true },
+                { name: "employe", label: k("pointages.salarie"), type: "select", options: employeOpts },
+                { name: "worker_name", label: k("pointages.nomLibre") },
+                { name: "date", label: k("date"), type: "date", required: true },
+                { name: "hours", label: k("pointages.heures"), type: "number", min: 0, step: "0.25", required: true },
+                {
+                  name: "hours_type", label: k("pointages.type"), type: "select", defaultValue: "normal",
+                  options: ["normal", "supplementaire", "nuit", "astreinte"].map((v) => ({ value: v, label: k(`pointages.types.${v}`) })),
+                },
+                {
+                  name: "nature_mo", label: k("pointages.nature"), type: "select", defaultValue: "directe",
+                  options: [
+                    { value: "directe", label: k("pointages.directe") },
+                    { value: "indirecte", label: k("pointages.indirecte") },
+                  ],
+                },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
+        <div data-testid="m3-pointages">
+          <DataTable columns={colsPointages} rows={pointages.slice(0, 50)} caption={k("pointages.title")} density="compact" emptyLabel={t("tableaux.operations.aucunPointage")} />
+        </div>
         <p className="muted">{k("pointages.note")}</p>
       </SectionCard>
 
-      <SectionCard title={k("suivi.title")}>
+      <SectionCard
+        title={k("suivi.title")}
+        actions={
+          <SectionActions>
+            <ActionBar actions={[{ label: k("suivi.publier"), path: "/api/operations/ordres/publier-marges/", confirm: k("suivi.publierQ") }]} />
+            <Menu
+              label={t("tableaux.operations.rapportsPeriodiques")}
+              items={[
+                { label: k("suivi.hebdoPdf"), icon: FileDown, onSelect: () => telecharger("/api/operations/ordres/rapport-periodique/?periode=hebdo&export=pdf", "rapport-hebdo.pdf") },
+                { label: k("suivi.mensuelPdf"), icon: FileDown, onSelect: () => telecharger("/api/operations/ordres/rapport-periodique/?periode=mensuel&export=pdf", "rapport-mensuel.pdf") },
+                { label: k("suivi.mensuelXlsx"), icon: FileDown, onSelect: () => telecharger("/api/operations/ordres/rapport-periodique/?periode=mensuel&export=xlsx", "rapport-mensuel.xlsx") },
+              ]}
+              trigger={
+                <button type="button" className="btn ghost">
+                  <FileDown size={14} aria-hidden="true" /> {t("tableaux.operations.rapportsPeriodiques")}
+                </button>
+              }
+            />
+          </SectionActions>
+        }
+      >
         {ind && (
           <div className="kpi-grid">
             <Kpi label={k("suivi.productivite")} value={pct(ind.productivite_pct)} tone="brand" delay={0} />
@@ -688,118 +829,44 @@ export function EcartsM3Section() {
             <Kpi label={k("suivi.retards")} value={ind.of_en_retard} hint={`${ind.ruptures_ouvertes} ${k("suivi.ruptures")}`} tone="accent" delay={0.09} />
           </div>
         )}
-        <div className="action-bar-buttons">
-          <ActionBar actions={[{ label: k("suivi.publier"), path: "/api/operations/ordres/publier-marges/", confirm: k("suivi.publierQ") }]} />
-          <Pdf path="/api/operations/ordres/rapport-periodique/?periode=hebdo&export=pdf" name="rapport-hebdo.pdf" label={k("suivi.hebdoPdf")} />
-          <Pdf path="/api/operations/ordres/rapport-periodique/?periode=mensuel&export=pdf" name="rapport-mensuel.pdf" label={k("suivi.mensuelPdf")} />
-          <Pdf path="/api/operations/ordres/rapport-periodique/?periode=mensuel&export=xlsx" name="rapport-mensuel.xlsx" label={k("suivi.mensuelXlsx")} />
+        <h4>{t("tableaux.operations.margesAffaire")}</h4>
+        <div data-testid="m3-marges">
+          <DataTable
+            columns={colsMarges}
+            rows={(suivi?.affaires ?? []).map((a) => ({ ...a, id: a.affaire }))}
+            caption={t("tableaux.operations.margesAffaire")}
+            emptyLabel={t("tableaux.operations.aucuneMarge")}
+          />
         </div>
-        <table className="table" data-testid="m3-marges">
-          <thead>
-            <tr>
-              <th>{k("affaire")}</th>
-              <th>{k("suivi.avancement")}</th>
-              <th>{k("suivi.ca")}</th>
-              <th>{k("suivi.engage")}</th>
-              <th>{k("suivi.cat")}</th>
-              <th>{k("suivi.marge")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(suivi?.affaires ?? []).map((a) => (
-              <tr key={a.affaire}>
-                <td>
-                  {a.affaire_code} · {a.affaire_label}
-                </td>
-                <td>{pct(a.avancement_pct)}</td>
-                <td>{fcfa(a.chiffre_affaires)}</td>
-                <td>{fcfa(a.couts_engages)}</td>
-                <td>{fcfa(a.cout_a_terminaison)}</td>
-                <td>
-                  {fcfa(a.marge_a_terminaison)} {a.marge_pct !== null && <span className="muted">({pct(a.marge_pct)})</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
         <p className="muted">{t("ecarts_m3.suivi.note", { m: suivi?.methode ?? 1 })}</p>
-        <table className="table" data-testid="m3-of-impressions">
-          <thead>
-            <tr>
-              <th>{k("of")}</th>
-              <th>{k("statut")}</th>
-              <th>{k("suivi.avancement")}</th>
-              <th>{k("suivi.periode")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {ordres.slice(0, 50).map((o) => {
-              const s = suivi?.ordres.find((x) => x.ordre === o.id);
-              const actif = o.status === "prevu" || o.status === "lance" || o.status === "en_cours";
-              return (
-                <tr key={o.id}>
-                  <td>
-                    {o.code} · {o.label}
-                  </td>
-                  <td>{o.status_label}</td>
-                  <td>{pct(s?.avancement_pct ?? null)}</td>
-                  <td>
-                    {o.planned_start ? formatDate(o.planned_start) : "—"} → {o.planned_end ? formatDate(o.planned_end) : "—"}
-                    {o.motif_replanification ? <span className="muted"> · {o.motif_replanification}</span> : null}
-                  </td>
-                  <td>
-                    {actif && (
-                      <ActionBar
-                        actions={[
-                          { label: k("suivi.verifier"), path: `/api/operations/ordres/${o.id}/verifier-besoins/`, tone: "ghost" as const },
-                          {
-                            label: k("suivi.replanifier"), path: `/api/operations/ordres/${o.id}/replanifier/`, tone: "ghost" as const,
-                            body: { motif: k("suivi.motifReplan") }, prompt: { name: "decalage_jours", label: k("suivi.decalage") },
-                          },
-                        ]}
-                      />
-                    )}
-                    <Pdf path={`/api/operations/ordres/${o.id}/?export=pdf`} name={`${o.code}.pdf`} label={k("pdf")} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <h4>{t("tableaux.operations.ordres")}</h4>
+        <div data-testid="m3-of-impressions">
+          <DataTable columns={colsOrdres} rows={ordres.slice(0, 50)} caption={t("tableaux.operations.ordres")} emptyLabel={t("tableaux.operations.aucunOrdre")} />
+        </div>
       </SectionCard>
 
-      <SectionCard title={k("charge.title")}>
-        <ActionBar actions={[{ label: k("charge.escalader"), path: "/api/operations/ordres/escalader-surcharges/", confirm: k("charge.escaladerQ") }]} />
-        <table className="table" data-testid="m3-charge-jour">
-          <thead>
-            <tr>
-              <th>{k("date")}</th>
-              <th>{k("charge.perimetre")}</th>
-              <th>{k("charge.ressource")}</th>
-              <th>{k("charge.planifie")}</th>
-              <th>{k("charge.capacite")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lignesSurcharge.map((l) => (
-              <tr key={`${l.date}-${l.scope}-${l.resource}`}>
-                <td>{formatDate(l.date)}</td>
-                <td>{l.scope}</td>
-                <td>{k(`charge.${l.resource}`)}</td>
-                <td>
-                  {formatNumber(Number(l.planned_hours))} h {l.overload && <Badge tone="err">{k("charge.surcharge")}</Badge>}
-                </td>
-                <td>{l.capacity === null ? "—" : `${formatNumber(Number(l.capacity))} h`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <SectionCard
+        title={k("charge.title")}
+        actions={
+          <SectionActions>
+            <ActionBar actions={[{ label: k("charge.escalader"), path: "/api/operations/ordres/escalader-surcharges/", confirm: k("charge.escaladerQ") }]} />
+          </SectionActions>
+        }
+      >
+        <div data-testid="m3-charge-jour">
+          <DataTable
+            columns={colsCharge}
+            rows={lignesSurcharge.map((l) => ({ ...l, id: `${l.date}-${l.scope}-${l.resource}` }))}
+            caption={k("charge.title")}
+            density="compact"
+            emptyLabel={t("tableaux.operations.aucuneCharge")}
+          />
+        </div>
         {escalades.length > 0 && (
           <ul data-testid="m3-escalades">
             {escalades.map((e) => (
               <li key={e.id}>
-                <Badge tone="warn">{k("charge.escalade")}</Badge> {e.scope} · {k(`charge.${e.resource}`)} · {formatDate(e.semaine)} : +{formatNumber(Number(e.surcharge_pct))} %
+                <Badge tone="warn">{k("charge.escalade")}</Badge> {perimetre(e.scope)} · {k(`charge.${e.resource}`)} · {formatDate(e.semaine)} : +{formatNumber(Number(e.surcharge_pct))} %
               </li>
             ))}
           </ul>
@@ -808,48 +875,13 @@ export function EcartsM3Section() {
       </SectionCard>
 
       <SectionCard title={k("registre.title")}>
-        <table className="table" data-testid="m3-registre">
-          <thead>
-            <tr>
-              <th>{k("registre.document")}</th>
-              <th>{k("registre.type")}</th>
-              <th>{k("registre.objet")}</th>
-              <th>{k("date")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {registre.map((d) => (
-              <tr key={d.id}>
-                <td>
-                  {d.titre} <span className="muted">{d.reference}</span>
-                </td>
-                <td>{d.type ?? "—"}</td>
-                <td>{d.objet}</td>
-                <td>{formatDate(d.lie_le)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <table className="table" data-testid="m3-dossiers">
-          <thead>
-            <tr>
-              <th>{k("registre.dossier")}</th>
-              <th>{k("registre.empreinte")}</th>
-              <th>{k("registre.conservation")}</th>
-              <th>{k("date")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dossiers.map((d) => (
-              <tr key={d.id}>
-                <td>{d.ordre_code}</td>
-                <td className="muted">{d.sha256.slice(0, 16)}…</td>
-                <td>{t("ecarts_m3.registre.ans", { n: d.retention_years })}</td>
-                <td>{formatDate(d.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="m3-registre">
+          <DataTable columns={colsRegistre} rows={registre} caption={k("registre.title")} emptyLabel={t("tableaux.operations.aucunDocument")} />
+        </div>
+        <h4>{t("tableaux.operations.dossiers")}</h4>
+        <div data-testid="m3-dossiers">
+          <DataTable columns={colsDossiers} rows={dossiers} caption={t("tableaux.operations.dossiers")} emptyLabel={t("tableaux.operations.aucunDossier")} />
+        </div>
       </SectionCard>
     </>
   );

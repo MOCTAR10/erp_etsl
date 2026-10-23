@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import type {
   ControleQualite,
@@ -243,21 +243,26 @@ export function QualitePage() {
 
   return (
     <>
-      <PageHeader title={t("qualite.title")} />
-      <QuickForm
-        title={t("qualite.form.title")}
-        endpoint="/api/qualite/non-conformites/"
-        fields={[
-          {
-            name: "gravite",
-            label: t("qualite.form.gravite"),
-            type: "select",
-            required: true,
-            defaultValue: "mineure",
-            options: ["mineure", "majeure", "critique"].map((v) => ({ value: v, label: t(`qualite.nc_gravite.${v}`) })),
-          },
-          { name: "description", label: t("qualite.form.description"), type: "textarea", required: true },
-        ]}
+      <PageHeader
+        title={t("qualite.title")}
+        subtitle={t("tableaux.entetes.qualite")}
+        actions={
+          <QuickForm
+            title={t("qualite.form.title")}
+            endpoint="/api/qualite/non-conformites/"
+            fields={[
+              {
+                name: "gravite",
+                label: t("qualite.form.gravite"),
+                type: "select",
+                required: true,
+                defaultValue: "mineure",
+                options: ["mineure", "majeure", "critique"].map((v) => ({ value: v, label: t(`qualite.nc_gravite.${v}`) })),
+              },
+              { name: "description", label: t("qualite.form.description"), type: "textarea", required: true },
+            ]}
+          />
+        }
       />
 
       <div className="kpi-grid">
@@ -323,22 +328,22 @@ export function QualitePage() {
 
       {(qualifs.count > 0 || qualifs.search) && (
         <SectionCard title={`${t("qualite.qualifs")} · ${qualifs.count}`}>
-          <PagedDataTable list={qualifs} columns={qualifColumns(t)} caption={t("qualite.qualifs")} searchPlaceholder={t("qualite.searchQualifs")} />
+          <PagedDataGrid list={qualifs} columns={qualifColumns(t)} caption={t("qualite.qualifs")} searchPlaceholder={t("qualite.searchQualifs")} />
         </SectionCard>
       )}
       {(wps.count > 0 || wps.search) && (
         <SectionCard title={`${t("qualite.wps")} · ${wps.count}`}>
-          <PagedDataTable list={wps} columns={wpsColumns(t)} caption={t("qualite.wps")} searchPlaceholder={t("qualite.searchWps")} />
+          <PagedDataGrid list={wps} columns={wpsColumns(t)} caption={t("qualite.wps")} searchPlaceholder={t("qualite.searchWps")} />
         </SectionCard>
       )}
       {(controles.count > 0 || controles.search) && (
         <SectionCard title={`${t("qualite.controles")} · ${controles.count}`}>
-          <PagedDataTable list={controles} columns={ctrlColumns(t)} caption={t("qualite.controles")} searchPlaceholder={t("qualite.searchControles")} />
+          <PagedDataGrid list={controles} columns={ctrlColumns(t)} caption={t("qualite.controles")} searchPlaceholder={t("qualite.searchControles")} />
         </SectionCard>
       )}
       {(pvs.count > 0 || pvs.search) && (
         <SectionCard title={`${t("qualite.pvs")} · ${pvs.count}`}>
-          <PagedDataTable list={pvs} columns={pvColumns(t)} caption={t("qualite.pvs")} searchPlaceholder={t("qualite.searchPvs")} />
+          <PagedDataGrid list={pvs} columns={pvColumns(t)} caption={t("qualite.pvs")} searchPlaceholder={t("qualite.searchPvs")} />
         </SectionCard>
       )}
       <ItpSection />

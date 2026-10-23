@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
-import { FilterBar, filtersToQuery, type FilterDef, type FilterValues } from "./FilterBar";
+import { cleanFilterLabel, FilterBar, filtersToQuery, type FilterDef, type FilterValues } from "./FilterBar";
 
 const defs: FilterDef[] = [
   { champ: "status", type: "choix", libelle: "Statut", choix: [{ valeur: "draft", libelle: "Brouillon" }, { valeur: "archived", libelle: "Archivé" }] },
@@ -37,14 +37,23 @@ describe("<FilterBar />", () => {
     expect(screen.queryByLabelText("Dossier")).toBeNull();
     await user.selectOptions(screen.getByLabelText("Statut"), "archived");
     await user.selectOptions(screen.getByLabelText("Type de document"), "3");
-    await user.type(screen.getByLabelText(/Date du document — /, { selector: "[id$=-du]" }), "2026-01-01");
-    await user.type(screen.getByLabelText("Fournisseur / client"), "Total");
+    // période : un seul contrôle « Date du document » (jj/mm/aaaa), pas deux champs date US
+    expect(screen.getByRole("button", { name: "Date du document" })).toBeInTheDocument();
+    // 4e critère : rangé dans « Plus de filtres »
+    expect(screen.queryByLabelText("Fournisseur / client")).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Plus de filtres|formulaires.filtres.plus/ }));
+    await user.type(await screen.findByLabelText("Fournisseur / client"), "Total");
     expect(new URLSearchParams(q).get("status")).toBe("archived");
     expect(new URLSearchParams(q).get("type")).toBe("3");
-    expect(new URLSearchParams(q).get("document_date__gte")).toBe("2026-01-01");
     expect(new URLSearchParams(q).get("counterparty")).toBe("Total");
-    await user.click(screen.getByRole("button"));
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: /Effacer|effacer/ }));
     expect(q).toBe("");
+  });
+
+  it("retire les références techniques des libellés servis par l'API", () => {
+    expect(cleanFilterLabel("Statut (RF-41)")).toBe("Statut");
+    expect(cleanFilterLabel("Créé le")).toBe("Créé le");
   });
 
   it("ignore les valeurs vides", () => {

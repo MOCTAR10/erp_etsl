@@ -4,9 +4,9 @@ import { Activity, Flame, Gauge, Inbox, ShieldAlert, ShieldCheck } from "lucide-
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, PagedDataTable, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
-import { formatDate } from "../lib/format";
+import { formatDate, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   IndicateursHse,
@@ -220,6 +220,8 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
           ...(inc.statut !== "cloture"
             ? [{
                 label: t("actions.cloturer"), path: `/api/hse/incidents/${inc.id}/cloturer/`,
+                // Une seule action pleine par carte : pendant l'enquête, c'est l'arrêt du plan d'action.
+                ...(inc.statut === "en_enquete" ? { tone: "ghost" as const } : {}),
                 prompt: ["quasi_accident", "situation_dangereuse"].includes(inc.type_incident)
                   ? { name: "retour_experience", label: t("m7e.inc.rex") }
                   : { name: "rapport", label: t("hse.act.rapport") },
@@ -230,7 +232,7 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
             : []),
         ]}
       />
-      <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`)}>
+      <button type="button" className="btn ghost sm" onClick={() => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`)}>
         {t("m7e.inc.pdf")}
       </button>
     </BoardCard>
@@ -307,47 +309,52 @@ export function HsePage() {
 
   return (
     <>
-      <PageHeader title={t("hse.title")} />
-      <QuickForm
-        title={t("hse.form.title")}
-        endpoint="/api/hse/incidents/"
-        fields={[
-          {
-            name: "type_incident",
-            label: t("hse.col.type"),
-            type: "select",
-            required: true,
-            defaultValue: "quasi_accident",
-            options: typesIncident,
-          },
-          {
-            name: "gravite",
-            label: t("hse.gravite"),
-            type: "select",
-            required: true,
-            defaultValue: "mineure",
-            options: ["mineure", "majeure", "critique"].map((v) => ({ value: v, label: t(`hse.incident_gravite.${v}`) })),
-          },
-          { name: "date_evenement", label: t("hse.form.date"), type: "datetime-local", required: true },
-          { name: "lieu", label: t("hse.col.lieux"), required: true },
-          {
-            name: "zone", label: t("m7e.inc.zone"), type: "select",
-            options: ["atelier", "chantier", "bureau", "site_client", "site_gr"].map((v) => ({ value: v, label: t(`m7e.zones.${v}`) })),
-          },
-          { name: "personnes_impliquees", label: t("m7e.inc.personnes") },
-          { name: "description", label: t("hse.form.description"), type: "textarea", required: true },
-        ]}
+      <PageHeader
+        title={t("hse.title")}
+        subtitle={t("tableaux.entetes.hse")}
+        actions={
+          <QuickForm
+            title={t("hse.form.title")}
+            endpoint="/api/hse/incidents/"
+            fields={[
+              {
+                name: "type_incident",
+                label: t("hse.col.type"),
+                type: "select",
+                required: true,
+                defaultValue: "quasi_accident",
+                options: typesIncident,
+              },
+              {
+                name: "gravite",
+                label: t("hse.gravite"),
+                type: "select",
+                required: true,
+                defaultValue: "mineure",
+                options: ["mineure", "majeure", "critique"].map((v) => ({ value: v, label: t(`hse.incident_gravite.${v}`) })),
+              },
+              { name: "date_evenement", label: t("hse.form.date"), type: "datetime-local", required: true },
+              { name: "lieu", label: t("hse.col.lieux"), required: true },
+              {
+                name: "zone", label: t("m7e.inc.zone"), type: "select",
+                options: ["atelier", "chantier", "bureau", "site_client", "site_gr"].map((v) => ({ value: v, label: t(`m7e.zones.${v}`) })),
+              },
+              { name: "personnes_impliquees", label: t("m7e.inc.personnes") },
+              { name: "description", label: t("hse.form.description"), type: "textarea", required: true },
+            ]}
+          />
+        }
       />
 
       <div className="kpi-grid">
-        <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? "∞"} hint={`${t("hse.incidentsOuverts")} · ${s.incidents_ouverts}`} icon={ShieldAlert} tone="ok" delay={0} />
-        <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${t("hse.risquesCritiques")} · ${s.risques_critiques}`} icon={ShieldCheck} tone="brand" delay={0.05} />
-        <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${t("hse.actionsOuvertes")} · ${s.actions_ouvertes}`} icon={Flame} tone="warn" delay={0.1} />
-        <Kpi label={t("hse.epiRenouveler")} value={s.epi_a_renouveler} hint={`${t("hse.formationsPrevues")} · ${s.formations_prevues} · ${t("hse.bsdAttente")} · ${s.bsd_en_attente}`} icon={Activity} tone="warn" delay={0.15} />
+        <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? t("tableaux.entetes.aucunAccident")} hint={`${s.incidents_ouverts} ${t("hse.incidentsOuverts")}`} icon={ShieldAlert} tone="ok" delay={0} />
+        <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${s.risques_critiques} ${t("hse.risquesCritiques")}`} icon={ShieldCheck} tone="brand" delay={0.05} />
+        <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${s.actions_ouvertes} ${t("hse.actionsOuvertes")}`} icon={Flame} tone="warn" delay={0.1} />
+        <Kpi label={t("hse.epiRenouveler")} value={s.epi_a_renouveler} hint={`${s.formations_prevues} ${t("hse.formationsPrevues")} · ${s.bsd_en_attente} ${t("hse.bsdAttente")}`} icon={Activity} tone="warn" delay={0.15} />
         <Kpi
           label={t("hse.trir")}
-          value={frequence.data?.trir ?? "—"}
-          hint={`LTIR ${frequence.data?.ltir ?? "—"} · LTIFR ${frequence.data?.ltifr ?? "—"} · ${t("hse.joursPerdus")} ${frequence.data?.jours_perdus ?? 0}`}
+          value={frequence.data ? formatNumber(frequence.data.trir, { decimals: 2 }) : "—"}
+          hint={`LTIR ${formatNumber(frequence.data?.ltir, { decimals: 2 })} · LTIFR ${formatNumber(frequence.data?.ltifr, { decimals: 2 })} · ${frequence.data?.jours_perdus ?? 0} ${t("hse.joursPerdus")}`}
           icon={Gauge}
           tone="brand"
           delay={0.2}
@@ -404,22 +411,22 @@ export function HsePage() {
 
       {(risques.count > 0 || risques.search) && (
         <SectionCard title={`${t("hse.risques")} · ${risques.count}`}>
-          <PagedDataTable list={risques} columns={risqueColumns(t)} caption={t("hse.risques")} searchPlaceholder={t("hse.searchRisques")} />
+          <PagedDataGrid list={risques} columns={risqueColumns(t)} caption={t("hse.risques")} searchPlaceholder={t("hse.searchRisques")} />
         </SectionCard>
       )}
       {(atex.count > 0 || atex.search) && (
         <SectionCard title={`${t("hse.atex")} · ${atex.count}`}>
-          <PagedDataTable list={atex} columns={atexColumns(t)} caption={t("hse.atex")} searchPlaceholder={t("hse.searchAtex")} />
+          <PagedDataGrid list={atex} columns={atexColumns(t)} caption={t("hse.atex")} searchPlaceholder={t("hse.searchAtex")} />
         </SectionCard>
       )}
       {(formations.count > 0 || formations.search) && (
         <SectionCard title={`${t("hse.formations")} · ${formations.count}`}>
-          <PagedDataTable list={formations} columns={formationColumns(t)} caption={t("hse.formations")} searchPlaceholder={t("hse.searchFormations")} />
+          <PagedDataGrid list={formations} columns={formationColumns(t)} caption={t("hse.formations")} searchPlaceholder={t("hse.searchFormations")} />
         </SectionCard>
       )}
       {(epis.count > 0 || epis.search) && (
         <SectionCard title={`${t("hse.epi")} · ${epis.count}`}>
-          <PagedDataTable list={epis} columns={epiColumns(t)} caption={t("hse.epi")} searchPlaceholder={t("hse.searchEpis")} />
+          <PagedDataGrid list={epis} columns={epiColumns(t)} caption={t("hse.epi")} searchPlaceholder={t("hse.searchEpis")} />
         </SectionCard>
       )}
       <ConformiteHse />
@@ -436,7 +443,7 @@ export function HsePage() {
       <EcartsM7Sections />
       {(bsd.count > 0 || bsd.search) && (
         <SectionCard title={`${t("hse.bsd")} · ${bsd.count}`}>
-          <PagedDataTable list={bsd} columns={bsdColumns(t)} caption={t("hse.bsd")} searchPlaceholder={t("hse.searchBsd")} />
+          <PagedDataGrid list={bsd} columns={bsdColumns(t)} caption={t("hse.bsd")} searchPlaceholder={t("hse.searchBsd")} />
         </SectionCard>
       )}
     </>

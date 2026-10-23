@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface Parametre {
   id: string;
@@ -110,6 +112,51 @@ function ParametresAchats() {
   });
   if (q.isError || !q.data) return null;
   const provisoires = q.data.filter((p) => p.est_provisoire).length;
+  const columns: Column<Parametre>[] = [
+    { key: "libelle", header: t("tableaux.achats.parametre"), render: (p) => p.label },
+    {
+      key: "valeur",
+      header: t("tableaux.achats.valeur"),
+      num: true,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <input type="number" min={0} step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+        ) : (
+          `${formatNumber(Number(p.valeur))} ${p.unite === "choix" ? "" : p.unite}`
+        ),
+    },
+    {
+      key: "statut",
+      header: t("tableaux.achats.statut"),
+      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("ecarts_m2.provisoire") : t("ecarts_m2.confirme")}</Badge>,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <div className="action-bar-buttons">
+            <button type="button" className="btn primary sm" onClick={() => modifier.mutate(edit)}>
+              {t("ecarts_m2.params.enregistrer")}
+            </button>
+            <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
+              {t("ecarts_m2.params.annuler")}
+            </button>
+          </div>
+        ) : (
+          <div className="action-bar-buttons">
+            <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
+              {t("ecarts_m2.params.modifier")}
+            </button>
+            {p.est_provisoire && (
+              <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("ecarts_m2.params.confirmQuestion")) && confirmer.mutate(p.id)}>
+                {t("ecarts_m2.params.confirmer")}
+              </button>
+            )}
+          </div>
+        ),
+    },
+  ];
   return (
     <div data-testid="parametres-achats">
       {provisoires > 0 && (
@@ -122,54 +169,12 @@ function ParametresAchats() {
           {error}
         </p>
       )}
-      <table className="table">
-        <caption className="sr-only">{t("ecarts_m2.params.title")}</caption>
-        <tbody>
-          {q.data.map((p) => (
-            <tr key={p.id}>
-              <td>{p.label}</td>
-              <td className="num">
-                {edit?.id === p.id ? (
-                  <input type="number" min={0} step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-                ) : (
-                  `${formatNumber(Number(p.valeur))} ${p.unite === "choix" ? "" : p.unite}`
-                )}
-              </td>
-              <td>
-                <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("ecarts_m2.provisoire") : t("ecarts_m2.confirme")}</Badge>
-              </td>
-              <td>
-                {edit?.id === p.id ? (
-                  <>
-                    <button type="button" className="btn" onClick={() => modifier.mutate(edit)}>
-                      {t("ecarts_m2.params.enregistrer")}
-                    </button>{" "}
-                    <button type="button" className="btn ghost" onClick={() => setEdit(null)}>
-                      {t("ecarts_m2.params.annuler")}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
-                      {t("ecarts_m2.params.modifier")}
-                    </button>{" "}
-                    {p.est_provisoire && (
-                      <button type="button" className="btn ghost" onClick={() => window.confirm(t("ecarts_m2.params.confirmQuestion")) && confirmer.mutate(p.id)}>
-                        {t("ecarts_m2.params.confirmer")}
-                      </button>
-                    )}
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable caption={t("ecarts_m2.params.title")} columns={columns} rows={q.data} />
     </div>
   );
 }
 
-/** Écarts M2 : catalogue / agréments M6-M7, inspections ITP / CND, lot + certificat à réception, circuit affaire → DA,
+/** Écarts M2 : catalogue / agréments qualité-HSE, inspections ITP / CND, lot + certificat à réception, circuit affaire → DA,
  * location GR → BC, avoirs fournisseurs, pièces archivées en GED, paramètres provisoires. */
 export function EcartsM2Section() {
   const { t } = useTranslation();
@@ -199,11 +204,102 @@ export function EcartsM2Section() {
     { value: "false", label: t("ecarts_m2.non") },
   ];
   const bools = (v: Record<string, string>) => ({ ...v, exige_itp: v.exige_itp === "true", exige_cnd: v.exige_cnd === "true" });
+  const actionsHeader = <span className="sr-only">{t("ui.actions")}</span>;
+
+  const colsAgrements: Column<Agrement>[] = [
+    { key: "fournisseur", header: t("ecarts_m2.catalogue.fournisseur"), render: (a) => `${a.code} · ${a.fournisseur_nom}` },
+    { key: "domaine", header: t("ecarts_m2.catalogue.domaine"), render: (a) => a.domaine_label },
+    { key: "reference", header: t("ecarts_m2.catalogue.reference"), render: (a) => a.reference || "—" },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (a) => (
+        <ActionBar
+          actions={[
+            { label: t("ecarts_m2.catalogue.valider"), path: `/api/achats/agrements/${a.id}/valider/` },
+            { label: t("ecarts_m2.catalogue.refuser"), path: `/api/achats/agrements/${a.id}/refuser/`, tone: "danger", prompt: { name: "motif", label: t("ecarts_m2.catalogue.motif") } },
+          ]}
+        />
+      ),
+    },
+  ];
+
+  const colsCatalogue: Column<LigneCatalogue>[] = [
+    { key: "fournisseur", header: t("ecarts_m2.catalogue.fournisseur"), render: (f) => `${f.code} · ${f.nom}`, sortValue: (f) => f.nom },
+    { key: "qualite", header: t("ecarts_m2.catalogue.qualite"), render: (f) => (f.agree_qualite_jusqu ? formatDate(f.agree_qualite_jusqu) : "—"), sortValue: (f) => f.agree_qualite_jusqu },
+    { key: "hse", header: t("ecarts_m2.catalogue.hse"), render: (f) => (f.agree_hse_jusqu ? formatDate(f.agree_hse_jusqu) : "—"), sortValue: (f) => f.agree_hse_jusqu },
+    {
+      key: "etat",
+      header: t("ecarts_m2.catalogue.etat"),
+      render: (f) => (
+        <>
+          <Badge tone={ETAT_TONE[f.etat]}>{t(`ecarts_m2.catalogue.etats.${f.etat}`)}</Badge>
+          {f.etat === "a_renouveler" && f.jours_restants !== null ? ` J-${f.jours_restants}` : ""}
+          {f.demande_en_cours && <Badge tone="neutral">{t("ecarts_m2.catalogue.demandeEnCours")}</Badge>}
+        </>
+      ),
+    },
+    { key: "note", header: t("ecarts_m2.catalogue.note"), num: true, render: (f) => (f.note === null ? "—" : `${f.note} / 100`), sortValue: (f) => f.note },
+  ];
+
+  const colsRegles: Column<Regle>[] = [
+    { key: "cible", header: t("ecarts_m2.inspection.cible"), render: (r) => r.article_code ?? r.article_type_label },
+    { key: "itp", header: t("ecarts_m2.inspection.itp"), render: (r) => (r.exige_itp ? t("ecarts_m2.oui") : t("ecarts_m2.non")) },
+    { key: "cnd", header: t("ecarts_m2.inspection.cnd"), render: (r) => (r.exige_cnd ? `${t("ecarts_m2.oui")} ${r.methode_cnd}` : t("ecarts_m2.non")) },
+    {
+      key: "statut",
+      header: t("ecarts_m2.inspection.statut"),
+      render: (r) => (
+        <>
+          <Badge tone={r.est_provisoire ? "warn" : "ok"}>{r.est_provisoire ? t("ecarts_m2.provisoire") : t("ecarts_m2.confirme")}</Badge>
+          {!r.is_active && <Badge tone="neutral">{t("ecarts_m2.inspection.inactive")}</Badge>}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (r) => (r.est_provisoire ? <ActionBar actions={[{ label: t("ecarts_m2.params.confirmer"), path: `/api/achats/regles-inspection/${r.id}/confirmer/`, tone: "ghost" }]} /> : null),
+    },
+  ];
+
+  const colsAvoirs: Column<Avoir>[] = [
+    { key: "code", header: t("ecarts_m2.avoirs.code"), render: (a) => a.code, sortValue: (a) => a.code },
+    { key: "facture", header: t("ecarts_m2.avoirs.facture"), render: (a) => `${a.facture_code} · ${a.fournisseur_nom ?? "—"}` },
+    { key: "date", header: t("ecarts_m2.avoirs.date"), render: (a) => formatDate(a.date_avoir), sortValue: (a) => a.date_avoir },
+    { key: "montant", header: t("ecarts_m2.avoirs.montant"), num: true, render: (a) => formatMoney(a.montant_ht), sortValue: (a) => Number(a.montant_ht ?? 0) },
+    {
+      key: "statut",
+      header: t("ecarts_m2.avoirs.statut"),
+      render: (a) => (
+        <>
+          <Badge tone={a.statut === "comptabilise" ? "ok" : "warn"}>{a.statut_label}</Badge> {a.move_number ?? ""}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (a) =>
+        a.statut === "brouillon" ? (
+          <ActionBar actions={[{ label: t("ecarts_m2.avoirs.comptabiliser"), path: `/api/achats/avoirs/${a.id}/comptabiliser/`, confirm: t("ecarts_m2.avoirs.confirm") }]} />
+        ) : null,
+    },
+  ];
+
+  const colsPieces: Column<Piece & { id: string }>[] = [
+    { key: "nature", header: t("ecarts_m2.ged.nature"), render: (p) => p.nature, sortValue: (p) => p.nature },
+    { key: "piece", header: t("ecarts_m2.ged.piece"), render: (p) => p.piece },
+    { key: "archive", header: t("ecarts_m2.ged.archive"), render: (p) => formatDate(p.archive_le), sortValue: (p) => p.archive_le },
+    { key: "conservation", header: t("ecarts_m2.ged.conservation"), render: (p) => (p.conservation_ans === null ? "—" : t("ecarts_m2.ged.ans", { n: p.conservation_ans })) },
+  ];
 
   return (
     <>
-      <SectionCard title={t("ecarts_m2.catalogue.title")}>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m2.catalogue.title")}
+        actions={
+          <SectionActions>
           <QuickForm
             title={t("ecarts_m2.catalogue.demander")}
             endpoint="/api/achats/agrements/"
@@ -226,64 +322,25 @@ export function EcartsM2Section() {
               { name: "note_evaluation", label: t("ecarts_m2.catalogue.noteEvaluation"), type: "number", min: 0 },
             ]}
           />
-        </div>
+          </SectionActions>
+        }
+      >
         {agrements.length > 0 && (
-          <table className="table" data-testid="agrements-en-attente">
-            <caption>{t("ecarts_m2.catalogue.enAttente")}</caption>
-            <tbody>
-              {agrements.map((a) => (
-                <tr key={a.id}>
-                  <td>
-                    {a.code} · {a.fournisseur_nom}
-                  </td>
-                  <td>{a.domaine_label}</td>
-                  <td>{a.reference || "—"}</td>
-                  <td>
-                    <ActionBar
-                      actions={[
-                        { label: t("ecarts_m2.catalogue.valider"), path: `/api/achats/agrements/${a.id}/valider/` },
-                        { label: t("ecarts_m2.catalogue.refuser"), path: `/api/achats/agrements/${a.id}/refuser/`, tone: "danger", prompt: { name: "motif", label: t("ecarts_m2.catalogue.motif") } },
-                      ]}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div data-testid="agrements-en-attente">
+            <h4>{t("ecarts_m2.catalogue.enAttente")}</h4>
+            <DataTable caption={t("ecarts_m2.catalogue.enAttente")} columns={colsAgrements} rows={agrements} />
+          </div>
         )}
-        <table className="table" data-testid="catalogue-fournisseurs">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m2.catalogue.fournisseur")}</th>
-              <th>{t("ecarts_m2.catalogue.qualite")}</th>
-              <th>{t("ecarts_m2.catalogue.hse")}</th>
-              <th>{t("ecarts_m2.catalogue.etat")}</th>
-              <th>{t("ecarts_m2.catalogue.note")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(catalogue?.rows ?? []).map((f) => (
-              <tr key={f.id}>
-                <td>
-                  {f.code} · {f.nom}
-                </td>
-                <td>{f.agree_qualite_jusqu ? formatDate(f.agree_qualite_jusqu) : "—"}</td>
-                <td>{f.agree_hse_jusqu ? formatDate(f.agree_hse_jusqu) : "—"}</td>
-                <td>
-                  <Badge tone={ETAT_TONE[f.etat]}>{t(`ecarts_m2.catalogue.etats.${f.etat}`)}</Badge>
-                  {f.etat === "a_renouveler" && f.jours_restants !== null ? ` J-${f.jours_restants}` : ""}
-                  {f.demande_en_cours && <Badge tone="neutral">{t("ecarts_m2.catalogue.demandeEnCours")}</Badge>}
-                </td>
-                <td>{f.note === null ? "—" : `${f.note} / 100`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="catalogue-fournisseurs">
+          <DataTable caption={t("ecarts_m2.catalogue.title")} columns={colsCatalogue} rows={catalogue?.rows ?? []} />
+        </div>
         <p className="muted">{t("ecarts_m2.catalogue.note_bas", { jours: catalogue?.alerte_jours ?? 30 })}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m2.reception.title")}>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m2.reception.title")}
+        actions={
+          <SectionActions>
           <QuickForm
             title={t("ecarts_m2.reception.ligneLot")}
             endpoint="/api/achats/receipt-lines/"
@@ -324,37 +381,19 @@ export function EcartsM2Section() {
               },
             ]}
           />
+          </SectionActions>
+        }
+      >
+        <div data-testid="regles-inspection">
+          <DataTable caption={t("ecarts_m2.inspection.ajouter")} columns={colsRegles} rows={regles} />
         </div>
-        <table className="table" data-testid="regles-inspection">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m2.inspection.cible")}</th>
-              <th>{t("ecarts_m2.inspection.itp")}</th>
-              <th>{t("ecarts_m2.inspection.cnd")}</th>
-              <th>{t("ecarts_m2.inspection.statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {regles.map((r) => (
-              <tr key={r.id}>
-                <td>{r.article_code ?? r.article_type_label}</td>
-                <td>{r.exige_itp ? t("ecarts_m2.oui") : t("ecarts_m2.non")}</td>
-                <td>{r.exige_cnd ? `${t("ecarts_m2.oui")} ${r.methode_cnd}` : t("ecarts_m2.non")}</td>
-                <td>
-                  <Badge tone={r.est_provisoire ? "warn" : "ok"}>{r.est_provisoire ? t("ecarts_m2.provisoire") : t("ecarts_m2.confirme")}</Badge>
-                  {!r.is_active && <Badge tone="neutral">{t("ecarts_m2.inspection.inactive")}</Badge>}
-                </td>
-                <td>{r.est_provisoire && <ActionBar actions={[{ label: t("ecarts_m2.params.confirmer"), path: `/api/achats/regles-inspection/${r.id}/confirmer/`, tone: "ghost" }]} />}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
         <p className="muted">{t("ecarts_m2.reception.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m2.amont.title")}>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m2.amont.title")}
+        actions={
+          <SectionActions>
           <QuickForm
             title={t("ecarts_m2.amont.daAffaire")}
             endpoint="/api/achats/requests/depuis-affaire/"
@@ -367,12 +406,16 @@ export function EcartsM2Section() {
             submitLabel={t("ecarts_m2.amont.generer")}
             fields={[{ name: "location", label: t("ecarts_m2.amont.location"), type: "select", required: true, options: opt(locations, (l) => l.code) }]}
           />
-        </div>
+          </SectionActions>
+        }
+      >
         <p className="muted">{t("ecarts_m2.amont.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m2.avoirs.title")}>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m2.avoirs.title")}
+        actions={
+          <SectionActions>
           <QuickForm
             title={t("ecarts_m2.avoirs.nouveau")}
             endpoint="/api/achats/avoirs/"
@@ -384,63 +427,24 @@ export function EcartsM2Section() {
               { name: "motif", label: t("ecarts_m2.avoirs.motif"), type: "textarea", required: true },
             ]}
           />
+          </SectionActions>
+        }
+      >
+        <div data-testid="avoirs-fournisseurs">
+          <DataTable caption={t("ecarts_m2.avoirs.title")} columns={colsAvoirs} rows={avoirs} emptyLabel={t("tableaux.achats.aucunAvoir")} />
         </div>
-        <table className="table" data-testid="avoirs-fournisseurs">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m2.avoirs.code")}</th>
-              <th>{t("ecarts_m2.avoirs.facture")}</th>
-              <th>{t("ecarts_m2.avoirs.date")}</th>
-              <th>{t("ecarts_m2.avoirs.montant")}</th>
-              <th>{t("ecarts_m2.avoirs.statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {avoirs.map((a) => (
-              <tr key={a.id}>
-                <td>{a.code}</td>
-                <td>
-                  {a.facture_code} · {a.fournisseur_nom ?? "—"}
-                </td>
-                <td>{formatDate(a.date_avoir)}</td>
-                <td>{a.montant_ht === null ? "—" : formatNumber(Number(a.montant_ht))}</td>
-                <td>
-                  <Badge tone={a.statut === "comptabilise" ? "ok" : "warn"}>{a.statut_label}</Badge> {a.move_number ?? ""}
-                </td>
-                <td>
-                  {a.statut === "brouillon" && (
-                    <ActionBar actions={[{ label: t("ecarts_m2.avoirs.comptabiliser"), path: `/api/achats/avoirs/${a.id}/comptabiliser/`, confirm: t("ecarts_m2.avoirs.confirm") }]} />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
         <p className="muted">{t("ecarts_m2.avoirs.note")}</p>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m2.ged.title")}>
-        <table className="table" data-testid="pieces-archivees">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m2.ged.nature")}</th>
-              <th>{t("ecarts_m2.ged.piece")}</th>
-              <th>{t("ecarts_m2.ged.archive")}</th>
-              <th>{t("ecarts_m2.ged.conservation")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(pieces?.rows ?? []).slice(0, 30).map((p) => (
-              <tr key={`${p.nature}-${p.piece}`}>
-                <td>{p.nature}</td>
-                <td>{p.piece}</td>
-                <td>{formatDate(p.archive_le)}</td>
-                <td>{p.conservation_ans === null ? "—" : t("ecarts_m2.ged.ans", { n: p.conservation_ans })}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="pieces-archivees">
+          <DataTable
+            caption={t("ecarts_m2.ged.title")}
+            density="compact"
+            columns={colsPieces}
+            rows={(pieces?.rows ?? []).slice(0, 30).map((p) => ({ ...p, id: `${p.nature}-${p.piece}` }))}
+          />
+        </div>
         <p className="muted">{t("ecarts_m2.ged.note", { n: pieces?.conservation_ans ?? 10 })}</p>
       </SectionCard>
 

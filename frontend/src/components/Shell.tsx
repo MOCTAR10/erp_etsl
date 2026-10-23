@@ -1,21 +1,23 @@
 import {
-  KeyRound,
   Bell,
   Boxes,
   Calculator,
-  CircleUser,
+  ChevronDown,
   FileSignature,
   FileUp,
   Filter,
   FolderOpen,
   GitBranch,
   HardHat,
+  KeyRound,
   Languages,
   LayoutDashboard,
   LineChart,
   LogOut,
-  Menu,
+  Menu as MenuIcon,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   PieChart,
   Scale,
   Search,
@@ -32,16 +34,21 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
+import { api } from "../api/client";
 import { useAuth } from "../store/auth";
-import { canSeeApp, ROUTE_APP, type ErpApp } from "../lib/modules";
+import { searchEntities, type EntityRow } from "../lib/entitySearch";
+import { canSeeApp, ROUTE_APP, sansCode, type ErpApp } from "../lib/modules";
+import { initiales, roleLabel } from "../lib/roles";
 import { MotionProvider } from "./Pilot";
 import { BrandLogo } from "./BrandLogo";
-import { CommandPalette, type PaletteItem } from "./CommandPalette";
+import { CommandPalette, Menu, Tooltip } from "./ui";
+import type { CommandGroupDef, CommandItemDef, MenuEntry } from "./ui";
 
 interface NavItem {
   to: string;
@@ -54,6 +61,7 @@ interface ModuleNavItem extends NavItem {
   app: ErpApp;
 }
 
+/** Pilotage : écrans de suivi transverses (non filtrés par module). */
 const PILOT_NAV: NavItem[] = [
   { to: "/", key: "nav.dashboard", Icon: LayoutDashboard },
   { to: "/direction", key: "nav.direction", Icon: LineChart },
@@ -62,15 +70,18 @@ const PILOT_NAV: NavItem[] = [
   { to: "/notifications", key: "nav.notifications", Icon: Bell },
   { to: "/signatures", key: "nav.signatures", Icon: FileSignature },
   { to: "/documents", key: "ecarts_tr.nav.ged", Icon: FolderOpen },
-  { to: "/parametres", key: "ecarts_tr.nav.parametres", Icon: SlidersHorizontal },
+];
+
+/** Espace & administration : outils personnels et paramétrage (groupe repliable). */
+const OUTILS_NAV: NavItem[] = [
   { to: "/terrain", key: "nav.terrain", Icon: Smartphone },
   { to: "/mon-espace", key: "nav.monEspace", Icon: UserRound },
   { to: "/securite", key: "nav.securite", Icon: KeyRound },
+  { to: "/parametres", key: "ecarts_tr.nav.parametres", Icon: SlidersHorizontal },
   { to: "/reprise", key: "ecarts_import.nav", Icon: FileUp },
+  /** Administration (EX-G-01) : comptes, matrice des droits, référentiels, piste d'audit — rôle admin seulement. */
+  { to: "/administration", key: "ecarts_tr.nav.administration", Icon: UserCog },
 ];
-
-/** Administration (EX-G-01) : comptes, matrice des droits, référentiels, piste d'audit — rôle admin seulement. */
-const ADMIN_NAV: NavItem[] = [{ to: "/administration", key: "ecarts_tr.nav.administration", Icon: UserCog }];
 /** Reprise de données (CDC §10) : cercle de l'API d'import + RH (salariés, paie) + QA/QC (qualité) + cercle paie. */
 const REPRISE_ROLES = new Set(["admin", "comptable", "finance", "direction", "rh", "qaqc", "pdg", "dga", "hse", "logistique", "maintenance"]);
 
@@ -89,82 +100,150 @@ const MODULE_NAV: ModuleNavItem[] = [
   { to: "/juridique", key: "nav.juridique", Icon: Scale, app: ROUTE_APP["/juridique"] },
 ];
 
+/** Préférences d'affichage du menu (par poste) : lecture / écriture tolérantes (navigation privée, stockage bloqué). */
+function lirePref(cle: string): string | null {
+  try {
+    return localStorage.getItem(cle);
+  } catch {
+    return null;
+  }
+}
+function ecrirePref(cle: string, valeur: string) {
+  try {
+    localStorage.setItem(cle, valeur);
+  } catch {
+    /* stockage indisponible : préférence non mémorisée */
+  }
+}
+const PREF_RAIL = "etls.nav.rail";
+const PREF_OUTILS = "etls.nav.outils";
+
 export function Shell() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const user = useAuth((s) => s.user);
   const clear = useAuth((s) => s.clear);
 
   const [theme, setTheme] = useState(() => document.documentElement.getAttribute("data-theme") ?? "light");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [rail, setRail] = useState(() => lirePref(PREF_RAIL) === "1");
+  const [outilsPref, setOutilsPref] = useState(() => lirePref(PREF_OUTILS) === "1");
   const isDark = theme === "dark";
   const ThemeIcon = isDark ? Sun : Moon;
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     const root = document.documentElement;
     const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
     root.setAttribute("data-theme", next);
-    localStorage.setItem("etls.theme", next);
+    ecrirePref("etls.theme", next);
     setTheme(next);
-  };
+  }, []);
 
-  const toggleLang = () => {
+  const toggleLang = useCallback(() => {
     const next = i18n.language === "fr" ? "en" : "fr";
     void i18n.changeLanguage(next);
-    localStorage.setItem("etls.lang", next);
-  };
+    ecrirePref("etls.lang", next);
+  }, [i18n]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     clear();
     navigate("/login", { replace: true });
+  }, [clear, navigate]);
+
+  const toggleRail = () => {
+    setRail((r) => {
+      ecrirePref(PREF_RAIL, r ? "0" : "1");
+      return !r;
+    });
   };
 
-  const pilotNav = useMemo(() => {
-    const base = PILOT_NAV.filter(({ to }) => to !== "/reprise" || REPRISE_ROLES.has(user?.role ?? ""));
-    // Administration (EX-G-01) : rôle admin seulement.
-    return user?.role === "admin" ? [...base, ...ADMIN_NAV] : base;
-  }, [user?.role]);
+  const outilsNav = useMemo(
+    () =>
+      OUTILS_NAV.filter(({ to }) => {
+        if (to === "/reprise") return REPRISE_ROLES.has(user?.role ?? "");
+        if (to === "/administration") return user?.role === "admin";
+        return true;
+      }),
+    [user?.role],
+  );
 
   const visibleModules = useMemo(
     () => MODULE_NAV.filter(({ app }) => canSeeApp(user?.modules, app)),
     [user?.modules],
   );
 
-  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email || "";
-  const initials = (displayName || "?")
-    .split(/[\s@._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
+  // Le groupe « Espace & administration » s'ouvre de lui-même si l'écran courant en fait partie.
+  const outilsActif = outilsNav.some(({ to }) => pathname === to || pathname.startsWith(`${to}/`));
+  const outilsOpen = outilsPref || outilsActif;
+  const toggleOutils = () => {
+    setOutilsPref((o) => {
+      ecrirePref(PREF_OUTILS, o ? "0" : "1");
+      return !o;
+    });
+  };
 
-  // Palette de commandes : pages (déjà filtrées par rôle) + actions rapides.
-  const paletteItems = useMemo<PaletteItem[]>(
-    () => [
-      ...[...pilotNav, ...visibleModules].map(({ to, key, Icon }) => ({
-        id: `go${to === "/" ? "-home" : to.replace(/\//g, "-")}`,
-        label: t(key),
-        group: t("palette.pages"),
-        Icon,
-        keywords: to,
-        run: () => navigate(to),
-      })),
-      { id: "act-theme", label: t("common.theme"), group: t("palette.actions"), Icon: isDark ? Sun : Moon, run: toggleTheme },
-      { id: "act-lang", label: t("common.language"), group: t("palette.actions"), Icon: Languages, run: toggleLang },
-      { id: "act-logout", label: t("common.logout"), group: t("palette.actions"), Icon: LogOut, run: logout },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, pilotNav, visibleModules, isDark, i18n.language],
+  // Compteur discret : notifications non lues (même cache que l'écran Notifications).
+  const notifications = useQuery({
+    queryKey: ["notifications"],
+    queryFn: api.notifications,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    retry: 0,
+  });
+  const nonLues = (notifications.data ?? []).filter((n) => !n.is_read).length;
+
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email || "";
+  const role = roleLabel(t, user?.role);
+
+  // Palette : écrans visibles par le rôle, actions rapides (routes existantes), recherche d'entités via l'API.
+  const paletteGroups = useMemo<CommandGroupDef[]>(() => {
+    const versPage = (items: NavItem[]): CommandItemDef[] =>
+      items.map(({ to, key, Icon }) => ({
+        id: `nav-${to}`,
+        label: sansCode(t(key)),
+        icon: Icon,
+        keywords: [to.replace(/[/-]/g, " "), t(key)],
+        onSelect: () => navigate(to),
+      }));
+    const aller = (id: string, label: string, icon: LucideIcon, to: string): CommandItemDef => ({ id, label, icon, onSelect: () => navigate(to) });
+    return [
+      { id: "pilotage", heading: t("nav.groupPilotage"), items: versPage(PILOT_NAV) },
+      { id: "modules", heading: t("nav.groupModules"), items: versPage(visibleModules) },
+      { id: "outils", heading: t("shell.groupOutils"), items: versPage(outilsNav) },
+      {
+        id: "actions",
+        heading: t("shell.groupes.actions"),
+        items: [
+          aller("act-delegation", t("shell.actions.delegation"), ShieldCheck, "/securite"),
+          aller("act-documents", t("shell.actions.documents"), FolderOpen, "/documents"),
+          aller("act-terrain", t("shell.actions.terrain"), Smartphone, "/terrain"),
+          aller("act-conges", t("shell.actions.conges"), UserRound, "/mon-espace"),
+          aller("act-mdp", t("shell.actions.motDePasse"), KeyRound, "/mon-mot-de-passe"),
+          { id: "act-theme", label: t(isDark ? "shell.actions.themeClair" : "shell.actions.themeSombre"), icon: isDark ? Sun : Moon, onSelect: toggleTheme },
+          { id: "act-lang", label: t("shell.actions.langue"), icon: Languages, onSelect: toggleLang },
+          { id: "act-logout", label: t("shell.actions.deconnexion"), icon: LogOut, onSelect: logout },
+        ],
+      },
+    ];
+  }, [t, navigate, visibleModules, outilsNav, isDark, toggleTheme, toggleLang, logout]);
+
+  const rechercher = useCallback(
+    async (q: string, signal: AbortSignal): Promise<CommandGroupDef[]> => {
+      const groupes = await searchEntities(q, signal, user?.modules, (path, query, s) => api.rechercher<EntityRow>(path, query, s));
+      return groupes.map((g) => ({
+        id: `ent-${g.key}`,
+        heading: t(`shell.search.${g.key}`),
+        items: g.hits.map((h) => ({ id: h.id, label: h.label, hint: h.hint, icon: h.icon, onSelect: () => navigate(h.route) })),
+      }));
+    },
+    [user?.modules, t, navigate],
   );
 
   useEffect(() => {
+    // Tiroir de navigation mobile : Échap le referme (comportement attendu au clavier).
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPaletteOpen((o) => !o);
-      }
-      // Tiroir de navigation mobile : Échap le referme (comportement attendu au clavier).
       if (e.key === "Escape") setNavOpen(false);
     };
     window.addEventListener("keydown", onKey);
@@ -172,25 +251,69 @@ export function Shell() {
   }, []);
 
   const renderNav = (items: NavItem[]) =>
-    items.map(({ to, key, Icon }) => (
-      <NavLink
-        key={to}
-        to={to}
-        end={to === "/"}
-        onClick={() => setNavOpen(false)}
-        className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
-      >
-        <Icon size={16} />
-        {t(key)}
-      </NavLink>
-    ));
+    items.map(({ to, key, Icon }) => {
+      const label = sansCode(t(key));
+      const badge = to === "/notifications" && nonLues > 0 ? nonLues : 0;
+      const link = (
+        <NavLink
+          key={to}
+          to={to}
+          end={to === "/"}
+          onClick={() => setNavOpen(false)}
+          aria-label={rail ? label : undefined}
+          // Classe texte (pas de fonction) : NavLink ajoute `active` lui-même, et le Slot Radix de l'infobulle
+          // (mode rail) ne sait fusionner que des chaînes.
+          className="nav-link"
+        >
+          <Icon size={16} strokeWidth={1.85} aria-hidden="true" />
+          <span className="nav-label">{label}</span>
+          {badge ? (
+            <>
+              <span className="nav-badge" aria-hidden="true">
+                {badge > 99 ? "99+" : badge}
+              </span>
+              <span className="sr-only">{t("shell.nonLues", { count: badge })}</span>
+            </>
+          ) : null}
+        </NavLink>
+      );
+      return rail ? (
+        <Tooltip key={to} content={badge ? `${label} · ${t("shell.nonLues", { count: badge })}` : label} side="right" delay={150}>
+          {link}
+        </Tooltip>
+      ) : (
+        link
+      );
+    });
+
+  const profilItems: MenuEntry[] = [
+    {
+      type: "label",
+      label: (
+        <span className="profile-head">
+          <span className="profile-head-name">{displayName}</span>
+          {user?.email && user.email !== displayName ? <span className="profile-head-mail">{user.email}</span> : null}
+          <span className="profile-head-role">{role}</span>
+        </span>
+      ),
+    },
+    "separator",
+    { id: "espace", label: t("shell.profil.monEspace"), icon: UserRound, onSelect: () => navigate("/mon-espace") },
+    { id: "mdp", label: t("shell.profil.motDePasse"), icon: KeyRound, onSelect: () => navigate("/mon-mot-de-passe") },
+    { id: "secu", label: t("shell.profil.securite"), icon: ShieldCheck, onSelect: () => navigate("/securite") },
+    "separator",
+    { id: "theme", label: t(isDark ? "shell.profil.themeClair" : "shell.profil.themeSombre"), icon: isDark ? Sun : Moon, onSelect: toggleTheme },
+    { id: "langue", label: t("shell.profil.langue"), icon: Languages, onSelect: toggleLang },
+    "separator",
+    { id: "logout", label: t("shell.profil.deconnexion"), icon: LogOut, onSelect: logout, danger: true },
+  ];
 
   return (
     <MotionProvider>
       <a className="skip-link" href="#main-content">
         {t("common.skipToContent")}
       </a>
-      <div className="app-shell">
+      <div className={rail ? "app-shell shell-v2 is-rail" : "app-shell shell-v2"}>
         <aside className={navOpen ? "sidebar open" : "sidebar"} id="app-sidebar">
           <div className="sidebar-brand">
             <BrandLogo />
@@ -198,17 +321,49 @@ export function Shell() {
           <nav className="sidebar-scroll" aria-label={t("common.mainNav")}>
             <div className="nav-group">
               <span className="nav-group-label">{t("nav.groupPilotage")}</span>
-              {renderNav(pilotNav)}
+              {renderNav(PILOT_NAV)}
             </div>
+            {visibleModules.length > 0 ? (
+              <div className="nav-group">
+                <span className="nav-group-label">{t("nav.groupModules")}</span>
+                {renderNav(visibleModules)}
+              </div>
+            ) : null}
             <div className="nav-group">
-              <span className="nav-group-label">{t("nav.groupModules")}</span>
-              {renderNav(visibleModules)}
+              <button
+                type="button"
+                className="nav-group-label nav-group-toggle"
+                aria-expanded={outilsOpen || rail}
+                aria-controls="nav-outils"
+                onClick={toggleOutils}
+                disabled={outilsActif}
+                title={outilsOpen ? t("shell.masquerOutils") : t("shell.afficherOutils")}
+              >
+                <span>{t("shell.groupOutils")}</span>
+                <ChevronDown size={14} aria-hidden="true" className="nav-group-chevron" />
+              </button>
+              <div id="nav-outils" className="nav-group-items" hidden={!(outilsOpen || rail)}>
+                {renderNav(outilsNav)}
+              </div>
             </div>
           </nav>
-          <button type="button" className="btn ghost sidebar-logout" onClick={logout}>
-            <LogOut size={15} />
-            {t("common.logout")}
-          </button>
+          <div className="sidebar-foot">
+            <button type="button" className="btn ghost sidebar-logout" onClick={logout} aria-label={t("common.logout")}>
+              <LogOut size={15} aria-hidden="true" />
+              <span className="nav-label">{t("common.logout")}</span>
+            </button>
+            <Tooltip content={rail ? t("shell.deplier") : t("shell.reduire")} side="right">
+              <button
+                type="button"
+                className="icon-btn sidebar-rail-toggle"
+                aria-label={rail ? t("shell.deplier") : t("shell.reduire")}
+                aria-pressed={rail}
+                onClick={toggleRail}
+              >
+                {rail ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}
+              </button>
+            </Tooltip>
+          </div>
         </aside>
 
         {navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />}
@@ -223,56 +378,54 @@ export function Shell() {
               aria-expanded={navOpen}
               onClick={() => setNavOpen((o) => !o)}
             >
-              <Menu size={18} />
+              <MenuIcon size={18} aria-hidden="true" />
             </button>
+            <div className="topbar-brand">
+              <BrandLogo showTag={false} />
+            </div>
             <div className="topbar-search">
               <button
                 type="button"
                 className="search-trigger"
                 aria-label={t("common.search")}
                 aria-haspopup="dialog"
+                aria-keyshortcuts="Control+K Meta+K"
                 onClick={() => setPaletteOpen(true)}
               >
-                <Search size={15} />
-                <span>{t("common.search")}</span>
+                <Search size={15} aria-hidden="true" />
+                <span className="search-trigger-text">{t("shell.rechercher")}</span>
                 <kbd>Ctrl K</kbd>
               </button>
             </div>
 
             <div className="actions">
-              <button
-                className="icon-btn"
-                title={t("common.theme")}
-                onClick={toggleTheme}
-                aria-label={t("common.theme")}
-              >
-                <ThemeIcon size={16} />
-              </button>
-              <button
-                className="icon-btn"
-                title={t("common.language")}
-                onClick={toggleLang}
-                aria-label={t("common.language")}
-              >
-                <Languages size={16} />
-              </button>
-
-              <div className="user-chip">
-                <span className="avatar" aria-hidden="true">
-                  {initials || <CircleUser size={16} />}
-                </span>
-                <span className="user-meta">
-                  <span className="user-name">{displayName}</span>
-                  <span className="user-role">{user?.role ?? ""}</span>
-                </span>
-                <NavLink to="/mon-mot-de-passe" className="icon-btn" title={t("ecarts_tr.mdp.menu")} aria-label={t("ecarts_tr.mdp.menu")}>
-                  <KeyRound size={15} />
-                </NavLink>
-                <button className="btn ghost" onClick={logout}>
-                  <LogOut size={15} />
-                  {t("common.logout")}
+              <Tooltip content={t("shell.tipTheme")} side="bottom">
+                <button type="button" className="icon-btn topbar-pref" onClick={toggleTheme} aria-label={t("common.theme")}>
+                  <ThemeIcon size={16} aria-hidden="true" />
                 </button>
-              </div>
+              </Tooltip>
+              <Tooltip content={t("shell.tipLangue")} side="bottom">
+                <button type="button" className="icon-btn topbar-pref" onClick={toggleLang} aria-label={t("common.language")}>
+                  <Languages size={16} aria-hidden="true" />
+                </button>
+              </Tooltip>
+              <span className="topbar-sep" aria-hidden="true" />
+              <Menu
+                align="end"
+                items={profilItems}
+                trigger={
+                  <button type="button" className="profile-trigger" aria-label={`${t("shell.profil.ouvrir")} — ${displayName}, ${role}`}>
+                    <span className="avatar" aria-hidden="true">
+                      {initiales(displayName)}
+                    </span>
+                    <span className="profile-meta" aria-hidden="true">
+                      <span className="profile-name">{displayName}</span>
+                      <span className="profile-role">{role}</span>
+                    </span>
+                    <ChevronDown size={14} className="profile-chevron" aria-hidden="true" />
+                  </button>
+                }
+              />
             </div>
           </header>
 
@@ -283,10 +436,13 @@ export function Shell() {
       </div>
       <CommandPalette
         open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        items={paletteItems}
-        placeholder={t("palette.placeholder")}
-        emptyLabel={t("common.noResult")}
+        onOpenChange={setPaletteOpen}
+        groups={paletteGroups}
+        search={rechercher}
+        debounce={300}
+        label={t("shell.paletteLabel")}
+        placeholder={t("shell.palettePlaceholder")}
+        emptyLabel={t("shell.paletteVide")}
       />
     </MotionProvider>
   );

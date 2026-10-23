@@ -9,6 +9,11 @@ import "./i18n";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/plus-jakarta-sans";
 import "./styles/global.css";
+import "./styles/primitives.css";
+import "./styles/pages/shell.css";
+import "./styles/pages/listes.css";
+import "./styles/pages/formulaires.css";
+import "./styles/pages/direction.css";
 import { registerServiceWorker, startAutoSync } from "./lib/offline";
 
 const storedTheme = localStorage.getItem("etls.theme");

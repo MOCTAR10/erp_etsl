@@ -3,9 +3,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, EmptyState, PageHeader, SectionCard } from "../components/ui";
-import type { BadgeTone } from "../components/ui";
-import { formatDateTime, formatNumber } from "../lib/format";
+import { Badge, DataTable, EmptyState, PageHeader, SectionCard } from "../components/ui";
+import type { BadgeTone, Column } from "../components/ui";
+import { formatDateTime, formatMoney, formatNumber } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
 
 interface ColonneGabarit {
@@ -81,8 +81,12 @@ const BASE = "/api/integrations/migration";
 const TON_LOT: Record<Lot["statut"], BadgeTone> = { valide: "ok", succes: "ok", partiel: "warn", rejete: "err", echec: "err" };
 const TON_CONTROLE: Record<Controle["statut"], BadgeTone> = { conforme: "ok", ecart: "err", a_saisir: "warn", a_controler: "neutral" };
 const SOURCES = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"];
+const tri = (v: string | null) => (v === null || v === "" ? null : Number(v));
+type ColonneLigne = ColonneGabarit & { id: string };
+type ControleLigne = Controle & { id: string };
+type TiersLigne = NonNullable<Controle["tiers"]>[number] & { id: string };
 
-/** Reprise de données (CDC §10) : gabarits CSV / XML / ZIP GED, exécution à blanc puis réelle, rapport d'anomalies,
+/** Reprise de données : gabarits CSV / XML / ZIP GED, exécution à blanc puis réelle, rapport d'anomalies,
  * historique des lots, rapprochements C1-C10 pour le PV de migration, paramètres provisoires. */
 export function ReprisePage() {
   const { t } = useTranslation();
@@ -128,6 +132,70 @@ export function ReprisePage() {
     void api.download(`${BASE}/modele/?gabarit=${gabarit!.code}&type=${type}`, `${gabarit!.code === "ged" ? "manifeste" : `modele_${gabarit!.code}`}.${type}`);
   const rapport = (lot: Lot) => void api.download(`${BASE}/lots/${lot.id}/rapport/`, `rapport_anomalies_${lot.gabarit}.csv`);
   const accept = gabarit?.formats.includes("zip") ? ".zip" : ".csv,.xml,.txt";
+
+  const colsAnomalies: Column<Ligne>[] = [
+    { key: "numero", header: t("ecarts_import.ligne"), num: true, render: (l) => formatNumber(l.numero), sortValue: (l) => l.numero },
+    { key: "erreur", header: t("ecarts_import.anomalie"), render: (l) => l.erreur },
+  ];
+  const colsGabarit: Column<ColonneLigne>[] = [
+    {
+      key: "nom",
+      header: t("ecarts_import.charger.colonne"),
+      render: (c) => (
+        <>
+          <code>{c.nom}</code> {gabarit?.sensibles.includes(c.nom) && <Badge tone="warn">{t("ecarts_import.charger.sensible")}</Badge>}
+        </>
+      ),
+    },
+    { key: "obligatoire", header: t("ecarts_import.charger.obligatoire"), render: (c) => (c.obligatoire ? t("ecarts_import.oui") : "") },
+    { key: "aide", header: t("ecarts_import.charger.aide"), render: (c) => c.aide },
+    { key: "exemple", header: t("ecarts_import.charger.exemple"), render: (c) => c.exemple },
+  ];
+  const colsLots: Column<Lot>[] = [
+    {
+      key: "le",
+      header: t("ecarts_import.historique.le"),
+      sortValue: (l) => l.cree_le,
+      render: (l) => (
+        <>
+          {formatDateTime(l.cree_le)}
+          {l.cree_par_email ? <div className="muted">{l.cree_par_email}</div> : null}
+        </>
+      ),
+    },
+    { key: "gabarit", header: t("ecarts_import.charger.gabarit"), render: (l) => l.gabarit_label, sortValue: (l) => l.gabarit_label },
+    {
+      key: "fichier",
+      header: t("ecarts_import.charger.fichier"),
+      render: (l) => (
+        <span title={l.empreinte}>
+          {l.fichier} <span className="muted">({l.format.toUpperCase()})</span>
+        </span>
+      ),
+    },
+    { key: "mode", header: t("ecarts_import.historique.mode"), render: (l) => l.mode_label },
+    { key: "statut", header: t("ecarts_import.historique.statut"), render: (l) => <Badge tone={TON_LOT[l.statut]}>{l.statut_label}</Badge> },
+    {
+      key: "resultat",
+      header: t("ecarts_import.historique.resultat"),
+      render: (l) => (
+        <>
+          {t("ecarts_import.compteurs", { lignes: l.lignes, creees: l.creees, maj: l.mises_a_jour, doublons: l.doublons, erreurs: l.erreurs })} ·{" "}
+          {formatNumber(Number(l.taux_erreur))} %
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (l) =>
+        l.lignes > 0 ? (
+          <button type="button" className="btn ghost sm" onClick={() => rapport(l)}>
+            {t("ecarts_import.rapport")}
+          </button>
+        ) : null,
+    },
+  ];
 
   return (
     <>
@@ -186,7 +254,7 @@ export function ReprisePage() {
             <button type="button" className="btn ghost" disabled={!gabarit} onClick={() => telecharger("xml")}>
               {t("ecarts_import.charger.modeleXml")}
             </button>
-            <button type="button" className="btn" disabled={!fichier || !gabarit || charger.isPending} onClick={() => charger.mutate("blanc")}>
+            <button type="button" className="btn ghost" disabled={!fichier || !gabarit || charger.isPending} onClick={() => charger.mutate("blanc")}>
               {t("ecarts_import.charger.blanc")}
             </button>
             <button
@@ -223,51 +291,14 @@ export function ReprisePage() {
                 </button>
               )}
               {(anomalies.data ?? []).length > 0 && (
-                <table className="table">
-                  <caption className="sr-only">{t("ecarts_import.anomalies")}</caption>
-                  <thead>
-                    <tr>
-                      <th>{t("ecarts_import.ligne")}</th>
-                      <th>{t("ecarts_import.anomalie")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {anomalies.data!.slice(0, 50).map((l) => (
-                      <tr key={l.id}>
-                        <td className="num">{l.numero}</td>
-                        <td>{l.erreur}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable columns={colsAnomalies} rows={anomalies.data!.slice(0, 50)} caption={t("ecarts_import.anomalies")} />
               )}
             </div>
           )}
           {gabarit && (
             <details>
               <summary>{t("ecarts_import.charger.colonnes", { n: gabarit.colonnes.length })}</summary>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>{t("ecarts_import.charger.colonne")}</th>
-                    <th>{t("ecarts_import.charger.obligatoire")}</th>
-                    <th>{t("ecarts_import.charger.aide")}</th>
-                    <th>{t("ecarts_import.charger.exemple")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {gabarit.colonnes.map((c) => (
-                    <tr key={c.nom}>
-                      <td>
-                        <code>{c.nom}</code> {gabarit.sensibles.includes(c.nom) && <Badge tone="warn">{t("ecarts_import.charger.sensible")}</Badge>}
-                      </td>
-                      <td>{c.obligatoire ? t("ecarts_import.oui") : ""}</td>
-                      <td>{c.aide}</td>
-                      <td>{c.exemple}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable columns={colsGabarit} rows={gabarit.colonnes.map((c) => ({ ...c, id: c.nom }))} caption={t("ecarts_import.charger.colonnes", { n: gabarit.colonnes.length })} />
             </details>
           )}
         </div>
@@ -277,49 +308,9 @@ export function ReprisePage() {
         {(lots.data ?? []).length === 0 ? (
           <EmptyState label={t("ecarts_import.historique.vide")} />
         ) : (
-          <table className="table" data-testid="reprise-historique">
-            <thead>
-              <tr>
-                <th>{t("ecarts_import.historique.le")}</th>
-                <th>{t("ecarts_import.charger.gabarit")}</th>
-                <th>{t("ecarts_import.charger.fichier")}</th>
-                <th>{t("ecarts_import.historique.mode")}</th>
-                <th>{t("ecarts_import.historique.statut")}</th>
-                <th>{t("ecarts_import.historique.resultat")}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {lots.data!.map((l) => (
-                <tr key={l.id}>
-                  <td>
-                    {formatDateTime(l.cree_le)}
-                    <br />
-                    <span className="muted">{l.cree_par_email ?? ""}</span>
-                  </td>
-                  <td>{l.gabarit_label}</td>
-                  <td title={l.empreinte}>
-                    {l.fichier} <span className="muted">({l.format.toUpperCase()})</span>
-                  </td>
-                  <td>{l.mode_label}</td>
-                  <td>
-                    <Badge tone={TON_LOT[l.statut]}>{l.statut_label}</Badge>
-                  </td>
-                  <td>
-                    {t("ecarts_import.compteurs", { lignes: l.lignes, creees: l.creees, maj: l.mises_a_jour, doublons: l.doublons, erreurs: l.erreurs })} ·{" "}
-                    {formatNumber(Number(l.taux_erreur))} %
-                  </td>
-                  <td>
-                    {l.lignes > 0 && (
-                      <button type="button" className="btn ghost" onClick={() => rapport(l)}>
-                        {t("ecarts_import.rapport")}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div data-testid="reprise-historique">
+            <DataTable columns={colsLots} rows={lots.data!} caption={t("ecarts_import.historique.titre")} />
+          </div>
         )}
       </SectionCard>
 
@@ -340,6 +331,27 @@ function RapprochementsSection() {
     retry: 0,
   });
   if (q.isError || !q.data) return null;
+  const cols: Column<ControleLigne>[] = [
+    {
+      key: "controle",
+      header: t("ecarts_import.rappro.controle"),
+      render: (c) => (
+        <>
+          <strong>{c.code}</strong> {c.libelle}
+          <div className="muted">{c.valideur}</div>
+        </>
+      ),
+    },
+    { key: "erp", header: t("ecarts_import.rappro.erp"), num: true, render: (c) => formatNumber(Number(c.valeur_erp)) },
+    { key: "source", header: t("ecarts_import.rappro.sourceCol"), num: true, render: (c) => (c.valeur_source === null ? "—" : formatNumber(Number(c.valeur_source))) },
+    { key: "ecart", header: t("ecarts_import.rappro.ecart"), num: true, render: (c) => (c.ecart === null ? "—" : formatNumber(Number(c.ecart))), sortValue: (c) => tri(c.ecart) },
+    {
+      key: "statut",
+      header: t("ecarts_import.historique.statut"),
+      render: (c) => <Badge tone={TON_CONTROLE[c.statut]}>{t(`ecarts_import.rappro.statuts.${c.statut}`)}</Badge>,
+    },
+    { key: "detail", header: t("ecarts_import.rappro.detail"), render: (c) => c.detail },
+  ];
   return (
     <SectionCard title={t("ecarts_import.rappro.titre")}>
       <div data-testid="reprise-rapprochements">
@@ -363,7 +375,7 @@ function RapprochementsSection() {
         </label>
         <p className="muted">{t("ecarts_a9.c2TiersAide")}</p>
         <div className="action-bar-buttons">
-          <button type="button" className="btn" onClick={() => setAppliquees(sources)}>
+          <button type="button" className="btn primary" onClick={() => setAppliquees(sources)}>
             {t("ecarts_import.rappro.calculer")}
           </button>
           <button
@@ -374,36 +386,7 @@ function RapprochementsSection() {
             {t("ecarts_import.rappro.exporter")}
           </button>
         </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>{t("ecarts_import.rappro.controle")}</th>
-              <th>{t("ecarts_import.rappro.erp")}</th>
-              <th>{t("ecarts_import.rappro.sourceCol")}</th>
-              <th>{t("ecarts_import.rappro.ecart")}</th>
-              <th>{t("ecarts_import.historique.statut")}</th>
-              <th>{t("ecarts_import.rappro.detail")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data.controles.map((c) => (
-              <tr key={c.code}>
-                <td>
-                  <strong>{c.code}</strong> {c.libelle}
-                  <br />
-                  <span className="muted">{c.valideur}</span>
-                </td>
-                <td className="num">{formatNumber(Number(c.valeur_erp))}</td>
-                <td className="num">{c.valeur_source === null ? "—" : formatNumber(Number(c.valeur_source))}</td>
-                <td className="num">{c.ecart === null ? "—" : formatNumber(Number(c.ecart))}</td>
-                <td>
-                  <Badge tone={TON_CONTROLE[c.statut]}>{t(`ecarts_import.rappro.statuts.${c.statut}`)}</Badge>
-                </td>
-                <td>{c.detail}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable columns={cols} rows={q.data.controles.map((c) => ({ ...c, id: c.code }))} caption={t("ecarts_import.rappro.titre")} />
         <C2ParTiers tiers={q.data.controles.find((c) => c.code === "C2")?.tiers ?? []} />
       </div>
     </SectionCard>
@@ -413,32 +396,32 @@ function RapprochementsSection() {
 function C2ParTiers({ tiers }: { tiers: NonNullable<Controle["tiers"]> }) {
   const { t } = useTranslation();
   if (tiers.length === 0) return null;
+  // Soldes de comptes de tiers (401 / 411) : montants en FCFA.
+  const cols: Column<TiersLigne>[] = [
+    {
+      key: "tiers",
+      header: t("ecarts_a9.tiers"),
+      render: (l) => (
+        <>
+          <strong>{l.code}</strong> {l.nom}
+        </>
+      ),
+    },
+    { key: "erp", header: t("ecarts_import.rappro.erp"), num: true, render: (l) => formatMoney(l.erp) },
+    { key: "source", header: t("ecarts_import.rappro.sourceCol"), num: true, render: (l) => (l.source === null ? "—" : formatMoney(l.source)) },
+    {
+      key: "ecart",
+      header: t("ecarts_import.rappro.ecart"),
+      num: true,
+      sortValue: (l) => tri(l.ecart),
+      render: (l) => (l.ecart === null ? "—" : Number(l.ecart) === 0 ? <Badge tone="ok">{formatMoney(0)}</Badge> : <Badge tone="err">{formatMoney(l.ecart)}</Badge>),
+    },
+  ];
   return (
-    <table className="table" data-testid="reprise-c2-tiers">
-      <caption>{t("ecarts_a9.c2Titre")}</caption>
-      <thead>
-        <tr>
-          <th>{t("ecarts_a9.tiers")}</th>
-          <th>{t("ecarts_import.rappro.erp")}</th>
-          <th>{t("ecarts_import.rappro.sourceCol")}</th>
-          <th>{t("ecarts_import.rappro.ecart")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {tiers.map((l) => (
-          <tr key={l.code}>
-            <td>
-              <strong>{l.code}</strong> {l.nom}
-            </td>
-            <td className="num">{formatNumber(Number(l.erp))}</td>
-            <td className="num">{l.source === null ? "—" : formatNumber(Number(l.source))}</td>
-            <td className="num">
-              {l.ecart === null ? "—" : Number(l.ecart) === 0 ? <Badge tone="ok">0</Badge> : <Badge tone="err">{formatNumber(Number(l.ecart))}</Badge>}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div data-testid="reprise-c2-tiers">
+      <h4>{t("ecarts_a9.c2Titre")}</h4>
+      <DataTable columns={cols} rows={tiers.map((l) => ({ ...l, id: l.code }))} caption={t("ecarts_a9.c2Titre")} />
+    </div>
   );
 }
 
@@ -467,6 +450,59 @@ function ParametresRepriseSection() {
   });
   if (q.isError || !q.data) return null;
   const provisoires = q.data.filter((p) => p.est_provisoire).length;
+  const cols: Column<Parametre>[] = [
+    { key: "label", header: t("tableaux.pages.reprise.parametre"), render: (p) => p.label },
+    {
+      key: "valeur",
+      header: t("tableaux.pages.reprise.valeur"),
+      num: true,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <input
+            type="number"
+            min={0}
+            step="0.5"
+            className="control"
+            aria-label={p.label}
+            value={edit.valeur}
+            onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })}
+          />
+        ) : (
+          `${formatNumber(Number(p.valeur), { decimals: Number.isInteger(Number(p.valeur)) ? 0 : 1 })} ${p.unite}`
+        ),
+    },
+    {
+      key: "statut",
+      header: t("ecarts_import.historique.statut"),
+      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("ecarts_import.params.provisoire") : t("ecarts_import.params.confirme")}</Badge>,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <div className="action-bar-buttons">
+            <button type="button" className="btn primary sm" onClick={() => modifier.mutate(edit)}>
+              {t("ecarts_import.params.valider")}
+            </button>
+            <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
+              {t("ecarts_import.params.annuler")}
+            </button>
+          </div>
+        ) : (
+          <div className="action-bar-buttons">
+            <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
+              {t("ecarts_import.params.modifier")}
+            </button>
+            {p.est_provisoire && (
+              <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("ecarts_import.params.confirmConfirmer")) && confirmer.mutate(p.id)}>
+                {t("ecarts_import.params.confirmer")}
+              </button>
+            )}
+          </div>
+        ),
+    },
+  ];
   return (
     <SectionCard title={t("ecarts_import.params.titre")}>
       <div data-testid="parametres-reprise">
@@ -480,49 +516,7 @@ function ParametresRepriseSection() {
             {error}
           </p>
         )}
-        <table className="table">
-          <caption className="sr-only">{t("ecarts_import.params.titre")}</caption>
-          <tbody>
-            {q.data.map((p) => (
-              <tr key={p.id}>
-                <td>{p.label}</td>
-                <td className="num">
-                  {edit?.id === p.id ? (
-                    <input type="number" min={0} step="0.5" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-                  ) : (
-                    `${formatNumber(Number(p.valeur))} ${p.unite}`
-                  )}
-                </td>
-                <td>
-                  <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("ecarts_import.params.provisoire") : t("ecarts_import.params.confirme")}</Badge>
-                </td>
-                <td>
-                  {edit?.id === p.id ? (
-                    <>
-                      <button type="button" className="btn" onClick={() => modifier.mutate(edit)}>
-                        {t("ecarts_import.params.valider")}
-                      </button>{" "}
-                      <button type="button" className="btn ghost" onClick={() => setEdit(null)}>
-                        {t("ecarts_import.params.annuler")}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
-                        {t("ecarts_import.params.modifier")}
-                      </button>{" "}
-                      {p.est_provisoire && (
-                        <button type="button" className="btn ghost" onClick={() => window.confirm(t("ecarts_import.params.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                          {t("ecarts_import.params.confirmer")}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable columns={cols} rows={q.data} caption={t("ecarts_import.params.titre")} />
       </div>
     </SectionCard>
   );

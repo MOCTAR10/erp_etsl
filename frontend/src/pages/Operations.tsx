@@ -9,9 +9,12 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney, formatNumber, formatPercent } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { CardActions } from "../components/ui/Board";
+import { actionsColumn } from "../components/ui/DataTable";
+import type { ActionDef } from "../components/ui";
 import type {
   ChargeStats,
   EquipeAffectation,
@@ -36,7 +39,7 @@ const VALID_STATUSES = new Set<OfStatus>(["prevu", "lance", "en_cours", "termine
 const METIERS = ["soudeur", "chaudronnier", "tuyauteur", "monteur", "peintre", "genie_civil", "electricien", "instrumentiste"];
 const BOARD_ORDER: OfStatus[] = ["en_cours", "lance", "prevu", "termine", "cloture"];
 
-function ofActions(of: OrdreFabrication, t: (k: string) => string) {
+function ofActions(of: OrdreFabrication, t: (k: string) => string): ActionDef[] {
   const base = `/api/operations/ordres/${of.id}`;
   switch (of.status) {
     case "prevu":
@@ -54,68 +57,59 @@ function ofActions(of: OrdreFabrication, t: (k: string) => string) {
 
 function OfCard({ of, index }: { of: OrdreFabrication; index: number }) {
   const { t } = useTranslation();
+  const pointees = Number(of.pointage_hours);
+  const prevues = Number(of.calculated_hours);
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        <span className="muted">{of.code}</span> · {of.label}
-      </div>
-      <div className="meta">
-        {t("operations.scope")}: {of.scope_label}
-        {of.affaire_code ? ` · ${of.affaire_code}` : ""}
-      </div>
-      {of.gamme_code ? (
-        <div className="meta muted">
-          {t("operations.gamme")}: {of.gamme_code}
-        </div>
-      ) : null}
-      <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className={`badge ${STATUS_BADGE[of.status] ?? "brand"}`}>{of.status_label}</span>
-        <span>
-          {formatNumber(Number(of.pointage_hours))}/{formatNumber(Number(of.calculated_hours))} h
+      <div className="card-top">
+        <span className="card-code">{of.code}</span>
+        <span className="card-tags">
+          <Badge tone="neutral">{of.scope_label}</Badge>
         </span>
       </div>
-      {of.planned_end ? (
-        <div className="meta muted">
-          {t("operations.due")} {formatDate(of.planned_end)}
-        </div>
-      ) : null}
-      <ActionBar actions={ofActions(of, t)} />
+      <div className="title">{of.label}</div>
+      <div className="meta">
+        {[of.affaire_code, of.gamme_code ? `${t("operations.gamme")} ${of.gamme_code}` : null].filter(Boolean).join(" · ") || "—"}
+      </div>
+      <div className="card-foot">
+        <span>{of.planned_end ? t("listes.operations.echeance", { date: formatDate(of.planned_end) }) : null}</span>
+        <span className={`amount${prevues > 0 && pointees > prevues ? " is-over" : ""}`}>
+          {t("listes.operations.heures", { pointees: formatNumber(pointees), prevues: formatNumber(prevues) })}
+        </span>
+      </div>
+      <CardActions actions={ofActions(of, t)} />
     </BoardCard>
   );
 }
 
 function Charge({ stats }: { stats: ChargeStats }) {
   const { t } = useTranslation();
-  const scope = (key: "atelier" | "chantier", delay: number, icon: typeof Factory) => (
-    <Kpi
-      label={t(`operations.${key}`)}
-      value={`${formatNumber(stats.totals[key].calculated)} h ${t("operations.planned")}`}
-      hint={`${formatNumber(stats.totals[key].pointed)} h ${t("operations.pointed")} · ${stats.totals[key].count} OF`}
-      icon={icon}
-      tone="brand"
-      delay={delay}
-    />
-  );
   const alertes = stats.alertes ?? [];
+  if (alertes.length === 0) return null;
   return (
-    <>
-      <div className="kpi-grid">
-        {scope("atelier", 0, Factory)}
-        {scope("chantier", 0.05, Construction)}
-      </div>
-      {alertes.length > 0 && (
-        <SectionCard title={`${t("operations.surcharge")} · ${alertes.length}`}>
-          <ul data-testid="alertes-surcharge">
-            {alertes.map((a) => (
-              <li key={`${a.scope}-${a.week}`}>
-                <Badge tone="warn">{t(`operations.${a.scope}`)}</Badge> {t("operations.semaine")} {formatDate(a.week)} :{" "}
-                {formatNumber(a.planned_hours)} h / {formatNumber(a.capacity)} h (+{formatNumber(a.overload_pct)} %)
-              </li>
-            ))}
-          </ul>
-        </SectionCard>
-      )}
-    </>
+    <SectionCard title={`${t("operations.surcharge")} · ${alertes.length}`}>
+      <ul className="overload-list" data-testid="alertes-surcharge">
+        {alertes.map((a) => {
+          // Barre : dépassement de capacité (pleine à +100 %).
+          const ratio = Math.max(0.04, Math.min(1, a.overload_pct / 100));
+          return (
+            <li key={`${a.scope}-${a.week}`}>
+              <span>
+                <strong>{t(`operations.${a.scope}`)}</strong>
+                <span className="cell-sub">{t("listes.operations.surchargeHint", { date: formatDate(a.week) })}</span>
+              </span>
+              <span className={`overload-bar${a.overload_pct >= 100 ? " err" : ""}`} aria-hidden>
+                <span style={{ width: `${Math.round(ratio * 100)}%` }} />
+              </span>
+              <span className="overload-hours">
+                {formatNumber(a.planned_hours)} h / {formatNumber(a.capacity)} h
+              </span>
+              <Badge tone={a.overload_pct >= 100 ? "err" : "warn"}>+{formatPercent(a.overload_pct)}</Badge>
+            </li>
+          );
+        })}
+      </ul>
+    </SectionCard>
   );
 }
 
@@ -212,43 +206,46 @@ export function OperationsPage() {
   ];
   const active = groups.en_cours.length + groups.lance.length + groups.prevu.length;
   const reported = situationsToutes.data?.reduce((a, s) => a + Number(s.ordered_hours), 0) ?? 0;
+  const chargeData = charge.data;
 
   return (
-    <>
-      <PageHeader title={t("operations.title")} />
+    <div className="listes-page">
+      <PageHeader title={t("operations.title")} subtitle={t("listes.sub.operations")} />
 
       <div className="kpi-grid">
         <Kpi label={t("operations.of")} value={active} icon={HardHat} tone="brand" delay={0} />
         <Kpi label={t("operations.reported")} value={`${formatNumber(reported)} h`} icon={Clock3} tone="accent" delay={0.05} />
+        {chargeData
+          ? (["atelier", "chantier"] as const).map((key, i) => (
+              <Kpi
+                key={key}
+                label={t(`operations.${key}`)}
+                value={`${formatNumber(chargeData.totals[key].calculated)} h ${t("operations.planned")}`}
+                hint={`${formatNumber(chargeData.totals[key].pointed)} h ${t("operations.pointed")} · ${chargeData.totals[key].count} OF`}
+                icon={key === "atelier" ? Factory : Construction}
+                tone="brand"
+                delay={0.1 + i * 0.05}
+              />
+            ))
+          : null}
       </div>
       {charge.data ? <Charge stats={charge.data} /> : null}
 
-      <SearchField value={ofSearch} onChange={setOfSearch} placeholder={t("operations.searchOf")} />
-      <SiteFilter value={ofSite} onChange={setOfSite} />
-
-      <div style={{ overflowX: "auto" }}>
-        <Board>
+      <section className="listes-block">
+        <div className="list-toolbar">
+          <SearchField value={ofSearch} onChange={setOfSearch} placeholder={t("operations.searchOf")} />
+          <SiteFilter value={ofSite} onChange={setOfSite} />
+        </div>
+        <Board label={t("listes.boardLabel.operations")}>
           {BOARD_ORDER.map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={t(`operations.${st}`)}
-              count={groups[st].length}
-              tone={STATUS_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={260}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                  {t("common.empty")}
-                </p>
-              ) : (
-                groups[st].map((of_, i) => <OfCard key={of_.id} of={of_} index={i} />)
-              )}
+            <BoardColumn key={st} title={t(`operations.${st}`)} count={groups[st].length} tone={STATUS_BADGE[st]} delay={ci * 0.04} limit={20}>
+              {groups[st].map((of_, i) => (
+                <OfCard key={of_.id} of={of_} index={i} />
+              ))}
             </BoardColumn>
           ))}
         </Board>
-      </div>
+      </section>
 
       {(situations.count > 0 || situations.search) && (
         <SectionCard title={`${t("operations.situations")} · ${situations.count}`}>
@@ -260,30 +257,26 @@ export function OperationsPage() {
               { key: "code", header: t("operations.sit.code"), render: (s) => s.code },
               { key: "periode", header: t("operations.sit.periode"), render: (s) => `${formatDate(s.period_start)} → ${formatDate(s.period_end)}` },
               { key: "heures", header: t("operations.sit.heures"), num: true, render: (s) => `${formatNumber(Number(s.ordered_hours))} h` },
-              { key: "avancement", header: t("operations.sit.avancement"), num: true, render: (s) => `${s.progress} %` },
-              { key: "montant", header: t("operations.sit.montant"), num: true, render: (s) => (s.amount === null ? t("operations.masked") : `${formatNumber(Number(s.amount))} F`) },
+              { key: "avancement", header: t("operations.sit.avancement"), num: true, render: (s) => formatPercent(s.progress) },
+              { key: "montant", header: t("operations.sit.montant"), num: true, render: (s) => (s.amount === null ? t("operations.masked") : formatMoney(s.amount)) },
               {
                 key: "statut",
                 header: t("operations.sit.statut"),
-                render: (s) => (
-                  <>
-                    <Badge tone={s.status === "brouillon" || s.status === "soumise" ? "warn" : "ok"}>{s.status_label}</Badge>
-                    {s.status === "brouillon" && (
-                      <ActionBar actions={[{ label: t("operations.actions.soumettre"), path: `/api/operations/situations/${s.id}/soumettre/` }]} />
-                    )}
-                    {s.status === "soumise" && (
-                      <ActionBar actions={[{ label: t("actions.valider"), path: `/api/operations/situations/${s.id}/validate/` }]} />
-                    )}
-                  </>
-                ),
+                render: (s) => <Badge tone={s.status === "brouillon" || s.status === "soumise" ? "warn" : "ok"}>{s.status_label}</Badge>,
               },
+              actionsColumn<SituationTravaux>(t("listes.col.actions"), (s) => [
+                ...(s.status === "brouillon" ? [{ label: t("operations.actions.soumettre"), path: `/api/operations/situations/${s.id}/soumettre/` }] : []),
+                ...(s.status === "soumise" ? [{ label: t("actions.valider"), path: `/api/operations/situations/${s.id}/validate/` }] : []),
+              ]),
             ]}
           />
         </SectionCard>
       )}
 
-        <SectionCard title={`${t("operations.equipes")} · ${(affectations.data ?? []).length}`}>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+        <SectionCard
+          title={`${t("operations.equipes")} · ${(affectations.data ?? []).length}`}
+          actions={
+          <div className="section-actions">
             <QuickForm
               title={t("operations.forms.equipe")}
               endpoint="/api/operations/equipes/"
@@ -314,42 +307,35 @@ export function OperationsPage() {
               ]}
             />
           </div>
+          }
+        >
           <DataTable
             rows={affectations.data ?? []}
             caption={t("operations.equipes")}
             columns={[
               { key: "equipe", header: t("operations.aff.equipe"), render: (a) => a.equipe_label },
-              { key: "metier", header: t("operations.aff.metier"), render: (a) => a.metier },
+              { key: "metier", header: t("operations.aff.metier"), render: (a) => (METIERS.includes(a.metier) ? t(`operations.forms.${a.metier}`) : a.metier) },
               { key: "of", header: t("operations.aff.of"), render: (a) => a.ordre_code },
               { key: "periode", header: t("operations.aff.periode"), render: (a) => `${formatDate(a.date_debut)} → ${formatDate(a.date_fin)}` },
               { key: "effectif", header: t("operations.aff.effectif"), num: true, render: (a) => a.effectif },
               {
                 key: "statut",
                 header: t("operations.aff.statut"),
-                render: (a) => (
-                  <>
-                    <Badge tone={a.statut === "planifiee" ? "warn" : "ok"}>{a.statut_label}</Badge>
-                    {a.statut === "planifiee" && (
-                      <ActionBar
-                        actions={[{
-                          label: t("operations.actions.mobiliser"),
-                          path: `/api/operations/affectations/${a.id}/mobiliser/`,
-                          confirm: t("operations.actions.confirmMobiliser"),
-                        }]}
-                      />
-                    )}
-                    {a.statut === "mobilisee" && (
-                      <ActionBar actions={[{ label: t("operations.actions.terminer"), path: `/api/operations/affectations/${a.id}/terminer/` }]} />
-                    )}
-                  </>
-                ),
+                render: (a) => <Badge tone={a.statut === "planifiee" ? "warn" : "ok"}>{a.statut_label}</Badge>,
               },
+              actionsColumn<EquipeAffectation>(t("listes.col.actions"), (a) => [
+                ...(a.statut === "planifiee"
+                  ? [{ label: t("operations.actions.mobiliser"), path: `/api/operations/affectations/${a.id}/mobiliser/`, confirm: t("operations.actions.confirmMobiliser") }]
+                  : []),
+                ...(a.statut === "mobilisee" ? [{ label: t("operations.actions.terminer"), path: `/api/operations/affectations/${a.id}/terminer/` }] : []),
+              ]),
             ]}
           />
         </SectionCard>
 
-        <SectionCard title={`${t("operations.presences")} · ${(presences.data ?? []).length}`}>
-          <div style={{ marginBottom: "0.75rem" }}>
+        <SectionCard
+          title={`${t("operations.presences")} · ${(presences.data ?? []).length}`}
+          actions={
             <QuickForm
               title={t("operations.forms.presence")}
               endpoint="/api/operations/presences/"
@@ -368,7 +354,8 @@ export function OperationsPage() {
                 { name: "motif", label: t("operations.forms.motif") },
               ]}
             />
-          </div>
+          }
+        >
           <DataTable
             rows={presences.data ?? []}
             caption={t("operations.presences")}
@@ -385,6 +372,6 @@ export function OperationsPage() {
       <EcartsM3Section />
       <ConsommationOfSection />
       <FluxM4Section />
-    </>
+    </div>
   );
 }

@@ -3,14 +3,17 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatDateTime, formatNumber } from "../../lib/format";
-import { ActionBar, Badge, SectionCard } from "../ui";
+import { formatDate, formatDateTime, formatMoney, formatNumber } from "../../lib/format";
+import { ActionBar, Badge, DataTable, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 /* Lot de suivi inter-modules : M3 → M11 (marge à terminaison), M10 → M11 (balance âgée), M3 → M5 (réservations),
    M1 → M10 (retenue de garantie), import du grand livre / gabarit SAGE, M4 → M3 (flux machines, compteurs, BL). */
 
-const fcfa = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatMoney(v));
 const pct = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${formatNumber(Number(v))} %`);
+/** Valeur de tri numérique d'une décimale DRF (`null` en fin de liste). */
+const num = (v: string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
 
 // --------------------------------------------------------------------------------------------- M3 → M11
 interface MargeRow {
@@ -35,6 +38,26 @@ export function MargesTerminaisonSection() {
     retry: 0,
   });
   const rows = q.data?.rows ?? [];
+  const cols: Column<MargeRow>[] = [
+    { key: "affaire", header: t("ecarts_suivi.affaire"), render: (r) => `${r.affaire_code} · ${r.affaire_label}`, sortValue: (r) => r.affaire_code },
+    { key: "avancement", header: t("ecarts_suivi.marges.avancement"), num: true, render: (r) => pct(r.avancement_pct), sortValue: (r) => num(r.avancement_pct) },
+    { key: "ca", header: t("ecarts_suivi.marges.ca"), num: true, render: (r) => fcfa(r.chiffre_affaires), sortValue: (r) => num(r.chiffre_affaires) },
+    { key: "engage", header: t("ecarts_suivi.marges.engage"), num: true, render: (r) => fcfa(r.couts_engages), sortValue: (r) => num(r.couts_engages) },
+    { key: "cat", header: t("ecarts_suivi.marges.cat"), num: true, render: (r) => fcfa(r.cout_a_terminaison), sortValue: (r) => num(r.cout_a_terminaison) },
+    {
+      key: "marge",
+      header: t("ecarts_suivi.marges.marge"),
+      num: true,
+      sortValue: (r) => num(r.marge_a_terminaison),
+      render: (r) => (
+        <>
+          {fcfa(r.marge_a_terminaison)} {r.marge_pct !== null && <span className="muted">({pct(r.marge_pct)})</span>}{" "}
+          {r.alerte && <Badge tone="err">{t("ecarts_suivi.marges.negative")}</Badge>}
+        </>
+      ),
+    },
+    { key: "publie", header: t("ecarts_suivi.marges.publie"), render: (r) => (r.publie_le ? formatDateTime(r.publie_le) : "—"), sortValue: (r) => r.publie_le },
+  ];
   return (
     <SectionCard title={t("ecarts_suivi.marges.title")}>
       <p className="muted">{t("ecarts_suivi.marges.note")}</p>
@@ -43,45 +66,8 @@ export function MargesTerminaisonSection() {
           { label: t("ecarts_suivi.marges.integrer", { n: q.data?.en_attente ?? 0 }), path: "/api/controle-gestion/marges-terminaison/integrer/", tone: "ghost" as const },
         ]}
       />
-      <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
-        <table className="table" data-testid="marges-terminaison">
-          <thead>
-            <tr>
-              <th>{t("ecarts_suivi.affaire")}</th>
-              <th>{t("ecarts_suivi.marges.avancement")}</th>
-              <th>{t("ecarts_suivi.marges.ca")}</th>
-              <th>{t("ecarts_suivi.marges.engage")}</th>
-              <th>{t("ecarts_suivi.marges.cat")}</th>
-              <th>{t("ecarts_suivi.marges.marge")}</th>
-              <th>{t("ecarts_suivi.marges.publie")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="muted">
-                  {t("ecarts_suivi.marges.vide")}
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  {r.affaire_code} · {r.affaire_label}
-                </td>
-                <td>{pct(r.avancement_pct)}</td>
-                <td>{fcfa(r.chiffre_affaires)}</td>
-                <td>{fcfa(r.couts_engages)}</td>
-                <td>{fcfa(r.cout_a_terminaison)}</td>
-                <td>
-                  {fcfa(r.marge_a_terminaison)} {r.marge_pct !== null && `(${pct(r.marge_pct)})`}{" "}
-                  {r.alerte && <Badge tone="err">{t("ecarts_suivi.marges.negative")}</Badge>}
-                </td>
-                <td>{r.publie_le ? formatDateTime(r.publie_le) : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div data-testid="marges-terminaison">
+        <DataTable columns={cols} rows={rows} caption={t("ecarts_suivi.marges.title")} loading={q.isLoading} emptyLabel={t("ecarts_suivi.marges.vide")} />
       </div>
     </SectionCard>
   );
@@ -102,31 +88,24 @@ interface Etat {
   lignes: Record<string, string | boolean | null>[];
 }
 
+type LigneEtat = { id: number; valeurs: Record<string, string | boolean | null> };
+
 function TableEtat({ etat }: { etat: Etat }) {
+  const rows: LigneEtat[] = etat.lignes.map((valeurs, i) => ({ id: i, valeurs }));
+  const cols: Column<LigneEtat>[] = etat.colonnes.map((c) => ({
+    key: c.key,
+    header: c.label,
+    num: c.montant,
+    render: (l) => {
+      const v = c.montant ? fcfa(l.valeurs[c.key] as string | null) : String(l.valeurs[c.key] ?? "");
+      return l.valeurs.total_ligne ? <strong>{v}</strong> : v;
+    },
+  }));
   return (
     <>
       <h4>{etat.titre}</h4>
       <p className="muted">{etat.sous_titre}</p>
-      <div className="table-wrap" tabIndex={0} role="region" aria-label={etat.titre}>
-        <table className="table">
-          <thead>
-            <tr>
-              {etat.colonnes.map((c) => (
-                <th key={c.key}>{c.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {etat.lignes.map((l, i) => (
-              <tr key={i} style={l.total_ligne ? { fontWeight: 600 } : undefined}>
-                {etat.colonnes.map((c) => (
-                  <td key={c.key}>{c.montant ? fcfa(l[c.key] as string | null) : String(l[c.key] ?? "")}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable columns={cols} rows={rows} caption={etat.titre} />
     </>
   );
 }
@@ -187,71 +166,63 @@ export function ReservationsStockSection() {
     queryFn: () => api.listAll<Reservation>("/api/stocks/reservations/", { maxPages: 2 }),
     retry: 0,
   }).data ?? [];
+  const dispoRows = (dispo.data?.rows ?? []).map((d) => ({ ...d, id: d.article }));
+  const dispoCols: Column<Dispo & { id: string }>[] = [
+    { key: "article", header: t("ecarts_suivi.resa.article"), render: (d) => `${d.code} · ${d.label}`, sortValue: (d) => d.code },
+    { key: "physique", header: t("ecarts_suivi.resa.physique"), num: true, render: (d) => formatNumber(Number(d.physique)), sortValue: (d) => num(d.physique) },
+    { key: "reserve", header: t("ecarts_suivi.resa.reserve"), num: true, render: (d) => formatNumber(Number(d.reserve)), sortValue: (d) => num(d.reserve) },
+    { key: "disponible", header: t("ecarts_suivi.resa.disponible"), num: true, render: (d) => formatNumber(Number(d.disponible)), sortValue: (d) => num(d.disponible) },
+  ];
+  const resaCols: Column<Reservation>[] = [
+    { key: "article", header: t("ecarts_suivi.resa.article"), render: (r) => `${r.article_code} · ${r.article_label}`, sortValue: (r) => r.article_code },
+    { key: "of", header: t("ecarts_suivi.resa.of"), render: (r) => r.ordre_code ?? "—", sortValue: (r) => r.ordre_code },
+    {
+      key: "quantite",
+      header: t("ecarts_suivi.resa.quantite"),
+      num: true,
+      sortValue: (r) => num(r.quantite),
+      render: (r) => (
+        <>
+          {formatNumber(Number(r.quantite))}{" "}
+          <span className="muted">
+            ({t("ecarts_suivi.resa.reste")} {formatNumber(Number(r.reste))})
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "statut",
+      header: t("ecarts_suivi.resa.statut"),
+      sortValue: (r) => r.statut_label,
+      render: (r) => (
+        <>
+          <Badge tone={r.statut === "active" ? "warn" : r.statut === "consommee" ? "ok" : "brand"}>{r.statut_label}</Badge> <span className="muted">{r.motif}</span>
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (r) =>
+        r.statut === "active" ? (
+          <ActionBar
+            actions={[
+              { label: t("ecarts_suivi.resa.liberer"), path: `/api/stocks/reservations/${r.id}/liberer/`, tone: "ghost" as const, prompt: { name: "motif", label: t("ecarts_suivi.motif") } },
+            ]}
+          />
+        ) : null,
+    },
+  ];
   return (
     <SectionCard title={t("ecarts_suivi.resa.title")}>
       <p className="muted">
         {t("ecarts_suivi.resa.note")} {dispo.data && <Badge tone="warn">{dispo.data.bloquante ? t("ecarts_suivi.resa.bloquante") : t("ecarts_suivi.resa.alerte")}</Badge>}
       </p>
-      <table className="table" data-testid="disponibilites-stock">
-        <thead>
-          <tr>
-            <th>{t("ecarts_suivi.resa.article")}</th>
-            <th>{t("ecarts_suivi.resa.physique")}</th>
-            <th>{t("ecarts_suivi.resa.reserve")}</th>
-            <th>{t("ecarts_suivi.resa.disponible")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(dispo.data?.rows ?? []).map((d) => (
-            <tr key={d.article}>
-              <td>
-                {d.code} · {d.label}
-              </td>
-              <td>{formatNumber(Number(d.physique))}</td>
-              <td>{formatNumber(Number(d.reserve))}</td>
-              <td>{formatNumber(Number(d.disponible))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
-        <table className="table" data-testid="reservations-stock">
-          <thead>
-            <tr>
-              <th>{t("ecarts_suivi.resa.article")}</th>
-              <th>{t("ecarts_suivi.resa.of")}</th>
-              <th>{t("ecarts_suivi.resa.quantite")}</th>
-              <th>{t("ecarts_suivi.resa.statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {resas.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  {r.article_code} · {r.article_label}
-                </td>
-                <td>{r.ordre_code ?? "—"}</td>
-                <td>
-                  {formatNumber(Number(r.quantite))} ({t("ecarts_suivi.resa.reste")} {formatNumber(Number(r.reste))})
-                </td>
-                <td>
-                  <Badge tone={r.statut === "active" ? "warn" : r.statut === "consommee" ? "ok" : "brand"}>{r.statut_label}</Badge>{" "}
-                  <span className="muted">{r.motif}</span>
-                </td>
-                <td>
-                  {r.statut === "active" && (
-                    <ActionBar
-                      actions={[
-                        { label: t("ecarts_suivi.resa.liberer"), path: `/api/stocks/reservations/${r.id}/liberer/`, tone: "ghost" as const, prompt: { name: "motif", label: t("ecarts_suivi.motif") } },
-                      ]}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div data-testid="disponibilites-stock">
+        <DataTable columns={dispoCols} rows={dispoRows} caption={t("ecarts_suivi.resa.disponible")} loading={dispo.isLoading} />
+      </div>
+      <div data-testid="reservations-stock">
+        <DataTable columns={resaCols} rows={resas} caption={t("ecarts_suivi.resa.title")} />
       </div>
     </SectionCard>
   );
@@ -277,6 +248,43 @@ export function RetenuesGarantieSection() {
     queryFn: () => api.get<{ rows: RetenueRow[]; compte: string | null; provisoire: boolean }>("/api/comptabilite/retenues-garantie/"),
     retry: 0,
   });
+  const rgRows = (q.data?.rows ?? []).map((r) => ({ ...r, id: r.affaire }));
+  const rgCols: Column<RetenueRow & { id: string }>[] = [
+    { key: "affaire", header: t("ecarts_suivi.affaire"), render: (r) => `${r.affaire_code} · ${r.affaire_label}`, sortValue: (r) => r.affaire_code },
+    { key: "factures", header: t("ecarts_suivi.rg.factures"), num: true, render: (r) => formatNumber(r.factures), sortValue: (r) => r.factures },
+    { key: "retenue", header: t("ecarts_suivi.rg.retenue"), num: true, render: (r) => fcfa(r.retenue), sortValue: (r) => num(r.retenue) },
+    { key: "liberee", header: t("ecarts_suivi.rg.liberee"), num: true, render: (r) => fcfa(r.liberee), sortValue: (r) => num(r.liberee) },
+    { key: "solde", header: t("ecarts_suivi.rg.solde"), num: true, render: (r) => fcfa(r.solde), sortValue: (r) => num(r.solde) },
+    {
+      key: "echeance",
+      header: t("ecarts_suivi.rg.echeance"),
+      sortValue: (r) => r.date_liberation,
+      render: (r) => (
+        <>
+          {r.date_liberation ? formatDate(r.date_liberation) : "—"} {r.echue && <Badge tone="ok">{t("ecarts_suivi.rg.echue")}</Badge>}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (r) =>
+        r.solde === null || Number(r.solde) > 0 ? (
+          <ActionBar
+            actions={[
+              r.echue
+                ? { label: t("ecarts_suivi.rg.liberer"), path: `/api/comptabilite/retenues-garantie/${r.affaire}/liberer/`, confirm: t("ecarts_suivi.rg.confirmer") }
+                : {
+                    label: t("ecarts_suivi.rg.libererAnticipe"),
+                    path: `/api/comptabilite/retenues-garantie/${r.affaire}/liberer/`,
+                    tone: "ghost" as const,
+                    prompt: { name: "motif", label: t("ecarts_suivi.motif") },
+                  },
+            ]}
+          />
+        ) : null,
+    },
+  ];
   return (
     <SectionCard title={t("ecarts_suivi.rg.title")}>
       <p className="muted">{t("ecarts_suivi.rg.note", { compte: q.data?.compte ?? "4117" })}</p>
@@ -285,47 +293,8 @@ export function RetenuesGarantieSection() {
           {t("ecarts_suivi.provisoire")}
         </p>
       )}
-      <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
-        <table className="table" data-testid="retenues-garantie">
-          <thead>
-            <tr>
-              <th>{t("ecarts_suivi.affaire")}</th>
-              <th>{t("ecarts_suivi.rg.factures")}</th>
-              <th>{t("ecarts_suivi.rg.retenue")}</th>
-              <th>{t("ecarts_suivi.rg.liberee")}</th>
-              <th>{t("ecarts_suivi.rg.solde")}</th>
-              <th>{t("ecarts_suivi.rg.echeance")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {(q.data?.rows ?? []).map((r) => (
-              <tr key={r.affaire}>
-                <td>
-                  {r.affaire_code} · {r.affaire_label}
-                </td>
-                <td>{r.factures}</td>
-                <td>{fcfa(r.retenue)}</td>
-                <td>{fcfa(r.liberee)}</td>
-                <td>{fcfa(r.solde)}</td>
-                <td>
-                  {r.date_liberation ? formatDate(r.date_liberation) : "—"} {r.echue && <Badge tone="ok">{t("ecarts_suivi.rg.echue")}</Badge>}
-                </td>
-                <td>
-                  {(r.solde === null || Number(r.solde) > 0) && (
-                    <ActionBar
-                      actions={[
-                        r.echue
-                          ? { label: t("ecarts_suivi.rg.liberer"), path: `/api/comptabilite/retenues-garantie/${r.affaire}/liberer/`, confirm: t("ecarts_suivi.rg.confirmer") }
-                          : { label: t("ecarts_suivi.rg.libererAnticipe"), path: `/api/comptabilite/retenues-garantie/${r.affaire}/liberer/`, tone: "ghost" as const, prompt: { name: "motif", label: t("ecarts_suivi.motif") } },
-                      ]}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div data-testid="retenues-garantie">
+        <DataTable columns={rgCols} rows={rgRows} caption={t("ecarts_suivi.rg.title")} loading={q.isLoading} />
       </div>
     </SectionCard>
   );
@@ -425,6 +394,38 @@ export function ImportGrandLivreSection() {
     },
     onError: () => setMessage(t("ecarts_suivi.erreur")),
   });
+  const lotCols: Column<Batch>[] = [
+    {
+      key: "fichier",
+      header: t("ecarts_suivi.import.fichier"),
+      sortValue: (b) => b.created_at,
+      render: (b) => (
+        <>
+          {b.filename} <span className="muted">{formatDateTime(b.created_at)}</span>
+        </>
+      ),
+    },
+    { key: "connecteur", header: t("ecarts_suivi.import.connecteur"), render: (b) => b.connector_label },
+    {
+      key: "statut",
+      header: t("ecarts_suivi.resa.statut"),
+      render: (b) => (
+        <>
+          <Badge tone={b.status === "success" ? "ok" : b.status === "failed" ? "err" : "warn"}>{b.status_label}</Badge> <span className="muted">{b.error_message}</span>
+        </>
+      ),
+    },
+    {
+      key: "lignes",
+      header: t("ecarts_suivi.import.lignes"),
+      num: true,
+      render: (b) => (
+        <>
+          {formatNumber(b.created_rows)} / {formatNumber(b.total_rows)} {b.error_rows > 0 && <Badge tone="err">{t("ecarts_suivi.import.erreurs", { n: b.error_rows })}</Badge>}
+        </>
+      ),
+    },
+  ];
   return (
     <SectionCard title={t("ecarts_suivi.import.title")}>
       <p className="muted">{t("ecarts_suivi.import.note")}</p>
@@ -445,32 +446,9 @@ export function ImportGrandLivreSection() {
         </button>
       </div>
       {message && <p role="status">{message}</p>}
-      <table className="table" data-testid="lots-import">
-        <thead>
-          <tr>
-            <th>{t("ecarts_suivi.import.fichier")}</th>
-            <th>{t("ecarts_suivi.import.connecteur")}</th>
-            <th>{t("ecarts_suivi.resa.statut")}</th>
-            <th>{t("ecarts_suivi.import.lignes")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lots.map((b) => (
-            <tr key={b.id}>
-              <td>
-                {b.filename} <span className="muted">{formatDateTime(b.created_at)}</span>
-              </td>
-              <td>{b.connector_label}</td>
-              <td>
-                <Badge tone={b.status === "success" ? "ok" : b.status === "failed" ? "err" : "warn"}>{b.status_label}</Badge> <span className="muted">{b.error_message}</span>
-              </td>
-              <td>
-                {b.created_rows} / {b.total_rows} {b.error_rows > 0 && <Badge tone="err">{t("ecarts_suivi.import.erreurs", { n: b.error_rows })}</Badge>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div data-testid="lots-import">
+        <DataTable columns={lotCols} rows={lots} caption={t("ecarts_suivi.import.title")} />
+      </div>
       <h4>{t("ecarts_suivi.import.gabarit")}</h4>
       {gabarits.map((g) => (
         <GabaritForm key={`${g.id}-${g.est_provisoire}`} g={g} />
@@ -508,6 +486,22 @@ interface FluxBloc {
 export function FluxM4Section() {
   const { t } = useTranslation();
   const rows = useQuery({ queryKey: ["suivi", "flux-m4"], queryFn: () => api.get<{ rows: FluxBloc[] }>("/api/operations/flux-m4/"), retry: 0 }).data?.rows ?? [];
+  const machineCols: Column<Machine & { id: string }>[] = [
+    { key: "machine", header: t("ecarts_suivi.flux.machine"), render: (m) => `${m.equipement} · ${m.label}`, sortValue: (m) => m.equipement },
+    {
+      key: "source",
+      header: t("ecarts_suivi.flux.source"),
+      render: (m) => <Badge tone={m.source === "gr" ? "warn" : "brand"}>{m.source === "gr" ? `GR ${m.location ?? ""}` : t("ecarts_suivi.flux.parc")}</Badge>,
+    },
+    { key: "of", header: t("ecarts_suivi.resa.of"), render: (m) => m.of ?? "—", sortValue: (m) => m.of },
+    {
+      key: "periode",
+      header: t("ecarts_suivi.flux.periode"),
+      sortValue: (m) => m.debut,
+      render: (m) => `${m.debut ? formatDate(m.debut) : "—"} → ${m.fin ? formatDate(m.fin) : "…"}`,
+    },
+    { key: "compteur", header: t("ecarts_suivi.flux.compteur"), num: true, render: (m) => formatNumber(Number(m.compteur)), sortValue: (m) => num(m.compteur) },
+  ];
   return (
     <SectionCard title={t("ecarts_suivi.flux.title")}>
       <p className="muted">{t("ecarts_suivi.flux.note")}</p>
@@ -517,36 +511,7 @@ export function FluxM4Section() {
           <h4>
             {b.affaire ?? "—"} · {b.titre} <span className="muted">— {t("ecarts_suivi.flux.consoGr")} {formatNumber(Number(b.consommation_gr))}</span>
           </h4>
-          <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_suivi.tableau")}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_suivi.flux.machine")}</th>
-                  <th>{t("ecarts_suivi.flux.source")}</th>
-                  <th>{t("ecarts_suivi.resa.of")}</th>
-                  <th>{t("ecarts_suivi.flux.periode")}</th>
-                  <th>{t("ecarts_suivi.flux.compteur")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {b.machines.map((m, i) => (
-                  <tr key={`${m.equipement}-${i}`}>
-                    <td>
-                      {m.equipement} · {m.label}
-                    </td>
-                    <td>
-                      <Badge tone={m.source === "gr" ? "warn" : "brand"}>{m.source === "gr" ? `GR ${m.location ?? ""}` : t("ecarts_suivi.flux.parc")}</Badge>
-                    </td>
-                    <td>{m.of ?? "—"}</td>
-                    <td>
-                      {m.debut ? formatDate(m.debut) : "—"} → {m.fin ? formatDate(m.fin) : "…"}
-                    </td>
-                    <td>{formatNumber(Number(m.compteur))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={machineCols} rows={b.machines.map((m, i) => ({ ...m, id: `${m.equipement}-${i}` }))} caption={`${b.affaire ?? "—"} · ${b.titre}`} />
           {b.bl.length > 0 && (
             <ul>
               {b.bl.map((l) => (

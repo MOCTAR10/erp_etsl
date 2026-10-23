@@ -8,9 +8,10 @@ import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
 import { GrAffairesSection, ParametresLogistiqueSection } from "../components/workflow/GrAffairesSection";
 import { TarifsGrSection } from "../components/workflow/TarifsGrSection";
 import { EcartsM4Section } from "../components/logistique/EcartsM4Section";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, SearchField, SectionCard } from "../components/ui";
+import { actionsColumn } from "../components/ui/DataTable";
 import type { Column } from "../components/ui";
 import type {
   DemandeMobilisation,
@@ -40,31 +41,27 @@ const BOARD_ORDER: EquipementStatut[] = ["disponible", "affecte", "en_location",
 
 function EquipementCard({ eq, index }: { eq: EquipementParc; index: number }) {
   const { t } = useTranslation();
+  // Statut porté par la colonne ; la carte montre l'identité, la catégorie, le compteur et la localisation.
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
+      <div className="card-top">
+        <span className="card-code">{eq.code}</span>
         {eq.is_global_rental ? (
-          <span className="badge warn" title={t("logistique.globalRental")}>
-            GR
+          <span className="card-tags">
+            <Badge tone="brand" title={t("logistique.globalRental")}>
+              GR
+            </Badge>
           </span>
-        ) : null}{" "}
-        <span className="muted">{eq.code}</span> · {eq.label}
+        ) : null}
       </div>
-      <div className="meta">
-        {eq.categorie_label}
-        {eq.registration ? ` · ${eq.registration}` : ""}
-      </div>
-      <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className={`badge ${STATUS_BADGE[eq.statut] ?? "brand"}`}>{eq.statut_label}</span>
-        <span>
-          {eq.compteur_type_label}: {formatNumber(Number(eq.compteur_value))}
+      <div className="title">{eq.label}</div>
+      <div className="meta">{[eq.categorie_label, eq.registration].filter(Boolean).join(" · ")}</div>
+      <div className="card-foot">
+        <span>{[eq.site, eq.proprietaire_code].filter(Boolean).join(" · ")}</span>
+        <span className="amount" title={eq.compteur_type_label}>
+          {formatNumber(Number(eq.compteur_value))} {eq.compteur_type_label.toLowerCase()}
         </span>
       </div>
-      {eq.site || eq.proprietaire_code ? (
-        <div className="meta muted">
-          {[eq.site, eq.proprietaire_code].filter(Boolean).join(" · ")}
-        </div>
-      ) : null}
     </BoardCard>
   );
 }
@@ -73,7 +70,7 @@ type T = (key: string) => string;
 
 function locationColumns(t: T): Column<LocationGR>[] {
   return [
-    { key: "code", header: t("logistique.col.code"), render: (l) => l.code },
+    { key: "code", header: t("logistique.col.code"), sortValue: (l) => l.code, render: (l) => l.code },
     { key: "equip", header: t("logistique.col.equipement"), render: (l) => l.equipement_code },
     { key: "partner", header: t("logistique.col.partenaire"), render: (l) => l.partenaire_name },
     { key: "period", header: t("logistique.col.periodicite"), render: (l) => l.periodicite_label },
@@ -87,30 +84,30 @@ function locationColumns(t: T): Column<LocationGR>[] {
       key: "montant",
       header: t("logistique.col.montant"),
       num: true,
-      render: (l) => (l.montant_estime === null ? t("logistique.masked") : `${formatNumber(Number(l.montant_estime))} F`),
+      sortValue: (l) => (l.montant_estime === null ? null : Number(l.montant_estime)),
+      render: (l) => (l.montant_estime === null ? t("logistique.masked") : formatMoney(l.montant_estime)),
     },
     {
       key: "statut",
       header: t("logistique.col.statut"),
       render: (l) => (
         <>
-          <Badge tone="brand">{l.statut_label}</Badge> {l.imputation_618 && <Badge tone="warn">618</Badge>}
-          <ActionBar
-            actions={[
-              ...(l.statut === "brouillon" && !l.emis_le
-                ? [{ label: t("logistique.act.emettre"), path: `/api/logistique/locations/${l.id}/emettre/`, tone: "ghost" as const }]
-                : []),
-              ...(l.statut === "brouillon"
-                ? [{ label: t("actions.demarrer"), path: `/api/logistique/locations/${l.id}/demarrer/`, prompt: { name: "lecture_initiale", label: t("logistique.act.compteurDepart") } }]
-                : []),
-              ...(l.statut === "active"
-                ? [{ label: t("actions.cloturer"), path: `/api/logistique/locations/${l.id}/cloturer/`, prompt: { name: "lecture_finale", label: t("logistique.act.compteurFin") } }]
-                : []),
-            ]}
-          />
+          <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>{l.statut_label}</Badge>
+          {l.imputation_618 && <Badge tone="neutral">618</Badge>}
         </>
       ),
     },
+    actionsColumn<LocationGR>(t("listes.col.actions"), (l) => [
+      ...(l.statut === "brouillon"
+        ? [{ label: t("actions.demarrer"), path: `/api/logistique/locations/${l.id}/demarrer/`, prompt: { name: "lecture_initiale", label: t("logistique.act.compteurDepart") } }]
+        : []),
+      ...(l.statut === "brouillon" && !l.emis_le
+        ? [{ label: t("logistique.act.emettre"), path: `/api/logistique/locations/${l.id}/emettre/`, tone: "ghost" as const }]
+        : []),
+      ...(l.statut === "active"
+        ? [{ label: t("actions.cloturer"), path: `/api/logistique/locations/${l.id}/cloturer/`, prompt: { name: "lecture_finale", label: t("logistique.act.compteurFin") } }]
+        : []),
+    ]),
   ];
 }
 
@@ -119,25 +116,19 @@ function demandeColumns(t: T): Column<DemandeMobilisation>[] {
     { key: "code", header: t("logistique.col.code"), render: (d) => d.code },
     { key: "label", header: t("logistique.col.besoin"), render: (d) => d.label },
     { key: "dept", header: t("logistique.col.departement"), render: (d) => d.departement || "—" },
-    { key: "debut", header: t("logistique.debut"), render: (d) => (d.date_debut ? formatDate(d.date_debut) : "—") },
+    { key: "debut", header: t("logistique.debut"), sortValue: (d) => d.date_debut, render: (d) => formatDate(d.date_debut) },
     { key: "affaire", header: t("logistique.col.affaire"), render: (d) => d.affaire_code ?? "—" },
     {
       key: "statut",
       header: t("logistique.col.statut"),
-      render: (d) => (
-        <>
-          <Badge tone="brand">{d.statut_label}</Badge>
-          <ActionBar
-            actions={[
-              ...(d.statut === "brouillon"
-                ? [{ label: t("logistique.act.soumettre"), path: `/api/logistique/demandes/${d.id}/soumettre/`, tone: "ghost" as const }]
-                : []),
-              ...(d.statut === "soumise" ? [{ label: t("logistique.act.traiter"), path: `/api/logistique/demandes/${d.id}/traiter/` }] : []),
-            ]}
-          />
-        </>
-      ),
+      render: (d) => <Badge tone={d.statut === "soumise" ? "warn" : d.statut === "brouillon" ? "neutral" : "ok"}>{d.statut_label}</Badge>,
     },
+    actionsColumn<DemandeMobilisation>(t("listes.col.actions"), (d) => [
+      ...(d.statut === "brouillon"
+        ? [{ label: t("logistique.act.soumettre"), path: `/api/logistique/demandes/${d.id}/soumettre/`, tone: "ghost" as const }]
+        : []),
+      ...(d.statut === "soumise" ? [{ label: t("logistique.act.traiter"), path: `/api/logistique/demandes/${d.id}/traiter/` }] : []),
+    ]),
   ];
 }
 
@@ -191,29 +182,25 @@ export function LogistiquePage() {
   const groups = byStatus.data;
   const stats = parc.data;
 
-  const statutLabel = (key: EquipementStatut) => t(`logistique.${key}`);
+  const statutLabel = (key: EquipementStatut) => t(`listes.logistique.statut.${key}`);
 
   return (
-    <>
-      <PageHeader title={t("logistique.title")} />
+    <div className="listes-page">
+      <PageHeader title={t("logistique.title")} subtitle={t("listes.sub.logistique")} />
 
       <div className="kpi-grid">
         <Kpi
-          label={`${t("logistique.parc")} · ${stats?.parc.total ?? groups.disponible.length}`}
-          value={`${stats ? formatNumber(stats.parc.global_rental) : 0} GR · ${stats ? formatNumber(stats.parc.propre) : 0} ${t("logistique.propre")}`}
-          hint={`${t("logistique.equipements")} · ${stats ? formatNumber(stats.parc.total) : 0}`}
+          label={t("logistique.parc")}
+          value={stats?.parc.total ?? Object.values(groups).reduce((n, g) => n + g.length, 0)}
+          hint={stats ? t("listes.logistique.parcValue", { gr: formatNumber(stats.parc.global_rental), propre: formatNumber(stats.parc.propre) }) : undefined}
           icon={Truck}
           tone="brand"
           delay={0}
         />
         <Kpi
-          label={t("logistique.locationsActives")}
+          label={t("listes.logistique.actifs")}
           value={stats ? stats.locations.actives : "—"}
-          hint={
-            stats?.locations.total_montant_estime !== undefined
-              ? `${formatNumber(stats.locations.total_montant_estime)} FCFA`
-              : t("logistique.masked")
-          }
+          hint={stats?.locations.total_montant_estime !== undefined ? formatMoney(stats.locations.total_montant_estime) : t("logistique.masked")}
           icon={MapPin}
           tone="accent"
           delay={0.05}
@@ -221,36 +208,25 @@ export function LogistiquePage() {
         <Kpi label={t("logistique.demandes")} value={demandes.count} icon={ClipboardList} tone="warn" delay={0.1} />
       </div>
 
-      <SearchField value={eqSearch} onChange={setEqSearch} placeholder={t("logistique.searchEquipements")} />
-      <SiteFilter value={eqSite} onChange={setEqSite} />
-
-      <div style={{ overflowX: "auto" }}>
-        <Board>
+      <section className="listes-block">
+        <div className="list-toolbar">
+          <SearchField value={eqSearch} onChange={setEqSearch} placeholder={t("logistique.searchEquipements")} />
+          <SiteFilter value={eqSite} onChange={setEqSite} />
+        </div>
+        <Board label={t("listes.boardLabel.logistique")}>
           {BOARD_ORDER.map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={statutLabel(st)}
-              count={groups[st].length}
-              tone={STATUS_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={260}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                  {t("common.empty")}
-                </p>
-              ) : (
-                groups[st].map((eq, i) => <EquipementCard key={eq.id} eq={eq} index={i} />)
-              )}
+            <BoardColumn key={st} title={statutLabel(st)} count={groups[st].length} tone={STATUS_BADGE[st]} delay={ci * 0.04} limit={20}>
+              {groups[st].map((eq, i) => (
+                <EquipementCard key={eq.id} eq={eq} index={i} />
+              ))}
             </BoardColumn>
           ))}
         </Board>
-      </div>
+      </section>
 
       {(locations.count > 0 || locations.search) && (
-        <SectionCard title={`${t("logistique.locationsActives")} — GLOBAL RENTAL`}>
-          <PagedDataTable list={locations} columns={locationColumns(t)} caption={t("logistique.locationsActives")} searchPlaceholder={t("logistique.searchLocations")} />
+        <SectionCard title={`${t("listes.logistique.locationsTitle")} · ${locations.count}`}>
+          <PagedDataTable list={locations} columns={locationColumns(t)} caption={t("listes.logistique.locationsTitle")} searchPlaceholder={t("logistique.searchLocations")} />
         </SectionCard>
       )}
       <GrAffairesSection />
@@ -262,6 +238,6 @@ export function LogistiquePage() {
           <PagedDataTable list={demandes} columns={demandeColumns(t)} caption={t("logistique.demandes")} searchPlaceholder={t("logistique.searchDemandes")} />
         </SectionCard>
       )}
-    </>
+    </div>
   );
 }

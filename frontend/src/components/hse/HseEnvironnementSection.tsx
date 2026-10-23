@@ -6,12 +6,14 @@ import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { IndicateursHse, PlanReductionImpact, RapportEnvironnemental, RevueDirectionHse } from "../../types";
-import { ActionBar, Badge, Kpi, QuickForm, SectionCard } from "../ui";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 const RESSOURCES = ["electricite", "gazole", "essence", "gaz", "eau"];
 const pct = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} %`);
 
-/** Indicateurs HSE au-delà des taux de fréquence (CDC M7-07) : formation, recyclage, conformité ISO, environnement. */
+/** Indicateurs HSE au-delà des taux de fréquence : formation, recyclage, conformité ISO, environnement. */
 export function IndicateursHseSection() {
   const { t } = useTranslation();
   const q = useQuery({ queryKey: ["hse-indicateurs"], queryFn: () => api.get<IndicateursHse>("/api/hse/incidents/indicateurs/"), retry: 0 });
@@ -29,7 +31,15 @@ export function IndicateursHseSection() {
   );
 }
 
-/** Environnement ISO 14001 (CDC M7-06) : consommations mensuelles, émissions, plans de réduction, rapport annuel. */
+type LigneEnv = RapportEnvironnemental["environnement"]["lignes"][number] & { id: string };
+
+/** Quantité exacte (décimales significatives conservées, séparateurs français). */
+const quantite = (v: string) => {
+  const dec = (String(Number(v)).split(".")[1] ?? "").length;
+  return formatNumber(v, { decimals: Math.min(dec, 3) });
+};
+
+/** Environnement ISO 14001 : consommations mensuelles, émissions, plans de réduction, rapport annuel. */
 export function EnvironnementSection() {
   const { t } = useTranslation();
   const [annee, setAnnee] = useState(String(new Date().getFullYear()));
@@ -42,10 +52,38 @@ export function EnvironnementSection() {
   if (rapport.isError) return null;
   const ressources = RESSOURCES.map((v) => ({ value: v, label: t(`m7e.env.ressources.${v}`) }));
   const r = rapport.data;
+  const lignes: LigneEnv[] = (r?.environnement.lignes ?? []).map((l) => ({ ...l, id: l.ressource }));
+  const colLignes: Column<LigneEnv>[] = [
+    { key: "ressource", header: t("m7e.env.ressource"), render: (l) => l.libelle },
+    { key: "quantite", header: t("m7e.env.quantite"), num: true, sortValue: (l) => Number(l.quantite), render: (l) => `${quantite(l.quantite)} ${l.unite}` },
+    {
+      key: "emissions",
+      header: "kg CO2e",
+      num: true,
+      sortValue: (l) => (l.emissions_kg_co2e === null ? null : Number(l.emissions_kg_co2e)),
+      render: (l) => formatNumber(l.emissions_kg_co2e),
+    },
+  ];
+  const colPlans: Column<PlanReductionImpact>[] = [
+    { key: "plan", header: t("tableaux.hse.plan"), sortValue: (p) => p.code, render: (p) => <><strong>{p.code}</strong> · {p.objectif}</> },
+    { key: "periode", header: t("tableaux.hse.periode"), render: (p) => `${p.ressource_label || "—"} · ${p.annee_reference ?? "—"} → ${p.annee_cible}` },
+    {
+      key: "avancement",
+      header: t("tableaux.hse.avancement"),
+      render: (p) =>
+        p.avancement?.realise_pct != null ? (
+          <Badge tone={p.avancement.atteint ? "ok" : "warn"}>
+            {t("m7e.env.realise", { r: formatNumber(p.avancement.realise_pct, { decimals: 1 }), c: formatNumber(p.reduction_cible_pct, { decimals: 1 }) })}
+          </Badge>
+        ) : (
+          <span className="muted">{p.statut_label}</span>
+        ),
+    },
+  ];
   return (
     <SectionCard title={t("m7e.env.title")}>
       <div data-testid="environnement-hse">
-        <div className="action-bar-buttons">
+        <SectionActions>
           <QuickForm
             title={t("m7e.env.releve")}
             endpoint="/api/hse/consommations/"
@@ -69,60 +107,31 @@ export function EnvironnementSection() {
               { name: "actions", label: t("m7e.env.actions"), type: "textarea" },
             ]}
           />
+          <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/consommations/rapport/?annee=${annee}&export=pdf`, `rapport-environnemental-${annee}.pdf`)}>
+            {t("m7e.env.rapportPdf")}
+          </button>
+        </SectionActions>
+        <div className="field">
+          <label htmlFor="env-annee">{t("m7e.env.annee")}</label>
+          <input id="env-annee" className="control" type="number" value={annee} min={2000} max={2100} onChange={(e) => setAnnee(e.target.value)} style={{ maxWidth: 140 }} />
         </div>
-        <label>
-          {t("m7e.env.annee")}{" "}
-          <input type="number" aria-label={t("m7e.env.annee")} value={annee} min={2000} max={2100} onChange={(e) => setAnnee(e.target.value)} />
-        </label>{" "}
-        <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/consommations/rapport/?annee=${annee}&export=pdf`, `rapport-environnemental-${annee}.pdf`)}>
-          {t("m7e.env.rapportPdf")}
-        </button>
         {r && (
           <>
-            <p>{t("m7e.env.emissions", { t: formatNumber(Number(r.environnement.emissions_t_co2e)), n: r.incidents_environnement })}</p>
-            <table className="table">
-              <caption className="sr-only">{t("m7e.env.title")}</caption>
-              <thead>
-                <tr><th>{t("m7e.env.ressource")}</th><th className="num">{t("m7e.env.quantite")}</th><th className="num">kg CO2e</th></tr>
-              </thead>
-              <tbody>
-                {r.environnement.lignes.map((l) => (
-                  <tr key={l.ressource}>
-                    <td>{l.libelle}</td>
-                    <td className="num">{formatNumber(Number(l.quantite))} {l.unite}</td>
-                    <td className="num">{l.emissions_kg_co2e === null ? "—" : formatNumber(Number(l.emissions_kg_co2e))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <p>{t("m7e.env.emissions", { t: formatNumber(r.environnement.emissions_t_co2e, { decimals: 1 }), n: r.incidents_environnement })}</p>
+            <DataTable columns={colLignes} rows={lignes} caption={t("m7e.env.title")} />
           </>
         )}
         {(plans.data ?? []).length > 0 && (
-          <table className="table" data-testid="plans-reduction">
-            <caption className="sr-only">{t("m7e.env.plans")}</caption>
-            <tbody>
-              {(plans.data ?? []).map((p) => (
-                <tr key={p.id}>
-                  <td><strong>{p.code}</strong> · {p.objectif}</td>
-                  <td>{p.ressource_label || "—"} · {p.annee_reference ?? "—"} → {p.annee_cible}</td>
-                  <td>
-                    {p.avancement?.realise_pct != null ? (
-                      <Badge tone={p.avancement.atteint ? "ok" : "warn"}>{t("m7e.env.realise", { r: p.avancement.realise_pct, c: p.reduction_cible_pct })}</Badge>
-                    ) : (
-                      <span className="muted">{p.statut_label}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div data-testid="plans-reduction">
+            <DataTable columns={colPlans} rows={plans.data ?? []} caption={t("m7e.env.plans")} />
+          </div>
         )}
       </div>
     </SectionCard>
   );
 }
 
-/** Bilan HSE annuel et revue de direction (CDC §9.8) : bilan figé, validation hiérarchique, compte rendu scellé en GED. */
+/** Bilan HSE annuel et revue de direction : bilan figé, validation hiérarchique, compte rendu scellé en GED. */
 export function RevueDirectionSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -138,13 +147,60 @@ export function RevueDirectionSection() {
   });
   if (q.isError) return null;
   const annee = new Date().getFullYear();
-  return (
-    <SectionCard title={t("m7e.revue.title")}>
-      <div data-testid="revues-direction">
-        <div className="action-bar-buttons">
-          <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/revues-direction/bilan/?annee=${annee}&export=pdf`, `bilan-hse-${annee}.pdf`)}>
-            {t("m7e.revue.bilanPdf", { annee })}
+  const columns: Column<RevueDirectionHse>[] = [
+    {
+      key: "revue",
+      header: t("tableaux.hse.revue"),
+      sortValue: (r) => r.date_revue,
+      render: (r) => <><strong>{r.code}</strong> · {r.annee} · {formatDate(r.date_revue)}</>,
+    },
+    {
+      key: "statut",
+      header: t("tableaux.hse.statut"),
+      render: (r) => <><Badge tone={r.statut === "validee" ? "ok" : "warn"}>{r.statut_label}</Badge>{r.document ? ` ${t("m7e.revue.archivee")}` : ""}</>,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (r) => (
+        <div className="permis-actions">
+          <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/revues-direction/${r.id}/pdf/`, `${r.code}.pdf`)}>
+            PDF
           </button>
+          {r.statut !== "validee" && (
+            <>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  const body: Record<string, string> = {};
+                  for (const champ of ["participants", "conclusions", "decisions"] as const) {
+                    const v = window.prompt(t(`m7e.revue.${champ}`), r[champ]);
+                    if (v === null) return;
+                    body[champ] = v;
+                  }
+                  completer.mutate({ id: r.id, body });
+                }}
+              >
+                {t("m7e.revue.completer")}
+              </button>
+              <ActionBar
+                actions={[
+                  { label: t("m7e.revue.valider"), path: `/api/hse/revues-direction/${r.id}/valider/`, confirm: t("m7e.revue.confirmValider") },
+                  { label: t("m7e.revue.actualiser"), path: `/api/hse/revues-direction/${r.id}/actualiser/`, tone: "ghost" },
+                ]}
+              />
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
+  return (
+    <SectionCard
+      title={t("m7e.revue.title")}
+      actions={
+        <SectionActions>
           <QuickForm
             title={t("m7e.revue.nouvelle")}
             endpoint="/api/hse/revues-direction/"
@@ -156,53 +212,15 @@ export function RevueDirectionSection() {
               { name: "decisions", label: t("m7e.revue.decisions"), type: "textarea" },
             ]}
           />
-        </div>
+          <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/revues-direction/bilan/?annee=${annee}&export=pdf`, `bilan-hse-${annee}.pdf`)}>
+            {t("m7e.revue.bilanPdf", { annee })}
+          </button>
+        </SectionActions>
+      }
+    >
+      <div data-testid="revues-direction">
         {error && <p className="action-error" role="alert">{error}</p>}
-        {(q.data ?? []).length === 0 ? (
-          <p className="muted">{t("m7e.revue.aucune")}</p>
-        ) : (
-          <table className="table">
-            <caption className="sr-only">{t("m7e.revue.title")}</caption>
-            <tbody>
-              {(q.data ?? []).map((r) => (
-                <tr key={r.id}>
-                  <td><strong>{r.code}</strong> · {r.annee} · {formatDate(r.date_revue)}</td>
-                  <td><Badge tone={r.statut === "validee" ? "ok" : "warn"}>{r.statut_label}</Badge>{r.document ? ` ${t("m7e.revue.archivee")}` : ""}</td>
-                  <td>
-                    <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/revues-direction/${r.id}/pdf/`, `${r.code}.pdf`)}>
-                      PDF
-                    </button>{" "}
-                    {r.statut !== "validee" && (
-                      <>
-                        <button
-                          type="button"
-                          className="btn ghost"
-                          onClick={() => {
-                            const body: Record<string, string> = {};
-                            for (const champ of ["participants", "conclusions", "decisions"] as const) {
-                              const v = window.prompt(t(`m7e.revue.${champ}`), r[champ]);
-                              if (v === null) return;
-                              body[champ] = v;
-                            }
-                            completer.mutate({ id: r.id, body });
-                          }}
-                        >
-                          {t("m7e.revue.completer")}
-                        </button>{" "}
-                        <ActionBar
-                          actions={[
-                            { label: t("m7e.revue.actualiser"), path: `/api/hse/revues-direction/${r.id}/actualiser/`, tone: "ghost" },
-                            { label: t("m7e.revue.valider"), path: `/api/hse/revues-direction/${r.id}/valider/`, confirm: t("m7e.revue.confirmValider") },
-                          ]}
-                        />
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable columns={columns} rows={q.data ?? []} caption={t("m7e.revue.title")} emptyLabel={t("m7e.revue.aucune")} />
       </div>
     </SectionCard>
   );

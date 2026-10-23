@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Outillage design : catalogue Ladle, tests visuels (références locales, voir DESIGN_SYSTEM.md), Lighthouse
+build-ladle/
+e2e/visuel/references/
+e2e/visuel/.auth/
+lighthouse-*.report.*

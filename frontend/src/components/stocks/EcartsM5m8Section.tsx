@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface Plan {
   id: string;
@@ -77,10 +80,14 @@ interface Etat {
   hors_tolerance: number;
 }
 
-const num = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatNumber(Number(v)));
-const fcfa = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} FCFA`);
+/** Quantité exacte : entière sans décimales, sinon deux décimales (jamais d'arrondi trompeur). */
+const num = (v: string | null | undefined) => {
+  if (v === null || v === undefined) return "—";
+  return Number.isInteger(Number(v)) ? formatNumber(v) : formatNumber(v, { decimals: 2 });
+};
+const fcfa = (v: string | null) => formatMoney(v);
 
-/** Écarts M5 (lot m5m8) : plan d'inventaire annuel, écran de comptage, régularisation MAD, état des écarts. */
+/** Écarts stocks : plan d'inventaire annuel, écran de comptage, régularisation MAD, état des écarts. */
 export function InventaireAnnuelSection() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
@@ -132,14 +139,105 @@ export function InventaireAnnuelSection() {
 
   const a = annuel.data;
   const e = ecarts.data;
+
+  const lignesPlan: { id: string; label: string; valeur: ReactNode }[] = a
+    ? [
+        { id: "articles", label: t("ecarts_m5m8.stocks.articles"), valeur: formatNumber(a.articles) },
+        {
+          id: "passages",
+          label: t("ecarts_m5m8.stocks.passages"),
+          valeur: `${a.passages_prevus.length} · ${a.passages_prevus.map((d) => formatDate(d, i18n.language)).join(", ")}`,
+        },
+        { id: "capacite", label: t("ecarts_m5m8.stocks.capacite"), valeur: `${formatNumber(a.capacite)} (${a.articles_par_passage} × ${a.passages_prevus.length})` },
+        {
+          id: "cycles",
+          label: t("ecarts_m5m8.stocks.cycles"),
+          valeur: (
+            <>
+              {num(a.cycles_prevus)} / {num(a.cycles_cibles)}{" "}
+              <Badge tone={a.conforme ? "ok" : "err"}>{a.conforme ? t("ecarts_m5m8.stocks.conforme") : t("ecarts_m5m8.stocks.insuffisant")}</Badge>
+              {!a.conforme && a.articles_par_passage_conseille !== null && (
+                <span className="muted"> {t("ecarts_m5m8.stocks.conseille", { n: a.articles_par_passage_conseille })}</span>
+              )}
+            </>
+          ),
+        },
+        {
+          id: "couverture",
+          label: t("ecarts_m5m8.stocks.couverture"),
+          valeur: `${a.articles_comptes} / ${a.articles} (${a.couverture_pct === null ? "—" : `${num(a.couverture_pct)} %`})`,
+        },
+        {
+          id: "realises",
+          label: t("ecarts_m5m8.stocks.realises"),
+          valeur:
+            a.realises.length === 0
+              ? "—"
+              : a.realises.map((r) => `${r.code} (${formatDate(r.date, i18n.language)}, ${r.comptees}/${r.lignes}, ${t(`stocks.inv_status.${r.statut}`)})`).join(" · "),
+        },
+      ]
+    : [];
+  const colsPlan: Column<(typeof lignesPlan)[number]>[] = [
+    { key: "label", header: t("tableaux.stocks.indicateur"), render: (r) => r.label },
+    { key: "valeur", header: t("tableaux.stocks.valeur"), render: (r) => r.valeur },
+  ];
+
+  const colsComptage: Column<LigneEcart>[] = [
+    { key: "article", header: t("ecarts_m5m8.stocks.article"), render: (l) => `${l.article} · ${l.article_label}`, sortValue: (l) => l.article },
+    { key: "lot", header: t("ecarts_m5m8.stocks.lot"), render: (l) => l.lot ?? "—" },
+    { key: "qteSysteme", header: t("ecarts_m5m8.stocks.qteSysteme"), num: true, render: (l) => num(l.quantite_systeme) },
+    {
+      key: "qteReelle",
+      header: t("ecarts_m5m8.stocks.qteReelle"),
+      num: true,
+      render: (l) => (
+        <input
+          type="number"
+          className="control"
+          min={0}
+          step="0.01"
+          aria-label={`${t("ecarts_m5m8.stocks.qteReelle")} ${l.article}`}
+          value={saisie[l.id] ?? (l.comptee ? l.quantite_reelle : "")}
+          onChange={(ev) => setSaisie({ ...saisie, [l.id]: ev.target.value })}
+          style={{ width: "7rem", textAlign: "right" }}
+        />
+      ),
+    },
+    {
+      key: "ecart",
+      header: t("ecarts_m5m8.stocks.ecart"),
+      num: true,
+      render: (l) => (
+        <>
+          {l.comptee ? num(l.ecart) : "—"}
+          {l.comptee && l.ecart_pct !== null ? ` (${num(l.ecart_pct)} %)` : ""}{" "}
+          {l.comptee && l.hors_tolerance && <Badge tone="warn">{t("ecarts_m5m8.stocks.horsTolerance")}</Badge>}
+        </>
+      ),
+    },
+    { key: "valeur", header: t("ecarts_m5m8.stocks.valeur"), num: true, render: (l) => (l.comptee ? fcfa(l.valeur_ecart) : "—") },
+  ];
+
+  const colsEtat: Column<EtatRow>[] = [
+    { key: "inventaire", header: t("ecarts_m5m8.stocks.inventaire"), render: (r) => `${r.inventaire} · ${formatDate(r.date, i18n.language)}`, sortValue: (r) => r.date },
+    { key: "article", header: t("ecarts_m5m8.stocks.article"), render: (r) => `${r.article} · ${r.article_label}`, sortValue: (r) => r.article },
+    {
+      key: "ecart",
+      header: t("ecarts_m5m8.stocks.ecart"),
+      num: true,
+      render: (r) => (
+        <>
+          {num(r.ecart)} {r.hors_tolerance && <Badge tone="warn">{t("ecarts_m5m8.stocks.horsTolerance")}</Badge>}
+        </>
+      ),
+    },
+    { key: "valeur", header: t("ecarts_m5m8.stocks.valeur"), num: true, render: (r) => fcfa(r.valeur_ecart), sortValue: (r) => Number(r.valeur_ecart ?? 0) },
+  ];
   return (
-    <SectionCard title={t("ecarts_m5m8.stocks.title")}>
-      <div data-testid="inventaire-annuel">
-        <p className="muted">
-          <Badge tone="warn">{t("ecarts_m5m8.provisoire")}</Badge> {t("ecarts_m5m8.stocks.provisoireNote")}
-        </p>
-        {error && <p className="action-error" role="alert">{error}</p>}
-        <div className="action-bar-buttons">
+    <SectionCard
+      title={t("ecarts_m5m8.stocks.title")}
+      actions={
+        <SectionActions>
           <QuickForm
             title={t("ecarts_m5m8.stocks.nouveauPlan")}
             endpoint="/api/stocks/plans-inventaire/"
@@ -150,6 +248,15 @@ export function InventaireAnnuelSection() {
               { name: "prochaine_date", label: t("ecarts_m5m8.stocks.prochain"), type: "date", required: true },
             ]}
           />
+        </SectionActions>
+      }
+    >
+      <div data-testid="inventaire-annuel">
+        <p className="muted">
+          <Badge tone="warn">{t("ecarts_m5m8.provisoire")}</Badge> {t("ecarts_m5m8.stocks.provisoireNote")}
+        </p>
+        {error && <p className="action-error" role="alert">{error}</p>}
+        <div className="action-bar-buttons">
           <label>
             {t("ecarts_m5m8.stocks.plan")}{" "}
             <select value={plan} onChange={(ev) => setPlanId(ev.target.value)}>
@@ -166,29 +273,9 @@ export function InventaireAnnuelSection() {
         </div>
 
         {a && (
-          <table className="table" data-testid="plan-annuel">
-            <caption className="sr-only">{t("ecarts_m5m8.stocks.planAnnuel")}</caption>
-            <tbody>
-              <tr><th>{t("ecarts_m5m8.stocks.articles")}</th><td>{a.articles}</td></tr>
-              <tr><th>{t("ecarts_m5m8.stocks.passages")}</th><td>{a.passages_prevus.length} · {a.passages_prevus.map((d) => formatDate(d, i18n.language)).join(", ")}</td></tr>
-              <tr><th>{t("ecarts_m5m8.stocks.capacite")}</th><td>{a.capacite} ({a.articles_par_passage} × {a.passages_prevus.length})</td></tr>
-              <tr>
-                <th>{t("ecarts_m5m8.stocks.cycles")}</th>
-                <td>
-                  {num(a.cycles_prevus)} / {num(a.cycles_cibles)}{" "}
-                  <Badge tone={a.conforme ? "ok" : "err"}>{a.conforme ? t("ecarts_m5m8.stocks.conforme") : t("ecarts_m5m8.stocks.insuffisant")}</Badge>
-                  {!a.conforme && a.articles_par_passage_conseille !== null && (
-                    <span className="muted"> {t("ecarts_m5m8.stocks.conseille", { n: a.articles_par_passage_conseille })}</span>
-                  )}
-                </td>
-              </tr>
-              <tr><th>{t("ecarts_m5m8.stocks.couverture")}</th><td>{a.articles_comptes} / {a.articles} ({a.couverture_pct === null ? "—" : `${num(a.couverture_pct)} %`})</td></tr>
-              <tr>
-                <th>{t("ecarts_m5m8.stocks.realises")}</th>
-                <td>{a.realises.length === 0 ? "—" : a.realises.map((r) => `${r.code} (${formatDate(r.date, i18n.language)}, ${r.comptees}/${r.lignes}, ${t(`stocks.inv_status.${r.statut}`)})`).join(" · ")}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div data-testid="plan-annuel">
+            <DataTable caption={t("ecarts_m5m8.stocks.planAnnuel")} density="compact" columns={colsPlan} rows={lignesPlan} />
+          </div>
         )}
 
         <h4>{t("ecarts_m5m8.stocks.comptage")}</h4>
@@ -208,44 +295,9 @@ export function InventaireAnnuelSection() {
             </label>
             {e && (
               <>
-                <table className="table" data-testid="comptage-inventaire">
-                  <thead>
-                    <tr>
-                      <th>{t("ecarts_m5m8.stocks.article")}</th>
-                      <th>{t("ecarts_m5m8.stocks.lot")}</th>
-                      <th className="num">{t("ecarts_m5m8.stocks.qteSysteme")}</th>
-                      <th className="num">{t("ecarts_m5m8.stocks.qteReelle")}</th>
-                      <th className="num">{t("ecarts_m5m8.stocks.ecart")}</th>
-                      <th className="num">{t("ecarts_m5m8.stocks.valeur")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {e.lignes.map((l) => (
-                      <tr key={l.id}>
-                        <td>{l.article} · {l.article_label}</td>
-                        <td>{l.lot ?? "—"}</td>
-                        <td className="num">{num(l.quantite_systeme)}</td>
-                        <td className="num">
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            aria-label={`${t("ecarts_m5m8.stocks.qteReelle")} ${l.article}`}
-                            value={saisie[l.id] ?? (l.comptee ? l.quantite_reelle : "")}
-                            onChange={(ev) => setSaisie({ ...saisie, [l.id]: ev.target.value })}
-                            style={{ width: "7rem" }}
-                          />
-                        </td>
-                        <td className="num">
-                          {l.comptee ? num(l.ecart) : "—"}
-                          {l.comptee && l.ecart_pct !== null ? ` (${num(l.ecart_pct)} %)` : ""}{" "}
-                          {l.comptee && l.hors_tolerance && <Badge tone="warn">{t("ecarts_m5m8.stocks.horsTolerance")}</Badge>}
-                        </td>
-                        <td className="num">{l.comptee ? fcfa(l.valeur_ecart) : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div data-testid="comptage-inventaire">
+                  <DataTable caption={t("ecarts_m5m8.stocks.comptage")} columns={colsComptage} rows={e.lignes} />
+                </div>
                 <p>
                   {t("ecarts_m5m8.stocks.valeurAbsolue")} : {fcfa(e.valeur_absolue)} · {t("ecarts_m5m8.stocks.seuil")} : {fcfa(e.seuil_validation)}{" "}
                   {e.validation_requise && (
@@ -273,8 +325,8 @@ export function InventaireAnnuelSection() {
         <h4>{t("ecarts_m5m8.stocks.etat")}</h4>
         {plan && (
           <div className="action-bar-buttons">
-            <button type="button" className="btn ghost" onClick={() => void exporter("xlsx")}>{t("ecarts_m5m8.exportXlsx")}</button>
-            <button type="button" className="btn ghost" onClick={() => void exporter("pdf")}>{t("ecarts_m5m8.exportPdf")}</button>
+            <button type="button" className="btn ghost sm" onClick={() => void exporter("xlsx")}>{t("ecarts_m5m8.exportXlsx")}</button>
+            <button type="button" className="btn ghost sm" onClick={() => void exporter("pdf")}>{t("ecarts_m5m8.exportPdf")}</button>
           </div>
         )}
         {etat.data && (
@@ -283,28 +335,13 @@ export function InventaireAnnuelSection() {
               {t("ecarts_m5m8.stocks.etatResume", { n: etat.data.rows.length, h: etat.data.hors_tolerance })} · {fcfa(etat.data.valeur_nette)}
             </p>
             {etat.data.rows.length > 0 && (
-              <table className="table" data-testid="etat-ecarts">
-                <thead>
-                  <tr>
-                    <th>{t("ecarts_m5m8.stocks.inventaire")}</th>
-                    <th>{t("ecarts_m5m8.stocks.article")}</th>
-                    <th className="num">{t("ecarts_m5m8.stocks.ecart")}</th>
-                    <th className="num">{t("ecarts_m5m8.stocks.valeur")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {etat.data.rows.map((r) => (
-                    <tr key={`${r.inventaire}-${r.id}`}>
-                      <td>{r.inventaire} · {formatDate(r.date, i18n.language)}</td>
-                      <td>{r.article} · {r.article_label}</td>
-                      <td className="num">
-                        {num(r.ecart)} {r.hors_tolerance && <Badge tone="warn">{t("ecarts_m5m8.stocks.horsTolerance")}</Badge>}
-                      </td>
-                      <td className="num">{fcfa(r.valeur_ecart)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div data-testid="etat-ecarts">
+                <DataTable
+                  caption={t("ecarts_m5m8.stocks.etat")}
+                  columns={colsEtat}
+                  rows={etat.data.rows.map((r) => ({ ...r, id: `${r.inventaire}-${r.id}` }))}
+                />
+              </div>
             )}
           </>
         )}

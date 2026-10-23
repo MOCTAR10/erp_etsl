@@ -2,16 +2,12 @@ import { motion, MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 
 import { motionTokens } from "../theme/tokens";
-import { pageTransition, staggerContainer, staggerItem } from "../lib/motion";
+import { pageEnter, staggerContainer, staggerItem } from "../lib/motion";
 
-/** Transition de page pilote — fade + légère translation (tokens partagés). */
+/** Transition de page pilote — fondu 160 ms + translation de 4 px (preset partagé `pageEnter`). */
 export function withPilot(node: ReactNode): ReactNode {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: motionTokens.distance.sm }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={pageTransition}
-    >
+    <motion.div {...pageEnter}>
       {node}
     </motion.div>
   );
@@ -45,7 +41,7 @@ export function MotionItem({ children }: { children: ReactNode }) {
 /** Force libère le contrôle au moteur : respecte prefers-reduced-motion de l'OS. */
 export function MotionProvider({ children }: { children: ReactNode }) {
   return (
-    <MotionConfig reducedMotion="user" transition={{ duration: motionTokens.duration.base }}>
+    <MotionConfig reducedMotion="user" transition={{ duration: motionTokens.duration.fast, ease: motionTokens.ease.out }}>
       {children}
     </MotionConfig>
   );

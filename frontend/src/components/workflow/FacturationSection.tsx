@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { usePagedList } from "../../lib/usePagedList";
 import type { AFacturer, FactureClient, ModeleFacture, Paginated } from "../../types";
@@ -86,7 +86,7 @@ export function FacturationSection() {
               {jalons.map((j) => (
                 <tr key={j.id}>
                   <td>{j.affaire} — {j.label}</td>
-                  <td className="num">{j.montant === null ? "••••••" : `${formatNumber(Number(j.montant))} F`}</td>
+                  <td className="num">{j.montant === null ? "••••••" : formatMoney(j.montant)}</td>
                   <td>
                     <button type="button" className="btn ghost" onClick={() => action.mutate({ path: "/api/comptabilite/factures-clients/depuis-jalon/", body: { jalon: j.id } })}>
                       {t("facturation.facturer")}
@@ -97,7 +97,7 @@ export function FacturationSection() {
               {situations.map((s) => (
                 <tr key={s.id}>
                   <td>{s.code} — {s.affaire} {s.label}</td>
-                  <td className="num">{s.montant === null ? "••••••" : `${formatNumber(Number(s.montant))} F`}</td>
+                  <td className="num">{s.montant === null ? "••••••" : formatMoney(s.montant)}</td>
                   <td>
                     <button type="button" className="btn ghost" onClick={() => action.mutate({ path: "/api/comptabilite/factures-clients/depuis-situation/", body: { situation: s.id } })}>
                       {t("facturation.facturer")}
@@ -136,7 +136,7 @@ export function FacturationSection() {
                 </td>
                 <td>{f.client_name}</td>
                 <td>{formatDate(f.date)}</td>
-                <td className="num">{f.montant_ttc === null ? "••••••" : `${formatNumber(Number(f.montant_ttc))} F`}</td>
+                <td className="num">{f.montant_ttc === null ? "••••••" : formatMoney(f.montant_ttc)}</td>
                 <td>
                   <Badge tone={f.statut === "emise" ? "ok" : "warn"}>{t(`facturation.st.${f.statut}`)}</Badge>{" "}
                   {f.nature === "avoir" && <Badge tone="brand">{t("facturation.avoir")}</Badge>}

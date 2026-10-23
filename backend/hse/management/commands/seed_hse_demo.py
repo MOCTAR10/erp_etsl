@@ -28,7 +28,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write("Seed M7 - HSE (demo)")
+        self.stdout.write("Seed M7 - HSE")
 
         hse_user = User.objects.filter(role=User.Role.HSE).first()
         if hse_user is None:
@@ -47,7 +47,7 @@ class Command(BaseCommand):
             type_permis=PermisTravail.TypePermis.CHAUD,
             emplacement="Chantier RTC - zone montage line A",
             description="Soudure SMAW - rattachement piquage 6 pouces",
-            mesures="Bache anti-feu, extincteur 2x, vigie incendie",
+            mesures="Bâche anti-feu, extincteur 2x, vigie incendie",
             demandeur=hse_user,
             validateur=hse_user,
             date_debut=today,
@@ -57,8 +57,8 @@ class Command(BaseCommand):
         )
         PermisTravail.objects.create(
             type_permis=PermisTravail.TypePermis.HAUTEUR,
-            emplacement="Atelier - echafaudage porte-camion",
-            description="Travaux a 6 m - pose garde-corps traversée",
+            emplacement="Atelier - échafaudage porte-camion",
+            description="Travaux à 6 m - pose garde-corps traversée",
             demandeur=hse_user,
             date_debut=today + timedelta(days=5),
             date_fin=today + timedelta(days=6),
@@ -66,7 +66,7 @@ class Command(BaseCommand):
         )
         PermisTravail.objects.create(
             type_permis=PermisTravail.TypePermis.ATEX,
-            emplacement="Z20 - reservoir de stockage",
+            emplacement="Z20 - réservoir de stockage",
             description="Inspection interne zone 1 - sondeur d'ultrasons",
             demandeur=hse_user,
             date_debut=today - timedelta(days=10),
@@ -77,12 +77,12 @@ class Command(BaseCommand):
         )
 
         EvaluationRisque.objects.create(
-            lieux="Z20 - reservoir",
-            activite="Travaux a chaud",
+            lieux="Z20 - réservoir",
+            activite="Travaux à chaud",
             description="Risque d'inflammation des vapeurs d'hydrocarbures",
             probabilite=4,
             gravite=5,
-            mesure="Detection gaz + permis chaud + vigie + exclusions ATEX",
+            mesure="Détection gaz + permis chaud + vigie + exclusions ATEX",
             responsable=hse_user,
             statut=EvaluationRisque.Statut.OUVERTE,
         )
@@ -92,14 +92,14 @@ class Command(BaseCommand):
             description="Chute de charge - manipulation de porte-camions",
             probabilite=3,
             gravite=4,
-            mesure="Balizage + calage + formation eperillage",
+            mesure="Balisage + calage + formation élingage",
             responsable=hse_user,
             statut=EvaluationRisque.Statut.TRAITEE,
         )
 
         today_r = timezone.localdate()
         EquipementAtex.objects.create(
-            designation="Scie a eau ATEX Zone 1",
+            designation="Scie à eau ATEX Zone 1",
             zone_atex="Zone 1",
             marquage="II 2G Ex h IIB T4 Gb",
             fabricant="SawAtex",
@@ -111,7 +111,7 @@ class Command(BaseCommand):
             statut=EquipementAtex.Statut.DISPONIBLE,
         )
         EquipementAtex.objects.create(
-            designation="Projecteur eclair Z1",
+            designation="Projecteur d'éclairage Z1",
             zone_atex="Zone 1",
             marquage="II 2G Ex db IIB T6",
             fabricant="LuxPro",
@@ -127,12 +127,12 @@ class Command(BaseCommand):
             type_incident=Incident.TypeIncident.QUASI_ACCIDENT,
             gravite=Incident.Gravite.MINEURE,
             date_evenement=timezone.now() - timedelta(days=30),
-            lieu="Depot principal",
-            description="Deplacement d'un fardeau de tubes avec equilibre instable",
-            cause_immediate="Elingage en retrait",
-            cause_profonde="Absence de plan de levage pour la piece",
-            consequences="Aucun blessé - near miss declare",
-            rapport="Retrait du signalement et re-briefing equipe.",
+            lieu="Dépôt principal",
+            description="Déplacement d'un fardeau de tubes avec équilibre instable",
+            cause_immediate="Élingage en retrait",
+            cause_profonde="Absence de plan de levage pour la pièce",
+            consequences="Aucun blessé - presqu'accident déclaré",
+            rapport="Retrait du signalement et re-briefing équipe.",
             statut=Incident.Statut.CLOTURE,
             archive=True,
             declared_by=hse_user,
@@ -145,7 +145,7 @@ class Command(BaseCommand):
             gravite=Incident.Gravite.MAJEURE,
             date_evenement=timezone.now() - timedelta(days=3),
             lieu="Aire de lavage",
-            description="Deversement d'hydrocarbures hors bassin de retention",
+            description="Déversement d'hydrocarbures hors bassin de rétention",
             consequences="Env. 40 L dans le sol - confinement partiel",
             statut=Incident.Statut.EN_ENQUETE,
             declared_by=hse_user,
@@ -155,7 +155,7 @@ class Command(BaseCommand):
         ActionHse.objects.create(
             incident=incident,
             type=ActionHse.TypeAction.CORRECTIVE,
-            description="Confiner la zone et evacuater le sol pollue via filiere agreee",
+            description="Confiner la zone et évacuer le sol pollué via filière agréée",
             responsable=hse_user,
             echeance=today + timedelta(days=3),
             statut=ActionHse.Statut.EN_COURS,
@@ -163,7 +163,7 @@ class Command(BaseCommand):
         ActionHse.objects.create(
             incident=incident,
             type=ActionHse.TypeAction.PREVENTIVE,
-            description="Revue de procedure bassin de retention + briefing equipe",
+            description="Revue de procédure bassin de rétention + briefing équipe",
             responsable=hse_user,
             echeance=today + timedelta(days=15),
             statut=ActionHse.Statut.OUVERTE,
@@ -171,14 +171,14 @@ class Command(BaseCommand):
 
         FormationSecurite.objects.create(
             type_session=FormationSecurite.TypeSession.CAUSERIE,
-            theme="Causerie securite - manipulations en hauteur",
-            formateur="Equipe HSE",
+            theme="Causerie sécurité - manipulations en hauteur",
+            formateur="Équipe HSE",
             date_session=today + timedelta(days=4),
             statut=FormationSecurite.Statut.PLANIFIEE,
         )
         FormationSecurite.objects.create(
             type_session=FormationSecurite.TypeSession.FORMATION,
-            theme="Formation habilitations electrique / ATEX",
+            theme="Formation habilitations électrique / ATEX",
             formateur="CAP ETSL",
             date_session=today - timedelta(days=20),
             duree_heures=6,
@@ -192,7 +192,7 @@ class Command(BaseCommand):
 
         Epi.objects.create(
             type_epi=Epi.TypeEpi.CASQUE,
-            designation="Casque ballistique blanc",
+            designation="Casque balistique blanc",
             beneficiaire=first_benef,
             date_dotation=today - timedelta(days=120),
             date_renouvellement=today + timedelta(days=10),
@@ -219,7 +219,7 @@ class Command(BaseCommand):
             type_dechet=BordereauDechet.TypeDechet.METAUX,
             quantite=1.5,
             unite=BordereauDechet.Unite.T,
-            destination="Recyclage metaux - Libreville",
+            destination="Recyclage métaux - Libreville",
             statut=BordereauDechet.Statut.EN_ATTENTE,
         )
 

@@ -1,0 +1,41 @@
+/*
+ * Sections de modules (agent « tableaux », vague 3) : barre d'actions d'en-tête de section.
+ * Une seule action principale par section : les boutons de création suivants (QuickForm, toujours
+ * `.btn.primary`) passent en secondaire. Importé par `SectionActions.tsx`.
+ */
+@layer pages {
+  .section-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .section-actions > :not(:first-child) > .btn.primary,
+  .section-actions > .btn.primary:not(:first-child) {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .section-actions > :not(:first-child) > .btn.primary:hover:not(:disabled),
+  .section-actions > .btn.primary:not(:first-child):hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+  /* Rangée d'actions posée dans le corps de carte : alignée à gauche, au-dessus du contenu */
+  .card-body > .section-actions {
+    justify-content: flex-start;
+    margin-bottom: var(--space-3);
+  }
+  .card-header > .section-actions {
+    flex: none;
+    max-width: 100%;
+  }
+  @media (max-width: 640px) {
+    .card-header:has(> .section-actions) {
+      flex-wrap: wrap;
+    }
+    .card-header > .section-actions {
+      justify-content: flex-start;
+    }
+  }
+}

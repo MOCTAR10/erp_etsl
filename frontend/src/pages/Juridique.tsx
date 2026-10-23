@@ -6,11 +6,12 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { EcartsM12Section } from "../components/juridique/EcartsM12Section";
 import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
+  AlerteEcheance,
   AlertesResult,
   Assurance,
   BandeEcheance,
@@ -41,6 +42,33 @@ const BANDE_BADGE: Record<BandeEcheance, "ok" | "warn" | "err"> = {
 };
 const BANDES: BandeEcheance[] = ["expiree", "j0", "j15", "j30", "j60", "j90"];
 
+/** Alertes d'échéance (conventions, cautions, assurances), de la plus urgente à la plus lointaine. */
+function alerteColumns(t: T): Column<AlerteEcheance & { id: string }>[] {
+  return [
+    { key: "type", header: t("tableaux.entetes.colType"), render: (el) => t(`juridique.${el.type}`) },
+    {
+      key: "libelle",
+      header: t("tableaux.entetes.colLibelle"),
+      sortValue: (el) => el.libelle,
+      render: (el) => (
+        <>
+          {el.libelle}
+          <br />
+          <span className="muted">{el.code}</span>
+        </>
+      ),
+    },
+    { key: "echeance", header: t("tableaux.entetes.colEcheance"), sortValue: (el) => el.date_echeance, render: (el) => formatDate(el.date_echeance) },
+    { key: "jours", header: t("tableaux.entetes.colRestant"), num: true, sortValue: (el) => el.jours, render: (el) => `${el.jours} ${t("juridique.jours")}` },
+    {
+      key: "bande",
+      header: t("tableaux.entetes.colBande"),
+      render: (el) => <Badge tone={BANDE_BADGE[el.bande]}>{t(`juridique.bande.${el.bande}`)}</Badge>,
+    },
+  ];
+}
+
+
 function ConventionCard({ c, index }: { c: Convention; index: number }) {
   const { t } = useTranslation();
   const badge =
@@ -58,7 +86,7 @@ function ConventionCard({ c, index }: { c: Convention; index: number }) {
       </div>
       <div className="meta">{c.titre}</div>
       <div className="meta">
-        {c.has_amount_access && c.montant !== null ? `${formatNumber(c.montant)} F` : "••••••"} ·{" "}
+        {c.has_amount_access && c.montant !== null ? formatMoney(c.montant) : "••••••"} ·{" "}
         {c.partenaire_name ?? "—"}
       </div>
       <div className="meta">
@@ -91,7 +119,7 @@ const REUNION_TONE: Record<StatutReunion, Tone> = { planifiee: "warn", tenue: "o
 const GR_TONE: Record<StatutDossierGR, Tone> = { brouillon: "warn", ouvert: "brand", cloture: "ok" };
 
 const amount = (access: boolean, value: string | number | null) =>
-  access && value !== null ? `${formatNumber(value)} F` : "••••••";
+  access && value !== null ? formatMoney(value) : "••••••";
 const dateOr = (iso: string | null | undefined) => (iso ? formatDate(iso) : "—");
 const daysLeft = (t: T, d: number | null) => (d === null ? "—" : `${d} ${t("juridique.jours")}`);
 
@@ -272,36 +300,41 @@ export function JuridiquePage() {
 
   return (
     <>
-      <PageHeader title={t("juridique.title")} />
-      <QuickForm
-        title={t("juridique.form.title")}
-        endpoint="/api/juridique/courriers/"
-        fields={[
-          {
-            name: "sens",
-            label: t("juridique.col.sens"),
-            type: "select",
-            required: true,
-            defaultValue: "entrant",
-            options: [
-              { value: "entrant", label: t("juridique.form.entrant") },
-              { value: "sortant", label: t("juridique.form.sortant") },
-            ],
-          },
-          {
-            name: "type",
-            label: t("juridique.col.type"),
-            type: "select",
-            required: true,
-            defaultValue: "lettre",
-            options: ["lettre", "email", "note", "convocation", "proces", "autre"].map((v) => ({ value: v, label: t(`juridique.form.types.${v}`) })),
-          },
-          { name: "objet", label: t("juridique.col.objet"), required: true },
-          { name: "reference", label: t("juridique.form.reference") },
-          { name: "expediteur", label: t("juridique.form.expediteur") },
-          { name: "destinataire", label: t("juridique.form.destinataire") },
-          { name: "date_courrier", label: t("juridique.form.dateCourrier"), type: "date" },
-        ]}
+      <PageHeader
+        title={t("juridique.title")}
+        subtitle={t("tableaux.entetes.juridique")}
+        actions={
+          <QuickForm
+            title={t("juridique.form.title")}
+            endpoint="/api/juridique/courriers/"
+            fields={[
+              {
+                name: "sens",
+                label: t("juridique.col.sens"),
+                type: "select",
+                required: true,
+                defaultValue: "entrant",
+                options: [
+                  { value: "entrant", label: t("juridique.form.entrant") },
+                  { value: "sortant", label: t("juridique.form.sortant") },
+                ],
+              },
+              {
+                name: "type",
+                label: t("juridique.col.type"),
+                type: "select",
+                required: true,
+                defaultValue: "lettre",
+                options: ["lettre", "email", "note", "convocation", "proces", "autre"].map((v) => ({ value: v, label: t(`juridique.form.types.${v}`) })),
+              },
+              { name: "objet", label: t("juridique.col.objet"), required: true },
+              { name: "reference", label: t("juridique.form.reference") },
+              { name: "expediteur", label: t("juridique.form.expediteur") },
+              { name: "destinataire", label: t("juridique.form.destinataire") },
+              { name: "date_courrier", label: t("juridique.form.dateCourrier"), type: "date" },
+            ]}
+          />
+        }
       />
 
       <div className="kpi-grid">
@@ -325,9 +358,9 @@ export function JuridiquePage() {
           tone="warn"
           delay={0}
         />
-        <Kpi label={t("juridique.conventions")} value={s.conventions} hint={`${t("juridique.conventionsARenouveler")} ${s.conventions_a_renouveler}`} icon={FileText} tone="brand" delay={0.05} />
-        <Kpi label={t("juridique.contentieux")} value={s.contentieux_ouverts} hint={`${t("juridique.courriers")} ${s.courriers}`} icon={Gavel} tone="err" delay={0.1} />
-        <Kpi label={t("juridique.cautions")} value={s.cautions_en_cours} hint={`${t("juridique.assurances")} ${s.assurances}`} icon={ShieldCheck} tone="brand" delay={0.15} />
+        <Kpi label={t("juridique.conventions")} value={s.conventions} hint={t("tableaux.entetes.aRenouveler", { n: s.conventions_a_renouveler })} icon={FileText} tone="brand" delay={0.05} />
+        <Kpi label={t("juridique.contentieux")} value={s.contentieux_ouverts} hint={t("tableaux.entetes.courriers", { n: s.courriers })} icon={Gavel} tone="err" delay={0.1} />
+        <Kpi label={t("juridique.cautions")} value={s.cautions_en_cours} hint={t("tableaux.entetes.assurances", { n: s.assurances })} icon={ShieldCheck} tone="brand" delay={0.15} />
       </div>
 
       {a.total > 0 ? (
@@ -335,24 +368,18 @@ export function JuridiquePage() {
           <h3 className="section-heading">
             {t("juridique.alertes")} · {a.total}
           </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.5rem" }}>
-            {BANDES.flatMap((bande) =>
-              [...a.conventions, ...a.cautions, ...a.assurances]
-                .filter((el) => el.bande === bande)
-                .map((el) => (
-                  <div className="card kpi" key={`${el.type}-${el.code}`}>
-                    <span className="kpi-label">
-                      {t(`juridique.${el.type}`)} · {el.code}{" "}
-                      <span className={`badge ${BANDE_BADGE[bande]}`}>{t(`juridique.bande.${bande}`)}</span>
-                    </span>
-                    <span className="kpi-value">{el.libelle}</span>
-                    <span className="meta muted">
-                      {formatDate(el.date_echeance)} · {el.jours} {t("juridique.jours")}
-                    </span>
-                  </div>
-                ))
-            )}
-          </div>
+          <SectionCard>
+            <DataTable
+              rows={BANDES.flatMap((bande) =>
+                [...a.conventions, ...a.cautions, ...a.assurances]
+                  .filter((el) => el.bande === bande)
+                  .map((el) => ({ ...el, id: `${el.type}-${el.code}` })),
+              )}
+              columns={alerteColumns(t)}
+              caption={t("juridique.alertes")}
+              density="compact"
+            />
+          </SectionCard>
         </>
       ) : null}
 
@@ -390,22 +417,22 @@ export function JuridiquePage() {
 
       {(cautions.count > 0 || cautions.search) && (
         <SectionCard title={`${t("juridique.cautions")} · ${cautions.count}`}>
-          <PagedDataTable list={cautions} columns={cautionColumns(t)} caption={t("juridique.cautions")} searchPlaceholder={t("juridique.searchCautions")} />
+          <PagedDataGrid list={cautions} columns={cautionColumns(t)} caption={t("juridique.cautions")} searchPlaceholder={t("juridique.searchCautions")} />
         </SectionCard>
       )}
       {(assurances.count > 0 || assurances.search) && (
         <SectionCard title={`${t("juridique.assurances")} · ${assurances.count}`}>
-          <PagedDataTable list={assurances} columns={assuranceColumns(t)} caption={t("juridique.assurances")} searchPlaceholder={t("juridique.searchAssurances")} />
+          <PagedDataGrid list={assurances} columns={assuranceColumns(t)} caption={t("juridique.assurances")} searchPlaceholder={t("juridique.searchAssurances")} />
         </SectionCard>
       )}
       {(contentieux.count > 0 || contentieux.search) && (
         <SectionCard title={`${t("juridique.contentieux")} · ${contentieux.count}`}>
-          <PagedDataTable list={contentieux} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} searchPlaceholder={t("juridique.searchContentieux")} />
+          <PagedDataGrid list={contentieux} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} searchPlaceholder={t("juridique.searchContentieux")} />
         </SectionCard>
       )}
       {(dossiersGr.count > 0 || dossiersGr.search) && (
         <SectionCard title={`GLOBAL RENTAL · ${dossiersGr.count}`}>
-          <PagedDataTable list={dossiersGr} columns={grColumns(t)} caption="GLOBAL RENTAL" searchPlaceholder={t("juridique.searchGr")} />
+          <PagedDataGrid list={dossiersGr} columns={grColumns(t)} caption="GLOBAL RENTAL" searchPlaceholder={t("juridique.searchGr")} />
         </SectionCard>
       )}
       <RechercheJuridiqueSection />
@@ -414,12 +441,12 @@ export function JuridiquePage() {
 
       {(courriers.count > 0 || courriers.search) && (
         <SectionCard title={`${t("juridique.courriers")} · ${courriers.count}`}>
-          <PagedDataTable list={courriers} columns={courrierColumns(t)} caption={t("juridique.courriers")} searchPlaceholder={t("juridique.searchCourriers")} />
+          <PagedDataGrid list={courriers} columns={courrierColumns(t)} caption={t("juridique.courriers")} searchPlaceholder={t("juridique.searchCourriers")} />
         </SectionCard>
       )}
       {(reunions.count > 0 || reunions.search) && (
         <SectionCard title={`${t("juridique.reunions")} · ${reunions.count}`}>
-          <PagedDataTable list={reunions} columns={reunionColumns(t)} caption={t("juridique.reunions")} searchPlaceholder={t("juridique.searchReunions")} />
+          <PagedDataGrid list={reunions} columns={reunionColumns(t)} caption={t("juridique.reunions")} searchPlaceholder={t("juridique.searchReunions")} />
         </SectionCard>
       )}
     </>

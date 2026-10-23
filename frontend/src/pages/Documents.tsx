@@ -1,12 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Download, FileText, ShieldCheck, Upload } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { Archive, Download, FileCheck2, FileText, Send, ShieldCheck, Upload } from "lucide-react";
+import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, FilterBar, filtersToQuery, Kpi, PageHeader, PagedDataTable, SectionCard } from "../components/ui";
-import type { BadgeTone, Column, FilterDef, FilterValues } from "../components/ui";
+import {
+  Badge,
+  DataGrid,
+  DatePicker,
+  FilterBar,
+  filtersToQuery,
+  Kpi,
+  notify,
+  PagedDataGrid,
+  PageHeader,
+  SearchField,
+  SectionCard,
+  Sheet,
+} from "../components/ui";
+import type { BadgeTone, FilterDef, FilterValues, GridColumn } from "../components/ui";
 import { formatDate } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
 import { usePagedList } from "../lib/usePagedList";
@@ -48,12 +61,14 @@ interface Verification {
 
 const TON: Record<string, BadgeTone> = { draft: "neutral", in_validation: "warn", rejected: "err", archived: "ok" };
 
-/** Formulaire d'ajout d'un document (fichier + métadonnées) : POST multipart sur l'API GED existante. */
+/** Ajout d'un document (fichier + métadonnées) dans un panneau latéral : POST multipart sur l'API GED existante. */
 function AjoutDocument({ types }: { types: DocType[] }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const uid = useId();
   const [ouvert, setOuvert] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const titre = t("ecarts_tr.ged.ajouter");
   const envoi = useMutation({
     mutationFn: (form: HTMLFormElement) => {
       const data = new FormData(form);
@@ -67,91 +82,111 @@ function AjoutDocument({ types }: { types: DocType[] }) {
       return api.upload<unknown>("/api/documents/documents/", fichier, "file", extra);
     },
     onSuccess: (_d, form) => {
+      const nom = String(new FormData(form).get("title") ?? "");
       form.reset();
-      setMessage({ ok: true, text: t("quickForm.created") });
+      setOuvert(false);
+      notify.success(t("formulaires.ged.ajoute"), { description: nom || undefined });
       void qc.invalidateQueries();
     },
-    onError: (e) => setMessage({ ok: false, text: e instanceof Error && !("status" in e) ? e.message : describeError(e) }),
+    onError: (e) => {
+      const text = e instanceof Error && !("status" in e) ? e.message : describeError(e);
+      setErreur(text);
+      notify.error(t("formulaires.quickForm.toastErr"), { description: text });
+    },
   });
-  if (!ouvert)
-    return (
-      <button type="button" className="btn primary" onClick={() => setOuvert(true)}>
-        <Upload size={16} aria-hidden="true" /> {t("ecarts_tr.ged.ajouter")}
-      </button>
-    );
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setMessage(null);
+    setErreur(null);
     envoi.mutate(e.currentTarget);
   };
+  const id = (n: string) => `${uid}-${n}`;
   return (
-    <form className="card quick-form" onSubmit={submit} aria-label={t("ecarts_tr.ged.ajouter")}>
-      <div className="quick-form-head">
-        <strong>{t("ecarts_tr.ged.ajouter")}</strong>
-        <button type="button" className="icon-btn" aria-label={t("quickForm.close")} onClick={() => setOuvert(false)}>
-          ×
+    <Sheet
+      open={ouvert}
+      onOpenChange={(o) => {
+        setOuvert(o);
+        if (o) setErreur(null);
+      }}
+      title={titre}
+      description={t("formulaires.ged.ajoutAide")}
+      width={480}
+      preventOutsideClose={envoi.isPending}
+      className="quick-form-sheet"
+      trigger={
+        <button type="button" className="btn primary">
+          <Upload size={16} aria-hidden="true" /> {titre}
         </button>
-      </div>
-      <div className="quick-form-grid">
-        <div className="field">
-          <label htmlFor="ged-title">{t("ecarts_tr.ged.titre")} *</label>
-          <input id="ged-title" name="title" required />
+      }
+    >
+      <form className="quick-form" onSubmit={submit} aria-label={titre}>
+        <div className="quick-form-fields">
+          <div className="field wide">
+            <label htmlFor={id("file")}>{t("ecarts_tr.ged.fichier")} *</label>
+            <input id={id("file")} name="file" type="file" required className="ged-file" />
+          </div>
+          <div className="field wide">
+            <label htmlFor={id("title")}>{t("ecarts_tr.ged.titre")} *</label>
+            <input id={id("title")} name="title" required />
+          </div>
+          <div className="field">
+            <label htmlFor={id("type")}>{t("ecarts_tr.ged.type")}</label>
+            <select id={id("type")} name="type">
+              <option value="">—</option>
+              {types.map((ty) => (
+                <option key={ty.id} value={ty.id}>
+                  {ty.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor={id("date")}>{t("ecarts_tr.ged.date")}</label>
+            <DatePicker id={id("date")} name="document_date" />
+          </div>
+          <div className="field">
+            <label htmlFor={id("ref")}>{t("ecarts_tr.ged.reference")}</label>
+            <input id={id("ref")} name="reference" />
+          </div>
+          <div className="field">
+            <label htmlFor={id("tiers")}>{t("ecarts_tr.ged.tiers")}</label>
+            <input id={id("tiers")} name="counterparty" />
+          </div>
+          <div className="field wide">
+            <label htmlFor={id("projet")}>{t("ecarts_tr.ged.projet")}</label>
+            <input id={id("projet")} name="project" />
+          </div>
         </div>
-        <div className="field">
-          <label htmlFor="ged-type">{t("ecarts_tr.ged.type")}</label>
-          <select id="ged-type" name="type">
-            <option value="">—</option>
-            {types.map((ty) => (
-              <option key={ty.id} value={ty.id}>
-                {ty.label}
-              </option>
-            ))}
-          </select>
+        <div className="quick-form-foot">
+          <div className="quick-form-feedback">
+            {erreur ? (
+              <p className="action-error" role="alert">
+                {erreur}
+              </p>
+            ) : (
+              <p className="quick-form-hint">{t("formulaires.quickForm.requis")}</p>
+            )}
+          </div>
+          <button type="button" className="btn ghost" onClick={() => setOuvert(false)}>
+            {t("actionBar.annuler")}
+          </button>
+          <button type="submit" className="btn primary" disabled={envoi.isPending}>
+            {envoi.isPending ? t("common.loading") : t("quickForm.save")}
+          </button>
         </div>
-        <div className="field">
-          <label htmlFor="ged-date">{t("ecarts_tr.ged.date")}</label>
-          <input id="ged-date" name="document_date" type="date" />
-        </div>
-        <div className="field">
-          <label htmlFor="ged-ref">{t("ecarts_tr.ged.reference")}</label>
-          <input id="ged-ref" name="reference" />
-        </div>
-        <div className="field">
-          <label htmlFor="ged-tiers">{t("ecarts_tr.ged.tiers")}</label>
-          <input id="ged-tiers" name="counterparty" />
-        </div>
-        <div className="field">
-          <label htmlFor="ged-projet">{t("ecarts_tr.ged.projet")}</label>
-          <input id="ged-projet" name="project" />
-        </div>
-        <div className="field wide">
-          <label htmlFor="ged-file">{t("ecarts_tr.ged.fichier")} *</label>
-          <input id="ged-file" name="file" type="file" required />
-        </div>
-      </div>
-      <div className="quick-form-actions">
-        <button type="submit" className="btn primary" disabled={envoi.isPending}>
-          {envoi.isPending ? t("common.loading") : t("quickForm.save")}
-        </button>
-        {message && (
-          <p className={message.ok ? "quick-form-ok" : "action-error"} role={message.ok ? "status" : "alert"}>
-            {message.text}
-          </p>
-        )}
-      </div>
-    </form>
+      </form>
+    </Sheet>
   );
 }
 
 /** GED autonome (flux M12 → tous) : recherche plein texte, filtres, ajout, téléchargement, intégrité, circuit. */
 export function DocumentsPage() {
   const { t, i18n } = useTranslation();
+  const qc = useQueryClient();
   const [criteres, setCriteres] = useState<FilterValues>({});
-  const [annee, setAnnee] = useState("");
   const [verif, setVerif] = useState<Record<string, Verification | string>>({});
-  // EX-G-09 : critères multicritères décrits par l'API (libellés traduits côté serveur) + année.
+  // EX-G-09 : critères multicritères décrits par l'API (libellés traduits côté serveur) + année (4 chiffres).
   const filtres = new URLSearchParams(filtersToQuery(criteres));
-  if (/^\d{4}$/.test(annee)) filtres.set("year", annee);
+  if (!/^\d{4}$/.test(filtres.get("year") ?? "")) filtres.delete("year");
   const extra = filtres.toString();
 
   const types = useQuery({ queryKey: ["ged-types"], queryFn: () => api.listAll<DocType>("/api/documents/types/"), retry: 0 }).data ?? [];
@@ -175,139 +210,160 @@ export function DocumentsPage() {
     try {
       const r = await api.get<Verification>(`/api/documents/documents/${d.id}/verify/`);
       setVerif((v) => ({ ...v, [d.id]: r }));
+      if (r.ok) notify.success(t("ecarts_tr.ged.integre"), { description: d.title });
+      else notify.error(t("ecarts_tr.ged.altere"), { description: d.title });
     } catch (e) {
       setVerif((v) => ({ ...v, [d.id]: describeError(e) }));
+      notify.error(t("formulaires.quickForm.toastErr"), { description: describeError(e) });
+    }
+  };
+  const soumettre = async (d: DocRow) => {
+    try {
+      await api.post<unknown>("/api/workflow/tasks/submit/", { document: d.id });
+      notify.success(t("formulaires.ged.soumis"), { description: d.title });
+      void qc.invalidateQueries();
+    } catch (e) {
+      notify.error(t("formulaires.quickForm.toastErr"), { description: describeError(e) });
     }
   };
 
-  const columns: Column<DocRow>[] = [
+  const columns: GridColumn<DocRow>[] = [
     {
       key: "titre",
       header: t("ecarts_tr.ged.titre"),
-      render: (d) => (
-        <>
-          <strong>{d.title}</strong>
-          {d.pdfa_statut === "converti" ? (
-            <>
-              {" "}
-              <Badge tone="ok">PDF/A-{d.pdfa_norme}</Badge>
-            </>
-          ) : null}
-          <div className="muted" style={{ fontSize: 12 }}>
-            {[d.reference, d.counterparty, d.project, d.dossier_path].filter(Boolean).join(" · ")}
-          </div>
-        </>
-      ),
-    },
-    { key: "type", header: t("ecarts_tr.ged.type"), render: (d) => d.type_label ?? "—" },
-    { key: "statut", header: t("ecarts_tr.ged.statut"), render: (d) => <Badge tone={TON[d.status] ?? "neutral"}>{t(`ecarts_tr.ged.statuts.${d.status}`)}</Badge> },
-    { key: "date", header: t("ecarts_tr.ged.date"), render: (d) => formatDate(d.document_date ?? d.created_at) },
-    {
-      key: "sha",
-      header: "SHA-256",
+      sortValue: (d) => d.title,
       render: (d) => {
-        const v = verif[d.id];
+        const meta = [d.reference, d.counterparty, d.project, d.dossier_path].filter(Boolean).join(" · ");
         return (
-          <>
-            <code style={{ fontSize: 11 }}>{d.sha256 ? `${d.sha256.slice(0, 12)}…` : "—"}</code>
-            {v ? (
-              typeof v === "string" ? (
-                <div className="action-error">{v}</div>
-              ) : (
-                <div>
-                  <Badge tone={v.ok ? "ok" : "err"}>{v.ok ? t("ecarts_tr.ged.integre") : t("ecarts_tr.ged.altere")}</Badge>
-                </div>
-              )
-            ) : null}
-          </>
+          <div className="ged-title">
+            <span className="ged-title-main">
+              <strong>{d.title}</strong>
+              {d.pdfa_statut === "converti" ? <Badge tone="ok">PDF/A-{d.pdfa_norme}</Badge> : null}
+            </span>
+            {meta ? <span className="ged-title-meta">{meta}</span> : null}
+          </div>
         );
       },
     },
+    { key: "type", header: t("ecarts_tr.ged.type"), sortValue: (d) => d.type_label, render: (d) => d.type_label ?? "—" },
     {
-      key: "actions",
-      header: "",
-      render: (d) => (
-        <div className="action-bar-buttons">
-          <button type="button" className="btn ghost" onClick={() => void api.download(`/api/documents/documents/${d.id}/download/`, d.title)}>
-            <Download size={14} aria-hidden="true" /> {t("ecarts_tr.ged.telecharger")}
-          </button>
-          <button type="button" className="btn ghost" onClick={() => void verifier(d)}>
-            <ShieldCheck size={14} aria-hidden="true" /> {t("ecarts_tr.ged.verifier")}
-          </button>
-          {d.status === "draft" || d.status === "rejected" ? (
-            <ActionBar actions={[{ label: t("ecarts_tr.ged.soumettre"), path: "/api/workflow/tasks/submit/", body: { document: d.id }, tone: "primary" }]} />
-          ) : null}
-        </div>
-      ),
+      key: "statut",
+      header: t("ecarts_tr.ged.statut"),
+      sortValue: (d) => d.status,
+      render: (d) => <Badge tone={TON[d.status] ?? "neutral"}>{t(`ecarts_tr.ged.statuts.${d.status}`)}</Badge>,
+    },
+    {
+      key: "date",
+      header: t("ecarts_tr.ged.date"),
+      sortValue: (d) => d.document_date ?? d.created_at,
+      render: (d) => <span className="num">{formatDate(d.document_date ?? d.created_at)}</span>,
+    },
+    {
+      key: "sha",
+      header: t("formulaires.ged.integrite"),
+      render: (d) => {
+        const v = verif[d.id];
+        if (v && typeof v !== "string")
+          return <Badge tone={v.ok ? "ok" : "err"}>{v.ok ? t("ecarts_tr.ged.integre") : t("ecarts_tr.ged.altere")}</Badge>;
+        return (
+          <code className="ged-sha" title={d.sha256 || undefined}>
+            {d.sha256 ? `${d.sha256.slice(0, 10)}…` : "—"}
+          </code>
+        );
+      },
     },
   ];
 
+  const typeColumns: GridColumn<DocType>[] = [
+    { key: "type", header: t("ecarts_tr.ged.type"), sortValue: (ty) => ty.label, render: (ty) => <strong>{ty.label}</strong> },
+    {
+      key: "retention",
+      header: t("ecarts_tr.ged.retention"),
+      num: true,
+      sortValue: (ty) => ty.retention_years,
+      render: (ty) => (ty.retention_years ? `${ty.retention_years} ${t("ecarts_tr.ged.ans")}` : "—"),
+    },
+    {
+      key: "statut",
+      header: t("ecarts_tr.parametres.statut"),
+      render: (ty) =>
+        ty.retention_provisoire ? (
+          <Badge tone="warn">{t("ecarts_tr.parametres.provisoire")}</Badge>
+        ) : (
+          <Badge tone="ok">{t("ecarts_tr.parametres.confirme")}</Badge>
+        ),
+    },
+  ];
+
+  const exporter = () => void api.download(`/api/reports/export/?export=xlsx${extra ? `&${extra}` : ""}`, "documents.xlsx");
+  const soumettable = (d: DocRow) => d.status === "draft" || d.status === "rejected";
+
   return (
     <>
-      <PageHeader title={t("ecarts_tr.ged.title")} subtitle={t("ecarts_tr.ged.subtitle")} />
+      <PageHeader
+        title={t("ecarts_tr.ged.title")}
+        subtitle={t("ecarts_tr.ged.subtitle")}
+        actions={
+          <>
+            <button type="button" className="btn ghost" onClick={exporter}>
+              <Download size={15} aria-hidden="true" /> Excel
+            </button>
+            <AjoutDocument types={types} />
+          </>
+        }
+      />
       <div className="kpi-grid">
         <Kpi label={t("ecarts_tr.ged.total")} value={facets?.total ?? 0} icon={FileText} tone="brand" />
         <Kpi label={t("ecarts_tr.ged.statuts.in_validation")} value={facets?.by_status?.in_validation ?? 0} icon={FileText} tone="warn" delay={0.05} />
         <Kpi label={t("ecarts_tr.ged.statuts.archived")} value={facets?.by_status?.archived ?? 0} icon={Archive} tone="accent" delay={0.1} />
       </div>
-      <SectionCard
-        title={t("ecarts_tr.ged.documents")}
-        actions={
-          <div className="action-bar-buttons">
-            <AjoutDocument types={types} />
-            <button type="button" className="btn ghost" onClick={() => void api.download(`/api/reports/export/?export=xlsx${extra ? `&${extra}` : ""}`, "documents.xlsx")}>
-              <Download size={14} aria-hidden="true" /> Excel
-            </button>
-          </div>
-        }
-      >
+      <SectionCard title={t("ecarts_tr.ged.documents")} className="ged-card">
         <FilterBar
           defs={defs}
           value={criteres}
           onChange={setCriteres}
           idPrefix="ged-f"
+          primary={["status", "type", "document_date"]}
           options={{ type: types.map((ty) => ({ valeur: String(ty.id), libelle: ty.label })) }}
+          search={<SearchField value={list.search} onChange={list.setSearch} placeholder={t("ecarts_tr.ged.rechercher")} />}
+          moreKeys={["year"]}
+          more={
+            <div className="field">
+              <label htmlFor="ged-f-annee">{t("ecarts_tr.ged.annee")}</label>
+              <input
+                id="ged-f-annee"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="2026"
+                value={criteres.year ?? ""}
+                onChange={(e) => setCriteres({ ...criteres, year: e.target.value.replace(/\D/g, "") })}
+              />
+            </div>
+          }
         />
-        <div className="quick-form-grid">
-          <div className="field">
-            <label htmlFor="ged-f-annee">{t("ecarts_tr.ged.annee")}</label>
-            <input id="ged-f-annee" inputMode="numeric" maxLength={4} value={annee} onChange={(e) => setAnnee(e.target.value)} />
-          </div>
-        </div>
-        <PagedDataTable list={list} columns={columns} caption={t("ecarts_tr.ged.documents")} searchPlaceholder={t("ecarts_tr.ged.rechercher")} />
+        <PagedDataGrid
+          list={list}
+          columns={columns}
+          caption={t("ecarts_tr.ged.documents")}
+          emptyLabel={t("common.empty")}
+          rowActions={(d) => [
+            { label: t("ecarts_tr.ged.telecharger"), icon: Download, onSelect: () => void api.download(`/api/documents/documents/${d.id}/download/`, d.title) },
+            { label: t("ecarts_tr.ged.verifier"), icon: ShieldCheck, onSelect: () => void verifier(d) },
+            soumettable(d) && "separator",
+            soumettable(d) && { label: t("ecarts_tr.ged.soumettre"), icon: Send, onSelect: () => void soumettre(d) },
+          ]}
+        />
       </SectionCard>
-      <SectionCard title={t("ecarts_tr.ged.types")} subtitle={t("ecarts_tr.ged.typesAide")}>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">{t("ecarts_tr.ged.type")}</th>
-                <th scope="col">{t("ecarts_tr.ged.retention")}</th>
-                <th scope="col">{t("ecarts_tr.parametres.statut")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {types.map((ty) => (
-                <tr key={ty.id}>
-                  <td>
-                    {ty.label} <span className="muted">({ty.code})</span>
-                  </td>
-                  <td>{ty.retention_years ? `${ty.retention_years} ${t("ecarts_tr.ged.ans")}` : "—"}</td>
-                  <td>
-                    {ty.retention_provisoire ? (
-                      <Badge tone="warn">{t("ecarts_tr.parametres.provisoire")}</Badge>
-                    ) : (
-                      <Badge tone="ok">{t("ecarts_tr.parametres.confirme")}</Badge>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Link className="btn ghost" to="/parametres">
-          {t("ecarts_tr.ged.modifierRetention")}
-        </Link>
+      <SectionCard
+        title={t("ecarts_tr.ged.types")}
+        subtitle={t("ecarts_tr.ged.typesAide")}
+        actions={
+          <Link className="btn ghost sm" to="/parametres">
+            <FileCheck2 size={14} aria-hidden="true" /> {t("formulaires.ged.modifierRetention")}
+          </Link>
+        }
+      >
+        <DataGrid rows={types} columns={typeColumns} caption={t("ecarts_tr.ged.types")} density="compact" maxHeight="none" emptyLabel={t("common.empty")} />
       </SectionCard>
     </>
   );

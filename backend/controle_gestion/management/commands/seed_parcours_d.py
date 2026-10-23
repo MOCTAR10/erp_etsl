@@ -41,7 +41,7 @@ class Command(ParcoursA):
         self.parcours_juridique()
         # Cubes : reconstruits depuis le grand livre (idempotent), puis lisibles à l'écran Direction.
         cubes.alimenter_cube(self.today.strftime("%Y-%m"))
-        self.stdout.write(self.style.SUCCESS("Parcours demo lot D pret."))
+        self.stdout.write(self.style.SUCCESS("Parcours lot D pret."))
 
     def _affaire(self, titre):
         affaire = Affaire.objects.filter(title=PREFIXE + titre).first()
@@ -77,8 +77,8 @@ class Command(ParcoursA):
         premiere = AnalyseEcart.objects.filter(budget_id=budget["id"]).order_by("period__number").first()
         if premiere is not None:
             self.call("finance@etls.local", "post", f"/api/controle-gestion/analyses-ecart/{premiere.pk}/analyser/", {
-                "analyse": "Demarrage du chantier decale : aucune situation emise avant le mois courant (demo).",
-                "actions": "Recaler le planning de facturation sur l'avancement reel (demo).",
+                "analyse": "Démarrage du chantier décalé : aucune situation émise avant le mois courant.",
+                "actions": "Recaler le planning de facturation sur l'avancement réel.",
             })
 
     # -- M12 : contrats signés en GED, avenant, dossier GR lié ---------------------------------------------
@@ -92,7 +92,7 @@ class Command(ParcoursA):
         )
         auteur = User.objects.get(email="admin@etls.local")
         contenu = f"{titre} - document de demonstration".encode()
-        doc = Document.objects.create(title=titre, status=Document.Status.DRAFT, type=type_doc, counterparty="Client (demo)")
+        doc = Document.objects.create(title=titre, status=Document.Status.DRAFT, type=type_doc, counterparty="Client")
         version = Version.objects.create(
             document=doc, number=1, file=ContentFile(contenu, name="contrat-demo.pdf"),
             sha256=hashlib.sha256(contenu).hexdigest(), size=len(contenu), original_filename="contrat-demo.pdf", created_by=auteur,
@@ -128,7 +128,7 @@ class Command(ParcoursA):
         # Avenant n1 : extension de périmètre, signé avec son propre document (rallonge la date de fin du contrat).
         if not contrat.avenants.exists():
             av = self.call("admin@etls.local", "post", "/api/commercial/avenants/", {
-                "contract": str(contrat.pk), "objet": "Extension de perimetre : lignes annexes (demo)",
+                "contract": str(contrat.pk), "objet": "Extension de périmètre : lignes annexes",
                 "delta_montant": "15000000", "nouvelle_date_fin": str(self.today + timedelta(days=30 * 15)),
             })
             doc = self._document_signe(f"Avenant 1 {contrat.code} (demo)")
@@ -140,13 +140,13 @@ class Command(ParcoursA):
             if not LienDocument.objects.filter(objet_type="commercial.contract", objet_id=str(objet.pk)).exists():
                 self.call("admin@etls.local", "post", "/api/juridique/liens/", {
                     "document": str(objet.document_id), "objet_type": "commercial.contract", "objet_id": str(objet.pk),
-                    "note": "Contrat signe (demo)",
+                    "note": "Contrat signé",
                 })
         # Dossier GLOBAL RENTAL (618) lié au contrat GR et à l'affaire GR, puis ouvert.
         if not DossierGlobalRental.objects.filter(affaire=gr_affaire).exists():
             dossier = self.call("admin@etls.local", "post", "/api/juridique/dossiers-gr/", {
                 "partenaire_gr": str(Partner.objects.get(code="GR-2000").pk), "affaire": str(gr_affaire.pk),
-                "reference_contrat": contrat_gr.code, "objet": "Location d'equipement intra-groupe (demo)",
+                "reference_contrat": contrat_gr.code, "objet": "Location d'équipement intra-groupe",
                 "montant_estime": "60000000", "signe_618": True, "date_debut": str(self.today - timedelta(days=12)),
                 "date_fin": str(self.today + timedelta(days=170)),
             })

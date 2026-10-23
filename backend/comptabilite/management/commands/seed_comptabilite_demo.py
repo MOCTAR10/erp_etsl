@@ -130,7 +130,7 @@ class Command(BaseCommand):
         controle, created = ControleInterne.objects.get_or_create(
             code="CON00001",
             defaults=dict(
-                libelle="Verification rapprochements bancaires du mois",
+                libelle="Vérification des rapprochements bancaires du mois",
                 reference_procedure="proc. 4.7", statut="planifie",
                 date_prevue=date.today(),
             ),

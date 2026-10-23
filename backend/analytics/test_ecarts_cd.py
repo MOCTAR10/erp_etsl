@@ -155,6 +155,24 @@ class DirectionTests(_Base):
         _param("TRESO_DELAI_DECAISSEMENT", "0")
         self.assertEqual(Decimal(pilotage.cashflow_13_semaines(today)["semaines"][0]["decaissements"]), Decimal("400000"))
 
+    def test_cashflow_inclut_les_factures_fournisseurs_rapprochees(self):
+        """Régression : l'annotation ne doit pas heurter la propriété `PurchaseInvoice.total` (500 sur /pilotage/)."""
+        from achats.models import GoodsReceipt, GoodsReceiptLine, PurchaseInvoice, PurchaseInvoiceLine, PurchaseOrder, PurchaseOrderLine
+        from achats.tests import make_references
+
+        _, unit, _ = make_references()
+        today = date(2026, 10, 21)
+        _param("TRESO_DELAI_DECAISSEMENT", "0")
+        order = PurchaseOrder.objects.create(order_date=today)
+        line = PurchaseOrderLine.objects.create(purchase_order=order, label="A", quantity=10, unit_price=50, unit=unit)
+        GoodsReceiptLine.objects.create(receipt=GoodsReceipt.objects.create(purchase_order=order), purchase_order_line=line, quantity=10)
+        inv = PurchaseInvoice.objects.create(purchase_order=order, invoice_date=today, status=PurchaseInvoice.Status.RAPPROCHEE)
+        PurchaseInvoiceLine.objects.create(invoice=inv, purchase_order_line=line, quantity=8, unit_price=50)
+        cf = pilotage.cashflow_13_semaines(today)
+        self.assertEqual(Decimal(cf["semaines"][0]["decaissements"]), Decimal("400"))
+        self.client.force_authenticate(self.finance)
+        self.assertEqual(self.client.get(BASE + "pilotage/").status_code, 200)
+
     def test_pipe_vers_budget(self):
         Budget.objects.create(label="CA 2026", type_budget="produit", fiscal_year=self._fy, montant=Decimal("10000000"), statut="approuve")
         self._post_produit("2000000.00", analytic=self.analytic_aff, ref="P1")

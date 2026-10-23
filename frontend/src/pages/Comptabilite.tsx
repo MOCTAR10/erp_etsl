@@ -1,10 +1,13 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { BadgePercent, ClipboardList, CreditCard, Inbox, Landmark } from "lucide-react";
+import { BadgePercent, ClipboardList, CreditCard, Landmark } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, FilterBar, Kpi, PageHeader, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, PageHeader, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { CardActions } from "../components/ui/Board";
+import { actionsColumn } from "../components/ui/DataTable";
+import type { ActionDef, Column } from "../components/ui";
 import { ClotureSection } from "../components/workflow/ClotureSection";
 import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
@@ -12,7 +15,7 @@ import { LettrageSection } from "../components/workflow/LettrageSection";
 import { EcartsM10Section } from "../components/comptabilite/EcartsM10Section";
 import { EcartsA2Section } from "../components/comptabilite/EcartsA2Section";
 import { ImportGrandLivreSection, RetenuesGarantieSection } from "../components/suivi/SuiviSections";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { useFiltresListe } from "../lib/useFiltresListe";
 import type {
@@ -37,97 +40,40 @@ const ENG_BADGE: Record<StatutEngagement, "ok" | "warn" | "err" | "brand"> = {
 const ENG_ORDER: StatutEngagement[] = ["brouillon", "soumis", "approuve", "annule"];
 const ENG_VALID = new Set<StatutEngagement>(ENG_ORDER);
 
-function BankCard({ b }: { b: CompteBancaire }) {
-  const { t } = useTranslation();
-  return (
-    <div className="card kpi" key={b.id}>
-      <span className="kpi-label">
-        {b.code} · {t("comptabilite.banque")} {b.banque} · {t("comptabilite.compte")} {b.compte_comptable_code}
-      </span>
-      <span className="kpi-value">{b.label}</span>
-      <span className="meta muted">
-        {b.numero ? `${t("comptabilite.reference")} ${b.numero} · ` : ""}
-        {t("comptabilite.soldeInitial")} {formatNumber(b.solde_initial)} F
-      </span>
-    </div>
-  );
+function engagementActions(e: Engagement, t: (k: string) => string): ActionDef[] {
+  const base = `/api/comptabilite/engagements/${e.id}`;
+  return [
+    ...(e.statut === "brouillon" ? [{ label: t("comptabilite.act.soumettre"), path: `${base}/soumettre/`, tone: "ghost" as const }] : []),
+    ...(e.statut === "soumis" ? [{ label: t("comptabilite.act.approuver"), path: `${base}/approuver/` }] : []),
+    ...(e.statut === "brouillon" || e.statut === "soumis"
+      ? [{ label: t("comptabilite.act.annuler"), path: `${base}/annuler/`, tone: "danger" as const, confirm: t("comptabilite.act.confirmAnnuler") }]
+      : []),
+  ];
 }
 
 function EngagementCard({ e, index }: { e: Engagement; index: number }) {
   const { t } = useTranslation();
+  const paye = Number(e.total_paye);
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        {e.code} <span className="muted">· {e.compte_depense_code ?? "—"}</span>
+      <div className="card-top">
+        <span className="card-code">
+          {e.code}
+          {e.compte_depense_code ? ` · ${e.compte_depense_code}` : ""}
+        </span>
       </div>
-      <div className="meta">{e.objet}</div>
-      <div className="meta">
-        {formatNumber(e.montant)} F · {t("comptabilite.totalDepenses")} {formatNumber(e.total_paye)} F
-        {e.fournisseur_name ? ` · ${e.fournisseur_name}` : ""}
+      <div className="title">{e.objet}</div>
+      {e.fournisseur_name ? <div className="meta">{e.fournisseur_name}</div> : null}
+      <div className="card-foot">
+        <span>{paye > 0 ? t("listes.compta.paye", { montant: formatMoney(paye) }) : null}</span>
+        <span className="amount">{formatMoney(e.montant)}</span>
       </div>
-      <ActionBar
-        actions={[
-          ...(e.statut === "brouillon"
-            ? [{ label: t("comptabilite.act.soumettre"), path: `/api/comptabilite/engagements/${e.id}/soumettre/`, tone: "ghost" as const }]
-            : []),
-          ...(e.statut === "soumis"
-            ? [{ label: t("comptabilite.act.approuver"), path: `/api/comptabilite/engagements/${e.id}/approuver/` }]
-            : []),
-          ...(e.statut === "brouillon" || e.statut === "soumis"
-            ? [{ label: t("comptabilite.act.annuler"), path: `/api/comptabilite/engagements/${e.id}/annuler/`, tone: "danger" as const, confirm: t("comptabilite.act.confirmAnnuler") }]
-            : []),
-        ]}
-      />
+      <CardActions actions={engagementActions(e, t)} />
     </BoardCard>
   );
 }
 
-function TvaCard({ d }: { d: DeclarationTva }) {
-  const { t } = useTranslation();
-  const badge = d.statut === "deposee" ? "ok" : "warn";
-  return (
-    <div className="card kpi" key={d.id}>
-      <span className="kpi-label">
-        {d.code} · {formatDate(d.mois)} · {d.taux_tva_code}{" "}
-        <span className={`badge ${badge}`}>{t(`comptabilite.tva_statut.${d.statut}`)}</span>
-      </span>
-      <span className="meta muted">
-        {d.has_amount_access ? (
-          <>
-            {formatNumber(d.base_imposable)} {t("comptabilite.baseImposable")} ·{" "}
-            {formatNumber(d.tva_collectee)} {t("comptabilite.tvaCollectee")} ·{" "}
-            {formatNumber(d.tva_deductible)} {t("comptabilite.tvaDeductible")}
-          </>
-        ) : (
-          "••••••"
-        )}
-      </span>
-      {d.has_amount_access ? (
-        <span className="meta muted">{t("comptabilite.tvaNet")} {formatNumber(d.net_a_payer)} F</span>
-      ) : (
-        <span className="meta muted">••••••</span>
-      )}
-    </div>
-  );
-}
-
-function ControleCard({ c }: { c: ControleInterne }) {
-  const { t } = useTranslation();
-  const badge = c.statut === "cloture" ? "ok" : c.statut === "realise" ? "brand" : "warn";
-  return (
-    <div className="card kpi" key={c.id}>
-      <span className="kpi-label">
-        {c.code} · {t("comptabilite.procedure")} {c.reference_procedure || "—"}{" "}
-        <span className={`badge ${badge}`}>{t(`comptabilite.controle_statut.${c.statut}`)}</span>
-      </span>
-      <span className="kpi-value">{c.libelle}</span>
-      <span className="meta muted">
-        {c.responsable_name ? ` · ${c.responsable_name}` : ""}
-        {c.date_prevue ? ` · ${formatDate(c.date_prevue)}` : ""}
-      </span>
-    </div>
-  );
-}
+const masque = "••••••";
 
 export function ComptabilitePage() {
   const { t, i18n } = useTranslation();
@@ -200,189 +146,203 @@ export function ComptabilitePage() {
   );
   const enCours = groups["brouillon"].length + groups["soumis"].length;
 
+  const bankColumns: Column<CompteBancaire>[] = [
+    { key: "banque", header: t("listes.compta.banque"), sortValue: (b) => b.banque, render: (b) => b.banque },
+    { key: "libelle", header: t("listes.compta.libelle"), render: (b) => <>{b.label}<span className="cell-sub">{b.code}</span></> },
+    { key: "numero", header: t("listes.compta.numero"), render: (b) => (b.numero ? <span className="cell-mono">{b.numero}</span> : "—") },
+    { key: "compte", header: t("listes.compta.compte"), render: (b) => b.compte_comptable_code },
+    { key: "solde", header: t("listes.compta.solde"), num: true, sortValue: (b) => Number(b.solde_initial), render: (b) => formatMoney(b.solde_initial) },
+  ];
+  const releveColumns: Column<ReleveBancaire>[] = [
+    { key: "code", header: t("comptabilite.col.code"), render: (r) => r.code },
+    { key: "bank", header: t("comptabilite.col.bank"), render: (r) => r.compte_bancaire_label },
+    { key: "period", header: t("comptabilite.col.period"), render: (r) => `${formatDate(r.date_debut, i18n.language)} → ${formatDate(r.date_fin, i18n.language)}` },
+    { key: "debit", header: t("comptabilite.col.debit"), num: true, render: (r) => formatMoney(r.total_debit) },
+    { key: "credit", header: t("comptabilite.col.credit"), num: true, render: (r) => formatMoney(r.total_credit) },
+    { key: "statut", header: t("comptabilite.col.status"), render: (r) => <Badge tone={r.statut === "valide" ? "ok" : "warn"}>{t(`comptabilite.releve_statut.${r.statut}`)}</Badge> },
+  ];
+  const paiementColumns: Column<Paiement>[] = [
+    { key: "code", header: t("comptabilite.col.code"), sortValue: (p) => p.code, render: (p) => p.code },
+    { key: "date", header: t("comptabilite.col.date"), sortValue: (p) => p.date, render: (p) => formatDate(p.date, i18n.language) },
+    { key: "sens", header: t("comptabilite.col.direction"), render: (p) => t(`comptabilite.sens_${p.sens}`) },
+    { key: "mode", header: t("comptabilite.col.mode"), render: (p) => t(`comptabilite.mode_${p.mode}`) },
+    {
+      key: "tiers",
+      header: t("comptabilite.col.party"),
+      render: (p) => (
+        <>
+          {p.tiers_name ?? "—"}
+          {p.imputation_618 ? <Badge tone="neutral">618</Badge> : null}
+        </>
+      ),
+    },
+    {
+      key: "montant",
+      header: t("comptabilite.col.amount"),
+      num: true,
+      sortValue: (p) => (p.has_amount_access && p.montant !== null ? Number(p.montant) : null),
+      render: (p) => (p.has_amount_access && p.montant !== null ? formatMoney(p.montant) : masque),
+    },
+    { key: "ecriture", header: t("comptabilite.col.entry"), render: (p) => p.move_number ?? "—" },
+    {
+      key: "statut",
+      header: t("comptabilite.col.status"),
+      render: (p) => (
+        <Badge tone={p.statut === "valide" ? "ok" : p.statut === "annule" ? "err" : "warn"}>{t(`comptabilite.paiement_statut.${p.statut}`)}</Badge>
+      ),
+    },
+    actionsColumn<Paiement>(t("listes.col.actions"), (p) =>
+      p.statut === "brouillon"
+        ? [
+            { label: t("actions.comptabiliser"), path: `/api/comptabilite/paiements/${p.id}/comptabiliser/`, confirm: t("comptabilite.act.confirmComptabiliser") },
+            { label: t("comptabilite.act.annuler"), path: `/api/comptabilite/paiements/${p.id}/annuler/`, tone: "danger" },
+          ]
+        : [],
+    ),
+  ];
+  const tvaColumns: Column<DeclarationTva>[] = [
+    { key: "code", header: t("comptabilite.col.code"), render: (d) => d.code },
+    { key: "mois", header: t("listes.compta.mois"), sortValue: (d) => d.mois, render: (d) => formatDate(d.mois) },
+    { key: "taux", header: t("listes.compta.taux"), render: (d) => d.taux_tva_code },
+    { key: "base", header: t("listes.compta.base"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.base_imposable) : masque) },
+    { key: "collectee", header: t("listes.compta.collectee"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.tva_collectee) : masque) },
+    { key: "deductible", header: t("listes.compta.deductible"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.tva_deductible) : masque) },
+    { key: "net", header: t("listes.compta.net"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.net_a_payer) : masque) },
+    { key: "statut", header: t("listes.compta.statut"), render: (d) => <Badge tone={d.statut === "deposee" ? "ok" : "warn"}>{t(`comptabilite.tva_statut.${d.statut}`)}</Badge> },
+  ];
+  const controleColumns: Column<ControleInterne>[] = [
+    { key: "code", header: t("comptabilite.col.code"), render: (c) => c.code },
+    { key: "libelle", header: t("listes.compta.controle"), render: (c) => c.libelle },
+    { key: "ref", header: t("listes.compta.reference"), render: (c) => c.reference_procedure || "—" },
+    { key: "resp", header: t("listes.compta.responsable"), render: (c) => c.responsable_name ?? "—" },
+    { key: "date", header: t("listes.compta.datePrevue"), sortValue: (c) => c.date_prevue, render: (c) => formatDate(c.date_prevue) },
+    {
+      key: "statut",
+      header: t("listes.compta.statut"),
+      render: (c) => (
+        <Badge tone={c.statut === "cloture" ? "ok" : c.statut === "realise" ? "brand" : "warn"}>{t(`comptabilite.controle_statut.${c.statut}`)}</Badge>
+      ),
+    },
+  ];
+
   return (
-    <>
-      <PageHeader title={t("comptabilite.title")} />
-      <QuickForm
-        title={t("comptabilite.form.title")}
-        endpoint="/api/comptabilite/paiements/"
-        fields={[
-          {
-            name: "sens",
-            label: t("comptabilite.col.direction"),
-            type: "select",
-            required: true,
-            defaultValue: "sortie",
-            options: ["sortie", "entree"].map((v) => ({ value: v, label: t(`comptabilite.sens_${v}`) })),
-          },
-          {
-            name: "mode",
-            label: t("comptabilite.col.mode"),
-            type: "select",
-            required: true,
-            defaultValue: "virement",
-            options: ["virement", "cheque", "especes", "cfonb", "autre"].map((v) => ({ value: v, label: t(`comptabilite.mode_${v}`) })),
-          },
-          { name: "montant", label: t("comptabilite.col.amount"), type: "number", required: true, min: 0, step: "0.01" },
-          { name: "date", label: t("comptabilite.col.date"), type: "date", required: true, defaultValue: new Date().toLocaleDateString("sv-SE") },
-          {
-            name: "compte_bancaire",
-            label: t("comptabilite.col.bank"),
-            type: "select",
-            options: banquesAll.map((b) => ({ value: b.id, label: `${b.code} · ${b.label}` })),
-          },
-          {
-            name: "engagement",
-            label: t("comptabilite.form.engagement"),
-            type: "select",
-            options: (engagementsTous.data ?? []).filter((e) => e.statut === "approuve").map((e) => ({ value: e.id, label: `${e.code} · ${e.objet}` })),
-          },
-          { name: "reference", label: t("comptabilite.form.reference") },
-          {
-            name: "analytic_account",
-            label: t("ecarts_m10.paiement.analytique"),
-            type: "select",
-            options: (analytiques.data ?? []).map((a) => ({ value: String(a.id), label: `${a.code} · ${a.label}` })),
-          },
-          { name: "retenue_source", label: t("ecarts_m10.paiement.retenue"), type: "select", options: [{ value: "true", label: t("ecarts_m10.paiement.oui") }] },
-        ]}
+    <div className="listes-page">
+      <PageHeader
+        title={t("comptabilite.title")}
+        subtitle={t("listes.sub.comptabilite")}
+        actions={
+          <QuickForm
+            title={t("comptabilite.form.title")}
+            endpoint="/api/comptabilite/paiements/"
+            fields={[
+              {
+                name: "sens",
+                label: t("comptabilite.col.direction"),
+                type: "select",
+                required: true,
+                defaultValue: "sortie",
+                options: ["sortie", "entree"].map((v) => ({ value: v, label: t(`comptabilite.sens_${v}`) })),
+              },
+              {
+                name: "mode",
+                label: t("comptabilite.col.mode"),
+                type: "select",
+                required: true,
+                defaultValue: "virement",
+                options: ["virement", "cheque", "especes", "cfonb", "autre"].map((v) => ({ value: v, label: t(`comptabilite.mode_${v}`) })),
+              },
+              { name: "montant", label: t("comptabilite.col.amount"), type: "number", required: true, min: 0, step: "0.01" },
+              { name: "date", label: t("comptabilite.col.date"), type: "date", required: true, defaultValue: new Date().toLocaleDateString("sv-SE") },
+              {
+                name: "compte_bancaire",
+                label: t("comptabilite.col.bank"),
+                type: "select",
+                options: banquesAll.map((b) => ({ value: b.id, label: `${b.code} · ${b.label}` })),
+              },
+              {
+                name: "engagement",
+                label: t("comptabilite.form.engagement"),
+                type: "select",
+                options: (engagementsTous.data ?? []).filter((e) => e.statut === "approuve").map((e) => ({ value: e.id, label: `${e.code} · ${e.objet}` })),
+              },
+              { name: "reference", label: t("comptabilite.form.reference") },
+              {
+                name: "analytic_account",
+                label: t("ecarts_m10.paiement.analytique"),
+                type: "select",
+                options: (analytiques.data ?? []).map((a) => ({ value: String(a.id), label: `${a.code} · ${a.label}` })),
+              },
+              { name: "retenue_source", label: t("ecarts_m10.paiement.retenue"), type: "select", options: [{ value: "true", label: t("ecarts_m10.paiement.oui") }] },
+            ]}
+          />
+        }
       />
 
       <div className="kpi-grid">
         <Kpi label={t("comptabilite.banques")} value={banquesAll.length} hint={`512 · ${t("comptabilite.compte")}`} icon={Landmark} tone="brand" delay={0} />
         <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("comptabilite.engagementsEnCours")} icon={ClipboardList} tone="warn" delay={0.05} />
         <Kpi label={t("comptabilite.paiements")} value={valides.length} hint={t("comptabilite.paiementsValides")} icon={CreditCard} tone="brand" delay={0.1} />
-        <Kpi label={t("comptabilite.tva")} value={`${formatNumber(tvaDue)} F`} hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
+        <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
       </div>
 
-      <SearchField value={engSearch} onChange={setEngSearch} placeholder={t("comptabilite.searchEngagements")} />
-
-      <div style={{ overflowX: "auto" }}>
-        <Board>
+      <section className="listes-block">
+        <div className="list-toolbar">
+          <SearchField value={engSearch} onChange={setEngSearch} placeholder={t("comptabilite.searchEngagements")} />
+        </div>
+        <Board label={t("listes.boardLabel.comptabilite")}>
           {ENG_ORDER.map((st, ci) => (
             <BoardColumn
               key={st}
               title={t(`comptabilite.engagement_statut.${st}`)}
               count={groups[st].length}
               tone={ENG_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={260}
+              delay={ci * 0.04}
               limit={20}
+              summary={groups[st].length ? formatMoney(groups[st].reduce((n, e) => n + Number(e.montant), 0)) : undefined}
             >
-              {groups[st].length === 0 ? (
-                <EmptyState icon={Inbox} label={t("common.empty")} />
-              ) : (
-                groups[st].map((e, i) => <EngagementCard key={e.id} e={e} index={i} />)
-              )}
+              {groups[st].map((e, i) => (
+                <EngagementCard key={e.id} e={e} index={i} />
+              ))}
             </BoardColumn>
           ))}
         </Board>
-      </div>
-
-      <p className="muted" style={{ marginTop: "0.5rem" }}>
-        {t("comptabilite.pendingNote")}
-      </p>
+        <p className="listes-note">{t("comptabilite.pendingNote")}</p>
+      </section>
 
       {banquesAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("comptabilite.banques")} · {banquesAll.length}
-          </h3>
-          <div className="card-list">
-            {banquesAll.map((b) => <BankCard key={b.id} b={b} />)}
-          </div>
-        </>
+        <SectionCard title={`${t("listes.compta.banques")} · ${banquesAll.length}`}>
+          <DataTable rows={banquesAll} columns={bankColumns} caption={t("listes.compta.banques")} />
+        </SectionCard>
       ) : null}
 
       {(releves.count > 0 || releves.search) && (
         <SectionCard title={`${t("comptabilite.releves")} · ${releves.count}`}>
-          <SearchField value={releves.search} onChange={releves.setSearch} placeholder={t("comptabilite.searchReleves")} />
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("comptabilite.col.code")}</th>
-                  <th>{t("comptabilite.col.bank")}</th>
-                  <th>{t("comptabilite.col.period")}</th>
-                  <th className="num">{t("comptabilite.col.debit")}</th>
-                  <th className="num">{t("comptabilite.col.credit")}</th>
-                  <th>{t("comptabilite.col.status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {relevesAll.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.code}</td>
-                    <td>{r.compte_bancaire_label}</td>
-                    <td>
-                      {formatDate(r.date_debut, i18n.language)} → {formatDate(r.date_fin, i18n.language)}
-                    </td>
-                    <td className="num">{formatNumber(r.total_debit)}</td>
-                    <td className="num">{formatNumber(r.total_credit)}</td>
-                    <td>
-                      <Badge tone={r.statut === "valide" ? "ok" : "warn"}>{t(`comptabilite.releve_statut.${r.statut}`)}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="list-toolbar">
+            <SearchField value={releves.search} onChange={releves.setSearch} placeholder={t("comptabilite.searchReleves")} />
           </div>
-          <Pagination page={releves.page} pageSize={releves.pageSize} count={releves.count} onPageChange={releves.setPage} onPageSizeChange={releves.setPageSize} />
+          <DataGrid
+            rows={relevesAll}
+            columns={releveColumns}
+            caption={t("comptabilite.releves")}
+            loading={releves.query.isFetching}
+            pagination={{ page: releves.page, pageSize: releves.pageSize, count: releves.count, onPageChange: releves.setPage, onPageSizeChange: releves.setPageSize }}
+          />
         </SectionCard>
       )}
 
       {(paiements.count > 0 || paiements.search || filtresPai.extra) && (
         <SectionCard title={`${t("comptabilite.paiements")} · ${paiements.count}`}>
-          <SearchField value={paiements.search} onChange={paiements.setSearch} placeholder={t("comptabilite.searchPaiements")} />
-          <FilterBar defs={filtresPai.defs} value={filtresPai.criteres} onChange={filtresPai.setCriteres} idPrefix="pai-f" />
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("comptabilite.col.code")}</th>
-                  <th>{t("comptabilite.col.date")}</th>
-                  <th>{t("comptabilite.col.direction")}</th>
-                  <th>{t("comptabilite.col.mode")}</th>
-                  <th>{t("comptabilite.col.party")}</th>
-                  <th className="num">{t("comptabilite.col.amount")}</th>
-                  <th>{t("comptabilite.col.entry")}</th>
-                  <th>{t("comptabilite.col.status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pay.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.code}</td>
-                    <td>{formatDate(p.date, i18n.language)}</td>
-                    <td>{t(`comptabilite.sens_${p.sens}`)}</td>
-                    <td>{t(`comptabilite.mode_${p.mode}`)}</td>
-                    <td>
-                      {p.tiers_name ?? "—"}
-                      {p.imputation_618 ? " · 618" : ""}
-                    </td>
-                    <td className="num">
-                      {p.has_amount_access && p.montant !== null ? `${formatNumber(p.montant)} F` : "••••••"}
-                    </td>
-                    <td>{p.move_number ?? "—"}</td>
-                    <td>
-                      <Badge tone={p.statut === "valide" ? "ok" : p.statut === "annule" ? "err" : "warn"}>
-                        {t(`comptabilite.paiement_statut.${p.statut}`)}
-                      </Badge>
-                      {p.statut === "brouillon" && (
-                        <ActionBar
-                          actions={[
-                            { label: t("actions.comptabiliser"), path: `/api/comptabilite/paiements/${p.id}/comptabiliser/`, confirm: t("comptabilite.act.confirmComptabiliser") },
-                            { label: t("comptabilite.act.annuler"), path: `/api/comptabilite/paiements/${p.id}/annuler/`, tone: "danger" },
-                          ]}
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="list-toolbar">
+            <SearchField value={paiements.search} onChange={paiements.setSearch} placeholder={t("comptabilite.searchPaiements")} />
           </div>
-          <Pagination page={paiements.page} pageSize={paiements.pageSize} count={paiements.count} onPageChange={paiements.setPage} onPageSizeChange={paiements.setPageSize} />
+          <FilterBar defs={filtresPai.defs} value={filtresPai.criteres} onChange={filtresPai.setCriteres} idPrefix="pai-f" />
+          <DataGrid
+            rows={pay}
+            columns={paiementColumns}
+            caption={t("comptabilite.paiements")}
+            loading={paiements.query.isFetching}
+            pagination={{ page: paiements.page, pageSize: paiements.pageSize, count: paiements.count, onPageChange: paiements.setPage, onPageSizeChange: paiements.setPageSize }}
+          />
         </SectionCard>
       )}
 
@@ -400,26 +360,16 @@ export function ComptabilitePage() {
       <ImportGrandLivreSection />
 
       {tvaAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("comptabilite.tva")} · {tvaAll.length}
-          </h3>
-          <div className="card-list">
-            {tvaAll.map((d) => <TvaCard key={d.id} d={d} />)}
-          </div>
-        </>
+        <SectionCard title={`${t("listes.compta.tva")} · ${tvaAll.length}`}>
+          <DataTable rows={tvaAll} columns={tvaColumns} caption={t("listes.compta.tva")} />
+        </SectionCard>
       ) : null}
 
       {controlesAll.length > 0 ? (
-        <>
-          <h3 className="section-heading">
-            {t("comptabilite.controles")} · {controlesAll.length}
-          </h3>
-          <div className="card-list">
-            {controlesAll.map((c) => <ControleCard key={c.id} c={c} />)}
-          </div>
-        </>
+        <SectionCard title={`${t("listes.compta.controles")} · ${controlesAll.length}`}>
+          <DataTable rows={controlesAll} columns={controleColumns} caption={t("listes.compta.controles")} />
+        </SectionCard>
       ) : null}
-    </>
+    </div>
   );
 }

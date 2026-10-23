@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Download, Minus } from "lucide-react";
+import { Check, Download, KeyRound, Minus, ShieldOff, Trash2, UserCheck, UserCog, UserX } from "lucide-react";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { SiteCompte, SitesSection } from "../components/sites/SitesSection";
-import { ActionBar, Badge, PageHeader, PagedDataTable, QuickForm, SectionCard } from "../components/ui";
-import type { Column } from "../components/ui";
+import { Badge, Menu, Modal, PageHeader, PagedDataGrid, QuickForm, SectionCard, SheetClose, notify } from "../components/ui";
+import type { BadgeTone, GridColumn, MenuEntry } from "../components/ui";
 import { formatDateTime } from "../lib/format";
-import { APP_NAV_KEY, type ErpApp } from "../lib/modules";
+import { APP_NAV_KEY, sansCode, type ErpApp } from "../lib/modules";
 import { describeError } from "../lib/offlineQueue";
+import { initiales, roleLabel } from "../lib/roles";
 import { usePagedList } from "../lib/usePagedList";
 import type { Paginated } from "../types";
 
@@ -66,62 +68,57 @@ const REFERENTIELS = [
   { key: "accounts", path: "/api/referentiels/accounts/" },
 ] as const;
 
+const AUDIT_TONE: Record<string, BadgeTone> = { create: "ok", delete: "err", update: "info", acl_grant: "brand", acl_revoke: "warn" };
+
 const court = (v: unknown) => {
   const s = typeof v === "string" ? v : JSON.stringify(v);
   return s && s.length > 60 ? `${s.slice(0, 60)}…` : (s ?? "—");
 };
 
-/** Rôle modifiable sur place (PATCH du compte) ; refus serveur affiché. */
-function RoleCompte({ c, roles }: { c: Compte; roles: Matrice["roles"] }) {
+const nomCompte = (c: Compte) => [c.first_name, c.last_name].filter(Boolean).join(" ") || c.email;
+
+/** Action de compte en cours (fenêtre de confirmation / saisie). */
+type Dialogue = { type: "role" | "mdp" | "mfa"; compte: Compte } | null;
+
+/** Mutation d'administration : retour par notification, rafraîchissement des listes. */
+function useActionAdmin() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [erreur, setErreur] = useState<string | null>(null);
-  const patch = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.patch<Compte>(`/api/users/users/${c.id}/`, body),
-    onSuccess: () => {
-      setErreur(null);
+  return useMutation({
+    mutationFn: ({ path, body, patch }: { path: string; body?: Record<string, unknown>; patch?: boolean; ok: string }) =>
+      patch ? api.patch<unknown>(path, body ?? {}) : api.post<unknown>(path, body),
+    onSuccess: (_r, v) => {
+      notify.success(v.ok);
       void qc.invalidateQueries();
     },
-    onError: (e) => setErreur(describeError(e)),
+    onError: (e) => notify.error(t("shell.admin.erreur"), { description: describeError(e) }),
   });
-  return (
-    <>
-      <label className="sr-only" htmlFor={`role-${c.id}`}>
-        {c.email}
-      </label>
-      <select id={`role-${c.id}`} value={c.role} disabled={patch.isPending} onChange={(e) => patch.mutate({ role: e.target.value })}>
-        {roles.map((r) => (
-          <option key={r.role} value={r.role}>
-            {r.label}
-          </option>
-        ))}
-      </select>
-      <button type="button" className="btn ghost" disabled={patch.isPending} onClick={() => patch.mutate({ is_active: !c.is_active })}>
-        {c.is_active ? t("ecarts_tr.admin.desactiver") : t("ecarts_tr.admin.reactiver")}
-      </button>
-      {erreur && (
-        <p className="action-error" role="alert">
-          {erreur}
-        </p>
-      )}
-    </>
-  );
+}
+
+async function telecharger(path: string, fichier: string, ok: string, ko: string) {
+  try {
+    await api.download(path, fichier);
+    notify.success(ok);
+  } catch (e) {
+    notify.error(ko, { description: describeError(e) });
+  }
 }
 
 function Referentiel({ path, cle }: { path: string; cle: string }) {
   const { t } = useTranslation();
   const list = usePagedList<RefRow>(`ref-${cle}`, (q) => api.get<Paginated<RefRow>>(`${path}${q}`), { pageSize: 20 });
-  const columns: Column<RefRow>[] = [
-    { key: "code", header: t("ecarts_tr.admin.code"), render: (r) => r.code },
-    { key: "label", header: t("ecarts_tr.admin.libelle"), render: (r) => r.name ?? r.label ?? "—" },
-    { key: "info", header: "", render: (r) => r.kind_label ?? r.article_type_label ?? r.unit_code ?? "" },
+  const columns: GridColumn<RefRow>[] = [
+    { key: "code", header: t("ecarts_tr.admin.code"), width: 160, sortValue: (r) => r.code, render: (r) => <span className="num">{r.code}</span> },
+    { key: "label", header: t("ecarts_tr.admin.libelle"), sortValue: (r) => r.name ?? r.label, render: (r) => r.name ?? r.label ?? "—" },
+    { key: "info", header: "", render: (r) => <span className="muted">{r.kind_label ?? r.article_type_label ?? r.unit_code ?? ""}</span> },
     {
       key: "actif",
-      header: t("ecarts_tr.admin.actif"),
+      header: t("ecarts_tr.admin.etat"),
+      width: 110,
       render: (r) => (r.is_active === false ? <Badge tone="neutral">{t("ecarts_tr.admin.inactif")}</Badge> : <Badge tone="ok">{t("ecarts_tr.admin.actif")}</Badge>),
     },
   ];
-  return <PagedDataTable list={list} columns={columns} caption={t(`ecarts_tr.admin.ref.${cle}`)} searchPlaceholder={t("common.searchPlaceholder")} />;
+  return <PagedDataGrid list={list} columns={columns} caption={t(`ecarts_tr.admin.ref.${cle}`)} searchPlaceholder={t("common.searchPlaceholder")} density="compact" />;
 }
 
 /** Administration (EX-G-01) : comptes et rôles, matrice rôle → modules, référentiels centraux, piste d'audit. */
@@ -130,6 +127,12 @@ export function AdministrationPage() {
   const [role, setRole] = useState("");
   const [onglet, setOnglet] = useState<(typeof REFERENTIELS)[number]["key"]>("partners");
   const [module, setModule] = useState("");
+  const [dialogue, setDialogue] = useState<Dialogue>(null);
+  const [nouveauRole, setNouveauRole] = useState("");
+  const [motDePasse, setMotDePasse] = useState("");
+  const [purge, setPurge] = useState(false);
+  const action = useActionAdmin();
+
   const matrice = useQuery({ queryKey: ["matrice-roles"], queryFn: () => api.get<Matrice>("/api/users/users/matrice/"), retry: 0 }).data;
   const roles = matrice?.roles ?? [];
   const comptes = usePagedList<Compte>("admin-comptes", (q) => api.get<Paginated<Compte>>(`/api/users/users/${q}`), {
@@ -141,109 +144,206 @@ export function AdministrationPage() {
     extra: module ? `module=${module}` : "",
   });
   const retention = useQuery({ queryKey: ["audit-retention"], queryFn: () => api.get<Retention>("/api/documents/audit/retention/"), retry: 0 }).data;
-  const roleOpts = roles.map((r) => ({ value: r.role, label: r.label }));
+  const libelleRole = (code: string) => roleLabel(t, code);
+  const roleOpts = roles.map((r) => ({ value: r.role, label: libelleRole(r.role) }));
 
-  const colComptes: Column<Compte>[] = [
+  const ouvrir = (type: "role" | "mdp" | "mfa", compte: Compte) => {
+    setNouveauRole(compte.role);
+    setMotDePasse("");
+    setDialogue({ type, compte });
+  };
+  const fermer = () => setDialogue(null);
+  const valider = () => {
+    if (!dialogue) return;
+    const { compte } = dialogue;
+    const base = `/api/users/users/${compte.id}/`;
+    const fin = { onSuccess: fermer };
+    if (dialogue.type === "role") action.mutate({ path: base, patch: true, body: { role: nouveauRole }, ok: t("shell.admin.roleOk") }, fin);
+    if (dialogue.type === "mdp")
+      action.mutate({ path: `${base}reinitialiser-mot-de-passe/`, body: { mot_de_passe: motDePasse }, ok: t("shell.admin.reinitMdpOk") }, fin);
+    if (dialogue.type === "mfa") action.mutate({ path: `${base}reinitialiser-mfa/`, ok: t("shell.admin.reinitMfaOk") }, fin);
+  };
+
+  const actionsCompte = (c: Compte): MenuEntry[] => [
+    { label: t("shell.admin.changerRole"), icon: UserCog, onSelect: () => ouvrir("role", c) },
+    { label: t("shell.admin.reinitMdp"), icon: KeyRound, onSelect: () => ouvrir("mdp", c) },
+    c.mfa_active && { label: t("ecarts_tr.admin.reinitMfa"), icon: ShieldOff, onSelect: () => ouvrir("mfa", c) },
+    "separator",
+    c.is_active
+      ? {
+          label: t("ecarts_tr.admin.desactiver"),
+          icon: UserX,
+          danger: true,
+          onSelect: () => action.mutate({ path: `/api/users/users/${c.id}/`, patch: true, body: { is_active: false }, ok: t("shell.admin.desactiverOk") }),
+        }
+      : {
+          label: t("ecarts_tr.admin.reactiver"),
+          icon: UserCheck,
+          onSelect: () => action.mutate({ path: `/api/users/users/${c.id}/`, patch: true, body: { is_active: true }, ok: t("shell.admin.reactiverOk") }),
+        },
+  ];
+
+  const colComptes: GridColumn<Compte>[] = [
     {
       key: "compte",
       header: t("ecarts_tr.admin.compte"),
+      sortValue: (c) => nomCompte(c),
       render: (c) => (
-        <>
-          <strong>{[c.first_name, c.last_name].filter(Boolean).join(" ") || c.email}</strong>
-          <div className="muted" style={{ fontSize: 12 }}>
-            {c.email}
-          </div>
-        </>
+        <span className="compte-cell">
+          <span className="compte-avatar" aria-hidden="true">
+            {initiales(nomCompte(c))}
+          </span>
+          <span className="compte-text">
+            <span className="compte-nom">{nomCompte(c)}</span>
+            <span className="compte-mail">{c.email}</span>
+          </span>
+        </span>
       ),
     },
-    { key: "role", header: t("ecarts_tr.admin.role"), render: (c) => <RoleCompte c={c} roles={roles} /> },
+    { key: "role", header: t("ecarts_tr.admin.role"), sortValue: (c) => libelleRole(c.role), render: (c) => libelleRole(c.role) },
     { key: "site", header: t("ecarts_a5.siteCompte"), render: (c) => <SiteCompte id={c.id} email={c.email} site={c.site_etsl} /> },
     {
       key: "etat",
       header: t("ecarts_tr.admin.etat"),
+      sortValue: (c) => c.is_active,
       render: (c) => (
-        <>
-          <Badge tone={c.is_active ? "ok" : "neutral"}>{c.is_active ? t("ecarts_tr.admin.actif") : t("ecarts_tr.admin.inactif")}</Badge>{" "}
+        <span className="badge-row">
+          <Badge tone={c.is_active ? "ok" : "neutral"}>{c.is_active ? t("ecarts_tr.admin.actif") : t("ecarts_tr.admin.inactif")}</Badge>
           {c.mfa_active ? <Badge tone="brand">MFA</Badge> : null}
-        </>
+        </span>
       ),
     },
-    { key: "modules", header: t("ecarts_tr.admin.modules"), num: true, render: (c) => c.modules.length },
-    { key: "connexion", header: t("ecarts_tr.admin.derniereConnexion"), render: (c) => (c.last_login ? formatDateTime(c.last_login) : "—") },
+    { key: "modules", header: t("ecarts_tr.admin.modules"), num: true, width: 100, sortValue: (c) => c.modules.length, render: (c) => c.modules.length },
     {
-      key: "mfa",
-      header: "",
-      render: (c) => (
-        <ActionBar
-          actions={[
-            {
-              label: t("ecarts_tr.mdp.reinitAdmin"),
-              path: `/api/users/users/${c.id}/reinitialiser-mot-de-passe/`,
-              tone: "ghost" as const,
-              prompt: { name: "mot_de_passe", label: t("ecarts_tr.mdp.reinitAdminPrompt") },
-            },
-            ...(c.mfa_active
-              ? [{ label: t("ecarts_tr.admin.reinitMfa"), path: `/api/users/users/${c.id}/reinitialiser-mfa/`, tone: "ghost" as const, confirm: t("ecarts_tr.admin.confirmReinitMfa") }]
-              : []),
-          ]}
-        />
-      ),
+      key: "connexion",
+      header: t("ecarts_tr.admin.derniereConnexion"),
+      sortValue: (c) => c.last_login,
+      render: (c) => <span className="num">{c.last_login ? formatDateTime(c.last_login) : <span className="muted">{t("shell.admin.jamais")}</span>}</span>,
     },
   ];
-  const colAudit: Column<Audit>[] = [
-    { key: "quand", header: t("ecarts_tr.audit.quand"), render: (a) => formatDateTime(a.created_at) },
+  const colAudit: GridColumn<Audit>[] = [
+    { key: "quand", header: t("ecarts_tr.audit.quand"), width: 170, render: (a) => <span className="num">{formatDateTime(a.created_at)}</span> },
     { key: "qui", header: t("ecarts_tr.audit.qui"), render: (a) => a.user_email ?? "—" },
-    { key: "action", header: t("ecarts_tr.audit.action"), render: (a) => <Badge tone={a.action === "delete" ? "err" : a.action === "create" ? "ok" : "brand"}>{a.action}</Badge> },
-    { key: "objet", header: t("ecarts_tr.audit.objet"), render: (a) => `${a.object_type} · ${a.object_id.slice(0, 8)}` },
+    {
+      key: "action",
+      header: t("ecarts_tr.audit.action"),
+      render: (a) => <Badge tone={AUDIT_TONE[a.action] ?? "neutral"}>{t(`shell.admin.actionsAudit.${a.action}`, { defaultValue: a.action })}</Badge>,
+    },
+    {
+      key: "objet",
+      header: t("ecarts_tr.audit.objet"),
+      render: (a) => (
+        <span className="audit-objet">
+          {a.object_type} <span className="muted num">{a.object_id.slice(0, 8)}</span>
+        </span>
+      ),
+    },
     {
       key: "detail",
       header: t("ecarts_tr.audit.avantApres"),
       render: (a) =>
         a.detail.champs ? (
-          <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: 12 }}>
+          <ul className="audit-diff">
             {a.detail.champs.slice(0, 4).map((k) => (
               <li key={k}>
-                <strong>{k}</strong> : {court(a.detail.avant?.[k])} → {court(a.detail.apres?.[k])}
+                <span className="audit-champ">{k}</span> <span className="muted">{court(a.detail.avant?.[k])}</span> → {court(a.detail.apres?.[k])}
               </li>
             ))}
           </ul>
         ) : (
-          <span className="muted" style={{ fontSize: 12 }}>
-            {court(a.detail.apres ?? a.detail.avant ?? a.detail)}
-          </span>
+          <span className="muted audit-brut">{court(a.detail.apres ?? a.detail.avant ?? a.detail)}</span>
         ),
     },
   ];
 
+  const qsRole = role ? `&role=${role}` : "";
+  const qsModule = module ? `&module=${module}` : "";
+  const exportBtn = (label: string, items: MenuEntry[]) => (
+    <Menu
+      align="end"
+      items={items}
+      trigger={
+        <button type="button" className="btn ghost">
+          <Download size={15} aria-hidden="true" />
+          {label}
+        </button>
+      }
+    />
+  );
+
+  let dialogueContenu: { titre: string; texte: ReactNode; corps?: ReactNode; danger?: boolean; pret: boolean } | null = null;
+  if (dialogue) {
+    const nom = nomCompte(dialogue.compte);
+    if (dialogue.type === "role")
+      dialogueContenu = {
+        titre: t("shell.admin.changerRoleTitre", { nom }),
+        texte: t("shell.admin.changerRoleAide"),
+        pret: Boolean(nouveauRole) && nouveauRole !== dialogue.compte.role,
+        corps: (
+          <div className="field">
+            <label htmlFor="admin-nouveau-role">{t("ecarts_tr.admin.role")}</label>
+            <select id="admin-nouveau-role" value={nouveauRole} onChange={(e) => setNouveauRole(e.target.value)}>
+              {roleOpts.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ),
+      };
+    if (dialogue.type === "mdp")
+      dialogueContenu = {
+        titre: t("shell.admin.reinitMdpTitre", { nom }),
+        texte: t("shell.admin.reinitMdpAide"),
+        pret: motDePasse.length >= 8,
+        corps: (
+          <div className="field">
+            <label htmlFor="admin-mdp">{t("ecarts_tr.mdp.reinitAdminPrompt")}</label>
+            <input id="admin-mdp" type="password" autoComplete="new-password" value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} />
+          </div>
+        ),
+      };
+    if (dialogue.type === "mfa")
+      dialogueContenu = { titre: t("shell.admin.reinitMfaTitre", { nom }), texte: t("ecarts_tr.admin.confirmReinitMfa"), danger: true, pret: true };
+  }
+
   return (
-    <>
+    <div className="shell-page">
       <PageHeader title={t("ecarts_tr.admin.title")} subtitle={t("ecarts_tr.admin.subtitle")} />
 
       <SectionCard
         title={t("ecarts_tr.admin.comptes")}
         actions={
           <div className="action-bar-buttons">
+            {exportBtn(t("shell.admin.exporter"), [
+              {
+                label: t("shell.admin.exportExcel"),
+                icon: Download,
+                onSelect: () => void telecharger(`/api/users/users/?export=xlsx${qsRole}`, "utilisateurs.xlsx", t("shell.admin.exportOk"), t("shell.admin.erreur")),
+              },
+            ])}
             <QuickForm
               title={t("ecarts_tr.admin.nouveauCompte")}
               endpoint="/api/users/users/"
               fields={[
-                { name: "email", label: "Email", required: true },
+                { name: "email", label: "E-mail", required: true },
                 { name: "first_name", label: t("ecarts_tr.admin.prenom") },
                 { name: "last_name", label: t("ecarts_tr.admin.nom") },
                 { name: "role", label: t("ecarts_tr.admin.role"), type: "select", options: roleOpts, required: true },
                 { name: "password", label: t("ecarts_tr.admin.motDePasse"), required: true },
               ]}
             />
-            <button type="button" className="btn ghost" onClick={() => void api.download(`/api/users/users/?export=xlsx${role ? `&role=${role}` : ""}`, "utilisateurs.xlsx")}>
-              <Download size={14} aria-hidden="true" /> Excel
-            </button>
           </div>
         }
       >
-        <div className="field" style={{ maxWidth: 320 }}>
-          <label htmlFor="admin-role">{t("ecarts_tr.admin.role")}</label>
-          <select id="admin-role" value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="">{t("ecarts_tr.parametres.tous")}</option>
+        <div className="list-tools">
+        <div className="shell-toolbar inline">
+          <label className="sr-only" htmlFor="admin-role">
+            {t("shell.admin.filtreRole")}
+          </label>
+          <select id="admin-role" className="control" value={role} onChange={(e) => setRole(e.target.value)}>
+            <option value="">{t("shell.admin.tousRoles")}</option>
             {roleOpts.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -251,18 +351,20 @@ export function AdministrationPage() {
             ))}
           </select>
         </div>
-        <PagedDataTable list={comptes} columns={colComptes} caption={t("ecarts_tr.admin.comptes")} searchPlaceholder={t("common.searchPlaceholder")} />
+        <PagedDataGrid list={comptes} columns={colComptes} caption={t("ecarts_tr.admin.comptes")} searchPlaceholder={t("common.searchPlaceholder")} rowActions={actionsCompte} maxHeight="none" />
+        </div>
       </SectionCard>
 
       <SectionCard title={t("ecarts_tr.admin.matrice")} subtitle={t("ecarts_tr.admin.matriceAide")}>
-        <div className="table-wrap">
-          <table className="table" data-testid="matrice-roles">
+        <div className="table-wrap matrice-wrap" tabIndex={0} role="region" aria-label={t("ecarts_tr.admin.matrice")}>
+          <table className="table matrice" data-testid="matrice-roles">
+            <caption className="sr-only">{t("ecarts_tr.admin.matrice")}</caption>
             <thead>
               <tr>
                 <th scope="col">{t("ecarts_tr.admin.role")}</th>
                 {(matrice?.modules ?? []).map((m) => (
-                  <th key={m} scope="col">
-                    {t(APP_NAV_KEY[m] ?? m)}
+                  <th key={m} scope="col" className="matrice-mod">
+                    {sansCode(t(APP_NAV_KEY[m] ?? m))}
                   </th>
                 ))}
                 <th scope="col" className="num">
@@ -273,10 +375,16 @@ export function AdministrationPage() {
             <tbody>
               {roles.map((r) => (
                 <tr key={r.role}>
-                  <td>{r.label}</td>
+                  <th scope="row">{libelleRole(r.role)}</th>
                   {(matrice?.modules ?? []).map((m) => (
-                    <td key={m} aria-label={r.modules.includes(m) ? t("ecarts_tr.admin.lecture") : t("ecarts_tr.admin.aucun")}>
-                      {r.modules.includes(m) ? <Check size={14} aria-hidden="true" /> : <Minus size={14} className="muted" aria-hidden="true" />}
+                    <td key={m} className="matrice-cell" aria-label={r.modules.includes(m) ? t("ecarts_tr.admin.lecture") : t("ecarts_tr.admin.aucun")}>
+                      {r.modules.includes(m) ? (
+                        <span className="matrice-oui">
+                          <Check size={13} strokeWidth={2.5} aria-hidden="true" />
+                        </span>
+                      ) : (
+                        <Minus size={13} className="matrice-non" aria-hidden="true" />
+                      )}
                     </td>
                   ))}
                   <td className="num">{r.comptes_actifs}</td>
@@ -308,7 +416,7 @@ export function AdministrationPage() {
                   options: ["client", "fournisseur", "both", "autre"].map((k) => ({ value: k, label: t(`ecarts_tr.admin.kinds.${k}`) })),
                 },
                 { name: "tax_id", label: "NIF" },
-                { name: "email", label: "Email" },
+                { name: "email", label: "E-mail" },
                 { name: "phone", label: t("ecarts_tr.admin.telephone") },
               ]}
             />
@@ -324,19 +432,14 @@ export function AdministrationPage() {
           ) : null
         }
       >
-        <div className="action-bar-buttons" role="tablist" aria-label={t("ecarts_tr.admin.referentiels")}>
-          {REFERENTIELS.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              role="tab"
-              aria-selected={onglet === r.key}
-              className={`btn ${onglet === r.key ? "primary" : "ghost"}`}
-              onClick={() => setOnglet(r.key)}
-            >
-              {t(`ecarts_tr.admin.ref.${r.key}`)}
-            </button>
-          ))}
+        <div className="shell-toolbar inline">
+          <div className="seg" role="tablist" aria-label={t("ecarts_tr.admin.referentiels")}>
+            {REFERENTIELS.map((r) => (
+              <button key={r.key} type="button" role="tab" aria-selected={onglet === r.key} onClick={() => setOnglet(r.key)}>
+                {t(`ecarts_tr.admin.ref.${r.key}`)}
+              </button>
+            ))}
+          </div>
         </div>
         {REFERENTIELS.filter((r) => r.key === onglet).map((r) => (
           <Referentiel key={r.key} path={r.path} cle={r.key} />
@@ -352,27 +455,99 @@ export function AdministrationPage() {
         }
         actions={
           <div className="action-bar-buttons">
-            <button type="button" className="btn ghost" onClick={() => void api.download(`/api/documents/audit/?export=csv${module ? `&module=${module}` : ""}`, "piste_audit.csv")}>
-              <Download size={14} aria-hidden="true" /> CSV
-            </button>
-            <button type="button" className="btn ghost" onClick={() => void api.download(`/api/documents/audit/?export=xlsx${module ? `&module=${module}` : ""}`, "piste_audit.xlsx")}>
-              <Download size={14} aria-hidden="true" /> Excel
-            </button>
-            <ActionBar actions={[{ label: t("ecarts_tr.audit.purger"), path: "/api/documents/audit/purger/", tone: "danger", confirm: t("ecarts_tr.audit.confirmPurger") }]} />
+            {exportBtn(t("shell.admin.exporter"), [
+              {
+                label: t("shell.admin.exportCsv"),
+                icon: Download,
+                onSelect: () => void telecharger(`/api/documents/audit/?export=csv${qsModule}`, "piste_audit.csv", t("shell.admin.exportOk"), t("shell.admin.erreur")),
+              },
+              {
+                label: t("shell.admin.exportExcel"),
+                icon: Download,
+                onSelect: () => void telecharger(`/api/documents/audit/?export=xlsx${qsModule}`, "piste_audit.xlsx", t("shell.admin.exportOk"), t("shell.admin.erreur")),
+              },
+            ])}
+            <Menu items={[{ label: t("ecarts_tr.audit.purger"), icon: Trash2, danger: true, onSelect: () => setPurge(true) }]} />
           </div>
         }
       >
         {retention?.provisoire ? (
-          <p className="action-error" role="note">
-            {t("ecarts_tr.audit.retentionProvisoire")}
-          </p>
+          <div className="banner warn" role="note">
+            <div className="banner-body">
+              <div className="banner-text">{t("ecarts_tr.audit.retentionProvisoire")}</div>
+            </div>
+          </div>
         ) : null}
-        <div className="field" style={{ maxWidth: 320 }}>
-          <label htmlFor="audit-module">{t("ecarts_tr.parametres.module")}</label>
-          <input id="audit-module" value={module} placeholder="stocks, achats, users…" onChange={(e) => setModule(e.target.value.trim())} />
+        <div className="list-tools">
+        <div className="shell-toolbar inline">
+          <label className="sr-only" htmlFor="audit-module">
+            {t("shell.admin.filtreModule")}
+          </label>
+          <input
+            id="audit-module"
+            className="control"
+            value={module}
+            placeholder={t("shell.admin.filtreModuleAide")}
+            onChange={(e) => setModule(e.target.value.trim())}
+          />
         </div>
-        <PagedDataTable list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} />
+        <PagedDataGrid list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" maxHeight="none" />
+        </div>
       </SectionCard>
-    </>
+
+      <Modal
+        open={dialogue !== null}
+        onOpenChange={(o) => {
+          if (!o) fermer();
+        }}
+        title={dialogueContenu?.titre ?? ""}
+        description={dialogueContenu?.texte}
+        width={480}
+        footer={
+          <>
+            <SheetClose>
+              <button type="button" className="btn ghost">
+                {t("shell.admin.annuler")}
+              </button>
+            </SheetClose>
+            <button
+              type="button"
+              className={dialogueContenu?.danger ? "btn danger" : "btn primary"}
+              disabled={!dialogueContenu?.pret || action.isPending}
+              onClick={valider}
+            >
+              {t("shell.admin.valider")}
+            </button>
+          </>
+        }
+      >
+        {dialogueContenu?.corps}
+      </Modal>
+
+      <Modal
+        open={purge}
+        onOpenChange={setPurge}
+        title={t("shell.admin.purgerTitre")}
+        description={t("ecarts_tr.audit.confirmPurger")}
+        width={480}
+        footer={
+          <>
+            <SheetClose>
+              <button type="button" className="btn ghost">
+                {t("shell.admin.annuler")}
+              </button>
+            </SheetClose>
+            <button
+              type="button"
+              className="btn danger"
+              disabled={action.isPending}
+              onClick={() => action.mutate({ path: "/api/documents/audit/purger/", ok: t("shell.admin.purgeOk") }, { onSuccess: () => setPurge(false) })}
+            >
+              {t("ecarts_tr.audit.purger")}
+            </button>
+          </>
+        }
+      />
+    </div>
   );
 }

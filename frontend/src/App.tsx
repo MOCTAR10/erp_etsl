@@ -6,7 +6,7 @@ import { useAuth } from "./store/auth";
 import { landingForRole } from "./lib/landing";
 import { Shell } from "./components/Shell";
 import { withPilot } from "./components/Pilot";
-import { KpiGridSkeleton } from "./components/ui";
+import { AppToaster, KpiGridSkeleton } from "./components/ui";
 import { LoginPage } from "./pages/Login";
 
 const DashboardPage = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
@@ -67,6 +67,7 @@ function GuestOnly({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
+    <>
     <Routes>
       <Route
         path="/login"
@@ -129,5 +130,7 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    <AppToaster />
+    </>
   );
 }

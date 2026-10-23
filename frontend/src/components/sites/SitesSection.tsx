@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { ActionBar, type ActionDef, Badge, QuickForm, SectionCard } from "../ui";
+import { ActionBar, type ActionDef, Badge, type Column, DataTable, QuickForm, SectionCard } from "../ui";
 import { describeError } from "../../lib/offlineQueue";
-import { useSites } from "./SiteFilter";
+import { formatNumber } from "../../lib/format";
+import { SectionActions } from "../sections/SectionActions";
+import { type SiteEtsl, useSites } from "./SiteFilter";
 
 const TYPES = ["atelier", "chantier", "depot", "base", "bureau"] as const;
 const RESSOURCES = ["depots", "equipements", "actifs", "salaries", "affaires", "ordres", "utilisateurs"] as const;
@@ -16,6 +18,12 @@ interface LigneRepartition extends Record<Ressource, number> {
   code: string;
   libelle: string;
   actif: boolean;
+}
+/** Ligne du tableau : un site, ou la ligne « non rattaché » (`site` nul). */
+interface LigneSite {
+  id: number | string;
+  site: SiteEtsl | null;
+  compte: Partial<Record<Ressource, number>>;
 }
 interface Repartition {
   ressources: Ressource[];
@@ -77,7 +85,7 @@ export function SitesSection() {
   const nonRattache = parSite.get(null);
   const liste = sites.data ?? [];
 
-  const actions = (s: (typeof liste)[number]): ActionDef[] => [
+  const actions = (s: SiteEtsl): ActionDef[] => [
     ...(s.est_provisoire ? [{ label: t("ecarts_a5.confirmer"), path: `/api/referentiels/sites/${s.id}/confirmer/` }] : []),
     {
       label: t("ecarts_a5.modifierAlias"),
@@ -95,12 +103,62 @@ export function SitesSection() {
     },
   ];
 
+  const lignes: LigneSite[] = [
+    ...liste.map((s) => ({ id: s.id, site: s, compte: parSite.get(s.id) ?? {} })),
+    ...(nonRattache ? [{ id: "__non-rattache", site: null, compte: nonRattache }] : []),
+  ];
+  const colonnes: Column<LigneSite>[] = [
+    {
+      key: "code",
+      header: t("ecarts_a5.code"),
+      render: (l) => (l.site ? <strong>{l.site.code}</strong> : <span className="muted">{t("ecarts_a5.nonRattache")}</span>),
+    },
+    {
+      key: "libelle",
+      header: t("ecarts_a5.libelle"),
+      render: (l) =>
+        l.site ? (
+          <>
+            {l.site.libelle}
+            {l.site.ville ? <div className="muted">{l.site.ville}</div> : null}
+          </>
+        ) : null,
+    },
+    { key: "type", header: t("ecarts_a5.type"), render: (l) => (l.site ? t(`ecarts_a5.types.${l.site.type_site}`, { defaultValue: l.site.type_site_label }) : null) },
+    { key: "alias", header: t("ecarts_a5.alias"), render: (l) => (l.site ? <span className="muted">{l.site.alias || "—"}</span> : null) },
+    ...RESSOURCES.map(
+      (r): Column<LigneSite> => ({
+        key: `res-${r}`,
+        header: t(`ecarts_a5.res.${r}`),
+        num: true,
+        render: (l) => formatNumber(l.compte[r] ?? 0),
+      }),
+    ),
+    {
+      key: "statut",
+      header: t("ecarts_a5.statut"),
+      render: (l) =>
+        !l.site ? null : !l.site.actif ? (
+          <Badge tone="neutral">{t("ecarts_a5.inactif")}</Badge>
+        ) : l.site.est_provisoire ? (
+          <Badge tone="warn">{t("ecarts_a5.provisoireBadge")}</Badge>
+        ) : (
+          <Badge tone="ok">{t("ecarts_a5.confirme")}</Badge>
+        ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ecarts_a5.actions")}</span>,
+      render: (l) => (l.site ? <ActionBar actions={actions(l.site)} /> : null),
+    },
+  ];
+
   return (
     <SectionCard
       title={t("ecarts_a5.titre")}
       subtitle={t("ecarts_a5.aide")}
       actions={
-        <div className="action-bar-buttons">
+        <SectionActions>
           <QuickForm
             title={t("ecarts_a5.nouveau")}
             endpoint="/api/referentiels/sites/"
@@ -122,7 +180,7 @@ export function SitesSection() {
           <ActionBar
             actions={[{ label: t("ecarts_a5.rattacher"), path: "/api/referentiels/sites/rattacher/", tone: "ghost", confirm: t("ecarts_a5.rattacherQ") }]}
           />
-        </div>
+        </SectionActions>
       }
     >
       {liste.some((s) => s.est_provisoire) ? (
@@ -131,72 +189,8 @@ export function SitesSection() {
         </p>
       ) : null}
       {rep ? <p className="muted">{rep.restriction.active ? t("ecarts_a5.restrictionOn") : t("ecarts_a5.restrictionOff")}</p> : null}
-      <div className="table-wrap">
-        <table className="table" data-testid="sites-etsl">
-          <caption className="sr-only">{t("ecarts_a5.titre")}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("ecarts_a5.code")}</th>
-              <th scope="col">{t("ecarts_a5.libelle")}</th>
-              <th scope="col">{t("ecarts_a5.type")}</th>
-              <th scope="col">{t("ecarts_a5.alias")}</th>
-              {RESSOURCES.map((r) => (
-                <th scope="col" key={r} style={{ textAlign: "right" }}>
-                  {t(`ecarts_a5.res.${r}`)}
-                </th>
-              ))}
-              <th scope="col">{t("ecarts_a5.statut")}</th>
-              <th scope="col">{t("ecarts_a5.actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {liste.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  <strong>{s.code}</strong>
-                </td>
-                <td>
-                  {s.libelle}
-                  {s.ville ? <div className="muted" style={{ fontSize: 12 }}>{s.ville}</div> : null}
-                </td>
-                <td>{t(`ecarts_a5.types.${s.type_site}`, { defaultValue: s.type_site_label })}</td>
-                <td className="muted" style={{ fontSize: 12 }}>
-                  {s.alias || "—"}
-                </td>
-                {RESSOURCES.map((r) => (
-                  <td key={r} style={{ textAlign: "right" }}>
-                    {parSite.get(s.id)?.[r] ?? 0}
-                  </td>
-                ))}
-                <td>
-                  {!s.actif ? (
-                    <Badge tone="neutral">{t("ecarts_a5.inactif")}</Badge>
-                  ) : s.est_provisoire ? (
-                    <Badge tone="warn">{t("ecarts_a5.provisoireBadge")}</Badge>
-                  ) : (
-                    <Badge tone="ok">{t("ecarts_a5.confirme")}</Badge>
-                  )}
-                </td>
-                <td>
-                  <ActionBar actions={actions(s)} />
-                </td>
-              </tr>
-            ))}
-            {nonRattache ? (
-              <tr>
-                <td colSpan={4} className="muted">
-                  {t("ecarts_a5.nonRattache")}
-                </td>
-                {RESSOURCES.map((r) => (
-                  <td key={r} style={{ textAlign: "right" }}>
-                    {nonRattache[r]}
-                  </td>
-                ))}
-                <td colSpan={2} />
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+      <div data-testid="sites-etsl">
+        <DataTable columns={colonnes} rows={lignes} caption={t("ecarts_a5.titre")} loading={sites.isLoading} />
       </div>
     </SectionCard>
   );

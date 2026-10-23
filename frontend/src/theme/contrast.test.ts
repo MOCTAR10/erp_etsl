@@ -61,12 +61,36 @@ describe("contraste WCAG AA de la charte", () => {
         ["brand", "brand-soft"],
         ["steel", "steel-soft"],
         ["on-brand", "brand"],
+        ["info-text", "info-soft"],
+        ["text", "surface-2"],
+        ["on-brand-solid", "brand-solid"],
+        ["on-brand-solid", "brand-solid-hover"],
+        ["text", "field"],
+        ["text-muted", "field"],
+        ["brand", "surface-2"],
       ];
       const failures = pairs
         .map(([fg, bg]) => [fg, bg, ratio(parse(v[fg], surface), parse(v[bg], surface))] as const)
         .filter(([, , r]) => r < 4.5)
         .map(([fg, bg, r]) => `${fg} sur ${bg} : ${r.toFixed(2)}`);
       expect(failures).toEqual([]);
+    });
+
+    it(`${mode} : aucun blanc pur ni noir pur pour les fonds et textes du mode sombre`, () => {
+      if (mode !== "dark") return;
+      const v = vars(selector);
+      for (const name of ["bg", "surface", "surface-2", "field", "text", "on-brand-solid"]) {
+        expect(["#ffffff", "#000000"], name).not.toContain(v[name].toLowerCase());
+      }
+    });
+
+    it(`${mode} : texte discret et bordure de champ (non-texte) >= 3:1 / visibles`, () => {
+      const v = { ...vars(":root"), ...vars(selector) };
+      const surface = parse(v.surface);
+      expect(ratio(parse(v["text-subtle"], surface), surface)).toBeGreaterThanOrEqual(3);
+      // Placeholders : lisibles aussi sur le fond (en creux) des champs.
+      expect(ratio(parse(v["text-subtle"], surface), parse(v.field, surface))).toBeGreaterThanOrEqual(3);
+      expect(ratio(parse(v["border-strong"], surface), surface)).toBeGreaterThan(1.3);
     });
   }
 });

@@ -1,18 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
-import { CheckCheck, CloudOff, RefreshCw, Trash2, Wifi } from "lucide-react";
+import { CheckCheck, CheckCircle2, ClipboardCheck, Clock3, CloudOff, FlameKindling, PackageCheck, RefreshCw, ShieldAlert, Trash2, TriangleAlert, Wifi } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, PageHeader, SectionCard } from "../components/ui";
+import { Badge, DatePicker, PageHeader, SectionCard } from "../components/ui";
 import { FichesSecuriteTerrain } from "../components/hse/FichesSecuriteTerrain";
 import { offlineQueue, submitOffline, submitOfflineChain, syncNow, useOnline, useQueueItems } from "../lib/offline";
 import { REF, type QueuedFile } from "../lib/offlineQueue";
-import { useAuth } from "../store/auth";
+import { formatDateTime } from "../lib/format";
 
 type Tab = "pointage" | "gaz" | "reception" | "controle" | "anomalie" | "permis";
 
 /** Types de permis proposés hors ligne (le serveur reste juge : liste HSE paramétrable). */
+/** Icône de chaque onglet (repère visuel au pouce). */
+const TAB_ICON: Record<Tab, LucideIcon> = {
+  pointage: Clock3,
+  gaz: FlameKindling,
+  reception: PackageCheck,
+  controle: ClipboardCheck,
+  anomalie: TriangleAlert,
+  permis: ShieldAlert,
+};
+
 const TYPES_PERMIS = ["chaud", "froid", "hauteur", "levage", "confine", "atex", "electrique", "fouille", "chimique"];
 
 /** Photo prise sur le terrain : gardée sur l'appareil (IndexedDB) jusqu'à l'envoi. */
@@ -36,7 +47,6 @@ export function TerrainPage() {
   const { t } = useTranslation();
   const online = useOnline();
   const items = useQueueItems();
-  const user = useAuth((s) => s.user);
   const [tab, setTab] = useState<Tab>("pointage");
   const [toast, setToast] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -81,20 +91,20 @@ export function TerrainPage() {
       <PageHeader title={t("terrain.title")} subtitle={t("terrain.subtitle")} />
 
       <div className={`terrain-status ${online ? "on" : "off"}`} role="status">
-        {online ? <Wifi size={18} /> : <CloudOff size={18} />}
-        <strong>{online ? t("terrain.online") : t("terrain.offline")}</strong>
-        <span>
-          {pending > 0 ? t("terrain.pending", { count: pending }) : t("terrain.allSynced")}
-          {failed > 0 ? ` · ${t("terrain.failed", { count: failed })}` : ""}
-        </span>
-        {conflicts > 0 && <Badge tone="err">{t("ecarts_a3.terrain.conflicts", { count: conflicts })}</Badge>}
-        {lastSync && (
-          <span className="muted" style={{ fontSize: 12 }}>
-            {t("ecarts_a3.terrain.lastSync", { date: new Date(lastSync).toLocaleTimeString() })}
+        <div className="terrain-status-icon" aria-hidden="true">
+          {online ? <Wifi size={18} /> : <CloudOff size={18} />}
+        </div>
+        <div className="terrain-status-text">
+          <strong>{online ? t("terrain.online") : t("terrain.offline")}</strong>
+          <span>
+            {pending > 0 ? t("terrain.pending", { count: pending }) : t("terrain.allSynced")}
+            {failed > 0 ? ` · ${t("terrain.failed", { count: failed })}` : ""}
           </span>
-        )}
-        <button className="btn ghost" onClick={() => void sync()} disabled={!online || syncing || pending === 0}>
-          <RefreshCw size={15} /> {t("terrain.sync")}
+          {lastSync && <small>{t("ecarts_a3.terrain.lastSync", { date: formatDateTime(new Date(lastSync).toISOString()) })}</small>}
+        </div>
+        {conflicts > 0 && <Badge tone="err">{t("ecarts_a3.terrain.conflicts", { count: conflicts })}</Badge>}
+        <button type="button" className="btn ghost sm terrain-sync" onClick={() => void sync()} disabled={!online || syncing || pending === 0}>
+          <RefreshCw size={15} aria-hidden="true" className={syncing ? "ui-spin" : undefined} /> {t("terrain.sync")}
         </button>
       </div>
 
@@ -106,7 +116,7 @@ export function TerrainPage() {
                 <div>
                   <strong>{i.label}</strong>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {t("ecarts_a3.terrain.horodatage", { date: new Date(i.createdAt).toLocaleString() })}
+                    {t("ecarts_a3.terrain.horodatage", { date: formatDateTime(new Date(i.createdAt).toISOString()) })}
                     {i.files?.length ? ` · ${t("ecarts_a3.terrain.photoQueued")}` : ""}
                     {i.dependsOn ? ` · ${t("ecarts_a3.terrain.attente")}` : ""}
                     {i.error ? ` · ${i.error}` : ""}
@@ -146,27 +156,37 @@ export function TerrainPage() {
         </SectionCard>
       )}
 
-      <div className="terrain-tabs" role="tablist">
-        {(["pointage", "gaz", "reception", "controle", "anomalie", "permis"] as Tab[]).map((k) => (
-          <button
-            key={k}
-            role="tab"
-            aria-selected={tab === k}
-            className={tab === k ? "active" : ""}
-            onClick={() => {
-              setTab(k);
-              setToast(null);
-            }}
-          >
-            {k === "permis" ? t("ecarts_a3.terrain.tabPermis") : t(`terrain.tabs.${k}`)}
-          </button>
-        ))}
+      <div className="terrain-tabs-wrap">
+        <div className="terrain-tabs" role="tablist" aria-label={t("terrain.title")}>
+          {(["pointage", "gaz", "reception", "controle", "anomalie", "permis"] as Tab[]).map((k) => {
+            const Icon = TAB_ICON[k];
+            return (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={tab === k}
+                className={tab === k ? "active" : ""}
+                onClick={() => {
+                  setTab(k);
+                  setToast(null);
+                }}
+              >
+                <Icon size={16} aria-hidden="true" />
+                {k === "permis" ? t("ecarts_a3.terrain.tabPermis") : t(`terrain.tabs.${k}`)}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {toast && (
-        <p className="terrain-toast" role="status">
-          {toast}
-        </p>
+        <div className="banner ok terrain-toast" role="status">
+          <CheckCircle2 size={18} aria-hidden="true" />
+          <div className="banner-body">
+            <p className="banner-text">{toast}</p>
+          </div>
+        </div>
       )}
 
       {tab === "pointage" && (
@@ -325,7 +345,7 @@ export function TerrainPage() {
         />
       )}
 
-      <p className="muted" style={{ fontSize: 12 }} data-testid="terrain-cache">
+      <p className="terrain-cache" data-testid="terrain-cache">
         {t("ecarts_a3.terrain.cache", {
           ordres: (ordres.data ?? []).length,
           permis: (permis.data ?? []).length,
@@ -335,7 +355,6 @@ export function TerrainPage() {
       </p>
 
       <FichesSecuriteTerrain />
-      {user ? null : null}
     </>
   );
 }
@@ -369,7 +388,7 @@ function Form({
   return (
     <form
       key={formKey}
-      className="terrain-form"
+      className="terrain-form card"
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
@@ -383,39 +402,51 @@ function Form({
         }
       }}
     >
-      {fields.map((f) => (
-        <label className="field" key={f.name}>
-          <span>{f.label}</span>
-          {f.kind === "file" ? (
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => setFiles({ ...files, [f.name]: e.target.files?.[0] })}
-            />
-          ) : f.kind === "select" ? (
-            <select required={f.required} value={values[f.name]} onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}>
-              <option value="">—</option>
-              {(f.options ?? []).map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type={f.kind}
+      {fields.map((f) =>
+        f.kind === "date" ? (
+          <div className="field" key={f.name}>
+            <label htmlFor={`terrain-${f.name}`}>{f.label}</label>
+            <DatePicker
+              id={`terrain-${f.name}`}
               required={f.required}
-              step={f.step}
-              placeholder={f.placeholder}
-              inputMode={f.kind === "number" ? "decimal" : undefined}
               value={values[f.name]}
-              onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}
+              onChange={(v) => setValues({ ...values, [f.name]: v })}
             />
-          )}
-        </label>
-      ))}
-      <button className="btn terrain-submit" type="submit" disabled={busy}>
+          </div>
+        ) : (
+          <label className="field" key={f.name}>
+            <span>{f.label}</span>
+            {f.kind === "file" ? (
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setFiles({ ...files, [f.name]: e.target.files?.[0] })}
+              />
+            ) : f.kind === "select" ? (
+              <select required={f.required} value={values[f.name]} onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}>
+                <option value="">—</option>
+                {(f.options ?? []).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={f.kind}
+                required={f.required}
+                step={f.step}
+                placeholder={f.placeholder}
+                inputMode={f.kind === "number" ? "decimal" : undefined}
+                value={values[f.name]}
+                onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}
+              />
+            )}
+          </label>
+        ),
+      )}
+      <button className="btn primary lg terrain-submit" type="submit" disabled={busy}>
         {submitLabel}
       </button>
     </form>

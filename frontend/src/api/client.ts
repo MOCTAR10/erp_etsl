@@ -148,6 +148,9 @@ export const api = {
   /** Toutes les pages d'une liste (listes de choix des formulaires) : suit `next` jusqu'à `maxPages`. */
   listAll: <T,>(path: string, opts?: ListAllOptions) =>
     listAll<T>((p) => raw<import("../types").Paginated<T>>(p), path, opts),
+  /** Recherche rapide (palette Ctrl K) : `?search=` d'une liste DRF, premiers résultats seulement, annulable. */
+  rechercher: <T,>(path: string, q: string, signal?: AbortSignal, pageSize = 5) =>
+    raw<import("../types").Paginated<T>>(`${path}?search=${encodeURIComponent(q)}&page_size=${pageSize}`, { signal }),
   /** Téléchargement authentifié d'un export (CSV, XLSX, PDF) : le serveur journalise l'export (EX-G-10). */
   download: async (path: string, filename: string) => {
     const res = await fetch(apiUrl(path), {

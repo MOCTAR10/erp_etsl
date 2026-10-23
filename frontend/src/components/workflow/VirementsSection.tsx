@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { Employe } from "../../types";
 import { SectionCard } from "../ui";
@@ -136,7 +136,7 @@ export function VirementsSection() {
                   </div>
                 </td>
                 <td>
-                  {o.nb_virements} · {formatNumber(o.total)} F
+                  {o.nb_virements} · {formatMoney(o.total)}
                 </td>
                 <td>
                   <button type="button" className="btn" onClick={() => void api.download(`/api/rh-paie/ordres-virement/${o.id}/fichier/`, `${o.code}.cfonb`)}>

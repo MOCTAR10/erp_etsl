@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { ClotureMensuelle, ControlesCloture, PeriodeRef } from "../../types";
 import { Badge, SectionCard } from "../ui";
@@ -116,7 +116,7 @@ export function ClotureSection() {
           </p>
           {c.statut === "cloturee" && c.has_amount_access && (
             <p className="muted">
-              {MONTANTS.map((k) => `${t(`cloture.m.${k}`)} : ${formatNumber(Number(c.synthese[k]))} F`).join(" · ")}
+              {MONTANTS.map((k) => `${t(`cloture.m.${k}`)} : ${formatMoney(c.synthese[k])}`).join(" · ")}
             </p>
           )}
           {c.statut === "cloturee" && (

@@ -55,7 +55,7 @@ class Command(BaseCommand):
         Courrier.objects.get_or_create(
             code="COU00002",
             defaults=dict(
-                sens="sortant", type="note", objet="Transmission compte rendu comite",
+                sens="sortant", type="note", objet="Transmission compte rendu comité",
                 reference="ETSL/SG/2026/118", statut="recu", date_courrier=_today(-1),
             ),
         )
@@ -64,7 +64,7 @@ class Command(BaseCommand):
         Convention.objects.get_or_create(
             code="CON00001",
             defaults=dict(
-                type="maintenance", titre="Contrat maintenance groupe electrogene",
+                type="maintenance", titre="Contrat maintenance groupe électrogène",
                 partenaire=gr, montant=Decimal("8500000"),
                 date_debut=_today(-90), date_fin=_today(75), renouvelable=True,
                 statut="signe",
@@ -76,7 +76,7 @@ class Command(BaseCommand):
             code="LIT00001",
             defaults=dict(
                 nature="commercial", objet="Litige litigieux paiement - site Libreville",
-                partie_adverse="SOCIETE BTP", montant_en_jeu=Decimal("12000000"),
+                partie_adverse="SOCIÉTÉ BTP", montant_en_jeu=Decimal("12000000"),
                 phase="pre_contentieux", statut="ouvert",
             ),
         )
@@ -86,7 +86,7 @@ class Command(BaseCommand):
             code="CAU00001",
             defaults=dict(
                 type="bonne_execution", emetteur=banque,
-                beneficiaire="Client Petrolier SA", objet="Bon de commande mise en service",
+                beneficiaire="Client Pétrolier SA", objet="Bon de commande mise en service",
                 montant=Decimal("5000000"), numero_instrument="BR000001",
                 date_emission=_today(-60), date_echeance=_today(45), statut="en_cours",
             ),
@@ -108,7 +108,7 @@ class Command(BaseCommand):
             code="REU00001",
             defaults=dict(
                 type="comite_direction", objet="Point mensuel affaires & caution",
-                date_reunion=timezone.now() + timedelta(days=2), lieu="Siege",
+                date_reunion=timezone.now() + timedelta(days=2), lieu="Siège",
                 statut="planifiee",
             ),
         )
@@ -170,7 +170,7 @@ class Command(BaseCommand):
             )
             ActionContentieux.objects.get_or_create(
                 contentieux=lit, type="courrier",
-                defaults={"description": "Mise en demeure adressee a la partie adverse (demo)."},
+                defaults={"description": "Mise en demeure adressée à la partie adverse."},
             )
         DossierGlobalRental.objects.filter(code="GRD00001", mandat_date_fin__isnull=True).update(
             mandat_reference="MAND-GR-2026", mandat_date_fin=_today(300)

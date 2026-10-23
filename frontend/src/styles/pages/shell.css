@@ -1,0 +1,802 @@
+/*
+ * Coquille applicative (agent Shell, vague 2) : sidebar en 3 groupes repliable en rail d'icônes,
+ * en-tête (recherche ⌘K, préférences, menu profil) et écrans Notifications / Sécurité / Administration.
+ * Couche `pages` : gagne sur `layout` (global.css) sans toucher aux classes e2e (on ajoute, on ne renomme pas).
+ * Classe racine `.shell-v2` posée par Shell.tsx sur `.app-shell` : les règles de coquille ne s'appliquent qu'à elle.
+ */
+@layer pages {
+  /* ── Coquille ─────────────────────────────────────────────────────────── */
+  .shell-v2 {
+    --sidebar-w: 248px;
+    --rail-w: 64px;
+    --bar-h: 60px;
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    transition: grid-template-columns 180ms var(--ease-out);
+  }
+
+  .shell-v2 .sidebar {
+    background: var(--surface);
+  }
+
+  /* Marque : même hauteur que l'en-tête, logo sur pastille blanche bordée (pas d'ombre). */
+  .shell-v2 .sidebar-brand {
+    height: var(--bar-h);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+  .shell-v2 .brand-chip {
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+  .brand-chip.lg {
+    padding: 8px 12px;
+  }
+  .shell-v2 .brand-chip img {
+    max-height: 22px;
+  }
+  .shell-v2 .brand-lockup {
+    gap: 10px;
+  }
+  .shell-v2 .brand-word {
+    font-size: 14.5px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.005em;
+    word-spacing: 0.08em;
+  }
+  .shell-v2 .brand-tag {
+    font-size: 11.5px;
+    margin-top: 1px;
+  }
+
+  /* Navigation */
+  .shell-v2 .sidebar .sidebar-scroll {
+    padding: 8px 10px 16px;
+    gap: 0;
+  }
+  .shell-v2 .nav-group {
+    gap: 1px;
+    margin-top: 12px;
+  }
+  .shell-v2 .nav-group:first-child {
+    margin-top: 4px;
+  }
+  .shell-v2 .nav-group-label {
+    font-size: 12px;
+    font-weight: var(--fw-semibold);
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-muted);
+    padding: 6px 10px 4px;
+  }
+  .shell-v2 .nav-group-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    border: 0;
+    background: none;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .shell-v2 .nav-group-toggle:hover:not(:disabled) {
+    color: var(--text);
+  }
+  .shell-v2 .nav-group-toggle:disabled {
+    cursor: default;
+  }
+  .shell-v2 .nav-group-toggle:disabled .nav-group-chevron {
+    visibility: hidden;
+  }
+  .shell-v2 .nav-group-chevron {
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .shell-v2 .nav-group-toggle[aria-expanded="false"] .nav-group-chevron {
+    transform: rotate(-90deg);
+  }
+  .shell-v2 .nav-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .shell-v2 .nav-group-items[hidden] {
+    display: none;
+  }
+
+  .shell-v2 .nav-link {
+    height: 34px;
+    padding: 0 10px;
+    gap: 10px;
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .shell-v2 .nav-link svg {
+    opacity: 1;
+  }
+  .shell-v2 .nav-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shell-v2 .nav-link:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .shell-v2 .nav-link.active {
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-weight: var(--fw-semibold);
+  }
+  /* Filet de marque fin (2 px) au bord du panneau. */
+  .shell-v2 .nav-link.active::before {
+    left: -10px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--brand), var(--accent));
+  }
+  .shell-v2 .nav-link:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+  }
+
+  /* Compteur discret (notifications non lues) */
+  .shell-v2 .nav-badge {
+    margin-left: auto;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .shell-v2 .nav-link.active .nav-badge {
+    background: var(--surface);
+    border-color: var(--brand-tint);
+    color: var(--brand);
+  }
+
+  /* Pied de sidebar : déconnexion + réduction en rail */
+  .shell-v2 .sidebar-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .shell-v2 .sidebar-logout {
+    display: inline-flex;
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 10px;
+    height: 34px;
+    margin: 0;
+    padding: 0 10px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13.5px;
+    font-weight: var(--fw-medium);
+    box-shadow: none;
+  }
+  .shell-v2 .sidebar-logout:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text);
+    border-color: transparent;
+  }
+  .shell-v2 .sidebar-rail-toggle {
+    flex: none;
+    border-color: transparent;
+    background: transparent;
+  }
+  .shell-v2 .sidebar-rail-toggle:hover {
+    border-color: transparent;
+  }
+
+  /* ── En-tête ──────────────────────────────────────────────────────────── */
+  .shell-v2 .topbar {
+    height: var(--bar-h);
+    padding: 0 var(--page-pad-x);
+    gap: 12px;
+    justify-content: flex-start;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+  }
+  .shell-v2 .topbar-brand {
+    display: none;
+    min-width: 0;
+  }
+  .shell-v2 .topbar-search {
+    flex: 1;
+    max-width: 440px;
+    min-width: 0;
+  }
+  .shell-v2 .search-trigger {
+    height: 36px;
+    padding: 0 8px 0 12px;
+    gap: 8px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13.5px;
+  }
+  .shell-v2 .search-trigger:hover {
+    border-color: var(--border-strong);
+    background: var(--surface);
+  }
+  .shell-v2 .search-trigger:focus-visible {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: var(--ring);
+  }
+  .shell-v2 .search-trigger kbd {
+    margin-left: auto;
+    padding: 1px 6px;
+    font-size: 11px;
+    border-bottom-width: 1px;
+    border-radius: var(--radius-xs);
+    color: var(--text-muted);
+  }
+  .shell-v2 .topbar .actions {
+    margin-left: auto;
+    gap: 4px;
+  }
+  .shell-v2 .topbar-pref {
+    border-color: transparent;
+    background: transparent;
+  }
+  .shell-v2 .topbar-pref:hover {
+    border-color: transparent;
+    background: var(--surface-2);
+  }
+  .shell-v2 .topbar-sep {
+    width: 1px;
+    height: 20px;
+    margin: 0 8px;
+    background: var(--border);
+  }
+
+  /* Déclencheur du menu profil : avatar + nom + rôle lisible */
+  .profile-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 40px;
+    padding: 0 8px 0 4px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .profile-trigger:hover,
+  .profile-trigger[data-state="open"] {
+    background: var(--surface-2);
+  }
+  .profile-trigger[data-state="open"] {
+    border-color: var(--border);
+  }
+  .profile-trigger:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+  }
+  .profile-trigger .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: var(--brand-solid);
+    color: var(--on-brand-solid);
+    font-size: 12px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.02em;
+  }
+  .profile-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+  }
+  .profile-name {
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-role {
+    font-size: 12px;
+    color: var(--text-muted);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-chevron {
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  /* En-tête du menu (dans .ui-menu-label) */
+  .profile-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 0 4px;
+  }
+  .profile-head-name {
+    font-size: 13.5px;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+  }
+  .profile-head-mail,
+  .profile-head-role {
+    font-size: 12px;
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+  }
+
+  /* ── Rail d'icônes (bureau seulement) ─────────────────────────────────── */
+  @media (min-width: 901px) {
+    .shell-v2.is-rail {
+      grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    }
+    .shell-v2.is-rail .sidebar-brand {
+      justify-content: center;
+      padding: 0;
+    }
+    .shell-v2.is-rail .sidebar-brand .brand-text,
+    .shell-v2.is-rail .nav-label,
+    .shell-v2.is-rail .nav-group-label {
+      display: none;
+    }
+    .shell-v2.is-rail .sidebar .sidebar-scroll {
+      padding: 8px 12px 16px;
+      align-items: center;
+    }
+    .shell-v2.is-rail .nav-group {
+      width: 40px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .shell-v2.is-rail .nav-group:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+    .shell-v2.is-rail .nav-link {
+      width: 40px;
+      height: 36px;
+      padding: 0;
+      justify-content: center;
+    }
+    .shell-v2.is-rail .nav-link.active::before {
+      left: -12px;
+    }
+    .shell-v2.is-rail .nav-badge {
+      position: absolute;
+      top: 3px;
+      right: 1px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      font-size: 10px;
+    }
+    .shell-v2.is-rail .sidebar-foot {
+      flex-direction: column;
+      padding: 10px 12px;
+    }
+    .shell-v2.is-rail .sidebar-logout {
+      flex: none;
+      width: 40px;
+      padding: 0;
+      justify-content: center;
+    }
+    .shell-v2.is-rail .topbar-brand {
+      display: flex;
+      align-items: center;
+    }
+    .shell-v2.is-rail .topbar-brand .brand-chip {
+      display: none;
+    }
+  }
+
+  /* ── Mobile / tablette : tiroir ───────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .shell-v2,
+    .shell-v2.is-rail {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .shell-v2 {
+      --bar-h: 56px;
+    }
+    .shell-v2 .sidebar {
+      width: min(288px, 86vw);
+    }
+    .shell-v2 .sidebar-rail-toggle,
+    .shell-v2 .topbar-pref,
+    .shell-v2 .topbar-sep,
+    .shell-v2 .profile-meta,
+    .shell-v2 .profile-chevron {
+      display: none;
+    }
+    .shell-v2 .topbar {
+      padding: 0 var(--page-pad-x);
+      gap: 8px;
+    }
+    .shell-v2 .topbar-brand {
+      display: flex;
+      align-items: center;
+    }
+    .shell-v2 .topbar-brand .brand-chip img {
+      max-height: 18px;
+    }
+    .shell-v2 .topbar-search {
+      flex: none;
+      margin-left: auto;
+    }
+    .shell-v2 .search-trigger {
+      width: 36px;
+      padding: 0;
+      justify-content: center;
+    }
+    .shell-v2 .search-trigger-text,
+    .shell-v2 .search-trigger kbd {
+      display: none;
+    }
+    .shell-v2 .topbar .actions {
+      margin-left: 0;
+    }
+    .profile-trigger {
+      padding: 0 2px;
+      height: 36px;
+    }
+  }
+
+  /* ── Écrans Notifications / Sécurité / Administration ─────────────────── */
+  .shell-card-flush {
+    padding: 0;
+    overflow: hidden;
+  }
+  .shell-card-flush .ui-grid-wrap {
+    border: 0;
+    border-radius: 0;
+  }
+  .shell-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .shell-toolbar.inline {
+    padding: 0;
+    border-bottom: 0;
+    margin-bottom: 12px;
+  }
+  .shell-toolbar .control {
+    width: auto;
+    min-width: 220px;
+    max-width: 100%;
+  }
+
+  /* Contrôle segmenté (filtres, onglets) */
+  .seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    max-width: 100%;
+  }
+  .seg > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .seg > button:hover {
+    color: var(--text);
+  }
+  .seg > button[aria-pressed="true"],
+  .seg > button[aria-selected="true"] {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-xs);
+  }
+  .seg > button:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+  }
+  .seg-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Notifications */
+  .notif-cell {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+  }
+  .notif-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: transparent;
+  }
+  .notif-cell.is-unread .notif-dot {
+    background: var(--brand);
+  }
+  .notif-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .notif-subject {
+    font-weight: var(--fw-medium);
+    color: var(--text);
+  }
+  .notif-cell.is-unread .notif-subject {
+    font-weight: var(--fw-semibold);
+  }
+  .notif-msg {
+    font-size: 13px;
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Sécurité */
+  .mfa-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .mfa-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: var(--surface-2);
+    color: var(--text-muted);
+  }
+  .mfa-icon.ok {
+    background: var(--ok-soft);
+    color: var(--ok-text);
+  }
+  .mfa-text {
+    flex: 1;
+    min-width: 220px;
+  }
+  .mfa-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .mfa-text p {
+    margin: 4px 0 0;
+    font-size: 13px;
+  }
+  .deleg-qui {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .shell-path {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    word-break: break-all;
+  }
+
+  /* Administration */
+  .compte-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .compte-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+  }
+  .compte-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.3;
+  }
+  .compte-nom {
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+  }
+  .compte-mail {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .badge-row {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .audit-diff {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12.5px;
+    display: grid;
+    gap: 2px;
+  }
+  .audit-champ {
+    font-weight: var(--fw-semibold);
+  }
+  .audit-brut {
+    font-size: 12.5px;
+  }
+  .audit-objet {
+    white-space: nowrap;
+  }
+
+  /* Matrice rôle → modules : première colonne collante, coches sobres */
+  .matrice-wrap {
+    overflow-x: auto;
+  }
+  .table.matrice th,
+  .table.matrice td {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .table.matrice thead th {
+    white-space: nowrap;
+    font-weight: var(--fw-semibold);
+    color: var(--text-muted);
+  }
+  .table.matrice th.matrice-mod {
+    text-align: center;
+    min-width: 76px;
+    white-space: normal;
+    line-height: 1.25;
+    vertical-align: bottom;
+  }
+  .table.matrice tbody th {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
+    text-align: left;
+    font-weight: var(--fw-medium);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .table.matrice thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--surface);
+  }
+  .matrice-cell {
+    text-align: center;
+  }
+  .matrice-oui {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+  .matrice-non {
+    color: var(--border-strong);
+  }
+
+  /* Pages de la coquille : cartes espacées, en-têtes de carte qui passent à la ligne sans écraser les actions. */
+  .shell-page > * + .card {
+    margin-top: 16px;
+  }
+  .shell-page .card-header {
+    flex-wrap: wrap;
+    gap: 12px 16px;
+  }
+  .shell-page .card-header > :first-child {
+    flex: 1 1 320px;
+    min-width: 0;
+  }
+  .shell-page .card-header > :last-child:not(:first-child) {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .shell-page .card-header .btn {
+    white-space: nowrap;
+  }
+  /* Filtre + recherche sur une seule ligne au-dessus de la grille. */
+  .list-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .list-tools > .shell-toolbar.inline {
+    margin: 0;
+    order: 2;
+  }
+  .list-tools > .search-field {
+    order: 1;
+    margin: 0;
+  }
+  .list-tools > .ui-grid-root {
+    order: 3;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shell-v2,
+    .shell-v2 .nav-link,
+    .shell-v2 .nav-group-chevron,
+    .profile-trigger,
+    .seg > button {
+      transition: none;
+    }
+  }
+}
