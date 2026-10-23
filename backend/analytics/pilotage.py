@@ -103,12 +103,12 @@ def cashflow_13_semaines(today=None):
     payees = set(valides.filter(facture__isnull=False).values_list("facture_id", flat=True))
     for inv in PurchaseInvoice.objects.filter(
         status__in=(PurchaseInvoice.Status.RAPPROCHEE, PurchaseInvoice.Status.COMPTABILISEE)
-    ).annotate(total=Sum("lines__price_total")):
+    ).annotate(total_lignes=Sum("lines__price_total")):  # pas `total` : propriété du modèle (non affectable)
         if inv.pk in payees:
             continue
         i = semaine(inv.invoice_date + timedelta(days=delai_dec))
         if i is not None:
-            dec[i] += inv.total or ZERO
+            dec[i] += inv.total_lignes or ZERO
     regle_eng = dict(
         valides.filter(engagement__isnull=False).values("engagement_id").annotate(t=Sum("montant")).values_list("engagement_id", "t")
     )
