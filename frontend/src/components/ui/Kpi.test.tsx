@@ -1,7 +1,22 @@
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Kpi } from "./Kpi";
+
+// jsdom n'a pas d'IntersectionObserver (compteur animé : useInView de motion).
+beforeAll(() => {
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    },
+  );
+});
 
 describe("<Kpi />", () => {
   it("montant : nombre et unité insécables, coupure permise seulement entre les deux", () => {
