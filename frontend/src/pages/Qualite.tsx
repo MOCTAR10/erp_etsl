@@ -245,6 +245,7 @@ export function QualitePage() {
     <>
       <PageHeader
         title={t("qualite.title")}
+        subtitle={t("tableaux.entetes.qualite")}
         actions={
           <QuickForm
             title={t("qualite.form.title")}

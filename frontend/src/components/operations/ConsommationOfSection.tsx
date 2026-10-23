@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { EmptyState, QuickForm, SectionCard } from "../ui";
+import { DataTable, EmptyState, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface Ordre {
   id: string;
@@ -64,6 +65,16 @@ export function ConsommationOfSection() {
     retry: 0,
   }).data?.lignes ?? [];
   const dispo = quants.filter((q) => Number(q.quantity) > 0);
+  const cols: Column<Ligne>[] = [
+    { key: "code", header: t("ecarts_a3.conso.cols.code"), sortValue: (l) => l.code, render: (l) => l.code },
+    { key: "date", header: t("ecarts_a3.conso.cols.date"), sortValue: (l) => l.date, render: (l) => formatDate(l.date) },
+    { key: "article", header: t("ecarts_a3.conso.cols.article"), sortValue: (l) => l.article_code, render: (l) => `${l.article_code} · ${l.article_label}` },
+    { key: "lot", header: t("ecarts_a3.conso.cols.lot"), render: (l) => l.lot_code ?? "—" },
+    { key: "coulee", header: t("ecarts_a3.conso.cols.coulee"), render: (l) => l.numero_coulee || "—" },
+    { key: "depot", header: t("ecarts_a3.conso.cols.depot"), render: (l) => l.depot_code ?? "—" },
+    { key: "quantite", header: t("ecarts_a3.conso.cols.quantite"), num: true, sortValue: (l) => Number(l.quantite), render: (l) => formatNumber(Number(l.quantite), { decimals: Number.isInteger(Number(l.quantite)) ? 0 : 2 }) },
+    { key: "valeur", header: t("ecarts_a3.conso.cols.valeur"), num: true, sortValue: (l) => (l.valeur === null ? null : Number(l.valeur)), render: (l) => formatMoney(l.valeur) },
+  ];
 
   return (
     <SectionCard title={t("ecarts_a3.conso.title")} subtitle={t("ecarts_a3.conso.hint")}>
@@ -106,36 +117,9 @@ export function ConsommationOfSection() {
         (lignes.length === 0 ? (
           <EmptyState label={t("ecarts_a3.conso.vide")} />
         ) : (
-          <table className="table" data-testid="consommations-of">
-            <thead>
-              <tr>
-                <th>{t("ecarts_a3.conso.cols.code")}</th>
-                <th>{t("ecarts_a3.conso.cols.date")}</th>
-                <th>{t("ecarts_a3.conso.cols.article")}</th>
-                <th>{t("ecarts_a3.conso.cols.lot")}</th>
-                <th>{t("ecarts_a3.conso.cols.coulee")}</th>
-                <th>{t("ecarts_a3.conso.cols.depot")}</th>
-                <th className="num">{t("ecarts_a3.conso.cols.quantite")}</th>
-                <th className="num">{t("ecarts_a3.conso.cols.valeur")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lignes.map((l) => (
-                <tr key={l.id}>
-                  <td>{l.code}</td>
-                  <td>{formatDate(l.date)}</td>
-                  <td>
-                    {l.article_code} · {l.article_label}
-                  </td>
-                  <td>{l.lot_code ?? "—"}</td>
-                  <td>{l.numero_coulee || "—"}</td>
-                  <td>{l.depot_code ?? "—"}</td>
-                  <td className="num">{formatNumber(Number(l.quantite))}</td>
-                  <td className="num">{formatMoney(l.valeur)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div data-testid="consommations-of">
+            <DataTable columns={cols} rows={lignes} caption={t("ecarts_a3.conso.title")} />
+          </div>
         ))}
     </SectionCard>
   );

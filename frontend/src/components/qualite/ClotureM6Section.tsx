@@ -1,10 +1,11 @@
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatNumber } from "../../lib/format";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
-import { ActionBar, Badge, Pagination, QuickForm, SearchField, SectionCard } from "../ui";
+import { ActionBar, Badge, PagedDataGrid, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface Instrument {
   id: string;
@@ -58,186 +59,179 @@ export function ClotureM6Section() {
   const instruments = useList<Instrument>("instruments", "/api/qualite/instruments/");
   const joints = useList<Joint>("joints", "/api/qualite/joints/");
   const epreuves = useList<Epreuve>("epreuves", "/api/qualite/epreuves/");
-  const instRows = instruments.rows;
-  const jointRows = joints.rows;
-  const epRows = epreuves.rows;
   const echeance = (mois: number) => {
     const d = new Date();
     d.setMonth(d.getMonth() + (mois || 12));
     return d.toISOString().slice(0, 10);
   };
   const TYPES_EQUIPEMENT = ["instrument", "poste_souder", "four_tth", "manometre", "thermometre", "autre"];
+  const actionsHeader = <span className="sr-only">{t("ui.actions")}</span>;
+
+  const instCols: Column<Instrument>[] = [
+    { key: "code", header: t("qualite.col.code"), render: (i) => i.code, sortValue: (i) => i.code },
+    {
+      key: "designation",
+      header: t("qualite.m6.designation"),
+      render: (i) => (
+        <>
+          {i.designation} <span className="muted">· {i.numero_serie}</span>
+        </>
+      ),
+      sortValue: (i) => i.designation,
+    },
+    {
+      key: "type",
+      header: t("qualite.col.type"),
+      render: (i) => (
+        <>
+          {i.type_label}
+          <span className="muted">
+            {" "}
+            · {t(`qualite.m6.ops.${i.operation_attendue}`)} / {i.periodicite_mois} {t("qualite.m6.mois")}
+            {i.organisme ? ` · ${i.organisme}` : ""}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "echeance",
+      header: t("qualite.m6.echeance"),
+      render: (i) => formatDate(i.echeance_etalonnage, i18n.language),
+      sortValue: (i) => i.echeance_etalonnage,
+    },
+    {
+      key: "statut",
+      header: t("qualite.col.statut"),
+      render: (i) => <Badge tone={i.utilisable ? "ok" : "err"}>{i.utilisable ? t("qualite.m6.utilisable") : t("qualite.m6.usageBloque")}</Badge>,
+    },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (i) => (
+        <div className="action-bar-buttons">
+          <ActionBar
+            actions={[
+              {
+                label: t("qualite.m6.etalonnerConforme"),
+                path: `/api/qualite/instruments/${i.id}/etalonner/`,
+                body: { conforme: true, echeance: echeance(i.periodicite_mois) },
+                confirm: t("qualite.m6.confirmEtalonnage"),
+              },
+              {
+                label: t("qualite.m6.horsTolerance"),
+                path: `/api/qualite/instruments/${i.id}/etalonner/`,
+                body: { conforme: false },
+                tone: "danger",
+                confirm: t("qualite.m6.confirmHorsTolerance"),
+              },
+            ]}
+          />
+          <button type="button" className="btn ghost sm" onClick={() => void api.download(`/api/qualite/instruments/${i.id}/etiquette/`, `etiquette-${i.code}.pdf`)}>
+            {t("qualite.m6.etiquette")}
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const jointCols: Column<Joint>[] = [
+    { key: "code", header: t("qualite.col.code"), render: (j) => j.code, sortValue: (j) => j.code },
+    { key: "of", header: t("qualite.m6.of"), render: (j) => j.ordre_code ?? "—", sortValue: (j) => j.ordre_code },
+    { key: "repere", header: t("qualite.m6.joint"), render: (j) => j.repere },
+    { key: "soudeur", header: t("qualite.col.soudeur"), render: (j) => j.soudeur_nom, sortValue: (j) => j.soudeur_nom },
+    { key: "wps", header: "WPS", render: (j) => j.wps_code ?? "—" },
+    { key: "coulee", header: t("qualite.m6.coulee"), render: (j) => j.numero_coulee || "—" },
+    { key: "date", header: t("qualite.col.date"), render: (j) => formatDate(j.date_soudage, i18n.language), sortValue: (j) => j.date_soudage },
+  ];
+
+  const epCols: Column<Epreuve>[] = [
+    { key: "code", header: t("qualite.col.code"), render: (e) => e.code, sortValue: (e) => e.code },
+    { key: "of", header: t("qualite.m6.of"), render: (e) => e.ordre_code ?? "—", sortValue: (e) => e.ordre_code },
+    {
+      key: "pression",
+      header: t("qualite.m6.pressionEssai"),
+      num: true,
+      render: (e) => `${formatNumber(e.pression_essai, { decimals: 1 })} bar · ${e.duree_minutes} min`,
+      sortValue: (e) => Number(e.pression_essai),
+    },
+    { key: "releves", header: t("qualite.m6.releves"), num: true, render: (e) => e.releves.length, sortValue: (e) => e.releves.length },
+    {
+      key: "resultat",
+      header: t("qualite.col.resultat"),
+      render: (e) =>
+        e.statut === "conclue" ? (
+          <Badge tone={e.resultat === "conforme" ? "ok" : "err"}>{t(`qualite.m6.res.${e.resultat}`)}</Badge>
+        ) : (
+          <Badge tone="warn">{e.statut_label}</Badge>
+        ),
+    },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (e) =>
+        e.statut === "en_cours" ? (
+          <ActionBar actions={[{ label: t("qualite.m6.conclure"), path: `/api/qualite/epreuves/${e.id}/conclure/`, confirm: t("qualite.m6.confirmConclure") }]} />
+        ) : null,
+    },
+  ];
 
   return (
     <>
-      <SectionCard title={`${t("qualite.m6.metrologie")} · ${instruments.count}`}>
-        <QuickForm
-          title={t("qualite.m6.newInstrument")}
-          endpoint="/api/qualite/instruments/"
-          fields={[
-            { name: "designation", label: t("qualite.m6.designation"), required: true },
-            {
-              name: "type_equipement",
-              label: t("qualite.col.type"),
-              type: "select",
-              required: true,
-              defaultValue: "instrument",
-              options: TYPES_EQUIPEMENT.map((v) => ({ value: v, label: t(`qualite.m6.types.${v}`) })),
-            },
-            { name: "periodicite_mois", label: t("qualite.m6.periodicite"), type: "number", min: 1, defaultValue: "12" },
-            { name: "organisme", label: t("qualite.m6.organisme") },
-            { name: "localisation", label: t("qualite.m6.localisation") },
-            { name: "numero_serie", label: t("qualite.m6.serie"), required: true },
-            { name: "date_etalonnage", label: t("qualite.m6.dernierEtalonnage"), type: "date", required: true },
-            { name: "echeance_etalonnage", label: t("qualite.m6.echeance"), type: "date", required: true },
-          ]}
+      <SectionCard
+        title={`${t("qualite.m6.metrologie")} · ${instruments.count}`}
+        actions={
+          <QuickForm
+            title={t("qualite.m6.newInstrument")}
+            endpoint="/api/qualite/instruments/"
+            fields={[
+              { name: "designation", label: t("qualite.m6.designation"), required: true },
+              {
+                name: "type_equipement",
+                label: t("qualite.col.type"),
+                type: "select",
+                required: true,
+                defaultValue: "instrument",
+                options: TYPES_EQUIPEMENT.map((v) => ({ value: v, label: t(`qualite.m6.types.${v}`) })),
+              },
+              { name: "periodicite_mois", label: t("qualite.m6.periodicite"), type: "number", min: 1, defaultValue: "12" },
+              { name: "organisme", label: t("qualite.m6.organisme") },
+              { name: "localisation", label: t("qualite.m6.localisation") },
+              { name: "numero_serie", label: t("qualite.m6.serie"), required: true },
+              { name: "date_etalonnage", label: t("qualite.m6.dernierEtalonnage"), type: "date", required: true },
+              { name: "echeance_etalonnage", label: t("qualite.m6.echeance"), type: "date", required: true },
+            ]}
+          />
+        }
+      >
+        <PagedDataGrid
+          list={instruments}
+          columns={instCols}
+          caption={t("qualite.m6.metrologie")}
+          searchPlaceholder={t("qualite.m6.searchInstruments")}
+          maxHeight="none"
         />
-        <SearchField value={instruments.search} onChange={instruments.setSearch} placeholder={t("qualite.m6.searchInstruments")} />
-        {instRows.length > 0 && (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("qualite.col.code")}</th>
-                  <th>{t("qualite.m6.designation")}</th>
-                  <th>{t("qualite.col.type")}</th>
-                  <th>{t("qualite.m6.echeance")}</th>
-                  <th>{t("qualite.col.statut")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {instRows.map((i) => (
-                  <tr key={i.id}>
-                    <td>{i.code}</td>
-                    <td>
-                      {i.designation} <span className="muted">· {i.numero_serie}</span>
-                    </td>
-                    <td>
-                      {i.type_label}
-                      <span className="muted">
-                        {" "}
-                        · {t(`qualite.m6.ops.${i.operation_attendue}`)} / {i.periodicite_mois} {t("qualite.m6.mois")}
-                        {i.organisme ? ` · ${i.organisme}` : ""}
-                      </span>
-                    </td>
-                    <td>{formatDate(i.echeance_etalonnage, i18n.language)}</td>
-                    <td>
-                      <Badge tone={i.utilisable ? "ok" : "err"}>{i.utilisable ? t("qualite.m6.utilisable") : t("qualite.m6.usageBloque")}</Badge>
-                    </td>
-                    <td>
-                      <ActionBar
-                        actions={[
-                          {
-                            label: t("qualite.m6.etalonnerConforme"),
-                            path: `/api/qualite/instruments/${i.id}/etalonner/`,
-                            body: { conforme: true, echeance: echeance(i.periodicite_mois) },
-                            confirm: t("qualite.m6.confirmEtalonnage"),
-                          },
-                          {
-                            label: t("qualite.m6.horsTolerance"),
-                            path: `/api/qualite/instruments/${i.id}/etalonner/`,
-                            body: { conforme: false },
-                            tone: "danger",
-                            confirm: t("qualite.m6.confirmHorsTolerance"),
-                          },
-                        ]}
-                      />{" "}
-                      <button type="button" className="btn ghost" onClick={() => void api.download(`/api/qualite/instruments/${i.id}/etiquette/`, `etiquette-${i.code}.pdf`)}>
-                        {t("qualite.m6.etiquette")}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <Pagination page={instruments.page} pageSize={instruments.pageSize} count={instruments.count} onPageChange={instruments.setPage} onPageSizeChange={instruments.setPageSize} />
       </SectionCard>
 
       <SectionCard title={`${t("qualite.m6.joints")} · ${joints.count}`}>
-        <SearchField value={joints.search} onChange={joints.setSearch} placeholder={t("qualite.m6.searchJoints")} />
-        {jointRows.length === 0 ? (
-          <p className="muted">{t("qualite.m6.jointsVide")}</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("qualite.col.code")}</th>
-                  <th>{t("qualite.m6.of")}</th>
-                  <th>{t("qualite.m6.joint")}</th>
-                  <th>{t("qualite.col.soudeur")}</th>
-                  <th>WPS</th>
-                  <th>{t("qualite.m6.coulee")}</th>
-                  <th>{t("qualite.col.date")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jointRows.map((j) => (
-                  <tr key={j.id}>
-                    <td>{j.code}</td>
-                    <td>{j.ordre_code}</td>
-                    <td>{j.repere}</td>
-                    <td>{j.soudeur_nom}</td>
-                    <td>{j.wps_code}</td>
-                    <td>{j.numero_coulee}</td>
-                    <td>{formatDate(j.date_soudage, i18n.language)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <Pagination page={joints.page} pageSize={joints.pageSize} count={joints.count} onPageChange={joints.setPage} onPageSizeChange={joints.setPageSize} />
+        <PagedDataGrid
+          list={joints}
+          columns={jointCols}
+          caption={t("qualite.m6.joints")}
+          searchPlaceholder={t("qualite.m6.searchJoints")}
+          emptyLabel={t("qualite.m6.jointsVide")}
+          maxHeight="none"
+        />
       </SectionCard>
 
       <SectionCard title={`${t("qualite.m6.epreuves")} · ${epreuves.count}`}>
-        <SearchField value={epreuves.search} onChange={epreuves.setSearch} placeholder={t("qualite.m6.searchEpreuves")} />
-        {epRows.length === 0 ? (
-          <p className="muted">{t("qualite.m6.epreuvesVide")}</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("qualite.col.code")}</th>
-                  <th>{t("qualite.m6.of")}</th>
-                  <th className="num">{t("qualite.m6.pressionEssai")}</th>
-                  <th className="num">{t("qualite.m6.releves")}</th>
-                  <th>{t("qualite.col.resultat")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {epRows.map((e) => (
-                  <tr key={e.id}>
-                    <td>{e.code}</td>
-                    <td>{e.ordre_code}</td>
-                    <td className="num">
-                      {e.pression_essai} bar · {e.duree_minutes} min
-                    </td>
-                    <td className="num">{e.releves.length}</td>
-                    <td>
-                      {e.statut === "conclue" ? (
-                        <Badge tone={e.resultat === "conforme" ? "ok" : "err"}>{t(`qualite.m6.res.${e.resultat}`)}</Badge>
-                      ) : (
-                        <Badge tone="warn">{e.statut_label}</Badge>
-                      )}
-                    </td>
-                    <td>
-                      {e.statut === "en_cours" && (
-                        <ActionBar actions={[{ label: t("qualite.m6.conclure"), path: `/api/qualite/epreuves/${e.id}/conclure/`, confirm: t("qualite.m6.confirmConclure") }]} />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <Pagination page={epreuves.page} pageSize={epreuves.pageSize} count={epreuves.count} onPageChange={epreuves.setPage} onPageSizeChange={epreuves.setPageSize} />
+        <PagedDataGrid
+          list={epreuves}
+          columns={epCols}
+          caption={t("qualite.m6.epreuves")}
+          searchPlaceholder={t("qualite.m6.searchEpreuves")}
+          emptyLabel={t("qualite.m6.epreuvesVide")}
+          maxHeight="none"
+        />
       </SectionCard>
     </>
   );

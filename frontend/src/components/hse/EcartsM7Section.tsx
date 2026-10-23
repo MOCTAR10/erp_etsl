@@ -1,11 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate } from "../../lib/format";
-import { describeError } from "../../lib/offlineQueue";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { formatDate, formatNumber } from "../../lib/format";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 import { useListeHse, type ValeurListeHse } from "./listesHse";
 
 interface Modele {
@@ -107,82 +108,89 @@ function Provisoire({ provisoire }: { provisoire: boolean }) {
   return provisoire ? <Badge tone="warn">{t(`${M}.provisoire`)}</Badge> : <Badge tone="ok">{t(`${M}.confirme`)}</Badge>;
 }
 
-/** Bouton d'édition PATCH (activer / désactiver une valeur de liste) : l'API garde les droits. */
-function PatchButton({ path, body, label }: { path: string; body: unknown; label: string }) {
-  const qc = useQueryClient();
-  const run = useMutation({ mutationFn: () => api.patch<unknown>(path, body), onSuccess: () => void qc.invalidateQueries() });
-  return (
-    <>
-      <button type="button" className="btn ghost" onClick={() => run.mutate()} disabled={run.isPending}>{label}</button>
-      {run.isError && <span role="alert" className="muted"> {describeError(run.error)}</span>}
-    </>
-  );
-}
+/** Quantité exacte (décimales significatives conservées, séparateurs français). */
+const quantite = (v: string) => {
+  const dec = (String(Number(v)).split(".")[1] ?? "").length;
+  return formatNumber(v, { decimals: Math.min(dec, 3) });
+};
 
 const CATEGORIES = ["type_permis", "type_incident", "type_dechet", "partage_gr"] as const;
 
-/** §9.2 : listes paramétrables (types de permis, d'incidents, de déchets ; destinataires du partage site GR). */
+
+/** Listes paramétrables (types de permis, d'incidents, de déchets ; destinataires du partage site GR). */
 export function ListesHseSection() {
   const { t } = useTranslation();
   const [categorie, setCategorie] = useState<(typeof CATEGORIES)[number]>("type_permis");
   const valeurs = useListe<ValeurListeHse>(`listes-${categorie}`, `/api/hse/listes/?categorie=${categorie}`);
-  return (
-    <SectionCard title={t(`${M}.listes.title`)}>
-      <div data-testid="listes-hse">
-        <p className="muted">{t(`${M}.listes.aide`)}</p>
-        <label>
-          {t(`${M}.listes.categorie`)}{" "}
-          <select value={categorie} onChange={(e) => setCategorie(e.target.value as (typeof CATEGORIES)[number])} aria-label={t(`${M}.listes.categorie`)}>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{t(`${M}.listes.categories.${c}`)}</option>)}
-          </select>
-        </label>{" "}
-        <QuickForm
-          title={t(`${M}.listes.ajouter`)}
-          endpoint="/api/hse/listes/"
-          transform={(v) => ({ ...v, categorie, gaz_obligatoire: v.gaz_obligatoire === "true", dangereux: v.dangereux === "true" })}
-          fields={[
-            { name: "code", label: t(`${M}.listes.code`), required: true },
-            { name: "libelle", label: t(`${M}.listes.libelle`), required: true },
-            ...(categorie === "type_permis" ? [{ name: "gaz_obligatoire", label: t(`${M}.listes.gaz`), type: "select" as const, defaultValue: "false", options: [{ value: "false", label: t(`${M}.non`) }, { value: "true", label: t(`${M}.oui`) }] }] : []),
-            ...(categorie === "type_dechet" ? [{ name: "dangereux", label: t(`${M}.listes.dangereux`), type: "select" as const, defaultValue: "false", options: [{ value: "false", label: t(`${M}.non`) }, { value: "true", label: t(`${M}.oui`) }] }] : []),
+  const columns: Column<ValeurListeHse>[] = [
+    { key: "code", header: t(`${M}.listes.code`), render: (v) => <code>{v.code}</code>, sortValue: (v) => v.code },
+    {
+      key: "libelle",
+      header: t(`${M}.listes.libelle`),
+      sortValue: (v) => v.libelle,
+      render: (v) => (
+        <>
+          {v.libelle} {v.gaz_obligatoire && <Badge tone="warn">{t(`${M}.listes.gaz`)}</Badge>}
+          {v.dangereux && <Badge tone="err">{t(`${M}.listes.dangereux`)}</Badge>}
+        </>
+      ),
+    },
+    {
+      key: "etat",
+      header: t(`${M}.listes.etat`),
+      render: (v) => (
+        <>
+          <Badge tone={v.actif ? "ok" : "neutral"}>{t(v.actif ? `${M}.actif` : `${M}.inactif`)}</Badge> <Provisoire provisoire={v.est_provisoire} />
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (v) => (
+        <ActionBar
+          actions={[
+            { label: t(v.actif ? `${M}.desactiver` : `${M}.activer`), path: `/api/hse/listes/${v.id}/`, method: "PATCH", body: { actif: !v.actif }, tone: "ghost" },
+            ...(v.est_provisoire ? [{ label: t(`${M}.confirmer`), path: `/api/hse/listes/${v.id}/confirmer/`, tone: "ghost" as const }] : []),
           ]}
         />
-        <table className="table">
-          <caption className="sr-only">{t(`${M}.listes.title`)}</caption>
-          <thead>
-            <tr>
-              <th>{t(`${M}.listes.code`)}</th>
-              <th>{t(`${M}.listes.libelle`)}</th>
-              <th>{t(`${M}.listes.etat`)}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {valeurs.map((v) => (
-              <tr key={v.id}>
-                <td><code>{v.code}</code></td>
-                <td>
-                  {v.libelle}
-                  {v.gaz_obligatoire && <Badge tone="warn">{t(`${M}.listes.gaz`)}</Badge>}
-                  {v.dangereux && <Badge tone="err">{t(`${M}.listes.dangereux`)}</Badge>}
-                </td>
-                <td>
-                  <Badge tone={v.actif ? "ok" : "neutral"}>{t(v.actif ? `${M}.actif` : `${M}.inactif`)}</Badge> <Provisoire provisoire={v.est_provisoire} />
-                </td>
-                <td>
-                  <PatchButton path={`/api/hse/listes/${v.id}/`} body={{ actif: !v.actif }} label={t(v.actif ? `${M}.desactiver` : `${M}.activer`)} />
-                  {v.est_provisoire && <ActionBar actions={[{ label: t(`${M}.confirmer`), path: `/api/hse/listes/${v.id}/confirmer/`, tone: "ghost" }]} />}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      ),
+    },
+  ];
+  return (
+    <SectionCard
+      title={t(`${M}.listes.title`)}
+      actions={
+        <SectionActions>
+          <QuickForm
+            title={t(`${M}.listes.ajouter`)}
+            endpoint="/api/hse/listes/"
+            transform={(v) => ({ ...v, categorie, gaz_obligatoire: v.gaz_obligatoire === "true", dangereux: v.dangereux === "true" })}
+            fields={[
+              { name: "code", label: t(`${M}.listes.code`), required: true },
+              { name: "libelle", label: t(`${M}.listes.libelle`), required: true },
+              ...(categorie === "type_permis" ? [{ name: "gaz_obligatoire", label: t(`${M}.listes.gaz`), type: "select" as const, defaultValue: "false", options: [{ value: "false", label: t(`${M}.non`) }, { value: "true", label: t(`${M}.oui`) }] }] : []),
+              ...(categorie === "type_dechet" ? [{ name: "dangereux", label: t(`${M}.listes.dangereux`), type: "select" as const, defaultValue: "false", options: [{ value: "false", label: t(`${M}.non`) }, { value: "true", label: t(`${M}.oui`) }] }] : []),
+            ]}
+          />
+        </SectionActions>
+      }
+    >
+      <div data-testid="listes-hse">
+        <p className="muted">{t(`${M}.listes.aide`)}</p>
+        <div className="field">
+          <label htmlFor="listes-hse-categorie">{t(`${M}.listes.categorie`)}</label>
+          <select id="listes-hse-categorie" className="control" value={categorie} onChange={(e) => setCategorie(e.target.value as (typeof CATEGORIES)[number])} style={{ maxWidth: 320 }}>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{t(`${M}.listes.categories.${c}`)}</option>)}
+          </select>
+        </div>
+        <DataTable columns={columns} rows={valeurs} caption={t(`${M}.listes.title`)} emptyLabel={t("tableaux.hse.aucuneValeur")} />
       </div>
     </SectionCard>
   );
 }
 
-/** M7-02 : check-lists d'audit (trames provisoires), réponses, constats et rapport PDF. */
+/** Check-lists d'audit (trames provisoires), réponses, constats et rapport PDF. */
 export function ChecklistsAuditSection() {
   const { t } = useTranslation();
   const modeles = useListe<Modele>("modeles", "/api/hse/modeles-checklist/");
@@ -192,10 +200,58 @@ export function ChecklistsAuditSection() {
   const courant = audits.find((a) => a.id === audit);
   const ouverts = audits.filter((a) => a.statut !== "cloture");
   const gravites = ["mineur", "majeur", "critique"].map((g) => ({ value: g, label: t(`${M}.checklist.gravites.${g}`) }));
+  const colModeles: Column<Modele>[] = [
+    { key: "trame", header: t("tableaux.hse.trame"), sortValue: (m) => m.code, render: (m) => <><strong>{m.code}</strong> · {m.intitule}</> },
+    { key: "questions", header: t("tableaux.hse.questions"), num: true, render: (m) => t(`${M}.checklist.nbQuestions`, { n: m.questions.length }) },
+    { key: "etat", header: t("tableaux.hse.etat"), render: (m) => <Provisoire provisoire={m.est_provisoire} /> },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (m) => (m.est_provisoire ? <ActionBar actions={[{ label: t(`${M}.confirmer`), path: `/api/hse/modeles-checklist/${m.id}/confirmer/`, tone: "ghost" }]} /> : null),
+    },
+  ];
+  const colReponses: Column<Reponse>[] = [
+    { key: "ordre", header: t("tableaux.hse.numero"), num: true, width: 56, render: (r) => r.ordre },
+    { key: "question", header: t("tableaux.hse.question"), render: (r) => <>{r.question}{r.commentaire ? <div className="muted">{r.commentaire}</div> : null}</> },
+    {
+      key: "reponse",
+      header: t("tableaux.hse.reponse"),
+      render: (r) => (
+        <>
+          <Badge tone={r.reponse === "conforme" ? "ok" : r.reponse === "non_conforme" ? "err" : r.reponse === "sans_objet" ? "neutral" : "warn"}>{r.reponse_label}</Badge>
+          {r.constat_gravite && <span className="muted"> · {t(`${M}.checklist.gravites.${r.constat_gravite}`)}</span>}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (r) =>
+        courant && courant.statut !== "cloture" ? (
+          <ActionBar
+            actions={[
+              { label: t(`${M}.checklist.conforme`), path: `/api/hse/reponses-checklist/${r.id}/repondre/`, body: { reponse: "conforme" }, tone: "ghost" },
+              { label: t(`${M}.checklist.nonConforme`), path: `/api/hse/reponses-checklist/${r.id}/repondre/`, body: { reponse: "non_conforme" }, tone: "danger", prompt: { name: "gravite", label: t(`${M}.checklist.gravite`), options: gravites } },
+              { label: t(`${M}.checklist.sansObjet`), path: `/api/hse/reponses-checklist/${r.id}/repondre/`, body: { reponse: "sans_objet" }, tone: "ghost" },
+            ]}
+          />
+        ) : null,
+    },
+  ];
   return (
-    <SectionCard title={t(`${M}.checklist.title`)}>
-      <div data-testid="checklists-hse">
-        <div className="action-bar-buttons">
+    <SectionCard
+      title={t(`${M}.checklist.title`)}
+      actions={
+        <SectionActions>
+          <QuickForm
+            title={t(`${M}.checklist.constat`)}
+            endpoint="/api/hse/constats-audit/"
+            fields={[
+              { name: "audit", label: t(`${M}.checklist.audit`), type: "select", required: true, options: ouverts.map((a) => ({ value: a.id, label: `${a.code} · ${a.zone}` })) },
+              { name: "description", label: t(`${M}.checklist.description`), type: "textarea", required: true },
+              { name: "gravite", label: t(`${M}.checklist.gravite`), type: "select", required: true, defaultValue: "mineur", options: [{ value: "conforme", label: t(`${M}.checklist.gravites.conforme`) }, ...gravites] },
+            ]}
+          />
           <QuickForm
             title={t(`${M}.checklist.modele`)}
             endpoint="/api/hse/modeles-checklist/"
@@ -206,36 +262,18 @@ export function ChecklistsAuditSection() {
               { name: "questions_texte", label: t(`${M}.checklist.questions`), type: "textarea", required: true },
             ]}
           />
-          <QuickForm
-            title={t(`${M}.checklist.constat`)}
-            endpoint="/api/hse/constats-audit/"
-            fields={[
-              { name: "audit", label: t(`${M}.checklist.audit`), type: "select", required: true, options: ouverts.map((a) => ({ value: a.id, label: `${a.code} · ${a.zone}` })) },
-              { name: "description", label: t(`${M}.checklist.description`), type: "textarea", required: true },
-              { name: "gravite", label: t(`${M}.checklist.gravite`), type: "select", required: true, defaultValue: "mineur", options: [{ value: "conforme", label: t(`${M}.checklist.gravites.conforme`) }, ...gravites] },
-            ]}
-          />
-        </div>
-        <table className="table">
-          <caption className="sr-only">{t(`${M}.checklist.modeles`)}</caption>
-          <tbody>
-            {modeles.map((m) => (
-              <tr key={m.id}>
-                <td><strong>{m.code}</strong> · {m.intitule}</td>
-                <td>{t(`${M}.checklist.nbQuestions`, { n: m.questions.length })}</td>
-                <td><Provisoire provisoire={m.est_provisoire} /></td>
-                <td>{m.est_provisoire && <ActionBar actions={[{ label: t(`${M}.confirmer`), path: `/api/hse/modeles-checklist/${m.id}/confirmer/`, tone: "ghost" }]} />}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <label>
-          {t(`${M}.checklist.audit`)}{" "}
-          <select value={audit} onChange={(e) => setAudit(e.target.value)} aria-label={t(`${M}.checklist.choisirAudit`)}>
+        </SectionActions>
+      }
+    >
+      <div data-testid="checklists-hse">
+        <DataTable columns={colModeles} rows={modeles} caption={t(`${M}.checklist.modeles`)} emptyLabel={t("tableaux.hse.aucunModele")} />
+        <div className="field">
+          <label htmlFor="checklist-audit">{t(`${M}.checklist.audit`)}</label>
+          <select id="checklist-audit" className="control" value={audit} onChange={(e) => setAudit(e.target.value)} aria-label={t(`${M}.checklist.choisirAudit`)} style={{ maxWidth: 420 }}>
             <option value="">—</option>
             {audits.map((a) => <option key={a.id} value={a.id}>{`${a.code} · ${a.zone} · ${formatDate(a.date_prevue)}`}</option>)}
           </select>
-        </label>
+        </div>
         {courant && (
           <>
             <div className="action-bar-buttons">
@@ -253,32 +291,9 @@ export function ChecklistsAuditSection() {
             </div>
             {courant.score !== null && <p role="status">{t(`${M}.checklist.score`, { score: courant.score })}</p>}
             {reponses.length > 0 && (
-              <table className="table" data-testid="reponses-checklist">
-                <caption className="sr-only">{t(`${M}.checklist.title`)}</caption>
-                <tbody>
-                  {reponses.map((r) => (
-                    <tr key={r.id}>
-                      <td className="num">{r.ordre}</td>
-                      <td>{r.question}{r.commentaire ? <div className="muted">{r.commentaire}</div> : null}</td>
-                      <td>
-                        <Badge tone={r.reponse === "conforme" ? "ok" : r.reponse === "non_conforme" ? "err" : r.reponse === "sans_objet" ? "neutral" : "warn"}>{r.reponse_label}</Badge>
-                        {r.constat_gravite && <span className="muted"> · {t(`${M}.checklist.gravites.${r.constat_gravite}`)}</span>}
-                      </td>
-                      <td>
-                        {courant.statut !== "cloture" && (
-                          <ActionBar
-                            actions={[
-                              { label: t(`${M}.checklist.conforme`), path: `/api/hse/reponses-checklist/${r.id}/repondre/`, body: { reponse: "conforme" }, tone: "ghost" },
-                              { label: t(`${M}.checklist.nonConforme`), path: `/api/hse/reponses-checklist/${r.id}/repondre/`, body: { reponse: "non_conforme" }, tone: "danger", prompt: { name: "gravite", label: t(`${M}.checklist.gravite`), options: gravites } },
-                              { label: t(`${M}.checklist.sansObjet`), path: `/api/hse/reponses-checklist/${r.id}/repondre/`, body: { reponse: "sans_objet" }, tone: "ghost" },
-                            ]}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div data-testid="reponses-checklist">
+                <DataTable columns={colReponses} rows={reponses} caption={t(`${M}.checklist.title`)} />
+              </div>
             )}
           </>
         )}
@@ -287,17 +302,64 @@ export function ChecklistsAuditSection() {
   );
 }
 
-/** M7-03 : plan de prévention (inspection commune, risques, mesures) et saisie des risques à l'écran. */
+/** Plan de prévention (inspection commune, risques, mesures) et saisie des risques à l'écran. */
 export function PlansPreventionSection() {
   const { t } = useTranslation();
   const plans = useListe<Plan>("plans", "/api/hse/plans-prevention/");
   const risques = useListe<Risque>("risques", "/api/hse/evaluations-risques/?ouverts=1");
   const duers = useListe<Duer>("duers", "/api/hse/duer/");
   const ouiNon = [{ value: "false", label: t(`${M}.non`) }, { value: "true", label: t(`${M}.oui`) }];
+  const columns: Column<Plan>[] = [
+    {
+      key: "plan",
+      header: t(`${M}.pdp.plan`),
+      sortValue: (p) => p.code,
+      render: (p) => (
+        <>
+          <strong>{p.code}</strong> · {p.entreprise_exterieure} · {p.site} {p.site_gr && <Badge tone="brand">{t(`${M}.gr.badge`)}</Badge>}
+        </>
+      ),
+    },
+    {
+      key: "inspection",
+      header: t(`${M}.pdp.inspection`),
+      sortValue: (p) => p.date_inspection_commune,
+      render: (p) => (p.date_inspection_commune ? formatDate(p.date_inspection_commune) : "—"),
+    },
+    { key: "risques", header: t(`${M}.pdp.risques`), render: (p) => p.risques_detail.map((r) => `${r.code} (${r.score})`).join(", ") || "—" },
+    {
+      key: "statut",
+      header: t(`${M}.pdp.statut`),
+      render: (p) => (
+        <>
+          <Badge tone={p.statut === "valide" ? "ok" : p.statut === "clos" ? "neutral" : "warn"}>{p.statut_label}</Badge>
+          {p.en_vigueur && <span className="muted"> · {t(`${M}.pdp.enVigueur`)}</span>}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) => (
+        <ActionBar
+          actions={[
+            ...(p.statut === "brouillon"
+              ? [
+                  { label: t(`${M}.pdp.valider`), path: `/api/hse/plans-prevention/${p.id}/valider/` },
+                  { label: t(`${M}.pdp.ajouterRisque`), path: `/api/hse/plans-prevention/${p.id}/ajouter-risque/`, tone: "ghost" as const, prompt: { name: "risque", label: t(`${M}.pdp.risque`), options: risques.map((r) => ({ value: r.id, label: `${r.code} · ${r.description.slice(0, 50)} (${r.score})` })) } },
+                ]
+              : []),
+            ...(p.statut === "valide" ? [{ label: t(`${M}.pdp.clore`), path: `/api/hse/plans-prevention/${p.id}/cloturer/`, tone: "ghost" as const, confirm: t(`${M}.pdp.clore`) }] : []),
+          ]}
+        />
+      ),
+    },
+  ];
   return (
-    <SectionCard title={`${t(`${M}.pdp.title`)} · ${plans.length}`}>
-      <div data-testid="plans-prevention">
-        <div className="action-bar-buttons">
+    <SectionCard
+      title={`${t(`${M}.pdp.title`)} · ${plans.length}`}
+      actions={
+        <SectionActions>
           <QuickForm
             title={t(`${M}.pdp.nouveau`)}
             endpoint="/api/hse/plans-prevention/"
@@ -326,51 +388,12 @@ export function PlansPreventionSection() {
               { name: "duer", label: "DUER", type: "select", options: duers.filter((d) => d.statut !== "approuve").map((d) => ({ value: d.id, label: `${d.code} · ${d.perimetre}` })) },
             ]}
           />
-        </div>
+        </SectionActions>
+      }
+    >
+      <div data-testid="plans-prevention">
         <p className="muted">{t(`${M}.pdp.aide`)}</p>
-        {plans.length > 0 && (
-          <table className="table">
-            <caption className="sr-only">{t(`${M}.pdp.title`)}</caption>
-            <thead>
-              <tr>
-                <th>{t(`${M}.pdp.plan`)}</th>
-                <th>{t(`${M}.pdp.inspection`)}</th>
-                <th>{t(`${M}.pdp.risques`)}</th>
-                <th>{t(`${M}.pdp.statut`)}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {plans.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <strong>{p.code}</strong> · {p.entreprise_exterieure} · {p.site}
-                    {p.site_gr && <Badge tone="brand">{t(`${M}.gr.badge`)}</Badge>}
-                  </td>
-                  <td>{p.date_inspection_commune ? formatDate(p.date_inspection_commune) : "—"}</td>
-                  <td>{p.risques_detail.map((r) => `${r.code} (${r.score})`).join(", ") || "—"}</td>
-                  <td>
-                    <Badge tone={p.statut === "valide" ? "ok" : p.statut === "clos" ? "neutral" : "warn"}>{p.statut_label}</Badge>
-                    {p.en_vigueur && <span className="muted"> · {t(`${M}.pdp.enVigueur`)}</span>}
-                  </td>
-                  <td>
-                    <ActionBar
-                      actions={[
-                        ...(p.statut === "brouillon"
-                          ? [
-                              { label: t(`${M}.pdp.ajouterRisque`), path: `/api/hse/plans-prevention/${p.id}/ajouter-risque/`, tone: "ghost" as const, prompt: { name: "risque", label: t(`${M}.pdp.risque`), options: risques.map((r) => ({ value: r.id, label: `${r.code} · ${r.description.slice(0, 50)} (${r.score})` })) } },
-                              { label: t(`${M}.pdp.valider`), path: `/api/hse/plans-prevention/${p.id}/valider/` },
-                            ]
-                          : []),
-                        ...(p.statut === "valide" ? [{ label: t(`${M}.pdp.clore`), path: `/api/hse/plans-prevention/${p.id}/cloturer/`, tone: "ghost" as const, confirm: t(`${M}.pdp.clore`) }] : []),
-                      ]}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {plans.length > 0 && <DataTable columns={columns} rows={plans} caption={t(`${M}.pdp.title`)} />}
       </div>
     </SectionCard>
   );
@@ -384,21 +407,44 @@ export function BsdPrestatairesSection() {
   const types = useListeHse("type_dechet");
   const valides = prestataires.filter((p) => p.valide).map((p) => ({ value: p.id, label: `${p.nom} · ${p.numero_agrement}` }));
   const ouverts = bsds.filter((b) => b.statut !== "traite");
+  const colPrestataires: Column<Prestataire>[] = [
+    { key: "nom", header: t("tableaux.hse.prestataire"), sortValue: (p) => p.nom, render: (p) => <>{p.nom}{p.autorite ? <span className="muted"> · {p.autorite}</span> : null}</> },
+    { key: "agrement", header: t("tableaux.hse.agrement"), render: (p) => p.numero_agrement },
+    { key: "types", header: t("tableaux.hse.dechets"), render: (p) => p.types_dechets || t(`${M}.bsd.tous`) },
+    {
+      key: "validite",
+      header: t("tableaux.hse.validite"),
+      sortValue: (p) => p.date_fin_validite,
+      render: (p) => <>{formatDate(p.date_fin_validite)} <Badge tone={p.valide ? "ok" : "err"}>{t(p.valide ? `${M}.bsd.valide` : `${M}.bsd.expire`)}</Badge></>,
+    },
+  ];
+  const colBsd: Column<Bsd>[] = [
+    { key: "code", header: t("tableaux.hse.bordereau"), sortValue: (b) => b.code, render: (b) => <><strong>{b.code}</strong> · {b.type_label}</> },
+    { key: "quantite", header: t("tableaux.hse.quantite"), num: true, sortValue: (b) => Number(b.quantite), render: (b) => `${quantite(b.quantite)} ${b.unite}` },
+    { key: "prestataire", header: t("tableaux.hse.prestataire"), render: (b) => b.prestataire_nom ?? <Badge tone="warn">{t(`${M}.bsd.sansPrestataire`)}</Badge> },
+    { key: "statut", header: t("tableaux.hse.statut"), render: (b) => <Badge tone={b.statut === "emis" ? "brand" : "warn"}>{b.statut_label}</Badge> },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (b) => (
+        <ActionBar
+          actions={[
+            ...(b.statut === "en_attente"
+              ? [{ label: t(`${M}.bsd.emettre`), path: `/api/hse/bordereaux-dechets/${b.id}/emettre/`, prompt: { name: "numero_bsd", label: t(`${M}.bsd.numero`) } }]
+              : []),
+            ...(!b.prestataire && valides.length > 0
+              ? [{ label: t(`${M}.bsd.affecter`), path: `/api/hse/bordereaux-dechets/${b.id}/affecter-prestataire/`, tone: "ghost" as const, prompt: { name: "prestataire", label: t(`${M}.bsd.prestataireAgree`), options: valides } }]
+              : []),
+            ...(b.statut === "emis" ? [{ label: t(`${M}.bsd.traiter`), path: `/api/hse/bordereaux-dechets/${b.id}/traiter/`, confirm: t(`${M}.bsd.traiter`) }] : []),
+          ]}
+        />
+      ),
+    },
+  ];
   return (
     <SectionCard title={t(`${M}.bsd.title`)}>
       <div data-testid="bsd-prestataires">
-        <div className="action-bar-buttons">
-          <QuickForm
-            title={t(`${M}.bsd.prestataire`)}
-            endpoint="/api/hse/prestataires-dechets/"
-            fields={[
-              { name: "nom", label: t(`${M}.bsd.nom`), required: true },
-              { name: "numero_agrement", label: t(`${M}.bsd.agrement`), required: true },
-              { name: "autorite", label: t(`${M}.bsd.autorite`) },
-              { name: "types_dechets", label: t(`${M}.bsd.types`) },
-              { name: "date_fin_validite", label: t(`${M}.bsd.validite`), type: "date", required: true },
-            ]}
-          />
+        <SectionActions>
           <QuickForm
             title={t(`${M}.bsd.nouveau`)}
             endpoint="/api/hse/bordereaux-dechets/"
@@ -411,99 +457,88 @@ export function BsdPrestatairesSection() {
               { name: "destination", label: t(`${M}.bsd.destination`) },
             ]}
           />
-        </div>
+          <QuickForm
+            title={t(`${M}.bsd.prestataire`)}
+            endpoint="/api/hse/prestataires-dechets/"
+            fields={[
+              { name: "nom", label: t(`${M}.bsd.nom`), required: true },
+              { name: "numero_agrement", label: t(`${M}.bsd.agrement`), required: true },
+              { name: "autorite", label: t(`${M}.bsd.autorite`) },
+              { name: "types_dechets", label: t(`${M}.bsd.types`) },
+              { name: "date_fin_validite", label: t(`${M}.bsd.validite`), type: "date", required: true },
+            ]}
+          />
+        </SectionActions>
         <p className="muted">{t(`${M}.bsd.aide`)}</p>
-        {prestataires.length > 0 && (
-          <table className="table">
-            <caption className="sr-only">{t(`${M}.bsd.prestataires`)}</caption>
-            <tbody>
-              {prestataires.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.nom}{p.autorite ? <span className="muted"> · {p.autorite}</span> : null}</td>
-                  <td>{p.numero_agrement}</td>
-                  <td>{p.types_dechets || t(`${M}.bsd.tous`)}</td>
-                  <td>{formatDate(p.date_fin_validite)} <Badge tone={p.valide ? "ok" : "err"}>{t(p.valide ? `${M}.bsd.valide` : `${M}.bsd.expire`)}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {prestataires.length > 0 && <DataTable columns={colPrestataires} rows={prestataires} caption={t(`${M}.bsd.prestataires`)} />}
         {ouverts.length > 0 && (
-          <table className="table" data-testid="bsd-ouverts">
-            <caption className="sr-only">{t(`${M}.bsd.ouverts`)}</caption>
-            <tbody>
-              {ouverts.map((b) => (
-                <tr key={b.id}>
-                  <td><strong>{b.code}</strong> · {b.type_label}</td>
-                  <td className="num">{b.quantite} {b.unite}</td>
-                  <td>{b.prestataire_nom ?? <Badge tone="warn">{t(`${M}.bsd.sansPrestataire`)}</Badge>}</td>
-                  <td><Badge tone={b.statut === "emis" ? "brand" : "warn"}>{b.statut_label}</Badge></td>
-                  <td>
-                    <ActionBar
-                      actions={[
-                        ...(!b.prestataire && valides.length > 0
-                          ? [{ label: t(`${M}.bsd.affecter`), path: `/api/hse/bordereaux-dechets/${b.id}/affecter-prestataire/`, tone: "ghost" as const, prompt: { name: "prestataire", label: t(`${M}.bsd.prestataireAgree`), options: valides } }]
-                          : []),
-                        ...(b.statut === "en_attente"
-                          ? [{ label: t(`${M}.bsd.emettre`), path: `/api/hse/bordereaux-dechets/${b.id}/emettre/`, prompt: { name: "numero_bsd", label: t(`${M}.bsd.numero`) } }]
-                          : []),
-                        ...(b.statut === "emis" ? [{ label: t(`${M}.bsd.traiter`), path: `/api/hse/bordereaux-dechets/${b.id}/traiter/`, confirm: t(`${M}.bsd.traiter`) }] : []),
-                      ]}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div data-testid="bsd-ouverts">
+            <DataTable columns={colBsd} rows={ouverts} caption={t(`${M}.bsd.ouverts`)} />
+          </div>
         )}
       </div>
     </SectionCard>
   );
 }
 
-/** M7-08 : fiches sécurité (publiées = consultables sur /terrain, y compris hors ligne). */
+/** Fiches sécurité (publiées = consultables sur /terrain, y compris hors ligne). */
 export function FichesSecuriteSection() {
   const { t } = useTranslation();
   const fiches = useListe<Fiche>("fiches", "/api/hse/fiches-securite/");
   const types = useListeHse("type_permis");
-  return (
-    <SectionCard title={`${t(`${M}.fiches.title`)} · ${fiches.length}`}>
-      <div data-testid="fiches-securite">
-        <QuickForm
-          title={t(`${M}.fiches.nouvelle`)}
-          endpoint="/api/hse/fiches-securite/"
-          fields={[
-            { name: "titre", label: t(`${M}.fiches.titre`), required: true },
-            { name: "categorie", label: t(`${M}.fiches.categorie`), type: "select", options: types },
-            { name: "risques", label: t(`${M}.fiches.risques`), type: "textarea" },
-            { name: "consignes", label: t(`${M}.fiches.consignes`), type: "textarea", required: true },
-            { name: "epi", label: t(`${M}.fiches.epi`), type: "textarea" },
-            { name: "urgence", label: t(`${M}.fiches.urgence`), type: "textarea" },
+  const columns: Column<Fiche>[] = [
+    {
+      key: "fiche",
+      header: t("tableaux.hse.fiche"),
+      sortValue: (f) => f.code,
+      render: (f) => <><strong>{f.code}</strong> · {f.titre} <span className="muted">v{f.version}</span></>,
+    },
+    {
+      key: "statut",
+      header: t("tableaux.hse.statut"),
+      render: (f) => (
+        <>
+          <Badge tone={f.statut === "publiee" ? "ok" : f.statut === "retiree" ? "neutral" : "warn"}>{f.statut_label}</Badge>{" "}
+          {f.provisoire && <Badge tone="warn">{t(`${M}.provisoire`)}</Badge>}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (f) => (
+        <ActionBar
+          actions={[
+            ...(f.statut !== "publiee" ? [{ label: t(`${M}.fiches.publier`), path: `/api/hse/fiches-securite/${f.id}/publier/` }] : []),
+            ...(f.statut === "publiee" ? [{ label: t(`${M}.fiches.retirer`), path: `/api/hse/fiches-securite/${f.id}/retirer/`, tone: "ghost" as const }] : []),
           ]}
         />
+      ),
+    },
+  ];
+  return (
+    <SectionCard
+      title={`${t(`${M}.fiches.title`)} · ${fiches.length}`}
+      actions={
+        <SectionActions>
+          <QuickForm
+            title={t(`${M}.fiches.nouvelle`)}
+            endpoint="/api/hse/fiches-securite/"
+            fields={[
+              { name: "titre", label: t(`${M}.fiches.titre`), required: true },
+              { name: "categorie", label: t(`${M}.fiches.categorie`), type: "select", options: types },
+              { name: "risques", label: t(`${M}.fiches.risques`), type: "textarea" },
+              { name: "consignes", label: t(`${M}.fiches.consignes`), type: "textarea", required: true },
+              { name: "epi", label: t(`${M}.fiches.epi`), type: "textarea" },
+              { name: "urgence", label: t(`${M}.fiches.urgence`), type: "textarea" },
+            ]}
+          />
+        </SectionActions>
+      }
+    >
+      <div data-testid="fiches-securite">
         <p className="muted">{t(`${M}.fiches.aide`)}</p>
-        <table className="table">
-          <caption className="sr-only">{t(`${M}.fiches.title`)}</caption>
-          <tbody>
-            {fiches.map((f) => (
-              <tr key={f.id}>
-                <td><strong>{f.code}</strong> · {f.titre} <span className="muted">v{f.version}</span></td>
-                <td>
-                  <Badge tone={f.statut === "publiee" ? "ok" : f.statut === "retiree" ? "neutral" : "warn"}>{f.statut_label}</Badge>{" "}
-                  {f.provisoire && <Badge tone="warn">{t(`${M}.provisoire`)}</Badge>}
-                </td>
-                <td>
-                  <ActionBar
-                    actions={[
-                      ...(f.statut !== "publiee" ? [{ label: t(`${M}.fiches.publier`), path: `/api/hse/fiches-securite/${f.id}/publier/` }] : []),
-                      ...(f.statut === "publiee" ? [{ label: t(`${M}.fiches.retirer`), path: `/api/hse/fiches-securite/${f.id}/retirer/`, tone: "ghost" as const }] : []),
-                    ]}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable columns={columns} rows={fiches} caption={t(`${M}.fiches.title`)} emptyLabel={t("tableaux.hse.aucuneFiche")} />
       </div>
     </SectionCard>
   );

@@ -3,9 +3,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatMoney, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
 
 interface Ligne {
   id: string;
@@ -172,6 +175,8 @@ interface FnpApercu {
 const money = (v: string | null | undefined) => (v === null || v === undefined ? "••••••" : formatMoney(Number(v)));
 const pct = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${formatNumber(Number(v))} %`);
 const BASE = "/api/controle-gestion";
+/** Lignes calculées par le serveur (sans `id`) : identifiant stable pour la grille. */
+const withId = <R,>(rows: R[] | undefined, id: (r: R) => string) => (rows ?? []).map((r) => ({ ...r, id: id(r) }));
 
 function useList<T>(key: unknown[], path: string, enabled = true) {
   return useQuery({ queryKey: ["m11e", ...key], queryFn: () => api.listAll<T>(path), retry: 0, enabled }).data ?? [];
@@ -185,7 +190,7 @@ function Provisoire({ show }: { show: boolean | undefined }) {
   return show ? <Badge tone="warn">{t("ecarts_m11.provisoire")}</Badge> : null;
 }
 
-/** Table de paramétrage (RGM_*, KPI_CIBLES) : valeurs ETSL modifiables et confirmables, provisoires par défaut. */
+/** Table de paramétrage (structure, taux, pondérations, cibles des KPI) : valeurs ETSL modifiables et confirmables, provisoires par défaut. */
 function ParamTable({ table, title }: { table: string; title: string }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -195,46 +200,52 @@ function ParamTable({ table, title }: { table: string; title: string }) {
   const done = { onSuccess: () => { setEdit(null); setError(null); void qc.invalidateQueries(); }, onError: (e: unknown) => setError(describeError(e)) };
   const save = useMutation({ mutationFn: (v: { id: string; valeur: string }) => api.patch(`${BASE}/parametres/${v.id}/`, { valeur: v.valeur }), ...done });
   const confirm = useMutation({ mutationFn: (id: string) => api.post(`${BASE}/parametres/${id}/confirmer/`), ...done });
+  const columns: Column<Param>[] = [
+    { key: "label", header: t("tableaux.controleGestion.parametre"), render: (p) => p.label },
+    {
+      key: "valeur",
+      header: t("tableaux.controleGestion.valeur"),
+      num: true,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <input aria-label={p.label} className="control" type="number" step="0.01" value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+        ) : (
+          `${formatNumber(Number(p.valeur))} ${p.unite}`
+        ),
+    },
+    {
+      key: "statut",
+      header: t("tableaux.controleGestion.statut"),
+      render: (p) => (p.est_provisoire ? <Badge tone="warn">{t("ecarts_m11.provisoire")}</Badge> : <Badge tone="ok">{t("ecarts_m11.confirme")}</Badge>),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <button type="button" className="btn primary sm" onClick={() => save.mutate(edit)}>
+            {t("ecarts_m11.enregistrer")}
+          </button>
+        ) : (
+          <div className="action-bar-buttons">
+            <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
+              {t("ecarts_m11.modifier")}
+            </button>
+            {p.est_provisoire && (
+              <button type="button" className="btn ghost sm" onClick={() => confirm.mutate(p.id)}>
+                {t("ecarts_m11.confirmer")}
+              </button>
+            )}
+          </div>
+        ),
+    },
+  ];
   return (
     <>
-      <h3>
-        {title} <code>{table}</code>
-      </h3>
-      <table className="table" data-testid={`table-${table}`}>
-        <tbody>
-          {rows.map((p) => (
-            <tr key={p.id}>
-              <td>{p.label}</td>
-              <td>
-                {edit?.id === p.id ? (
-                  <input aria-label={p.label} type="number" step="0.01" value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-                ) : (
-                  `${formatNumber(Number(p.valeur))} ${p.unite}`
-                )}
-              </td>
-              <td>{p.est_provisoire ? <Badge tone="warn">{t("ecarts_m11.provisoire")}</Badge> : <Badge tone="ok">{t("ecarts_m11.confirme")}</Badge>}</td>
-              <td>
-                {edit?.id === p.id ? (
-                  <button type="button" className="btn primary" onClick={() => save.mutate(edit)}>
-                    {t("ecarts_m11.enregistrer")}
-                  </button>
-                ) : (
-                  <>
-                    <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
-                      {t("ecarts_m11.modifier")}
-                    </button>
-                    {p.est_provisoire && (
-                      <button type="button" className="btn ghost" onClick={() => confirm.mutate(p.id)}>
-                        {t("ecarts_m11.confirmer")}
-                      </button>
-                    )}
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <h3>{title}</h3>
+      <div data-testid={`table-${table}`}>
+        <DataTable columns={columns} rows={rows} caption={title} density="compact" />
+      </div>
       {error && (
         <p className="action-error" role="alert">
           {error}
@@ -257,6 +268,26 @@ function EditionBrouillon({ budgets }: { budgets: BudgetM11[] }) {
   const saveBudget = useMutation({ mutationFn: () => api.patch(`${BASE}/budgets/${id}/`, form), ...ok });
   const saveLigne = useMutation({ mutationFn: (v: { id: string; montant: string }) => api.patch(`${BASE}/budget-lignes/${v.id}/`, { montant: v.montant }), ...ok });
   if (brouillons.length === 0) return <p className="muted">{t("ecarts_m11.edition.aucun")}</p>;
+  const lignesCols: Column<Ligne>[] = [
+    { key: "periode", header: t("tableaux.controleGestion.periode"), render: (l) => l.period_label, sortValue: (l) => l.period },
+    { key: "montant", header: t("tableaux.controleGestion.montant"), num: true, render: (l) => money(l.montant) },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (l) => (
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => {
+            const v = window.prompt(t("ecarts_m11.edition.nouveauMontant"), l.montant ?? "");
+            if (v !== null) saveLigne.mutate({ id: l.id, montant: v });
+          }}
+        >
+          {t("ecarts_m11.modifier")}
+        </button>
+      ),
+    },
+  ];
   return (
     <div data-testid="edition-brouillon">
       <div className="field" style={{ maxWidth: "24rem" }}>
@@ -302,28 +333,7 @@ function EditionBrouillon({ budgets }: { budgets: BudgetM11[] }) {
           <button type="button" className="btn primary" onClick={() => saveBudget.mutate()}>
             {t("ecarts_m11.enregistrer")}
           </button>
-          <table className="table">
-            <tbody>
-              {budget.lignes.map((l) => (
-                <tr key={l.id}>
-                  <td>{l.period_label}</td>
-                  <td>{money(l.montant)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={() => {
-                        const v = window.prompt(t("ecarts_m11.edition.nouveauMontant"), l.montant ?? "");
-                        if (v !== null) saveLigne.mutate({ id: l.id, montant: v });
-                      }}
-                    >
-                      {t("ecarts_m11.modifier")}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable columns={lignesCols} rows={budget.lignes} caption={t("ecarts_m11.edition.budget")} density="compact" />
         </>
       )}
       {msg && (
@@ -335,8 +345,8 @@ function EditionBrouillon({ budgets }: { budgets: BudgetM11[] }) {
   );
 }
 
-/** Écarts M11 : révision par ligne, tables RGM, axes, pipe → budget, imputation de structure, KPI, tableaux de bord,
- *  marge d'affaire, coût MO, plans d'action, reporting archivé, revue P-M11.10, provision 408. */
+/** Écarts M11 : révision par ligne, tables de paramétrage, axes, pipe → budget, imputation de structure, KPI, tableaux de bord,
+ *  marge d'affaire, coût MO, plans d'action, reporting archivé, revue de performance, provision 408. */
 export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }) {
   const { t } = useTranslation();
   const fy = `fiscal_year=${fiscalYear}`;
@@ -374,53 +384,48 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
 
   return (
     <>
-      <SectionCard title={t("ecarts_m11.budget.title")}>
-        <EditionBrouillon budgets={budgets} />
-        <h3>{t("ecarts_m11.budget.revisionLigne")}</h3>
-        <div className="action-bar-buttons">
-          <QuickForm
-            title={t("ecarts_m11.budget.nouvelleRevision")}
-            endpoint={`${BASE}/revisions/`}
-            fields={[
-              { name: "budget", label: t("ecarts_m11.budget.budget"), type: "select", required: true, options: approuves.filter((b) => b.statut === "approuve").map((b) => ({ value: b.id, label: `${b.code} — ${b.label}` })) },
-              { name: "date_revision", label: t("ecarts_m11.budget.date"), type: "date", required: true, defaultValue: new Date().toISOString().slice(0, 10) },
-              { name: "commentaire", label: t("ecarts_m11.budget.commentaire") },
-            ]}
-          />
-          {revOuvertes.length > 0 && (
+      <SectionCard
+        title={t("ecarts_m11.budget.title")}
+        actions={
+          <SectionActions>
             <QuickForm
-              title={t("ecarts_m11.budget.reviserLigne")}
-              endpoint={`${BASE}/revision-lignes/`}
+              title={t("ecarts_m11.budget.nouvelleRevision")}
+              endpoint={`${BASE}/revisions/`}
               fields={[
-                { name: "revision", label: t("ecarts_m11.budget.revision"), type: "select", required: true, options: revOuvertes.map((r) => ({ value: r.id, label: `${r.code} · ${r.budget_code}` })) },
-                { name: "period", label: t("ecarts_m11.budget.periode"), type: "select", required: true, options: optPeriode },
-                { name: "nouveau_montant", label: t("ecarts_m11.budget.montantRevise"), type: "number", min: 0, step: "0.01", required: true },
+                { name: "budget", label: t("ecarts_m11.budget.budget"), type: "select", required: true, options: approuves.filter((b) => b.statut === "approuve").map((b) => ({ value: b.id, label: `${b.code} — ${b.label}` })) },
+                { name: "date_revision", label: t("ecarts_m11.budget.date"), type: "date", required: true, defaultValue: new Date().toISOString().slice(0, 10) },
+                { name: "commentaire", label: t("ecarts_m11.budget.commentaire") },
               ]}
             />
-          )}
+            {revOuvertes.length > 0 && (
+              <QuickForm
+                title={t("ecarts_m11.budget.reviserLigne")}
+                endpoint={`${BASE}/revision-lignes/`}
+                fields={[
+                  { name: "revision", label: t("ecarts_m11.budget.revision"), type: "select", required: true, options: revOuvertes.map((r) => ({ value: r.id, label: `${r.code} · ${r.budget_code}` })) },
+                  { name: "period", label: t("ecarts_m11.budget.periode"), type: "select", required: true, options: optPeriode },
+                  { name: "nouveau_montant", label: t("ecarts_m11.budget.montantRevise"), type: "number", min: 0, step: "0.01", required: true },
+                ]}
+              />
+            )}
+          </SectionActions>
+        }
+      >
+        <EditionBrouillon budgets={budgets} />
+        <h3>{t("ecarts_m11.budget.revisionLigne")}</h3>
+        <div data-testid="revision-lignes">
+          <DataTable
+            caption={t("ecarts_m11.budget.revisionLigne")}
+            rows={revLignes}
+            emptyLabel={t("tableaux.controleGestion.aucuneRevision")}
+            columns={[
+              { key: "revision", header: t("ecarts_m11.budget.revision"), render: (l) => l.revision_code, sortValue: (l) => l.revision_code },
+              { key: "periode", header: t("ecarts_m11.budget.periode"), render: (l) => l.period_label },
+              { key: "avant", header: t("ecarts_m11.budget.avant"), num: true, render: (l) => money(l.ancien_montant) },
+              { key: "apres", header: t("ecarts_m11.budget.apres"), num: true, render: (l) => money(l.nouveau_montant) },
+            ]}
+          />
         </div>
-        {revLignes.length > 0 && (
-          <table className="table" data-testid="revision-lignes">
-            <thead>
-              <tr>
-                <th>{t("ecarts_m11.budget.revision")}</th>
-                <th>{t("ecarts_m11.budget.periode")}</th>
-                <th>{t("ecarts_m11.budget.avant")}</th>
-                <th>{t("ecarts_m11.budget.apres")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {revLignes.map((l) => (
-                <tr key={l.id}>
-                  <td>{l.revision_code}</td>
-                  <td>{l.period_label}</td>
-                  <td>{money(l.ancien_montant)}</td>
-                  <td>{money(l.nouveau_montant)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
         <p className="muted">{t("ecarts_m11.budget.note")}</p>
       </SectionCard>
 
@@ -434,84 +439,77 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
         <ParamTable table="KPI_CIBLES" title={t("ecarts_m11.tables.kpi")} />
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m11.axes.title")}>
-        <div className="action-bar-buttons">
-          <ActionBar actions={[{ label: t("ecarts_m11.axes.initialiser"), path: `${BASE}/axes/initialiser/`, tone: "ghost" }]} />
-          <QuickForm
-            title={t("ecarts_m11.axes.nouvelAxe")}
-            endpoint={`${BASE}/axes/`}
-            fields={[
-              { name: "code", label: t("ecarts_m11.axes.code"), required: true },
-              { name: "label", label: t("ecarts_m11.axes.libelle"), required: true },
-              { name: "axis_type", label: t("ecarts_m11.axes.type"), type: "select", required: true, defaultValue: "centre_cout", options: ["projet", "chantier", "centre_cout", "site"].map((v) => ({ value: v, label: t(`ecarts_m11.axes.types.${v}`) })) },
-            ]}
-          />
-          <QuickForm
-            title={t("ecarts_m11.axes.nouvelleValeur")}
-            endpoint={`${BASE}/valeurs-axes/`}
-            fields={[
-              { name: "axis", label: t("ecarts_m11.axes.axe"), type: "select", required: true, options: axes.map((a) => ({ value: String(a.id), label: `${a.code} — ${a.label}` })) },
-              { name: "code", label: t("ecarts_m11.axes.code"), required: true },
-              { name: "label", label: t("ecarts_m11.axes.libelle"), required: true },
+      <SectionCard
+        title={t("ecarts_m11.axes.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("ecarts_m11.axes.nouvelAxe")}
+              endpoint={`${BASE}/axes/`}
+              fields={[
+                { name: "code", label: t("ecarts_m11.axes.code"), required: true },
+                { name: "label", label: t("ecarts_m11.axes.libelle"), required: true },
+                { name: "axis_type", label: t("ecarts_m11.axes.type"), type: "select", required: true, defaultValue: "centre_cout", options: ["projet", "chantier", "centre_cout", "site"].map((v) => ({ value: v, label: t(`ecarts_m11.axes.types.${v}`) })) },
+              ]}
+            />
+            <QuickForm
+              title={t("ecarts_m11.axes.nouvelleValeur")}
+              endpoint={`${BASE}/valeurs-axes/`}
+              fields={[
+                { name: "axis", label: t("ecarts_m11.axes.axe"), type: "select", required: true, options: axes.map((a) => ({ value: String(a.id), label: `${a.code} — ${a.label}` })) },
+                { name: "code", label: t("ecarts_m11.axes.code"), required: true },
+                { name: "label", label: t("ecarts_m11.axes.libelle"), required: true },
+              ]}
+            />
+            <ActionBar actions={[{ label: t("ecarts_m11.axes.initialiser"), path: `${BASE}/axes/initialiser/`, tone: "ghost" }]} />
+          </SectionActions>
+        }
+      >
+        <div data-testid="axes-analytiques">
+          <DataTable
+            caption={t("ecarts_m11.axes.title")}
+            rows={axes}
+            columns={[
+              { key: "axe", header: t("ecarts_m11.axes.axe"), render: (a) => `${a.code} — ${a.label}`, sortValue: (a) => a.code },
+              { key: "type", header: t("ecarts_m11.axes.type"), render: (a) => a.axis_type_label },
+              {
+                key: "valeurs",
+                header: t("ecarts_m11.axes.valeurs"),
+                render: (a) =>
+                  valeurs
+                    .filter((v) => v.axis_code === a.code)
+                    .map((v) => v.code)
+                    .join(", ") || "—",
+              },
             ]}
           />
         </div>
-        <table className="table" data-testid="axes-analytiques">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.axes.axe")}</th>
-              <th>{t("ecarts_m11.axes.type")}</th>
-              <th>{t("ecarts_m11.axes.valeurs")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {axes.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  {a.code} — {a.label}
-                </td>
-                <td>{a.axis_type_label}</td>
-                <td>
-                  {valeurs
-                    .filter((v) => v.axis_code === a.code)
-                    .map((v) => v.code)
-                    .join(", ") || "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
         <p className="muted">{t("ecarts_m11.axes.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m11.pipe.title")}>
+      <SectionCard
+        title={t("ecarts_m11.pipe.title")}
+        actions={
+          <ActionBar actions={[{ label: t("ecarts_m11.pipe.proposer"), path: `${BASE}/pipe-budget/proposer/`, body: { fiscal_year: fiscalYear }, confirm: t("ecarts_m11.pipe.confirm") }]} />
+        }
+      >
         <Provisoire show={pipe?.provisoire} />
-        <table className="table" data-testid="pipe-budget">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.pipe.categorie")}</th>
-              <th>{t("ecarts_m11.pipe.nb")}</th>
-              <th>{t("ecarts_m11.pipe.brut")}</th>
-              <th>{t("ecarts_m11.pipe.ponderation")}</th>
-              <th>{t("ecarts_m11.pipe.pondere")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(pipe?.categories ?? []).map((c) => (
-              <tr key={c.categorie}>
-                <td>{t(`ecarts_m11.pipe.cat.${c.categorie}`)}</td>
-                <td>{c.nb}</td>
-                <td>{money(c.brut)}</td>
-                <td>{pct(c.ponderation)}</td>
-                <td>{money(c.pondere)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="pipe-budget">
+          <DataTable
+            caption={t("ecarts_m11.pipe.title")}
+            rows={withId(pipe?.categories, (c) => c.categorie)}
+            columns={[
+              { key: "categorie", header: t("ecarts_m11.pipe.categorie"), render: (c) => t(`ecarts_m11.pipe.cat.${c.categorie}`) },
+              { key: "nb", header: t("ecarts_m11.pipe.nb"), num: true, render: (c) => formatNumber(c.nb), sortValue: (c) => c.nb },
+              { key: "brut", header: t("ecarts_m11.pipe.brut"), num: true, render: (c) => money(c.brut), sortValue: (c) => Number(c.brut ?? 0) },
+              { key: "ponderation", header: t("ecarts_m11.pipe.ponderation"), num: true, render: (c) => pct(c.ponderation) },
+              { key: "pondere", header: t("ecarts_m11.pipe.pondere"), num: true, render: (c) => money(c.pondere), sortValue: (c) => Number(c.pondere ?? 0) },
+            ]}
+          />
+        </div>
         <p>
-          <strong>{t("ecarts_m11.pipe.total")}</strong> : {money(pipe?.total)}
+          <strong>{t("ecarts_m11.pipe.total")}</strong> : <span className="amount">{money(pipe?.total)}</span>
         </p>
-        <ActionBar actions={[{ label: t("ecarts_m11.pipe.proposer"), path: `${BASE}/pipe-budget/proposer/`, body: { fiscal_year: fiscalYear }, confirm: t("ecarts_m11.pipe.confirm") }]} />
       </SectionCard>
 
       <SectionCard title={t("ecarts_m11.imputation.title")}>
@@ -519,229 +517,188 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
         <p>
           {t("ecarts_m11.imputation.cle")} : <strong>{imputation?.cle_label ?? "—"}</strong> · {t("ecarts_m11.imputation.structure")} : {money(imputation?.charges_structure)}
         </p>
-        <table className="table" data-testid="imputation-structure">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.col.affaire")}</th>
-              <th>{t("ecarts_m11.col.profil")}</th>
-              <th>{t("ecarts_m11.imputation.part")}</th>
-              <th>{t("ecarts_m11.col.produits")}</th>
-              <th>{t("ecarts_m11.imputation.margeDirecte")}</th>
-              <th>{t("ecarts_m11.imputation.imputee")}</th>
-              <th>{t("ecarts_m11.imputation.margeApres")}</th>
-              <th>{t("ecarts_m11.imputation.tauxReel")}</th>
-              <th>{t("ecarts_m11.imputation.tauxStandard")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(imputation?.rows ?? []).map((r) => (
-              <tr key={r.affaire}>
-                <td>
-                  {r.code} · {r.titre}
-                </td>
-                <td>{r.profil}</td>
-                <td>{pct(r.part_pct)}</td>
-                <td>{money(r.produits)}</td>
-                <td>{money(r.marge_directe)}</td>
-                <td>{money(r.structure_imputee)}</td>
-                <td>{money(r.marge_apres_structure)}</td>
-                <td>{pct(r.taux_structure_reel)}</td>
-                <td>{pct(r.taux_structure_standard)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="imputation-structure">
+          <DataTable
+            caption={t("ecarts_m11.imputation.title")}
+            rows={withId(imputation?.rows, (r) => r.affaire)}
+            columns={[
+              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (r) => `${r.code} · ${r.titre}`, sortValue: (r) => r.code },
+              { key: "profil", header: t("ecarts_m11.col.profil"), render: (r) => r.profil },
+              { key: "part", header: t("ecarts_m11.imputation.part"), num: true, render: (r) => pct(r.part_pct) },
+              { key: "produits", header: t("ecarts_m11.col.produits"), num: true, render: (r) => money(r.produits), sortValue: (r) => Number(r.produits ?? 0) },
+              { key: "margeDirecte", header: t("ecarts_m11.imputation.margeDirecte"), num: true, render: (r) => money(r.marge_directe) },
+              { key: "imputee", header: t("ecarts_m11.imputation.imputee"), num: true, render: (r) => money(r.structure_imputee) },
+              { key: "margeApres", header: t("ecarts_m11.imputation.margeApres"), num: true, render: (r) => money(r.marge_apres_structure), sortValue: (r) => Number(r.marge_apres_structure ?? 0) },
+              { key: "tauxReel", header: t("ecarts_m11.imputation.tauxReel"), num: true, render: (r) => pct(r.taux_structure_reel) },
+              { key: "tauxStandard", header: t("ecarts_m11.imputation.tauxStandard"), num: true, render: (r) => pct(r.taux_structure_standard) },
+            ]}
+          />
+        </div>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m11.kpi.title")}>
         <Provisoire show={Boolean(kpis)} />
-        <table className="table" data-testid="kpis-m11">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.kpi.code")}</th>
-              <th>{t("ecarts_m11.kpi.libelle")}</th>
-              <th>{t("ecarts_m11.kpi.valeur")}</th>
-              <th>{t("ecarts_m11.kpi.cible")}</th>
-              <th>{t("ecarts_m11.kpi.formule")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(kpis?.kpis ?? []).map((k) => (
-              <tr key={k.code}>
-                <td>{k.code}</td>
-                <td>{k.libelle}</td>
-                <td>
-                  {k.valeur === null ? "—" : `${formatNumber(Number(k.valeur))} ${k.unite}`}{" "}
-                  {k.atteint !== null && <Badge tone={k.atteint ? "ok" : "err"}>{t(k.atteint ? "ecarts_m11.kpi.atteint" : "ecarts_m11.kpi.nonAtteint")}</Badge>}
-                </td>
-                <td>{`${formatNumber(Number(k.cible))} ${k.unite}`}</td>
-                <td className="muted">{k.formule}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="kpis-m11">
+          <DataTable
+            caption={t("ecarts_m11.kpi.title")}
+            rows={withId(kpis?.kpis, (k) => k.code)}
+            columns={[
+              { key: "libelle", header: t("ecarts_m11.kpi.libelle"), render: (k) => k.libelle, sortValue: (k) => k.libelle },
+              {
+                key: "valeur",
+                header: t("ecarts_m11.kpi.valeur"),
+                num: true,
+                render: (k) => (
+                  <>
+                    {k.valeur === null ? "—" : `${formatNumber(Number(k.valeur))} ${k.unite}`}{" "}
+                    {k.atteint !== null && <Badge tone={k.atteint ? "ok" : "err"}>{t(k.atteint ? "ecarts_m11.kpi.atteint" : "ecarts_m11.kpi.nonAtteint")}</Badge>}
+                  </>
+                ),
+              },
+              { key: "cible", header: t("ecarts_m11.kpi.cible"), num: true, render: (k) => `${formatNumber(Number(k.cible))} ${k.unite}` },
+              { key: "formule", header: t("ecarts_m11.kpi.formule"), render: (k) => <span className="muted">{k.formule}</span> },
+            ]}
+          />
+        </div>
         <p className="muted">{t("ecarts_m11.kpi.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m11.tableau.title")}>
-        <div className="field" style={{ maxWidth: "16rem" }}>
-          <label htmlFor="m11-par">{t("ecarts_m11.tableau.par")}</label>
-          <select id="m11-par" value={par} onChange={(e) => setPar(e.target.value)}>
-            {["profil", "client", "affaire", "responsable"].map((p) => (
-              <option key={p} value={p}>
-                {t(`ecarts_m11.tableau.axes.${p}`)}
-              </option>
-            ))}
-          </select>
+      <SectionCard
+        title={t("ecarts_m11.tableau.title")}
+        actions={
+          <div className="field" style={{ minWidth: "14rem", margin: 0 }}>
+            <label htmlFor="m11-par">{t("ecarts_m11.tableau.par")}</label>
+            <select id="m11-par" value={par} onChange={(e) => setPar(e.target.value)}>
+              {["profil", "client", "affaire", "responsable"].map((p) => (
+                <option key={p} value={p}>
+                  {t(`ecarts_m11.tableau.axes.${p}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+        }
+      >
+        <div data-testid="tableau-bord-m11">
+          <DataTable
+            caption={t("ecarts_m11.tableau.title")}
+            rows={withId(tableau?.lignes, (l) => l.cle)}
+            columns={[
+              { key: "cle", header: t(`ecarts_m11.tableau.axes.${par}`), render: (l) => l.cle, sortValue: (l) => l.cle },
+              { key: "affaires", header: t("ecarts_m11.tableau.affaires"), num: true, render: (l) => formatNumber(l.affaires), sortValue: (l) => l.affaires },
+              { key: "caPrevu", header: t("ecarts_m11.tableau.caPrevu"), num: true, render: (l) => money(l.ca_prevu), sortValue: (l) => Number(l.ca_prevu ?? 0) },
+              { key: "margePrevue", header: t("ecarts_m11.tableau.margePrevue"), num: true, render: (l) => money(l.marge_prevue) },
+              { key: "produits", header: t("ecarts_m11.col.produits"), num: true, render: (l) => money(l.produits) },
+              { key: "charges", header: t("ecarts_m11.tableau.charges"), num: true, render: (l) => money(l.charges) },
+              { key: "coutGr", header: t("ecarts_m11.tableau.coutGr"), num: true, render: (l) => money(l.cout_gr) },
+              { key: "margeReelle", header: t("ecarts_m11.tableau.margeReelle"), num: true, render: (l) => money(l.marge_reelle), sortValue: (l) => Number(l.marge_reelle ?? 0) },
+            ]}
+          />
         </div>
-        <table className="table" data-testid="tableau-bord-m11">
-          <thead>
-            <tr>
-              <th>{t(`ecarts_m11.tableau.axes.${par}`)}</th>
-              <th>{t("ecarts_m11.tableau.affaires")}</th>
-              <th>{t("ecarts_m11.tableau.caPrevu")}</th>
-              <th>{t("ecarts_m11.tableau.margePrevue")}</th>
-              <th>{t("ecarts_m11.col.produits")}</th>
-              <th>{t("ecarts_m11.tableau.charges")}</th>
-              <th>{t("ecarts_m11.tableau.coutGr")}</th>
-              <th>{t("ecarts_m11.tableau.margeReelle")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(tableau?.lignes ?? []).map((l) => (
-              <tr key={l.cle}>
-                <td>{l.cle}</td>
-                <td>{l.affaires}</td>
-                <td>{money(l.ca_prevu)}</td>
-                <td>{money(l.marge_prevue)}</td>
-                <td>{money(l.produits)}</td>
-                <td>{money(l.charges)}</td>
-                <td>{money(l.cout_gr)}</td>
-                <td>{money(l.marge_reelle)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m11.marges.title")}>
-        <table className="table" data-testid="marges-affaires">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.col.affaire")}</th>
-              <th>{t("ecarts_m11.col.client")}</th>
-              <th>{t("ecarts_m11.col.profil")}</th>
-              <th>{t("ecarts_m11.marges.ca")}</th>
-              <th>{t("ecarts_m11.marges.marge")}</th>
-              <th>{t("ecarts_m11.marges.validation")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {(marges?.rows ?? []).map((m) => (
-              <tr key={m.affaire}>
-                <td>
-                  {m.code} · {m.titre}
-                </td>
-                <td>{m.client || "—"}</td>
-                <td>{m.profil}</td>
-                <td>{money(m.ca)}</td>
-                <td>
-                  {money(m.marge)} ({pct(m.taux)})
-                </td>
-                <td>
-                  <Badge tone={m.validation === "validee" ? "ok" : m.validation === "rejetee" ? "err" : "warn"}>{t(`ecarts_m11.marges.statuts.${m.validation}`)}</Badge>
-                  {m.valide_par ? ` ${m.valide_par}` : ""}
-                </td>
-                <td>
-                  <ActionBar
-                    actions={[
-                      { label: t("ecarts_m11.marges.valider"), path: `${BASE}/marges-affaires/${m.affaire}/valider/` },
-                      { label: t("ecarts_m11.marges.rejeter"), path: `${BASE}/marges-affaires/${m.affaire}/rejeter/`, tone: "danger" as const, prompt: { name: "commentaire", label: t("ecarts_m11.marges.motif") } },
-                    ]}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="marges-affaires">
+          <DataTable
+            caption={t("ecarts_m11.marges.title")}
+            rows={withId(marges?.rows, (m) => m.affaire)}
+            columns={[
+              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (m) => `${m.code} · ${m.titre}`, sortValue: (m) => m.code },
+              { key: "client", header: t("ecarts_m11.col.client"), render: (m) => m.client || "—" },
+              { key: "profil", header: t("ecarts_m11.col.profil"), render: (m) => m.profil },
+              { key: "ca", header: t("ecarts_m11.marges.ca"), num: true, render: (m) => money(m.ca), sortValue: (m) => Number(m.ca ?? 0) },
+              {
+                key: "marge",
+                header: t("ecarts_m11.marges.marge"),
+                num: true,
+                render: (m) => (
+                  <>
+                    {money(m.marge)} <span className="muted">({pct(m.taux)})</span>
+                  </>
+                ),
+              },
+              {
+                key: "validation",
+                header: t("ecarts_m11.marges.validation"),
+                render: (m) => (
+                  <>
+                    <Badge tone={m.validation === "validee" ? "ok" : m.validation === "rejetee" ? "err" : "warn"}>{t(`ecarts_m11.marges.statuts.${m.validation}`)}</Badge>
+                    {m.valide_par ? <span className="muted"> {m.valide_par}</span> : null}
+                  </>
+                ),
+              },
+              actionsColumn<MargeAffaire & { id: string }>(t("ui.actions"), (m) => [
+                { label: t("ecarts_m11.marges.valider"), path: `${BASE}/marges-affaires/${m.affaire}/valider/` },
+                { label: t("ecarts_m11.marges.rejeter"), path: `${BASE}/marges-affaires/${m.affaire}/rejeter/`, tone: "danger" as const, prompt: { name: "commentaire", label: t("ecarts_m11.marges.motif") } },
+              ]),
+            ]}
+          />
+        </div>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m11.mo.title")}>
-        <table className="table" data-testid="cout-mo-affaires">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.col.affaire")}</th>
-              <th>{t("ecarts_m11.mo.ordres")}</th>
-              <th>{t("ecarts_m11.mo.heures")}</th>
-              <th>{t("ecarts_m11.mo.nonValorisees")}</th>
-              <th>{t("ecarts_m11.mo.cout")}</th>
-              <th>{t("ecarts_m11.mo.coutHoraire")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(coutMo?.rows ?? []).map((r) => (
-              <tr key={r.affaire}>
-                <td>{r.affaire}</td>
-                <td>{r.ordres}</td>
-                <td>{formatNumber(Number(r.heures))} h</td>
-                <td>{formatNumber(Number(r.heures_non_valorisees))} h</td>
-                <td>{money(r.cout)}</td>
-                <td>{money(r.cout_horaire_moyen)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="cout-mo-affaires">
+          <DataTable
+            caption={t("ecarts_m11.mo.title")}
+            rows={withId(coutMo?.rows, (r) => r.affaire)}
+            columns={[
+              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (r) => r.affaire, sortValue: (r) => r.affaire },
+              { key: "ordres", header: t("ecarts_m11.mo.ordres"), num: true, render: (r) => formatNumber(r.ordres) },
+              { key: "heures", header: t("ecarts_m11.mo.heures"), num: true, render: (r) => `${formatNumber(Number(r.heures))} h`, sortValue: (r) => Number(r.heures) },
+              { key: "nonValorisees", header: t("ecarts_m11.mo.nonValorisees"), num: true, render: (r) => `${formatNumber(Number(r.heures_non_valorisees))} h` },
+              { key: "cout", header: t("ecarts_m11.mo.cout"), num: true, render: (r) => money(r.cout), sortValue: (r) => Number(r.cout ?? 0) },
+              { key: "coutHoraire", header: t("ecarts_m11.mo.coutHoraire"), num: true, render: (r) => money(r.cout_horaire_moyen) },
+            ]}
+          />
+        </div>
         <p className="muted">{t("ecarts_m11.mo.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m11.plans.title")}>
-        <QuickForm
-          title={t("ecarts_m11.plans.nouveau")}
-          endpoint={`${BASE}/plans-sous-activite/`}
-          fields={[
-            { name: "budget", label: t("ecarts_m11.budget.budget"), type: "select", required: true, options: approuves.map((b) => ({ value: b.id, label: `${b.code} — ${b.label}` })) },
-            { name: "actions", label: t("ecarts_m11.plans.actions"), type: "textarea", required: true },
-            { name: "echeance", label: t("ecarts_m11.plans.echeance"), type: "date" },
-          ]}
-        />
-        <table className="table" data-testid="plans-sous-activite">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.plans.plan")}</th>
-              <th>{t("ecarts_m11.plans.centre")}</th>
-              <th>{t("ecarts_m11.plans.actions")}</th>
-              <th>{t("ecarts_m11.plans.echeance")}</th>
-              <th>{t("ecarts_m11.plans.statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {plans.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  {p.code} · {p.budget_code}
-                </td>
-                <td>{p.centre ? `${p.centre} (${pct(p.taux)})` : "—"}</td>
-                <td>{p.actions}</td>
-                <td>
-                  {p.echeance ?? "—"} {p.en_retard && <Badge tone="err">{t("ecarts_m11.plans.retard")}</Badge>}
-                </td>
-                <td>{p.statut_label}</td>
-                <td>
-                  {p.statut !== "clos" && (
-                    <ActionBar
-                      actions={[
-                        ...(p.statut === "ouvert" ? [{ label: t("ecarts_m11.plans.demarrer"), path: `${BASE}/plans-sous-activite/${p.id}/demarrer/`, tone: "ghost" as const }] : []),
-                        { label: t("ecarts_m11.plans.clore"), path: `${BASE}/plans-sous-activite/${p.id}/clore/`, prompt: { name: "suivi", label: t("ecarts_m11.plans.suivi") } },
-                      ]}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <SectionCard
+        title={t("ecarts_m11.plans.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("ecarts_m11.plans.nouveau")}
+              endpoint={`${BASE}/plans-sous-activite/`}
+              fields={[
+                { name: "budget", label: t("ecarts_m11.budget.budget"), type: "select", required: true, options: approuves.map((b) => ({ value: b.id, label: `${b.code} — ${b.label}` })) },
+                { name: "actions", label: t("ecarts_m11.plans.actions"), type: "textarea", required: true },
+                { name: "echeance", label: t("ecarts_m11.plans.echeance"), type: "date" },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
+        <div data-testid="plans-sous-activite">
+          <DataTable
+            caption={t("ecarts_m11.plans.title")}
+            rows={plans}
+            columns={[
+              { key: "plan", header: t("ecarts_m11.plans.plan"), render: (p) => `${p.code} · ${p.budget_code}`, sortValue: (p) => p.code },
+              { key: "centre", header: t("ecarts_m11.plans.centre"), render: (p) => (p.centre ? `${p.centre} (${pct(p.taux)})` : "—") },
+              { key: "actions", header: t("ecarts_m11.plans.actions"), render: (p) => p.actions },
+              {
+                key: "echeance",
+                header: t("ecarts_m11.plans.echeance"),
+                sortValue: (p) => p.echeance,
+                render: (p) => (
+                  <>
+                    {formatDate(p.echeance)} {p.en_retard && <Badge tone="err">{t("ecarts_m11.plans.retard")}</Badge>}
+                  </>
+                ),
+              },
+              { key: "statut", header: t("ecarts_m11.plans.statut"), render: (p) => p.statut_label },
+              actionsColumn<Plan>(t("ui.actions"), (p) =>
+                p.statut === "clos"
+                  ? []
+                  : [
+                      ...(p.statut === "ouvert" ? [{ label: t("ecarts_m11.plans.demarrer"), path: `${BASE}/plans-sous-activite/${p.id}/demarrer/`, tone: "ghost" as const }] : []),
+                      { label: t("ecarts_m11.plans.clore"), path: `${BASE}/plans-sous-activite/${p.id}/clore/`, prompt: { name: "suivi", label: t("ecarts_m11.plans.suivi") } },
+                    ],
+              ),
+            ]}
+          />
+        </div>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m11.reporting.title")}>
@@ -777,124 +734,126 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
             {dlError}
           </p>
         )}
-        <table className="table" data-testid="reportings-archives">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.reporting.cloture")}</th>
-              <th>{t("ecarts_m11.reporting.type")}</th>
-              <th>{t("ecarts_m11.reporting.echeance")}</th>
-              <th>{t("ecarts_m11.reporting.archive")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reportings.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  {r.cloture_code} · {r.period_label}
-                </td>
-                <td>{t("ecarts_m11.reporting.horizon", { type: r.type_reporting === "j4" ? "J+4" : "J+6", n: r.horizon })}</td>
-                <td>{r.echeance}</td>
-                <td>
-                  {r.archive_le} <Badge tone={r.a_temps ? "ok" : "err"}>{t(r.a_temps ? "ecarts_m11.reporting.aTemps" : "ecarts_m11.reporting.enRetard")}</Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="reportings-archives">
+          <DataTable
+            caption={t("ecarts_m11.reporting.title")}
+            rows={reportings}
+            columns={[
+              { key: "cloture", header: t("ecarts_m11.reporting.cloture"), render: (r) => `${r.cloture_code} · ${r.period_label}`, sortValue: (r) => r.cloture_code },
+              { key: "type", header: t("ecarts_m11.reporting.type"), render: (r) => t("ecarts_m11.reporting.horizon", { type: r.type_reporting === "j4" ? "J+4" : "J+6", n: r.horizon }) },
+              { key: "echeance", header: t("ecarts_m11.reporting.echeance"), render: (r) => formatDate(r.echeance), sortValue: (r) => r.echeance },
+              {
+                key: "archive",
+                header: t("ecarts_m11.reporting.archive"),
+                sortValue: (r) => r.archive_le,
+                render: (r) => (
+                  <>
+                    {formatDate(r.archive_le)} <Badge tone={r.a_temps ? "ok" : "err"}>{t(r.a_temps ? "ecarts_m11.reporting.aTemps" : "ecarts_m11.reporting.enRetard")}</Badge>
+                  </>
+                ),
+              },
+            ]}
+          />
+        </div>
         <p className="muted">{t("ecarts_m11.reporting.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m11.revue.title")}>
-        <QuickForm
-          title={t("ecarts_m11.revue.nouvelle")}
-          endpoint={`${BASE}/revues-performance/`}
-          fields={[
-            { name: "period", label: t("ecarts_m11.budget.periode"), type: "select", required: true, options: optPeriode },
-            { name: "date_revue", label: t("ecarts_m11.revue.date"), type: "date", required: true },
-            { name: "participants", label: t("ecarts_m11.revue.participants") },
-            { name: "ordre_du_jour", label: t("ecarts_m11.revue.odj"), type: "textarea" },
-          ]}
-        />
-        <table className="table" data-testid="revues-performance">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.revue.revue")}</th>
-              <th>{t("ecarts_m11.revue.date")}</th>
-              <th>{t("ecarts_m11.revue.odj")}</th>
-              <th>{t("ecarts_m11.revue.decisions")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {revues.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  {r.code} · {r.period_label} <Badge tone={r.statut === "tenue" ? "ok" : "warn"}>{r.statut_label}</Badge>
-                </td>
-                <td>{r.date_revue}</td>
-                <td style={{ whiteSpace: "pre-line" }}>{r.ordre_du_jour}</td>
-                <td>{r.decisions || "—"}</td>
-                <td>
-                  {r.statut === "planifiee" && (
-                    <ActionBar actions={[{ label: t("ecarts_m11.revue.tenir"), path: `${BASE}/revues-performance/${r.id}/tenir/`, prompt: { name: "decisions", label: t("ecarts_m11.revue.decisions") } }]} />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <SectionCard
+        title={t("ecarts_m11.revue.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("ecarts_m11.revue.nouvelle")}
+              endpoint={`${BASE}/revues-performance/`}
+              fields={[
+                { name: "period", label: t("ecarts_m11.budget.periode"), type: "select", required: true, options: optPeriode },
+                { name: "date_revue", label: t("ecarts_m11.revue.date"), type: "date", required: true },
+                { name: "participants", label: t("ecarts_m11.revue.participants") },
+                { name: "ordre_du_jour", label: t("ecarts_m11.revue.odj"), type: "textarea" },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
+        <div data-testid="revues-performance">
+          <DataTable
+            caption={t("ecarts_m11.revue.title")}
+            rows={revues}
+            columns={[
+              {
+                key: "revue",
+                header: t("ecarts_m11.revue.revue"),
+                sortValue: (r) => r.code,
+                render: (r) => (
+                  <>
+                    {r.code} · {r.period_label} <Badge tone={r.statut === "tenue" ? "ok" : "warn"}>{r.statut_label}</Badge>
+                  </>
+                ),
+              },
+              { key: "date", header: t("ecarts_m11.revue.date"), render: (r) => formatDate(r.date_revue), sortValue: (r) => r.date_revue },
+              { key: "odj", header: t("ecarts_m11.revue.odj"), render: (r) => <span style={{ whiteSpace: "pre-line" }}>{r.ordre_du_jour}</span> },
+              { key: "decisions", header: t("ecarts_m11.revue.decisions"), render: (r) => r.decisions || "—" },
+              actionsColumn<Revue>(t("ui.actions"), (r) =>
+                r.statut === "planifiee"
+                  ? [{ label: t("ecarts_m11.revue.tenir"), path: `${BASE}/revues-performance/${r.id}/tenir/`, prompt: { name: "decisions", label: t("ecarts_m11.revue.decisions") } }]
+                  : [],
+              ),
+            ]}
+          />
+        </div>
         <p className="muted">{t("ecarts_m11.revue.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m11.fnp.title", { compte: apercu?.compte ?? "408" })}>
+      <SectionCard
+        title={t("ecarts_m11.fnp.title", { compte: apercu?.compte ?? "408" })}
+        actions={
+          <ActionBar actions={[{ label: t("ecarts_m11.fnp.provisionner"), path: `${BASE}/provisions-fnp/provisionner/`, body: { date_arrete: dateFnp }, confirm: t("ecarts_m11.fnp.confirm") }]} />
+        }
+      >
         <div className="field" style={{ maxWidth: "14rem" }}>
           <label htmlFor="m11-fnp-date">{t("ecarts_m11.fnp.date")}</label>
           <input id="m11-fnp-date" type="date" value={dateFnp} onChange={(e) => setDateFnp(e.target.value)} />
         </div>
-        <table className="table" data-testid="fnp-apercu">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m11.fnp.bc")}</th>
-              <th>{t("ecarts_m11.fnp.fournisseur")}</th>
-              <th>{t("ecarts_m11.fnp.compte")}</th>
-              <th>{t("ecarts_m11.fnp.quantite")}</th>
-              <th>{t("ecarts_m11.fnp.montant")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(apercu?.lignes ?? []).map((l) => (
-              <tr key={`${l.bc}-${l.ligne}`}>
-                <td>
-                  {l.bc} · {l.ligne}
-                </td>
-                <td>{l.fournisseur}</td>
-                <td>{l.compte}</td>
-                <td>{l.quantite}</td>
-                <td>{money(l.montant)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="fnp-apercu">
+          <DataTable
+            caption={t("tableaux.controleGestion.apercuFnp")}
+            rows={withId(apercu?.lignes, (l) => `${l.bc}-${l.ligne}`)}
+            emptyLabel={t("tableaux.controleGestion.aucuneFnp")}
+            columns={[
+              { key: "bc", header: t("ecarts_m11.fnp.bc"), render: (l) => `${l.bc} · ${l.ligne}`, sortValue: (l) => l.bc },
+              { key: "fournisseur", header: t("ecarts_m11.fnp.fournisseur"), render: (l) => l.fournisseur },
+              { key: "compte", header: t("ecarts_m11.fnp.compte"), render: (l) => l.compte },
+              { key: "quantite", header: t("ecarts_m11.fnp.quantite"), num: true, render: (l) => formatNumber(Number(l.quantite), { decimals: Number.isInteger(Number(l.quantite)) ? 0 : 2 }) },
+              { key: "montant", header: t("ecarts_m11.fnp.montant"), num: true, render: (l) => money(l.montant), sortValue: (l) => Number(l.montant ?? 0) },
+            ]}
+          />
+        </div>
         <p>
-          <strong>{t("ecarts_m11.fnp.total")}</strong> : {money(apercu?.total)}
+          <strong>{t("ecarts_m11.fnp.total")}</strong> : <span className="amount">{money(apercu?.total)}</span>
         </p>
-        <ActionBar actions={[{ label: t("ecarts_m11.fnp.provisionner"), path: `${BASE}/provisions-fnp/provisionner/`, body: { date_arrete: dateFnp }, confirm: t("ecarts_m11.fnp.confirm") }]} />
-        <table className="table" data-testid="fnp-provisions">
-          <tbody>
-            {fnps.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  {p.code} · {p.date_arrete}
-                </td>
-                <td>{money(p.montant)}</td>
-                <td>
-                  {p.statut_label} {p.move_number ?? ""} {p.extourne_number ? `→ ${p.extourne_number}` : ""}
-                </td>
-                <td>{p.statut === "comptabilisee" && <ActionBar actions={[{ label: t("ecarts_m11.fnp.extourner"), path: `${BASE}/provisions-fnp/${p.id}/extourner/`, tone: "ghost" as const }]} />}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="fnp-provisions">
+          <DataTable
+            caption={t("tableaux.controleGestion.provisions")}
+            rows={fnps}
+            emptyLabel={t("tableaux.controleGestion.aucuneProvision")}
+            columns={[
+              { key: "provision", header: t("tableaux.controleGestion.provision"), render: (p) => `${p.code} · ${formatDate(p.date_arrete)}`, sortValue: (p) => p.date_arrete },
+              { key: "montant", header: t("tableaux.controleGestion.montant"), num: true, render: (p) => money(p.montant) },
+              {
+                key: "statut",
+                header: t("tableaux.controleGestion.statut"),
+                render: (p) => (
+                  <>
+                    {p.statut_label} <span className="muted">{p.move_number ?? ""} {p.extourne_number ? `→ ${p.extourne_number}` : ""}</span>
+                  </>
+                ),
+              },
+              actionsColumn<Fnp>(t("ui.actions"), (p) =>
+                p.statut === "comptabilisee" ? [{ label: t("ecarts_m11.fnp.extourner"), path: `${BASE}/provisions-fnp/${p.id}/extourner/`, tone: "ghost" as const }] : [],
+              ),
+            ]}
+          />
+        </div>
         <p className="muted">{t("ecarts_m11.fnp.note")}</p>
       </SectionCard>
     </>

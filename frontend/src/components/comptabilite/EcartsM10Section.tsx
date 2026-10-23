@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatMoney, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface Colonne {
   key: string;
@@ -106,9 +108,16 @@ function urlEtat(code: EtatCode, p: { from: string; to: string; exercice: string
   return `/api/comptabilite/etats/${code}/?${q}`;
 }
 
-function Cell({ col, v }: { col: Colonne; v: Cellule }) {
-  if (col.montant) return <td className="num">{v === null || v === undefined || v === "" ? "" : formatNumber(Number(v))}</td>;
-  return <td>{v === null || v === undefined ? "" : String(v)}</td>;
+type LigneEtat = Record<string, Cellule> & { id: number };
+type LigneGr =
+  | { id: string; kind: "a"; ref: string; code: string; equipement: string; affaire: string | null; date: string | null; montant: string | null }
+  | { id: string; kind: "e"; numero: string; location: string; libelle: string; date: string; montant: string | null };
+
+/** Cellule d'état : montants complets en FCFA, lignes de total en gras. */
+function cellule(col: Colonne, l: LigneEtat) {
+  const v = l[col.key];
+  const texte = v === null || v === undefined || v === "" ? "" : col.montant ? formatMoney(Number(v)) : String(v);
+  return l.total || l.total_ligne || l.entete ? <strong>{texte}</strong> : texte;
 }
 
 /** Écarts M10 : états SYSCOHADA exportables, trésorerie 13 semaines, autofacturation, 618 GR, gabarits fiscaux. */
@@ -136,6 +145,105 @@ export function EcartsM10Section() {
     api.download(`${url}&export=${fmt}`, `${code}.${fmt}`).catch((e) => setExportError(describeError(e)));
   };
   const provisoire = <Badge tone="warn">{t("ecarts_m10.provisoire")}</Badge>;
+  const actionsHeader = <span className="sr-only">{t("ui.actions")}</span>;
+
+  const colsTreso: Column<Semaine & { id: string }>[] = [
+    { key: "semaine", header: t("ecarts_m10.treso.semaine"), render: (r) => `S${r.numero} · ${formatDate(r.semaine)}`, sortValue: (r) => r.numero },
+    { key: "prevuEnc", header: t("ecarts_m10.treso.prevuEnc"), num: true, render: (r) => fcfa(r.prevu_encaissements) },
+    { key: "prevuDec", header: t("ecarts_m10.treso.prevuDec"), num: true, render: (r) => fcfa(r.prevu_decaissements) },
+    { key: "reelEnc", header: t("ecarts_m10.treso.reelEnc"), num: true, render: (r) => fcfa(r.realise_encaissements) },
+    { key: "reelDec", header: t("ecarts_m10.treso.reelDec"), num: true, render: (r) => fcfa(r.realise_decaissements) },
+    {
+      key: "soldePrevu",
+      header: t("ecarts_m10.treso.soldePrevu"),
+      num: true,
+      render: (r) => (
+        <>
+          {fcfa(r.solde_fin_prevu)} {r.alerte && <Badge tone="err">{t("tableaux.comptabilite.sousSeuil")}</Badge>}
+        </>
+      ),
+    },
+    { key: "soldeReel", header: t("ecarts_m10.treso.soldeReel"), num: true, render: (r) => fcfa(r.solde_fin_reel) },
+  ];
+
+  const colsAutof: Column<AutoFacture>[] = [
+    { key: "code", header: t("ecarts_m10.autof.code"), render: (a) => a.code, sortValue: (a) => a.code },
+    { key: "fournisseur", header: t("ecarts_m10.autof.fournisseur"), render: (a) => a.fournisseur_name, sortValue: (a) => a.fournisseur_name },
+    {
+      key: "objet",
+      header: t("ecarts_m10.autof.objet"),
+      render: (a) => (
+        <>
+          {a.objet} <span className="muted">· {a.compte_charge_code}</span>
+        </>
+      ),
+    },
+    { key: "ht", header: t("ecarts_m10.autof.ht"), num: true, render: (a) => fcfa(a.montant_ht), sortValue: (a) => Number(a.montant_ht ?? 0) },
+    { key: "tva", header: t("ecarts_m10.autof.tva"), num: true, render: (a) => fcfa(a.montant_tva) },
+    {
+      key: "ecriture",
+      header: t("ecarts_m10.autof.ecriture"),
+      render: (a) => (
+        <>
+          {a.move_number ?? "—"}
+          {a.statut === "brouillon" && (
+            <ActionBar actions={[{ label: t("ecarts_m10.autof.emettre"), path: `/api/comptabilite/autofactures/${a.id}/emettre/`, confirm: t("ecarts_m10.autof.confirmEmettre") }]} />
+          )}
+        </>
+      ),
+    },
+  ];
+
+  const lignesGr: LigneGr[] = [
+    ...(gr.data?.a_comptabiliser ?? []).map(
+      (l): LigneGr => ({ id: `a-${l.id}`, kind: "a", ref: l.id, code: l.code, equipement: l.equipement, affaire: l.affaire, date: l.date_retour, montant: l.montant }),
+    ),
+    ...(gr.data?.ecritures ?? []).map(
+      (x): LigneGr => ({ id: `e-${x.numero}`, kind: "e", numero: x.numero, location: x.location, libelle: x.libelle, date: x.date, montant: x.montant }),
+    ),
+  ];
+  const colsGr: Column<LigneGr>[] = [
+    { key: "location", header: t("ecarts_m10.gr.location"), render: (l) => (l.kind === "a" ? l.code : l.location) },
+    { key: "equipement", header: t("ecarts_m10.gr.equipement"), render: (l) => (l.kind === "a" ? l.equipement : l.libelle) },
+    { key: "affaire", header: t("ecarts_m10.gr.affaire"), render: (l) => (l.kind === "a" ? (l.affaire ?? "—") : "—") },
+    { key: "retour", header: t("ecarts_m10.gr.retour"), render: (l) => formatDate(l.date) },
+    { key: "montant", header: t("ecarts_m10.gr.montant"), num: true, render: (l) => fcfa(l.montant) },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (l) =>
+        l.kind === "a" ? (
+          <ActionBar actions={[{ label: t("ecarts_m10.gr.comptabiliser"), path: `/api/comptabilite/locations-gr/${l.ref}/comptabiliser/`, confirm: t("ecarts_m10.gr.confirm") }]} />
+        ) : (
+          <Badge tone="ok">{l.numero}</Badge>
+        ),
+    },
+  ];
+
+  const colsGabarits: Column<Gabarit>[] = [
+    {
+      key: "gabarit",
+      header: t("ecarts_m10.gabarits.gabarit"),
+      render: (g) => (
+        <>
+          {g.label} {g.est_provisoire ? provisoire : <Badge tone="ok">{t("ecarts_m10.confirme")}</Badge>}
+        </>
+      ),
+    },
+    { key: "parametres", header: t("ecarts_m10.gabarits.parametres"), render: (g) => <code>{JSON.stringify(g.parametres)}</code> },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (g) => (
+        <ActionBar
+          actions={[
+            { label: t("ecarts_m10.gabarits.modifier"), path: `/api/comptabilite/gabarits/${g.id}/modifier/`, tone: "ghost", prompt: { name: "parametres", label: t("ecarts_m10.gabarits.prompt") } },
+            ...(g.est_provisoire ? [{ label: t("ecarts_m10.gabarits.confirmer"), path: `/api/comptabilite/gabarits/${g.id}/confirmer/` }] : []),
+          ]}
+        />
+      ),
+    },
+  ];
 
   return (
     <>
@@ -195,34 +303,30 @@ export function EcartsM10Section() {
             </p>
             {etat.data.provisoire && etat.data.avertissement && <p className="muted">{etat.data.avertissement}</p>}
             {etat.data.tableaux.map((tab) => (
-              <div className="table-wrap" key={tab.titre} tabIndex={0} role="region" aria-label={tab.titre}>
+              <div className="etat-bloc" key={tab.titre} data-testid={`etat-${code}`}>
                 <h4>{tab.titre}</h4>
-                <table className="table" data-testid={`etat-${code}`}>
-                  <thead>
-                    <tr>
-                      {tab.colonnes.map((c) => (
-                        <th key={c.key}>{t(`ecarts_m10.col.${c.key}`, { defaultValue: c.label })}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tab.lignes.map((l, i) => (
-                      <tr key={i} style={l.total || l.total_ligne || l.entete ? { fontWeight: 600 } : undefined}>
-                        {tab.colonnes.map((c) => (
-                          <Cell key={c.key} col={c} v={l[c.key]} />
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  caption={tab.titre}
+                  density="compact"
+                  columns={tab.colonnes.map<Column<LigneEtat>>((c) => ({
+                    key: c.key,
+                    header: t(`ecarts_m10.col.${c.key}`, { defaultValue: c.label }),
+                    num: c.montant,
+                    render: (l) => cellule(c, l),
+                  }))}
+                  rows={tab.lignes.map((l, i) => ({ ...l, id: i }))}
+                />
               </div>
             ))}
           </>
         )}
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m10.treso.title")} subtitle={t("ecarts_m10.treso.subtitle")}>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m10.treso.title")}
+        subtitle={t("ecarts_m10.treso.subtitle")}
+        actions={
+          <SectionActions>
           <QuickForm
             title={t("ecarts_m10.treso.ajouter")}
             endpoint="/api/comptabilite/previsions-tresorerie/"
@@ -239,7 +343,9 @@ export function EcartsM10Section() {
               { name: "montant", label: t("ecarts_m10.treso.montant"), type: "number", min: 0, required: true },
             ]}
           />
-        </div>
+          </SectionActions>
+        }
+      >
         {treso.data && (
           <>
             <p className="muted">
@@ -247,44 +353,23 @@ export function EcartsM10Section() {
               {treso.data.alertes.length > 0 ? <Badge tone="err">{t("ecarts_m10.treso.alerte", { n: treso.data.alertes.length })}</Badge> : <Badge tone="ok">{t("ecarts_m10.treso.ok")}</Badge>}{" "}
               {treso.data.provisoire && provisoire}
             </p>
-            <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_m10.treso.title")}>
-              <table className="table" data-testid="tresorerie-13">
-                <thead>
-                  <tr>
-                    <th>{t("ecarts_m10.treso.semaine")}</th>
-                    <th>{t("ecarts_m10.treso.prevuEnc")}</th>
-                    <th>{t("ecarts_m10.treso.prevuDec")}</th>
-                    <th>{t("ecarts_m10.treso.reelEnc")}</th>
-                    <th>{t("ecarts_m10.treso.reelDec")}</th>
-                    <th>{t("ecarts_m10.treso.soldePrevu")}</th>
-                    <th>{t("ecarts_m10.treso.soldeReel")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {treso.data.rows.map((r) => (
-                    <tr key={r.semaine}>
-                      <td>
-                        S{r.numero} · {r.semaine}
-                      </td>
-                      <td className="num">{fcfa(r.prevu_encaissements)}</td>
-                      <td className="num">{fcfa(r.prevu_decaissements)}</td>
-                      <td className="num">{fcfa(r.realise_encaissements)}</td>
-                      <td className="num">{fcfa(r.realise_decaissements)}</td>
-                      <td className="num">
-                        {fcfa(r.solde_fin_prevu)} {r.alerte && <Badge tone="err">!</Badge>}
-                      </td>
-                      <td className="num">{fcfa(r.solde_fin_reel)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div data-testid="tresorerie-13">
+              <DataTable
+                caption={t("ecarts_m10.treso.title")}
+                density="compact"
+                columns={colsTreso}
+                rows={treso.data.rows.map((r) => ({ ...r, id: r.semaine }))}
+              />
             </div>
           </>
         )}
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m10.autof.title")} subtitle={t("ecarts_m10.autof.subtitle")}>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m10.autof.title")}
+        subtitle={t("ecarts_m10.autof.subtitle")}
+        actions={
+          <SectionActions>
           <QuickForm
             title={t("ecarts_m10.autof.ajouter")}
             endpoint="/api/comptabilite/autofactures/"
@@ -303,111 +388,25 @@ export function EcartsM10Section() {
               },
             ]}
           />
+          </SectionActions>
+        }
+      >
+        <div data-testid="autofactures">
+          <DataTable caption={t("ecarts_m10.autof.title")} columns={colsAutof} rows={autof.data ?? []} emptyLabel={t("tableaux.comptabilite.aucuneAutofacture")} />
         </div>
-        <table className="table" data-testid="autofactures">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m10.autof.code")}</th>
-              <th>{t("ecarts_m10.autof.fournisseur")}</th>
-              <th>{t("ecarts_m10.autof.objet")}</th>
-              <th>{t("ecarts_m10.autof.ht")}</th>
-              <th>{t("ecarts_m10.autof.tva")}</th>
-              <th>{t("ecarts_m10.autof.ecriture")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(autof.data ?? []).map((a) => (
-              <tr key={a.id}>
-                <td>{a.code}</td>
-                <td>{a.fournisseur_name}</td>
-                <td>
-                  {a.objet} <span className="muted">· {a.compte_charge_code}</span>
-                </td>
-                <td className="num">{fcfa(a.montant_ht)}</td>
-                <td className="num">{fcfa(a.montant_tva)}</td>
-                <td>
-                  {a.move_number ?? "—"}
-                  {a.statut === "brouillon" && (
-                    <ActionBar actions={[{ label: t("ecarts_m10.autof.emettre"), path: `/api/comptabilite/autofactures/${a.id}/emettre/`, confirm: t("ecarts_m10.autof.confirmEmettre") }]} />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
         <p className="muted">{t("ecarts_m10.autof.note")}</p>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m10.gr.title")} subtitle={t("ecarts_m10.gr.subtitle")}>
-        <table className="table" data-testid="locations-gr-618">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m10.gr.location")}</th>
-              <th>{t("ecarts_m10.gr.equipement")}</th>
-              <th>{t("ecarts_m10.gr.affaire")}</th>
-              <th>{t("ecarts_m10.gr.retour")}</th>
-              <th>{t("ecarts_m10.gr.montant")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {(gr.data?.a_comptabiliser ?? []).map((l) => (
-              <tr key={l.id}>
-                <td>{l.code}</td>
-                <td>{l.equipement}</td>
-                <td>{l.affaire ?? "—"}</td>
-                <td>{l.date_retour ?? "—"}</td>
-                <td className="num">{fcfa(l.montant)}</td>
-                <td>
-                  <ActionBar actions={[{ label: t("ecarts_m10.gr.comptabiliser"), path: `/api/comptabilite/locations-gr/${l.id}/comptabiliser/`, confirm: t("ecarts_m10.gr.confirm") }]} />
-                </td>
-              </tr>
-            ))}
-            {(gr.data?.ecritures ?? []).map((e) => (
-              <tr key={e.numero}>
-                <td>{e.location}</td>
-                <td colSpan={2}>{e.libelle}</td>
-                <td>{e.date}</td>
-                <td className="num">{fcfa(e.montant)}</td>
-                <td>
-                  <Badge tone="ok">{e.numero}</Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="locations-gr-618">
+          <DataTable caption={t("ecarts_m10.gr.title")} columns={colsGr} rows={lignesGr} emptyLabel={t("tableaux.comptabilite.aucuneLocation")} />
+        </div>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m10.gabarits.title")} subtitle={t("ecarts_m10.gabarits.subtitle")}>
-        <table className="table" data-testid="gabarits-etats">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m10.gabarits.gabarit")}</th>
-              <th>{t("ecarts_m10.gabarits.parametres")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {(gabarits.data ?? []).map((g) => (
-              <tr key={g.id}>
-                <td>
-                  {g.label} {g.est_provisoire ? provisoire : <Badge tone="ok">{t("ecarts_m10.confirme")}</Badge>}
-                </td>
-                <td>
-                  <code>{JSON.stringify(g.parametres)}</code>
-                </td>
-                <td>
-                  <ActionBar
-                    actions={[
-                      { label: t("ecarts_m10.gabarits.modifier"), path: `/api/comptabilite/gabarits/${g.id}/modifier/`, tone: "ghost", prompt: { name: "parametres", label: t("ecarts_m10.gabarits.prompt") } },
-                      ...(g.est_provisoire ? [{ label: t("ecarts_m10.gabarits.confirmer"), path: `/api/comptabilite/gabarits/${g.id}/confirmer/` }] : []),
-                    ]}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="gabarits-etats">
+          <DataTable caption={t("ecarts_m10.gabarits.title")} columns={colsGabarits} rows={gabarits.data ?? []} />
+        </div>
         <p className="muted">{t("ecarts_m10.gabarits.note")}</p>
       </SectionCard>
     </>

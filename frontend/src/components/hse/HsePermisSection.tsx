@@ -1,17 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { CoutsHseResult, PermisTravail, PersonnelHse } from "../../types";
-import { ActionBar, QuickForm, SectionCard } from "../ui";
+import { ActionBar, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 import { useListeHse } from "./listesHse";
 
 const FIGES = ["cloture", "refuse", "annule", "expire"];
 
-/** Demande de permis de travail à l'écran (CDC M7-11) : le demandeur est l'utilisateur connecté. */
+/** Demande de permis de travail à l'écran : le demandeur est l'utilisateur connecté. */
 export function DemandePermisForm() {
   const { t } = useTranslation();
   const types = useListeHse("type_permis");
@@ -96,9 +97,9 @@ export function PermisPieces({ permis }: { permis: PermisTravail }) {
   );
 }
 
-const montant = (v: string | null) => (v === null ? "—" : formatNumber(Number(v)));
+type LigneCout = { id: string; libelle: ReactNode; total: string | null };
 
-/** Coûts HSE par centre analytique (CDC M7 → M11) : lus dans la comptabilité, masqués hors cercle des montants. */
+/** Coûts HSE par centre analytique (aval contrôle de gestion) : lus dans la comptabilité, masqués hors cercle des montants. */
 export function CoutsHseSection() {
   const { t } = useTranslation();
   const [annee, setAnnee] = useState(String(new Date().getFullYear()));
@@ -109,38 +110,26 @@ export function CoutsHseSection() {
     retry: 0,
   });
   if (q.isError && !q.data) return null;
-  const rows = (q.data?.rows ?? []).filter((r) => r.total === null || Number(r.total) !== 0);
+  const lignes: LigneCout[] = (q.data?.rows ?? [])
+    .filter((r) => r.total === null || Number(r.total) !== 0)
+    .map((r) => ({ id: r.centre, libelle: `${r.centre} — ${r.libelle}`, total: r.total }));
+  const rows: LigneCout[] =
+    q.data && lignes.length > 0
+      ? [...lignes, { id: "__total", libelle: <strong>{t("m7e.couts.total")}</strong>, total: q.data.total }]
+      : lignes;
+  const columns: Column<LigneCout>[] = [
+    { key: "centre", header: t("m7e.couts.centre"), render: (r) => r.libelle },
+    { key: "total", header: t("m7e.couts.total"), num: true, render: (r) => (r.id === "__total" ? <strong>{formatMoney(r.total)}</strong> : formatMoney(r.total)) },
+  ];
   return (
     <SectionCard title={t("m7e.couts.title")}>
       <div data-testid="couts-hse">
         <p className="muted">{t("m7e.couts.hint")}</p>
-        <label>
-          {t("m7e.couts.annee")}{" "}
-          <input type="number" min={2000} max={2100} value={annee} onChange={(e) => setAnnee(e.target.value)} aria-label={t("m7e.couts.annee")} />
-        </label>
-        {q.data && rows.length === 0 ? (
-          <p className="muted">{t("m7e.couts.aucun")}</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr><th>{t("m7e.couts.centre")}</th><th className="num">{t("m7e.couts.total")}</th></tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.centre}>
-                  <td>{r.centre} — {r.libelle}</td>
-                  <td className="num">{montant(r.total)}</td>
-                </tr>
-              ))}
-              {q.data && (
-                <tr>
-                  <td><strong>{t("m7e.couts.total")}</strong></td>
-                  <td className="num"><strong>{montant(q.data.total)}</strong></td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
+        <div className="field">
+          <label htmlFor="couts-hse-annee">{t("m7e.couts.annee")}</label>
+          <input id="couts-hse-annee" className="control" type="number" min={2000} max={2100} value={annee} onChange={(e) => setAnnee(e.target.value)} style={{ maxWidth: 140 }} />
+        </div>
+        <DataTable columns={columns} rows={rows} caption={t("m7e.couts.title")} loading={q.isFetching} emptyLabel={t("m7e.couts.aucun")} />
       </div>
     </SectionCard>
   );

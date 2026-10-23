@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
+import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, PagedDataGrid, QuickForm, SectionCard } from "../ui";
 import type { ActionDef } from "../ui";
 import type { Column } from "../ui";
@@ -88,73 +89,91 @@ export function ConformiteHse() {
 
   return (
     <>
-      <SectionCard title={`${t("hse.m7.audits")} · ${audits.count}`}>
-        <QuickForm
-          title={t("hse.m7.newAudit")}
-          endpoint="/api/hse/audits/"
-          fields={[
-            {
-              name: "type_audit",
-              label: t("hse.m7.typeAudit"),
-              type: "select",
-              required: true,
-              defaultValue: "audit",
-              options: [
-                { value: "audit", label: t("hse.m7.audit") },
-                { value: "inspection", label: t("hse.m7.inspection") },
-              ],
-            },
-            { name: "zone", label: t("hse.m7.zone"), required: true },
-            { name: "date_prevue", label: t("hse.m7.datePrevue"), type: "date", required: true },
-          ]}
-        />
+      <SectionCard
+        title={`${t("hse.m7.audits")} · ${audits.count}`}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("hse.m7.newAudit")}
+              endpoint="/api/hse/audits/"
+              fields={[
+                {
+                  name: "type_audit",
+                  label: t("hse.m7.typeAudit"),
+                  type: "select",
+                  required: true,
+                  defaultValue: "audit",
+                  options: [
+                    { value: "audit", label: t("hse.m7.audit") },
+                    { value: "inspection", label: t("hse.m7.inspection") },
+                  ],
+                },
+                { name: "zone", label: t("hse.m7.zone"), required: true },
+                { name: "date_prevue", label: t("hse.m7.datePrevue"), type: "date", required: true },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
         <PagedDataGrid list={audits} columns={auditCols} caption={t("hse.m7.audits")} searchPlaceholder={t("hse.m7.searchAudits")} />
       </SectionCard>
 
-      <SectionCard title={`${t("hse.m7.duer")} · ${duers.count}`}>
-        <QuickForm
-          title={t("hse.m7.newDuer")}
-          endpoint="/api/hse/duer/"
-          fields={[
-            { name: "annee", label: t("hse.m7.annee"), type: "number", required: true, defaultValue: String(new Date().getFullYear()) },
-            { name: "perimetre", label: t("hse.m7.perimetre"), required: true },
-          ]}
-        />
+      <SectionCard
+        title={`${t("hse.m7.duer")} · ${duers.count}`}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("hse.m7.newDuer")}
+              endpoint="/api/hse/duer/"
+              fields={[
+                { name: "annee", label: t("hse.m7.annee"), type: "number", required: true, defaultValue: String(new Date().getFullYear()) },
+                { name: "perimetre", label: t("hse.m7.perimetre"), required: true },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
         <PagedDataGrid list={duers} columns={duerCols} caption={t("hse.m7.duer")} searchPlaceholder={t("hse.m7.searchDuer")} />
       </SectionCard>
 
-      <SectionCard title={`${t("hse.m7.plans")} · ${plans.count}`}>
-        <QuickForm
-          title={t("hse.m7.newPlan")}
-          endpoint="/api/hse/plans-urgence/"
-          fields={[
-            { name: "intitule", label: t("hse.m7.intitule"), required: true },
-            { name: "periodicite_mois", label: t("hse.m7.periodicite"), type: "number", required: true, defaultValue: "12", min: 1 },
-          ]}
-        />
-        {planOptions.length > 0 ? (
-          <QuickForm
-            title={t("hse.m7.newExercice")}
-            endpoint="/api/hse/exercices-urgence/"
-            fields={[
-              { name: "plan", label: t("hse.m7.plan"), type: "select", required: true, options: planOptions },
-              { name: "date_exercice", label: t("hse.m7.dateExercice"), type: "date", required: true },
-              { name: "participants", label: t("hse.m7.participants"), type: "number", defaultValue: "0", min: 0 },
-              {
-                name: "resultat",
-                label: t("hse.m7.resultat"),
-                type: "select",
-                required: true,
-                defaultValue: "satisfaisant",
-                options: [
-                  { value: "satisfaisant", label: t("hse.m7.satisfaisant") },
-                  { value: "insuffisant", label: t("hse.m7.insuffisant") },
-                ],
-              },
-              { name: "observations", label: t("hse.m7.observations"), type: "textarea" },
-            ]}
-          />
-        ) : null}
+      <SectionCard
+        title={`${t("hse.m7.plans")} · ${plans.count}`}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("hse.m7.newPlan")}
+              endpoint="/api/hse/plans-urgence/"
+              fields={[
+                { name: "intitule", label: t("hse.m7.intitule"), required: true },
+                { name: "periodicite_mois", label: t("hse.m7.periodicite"), type: "number", required: true, defaultValue: "12", min: 1 },
+              ]}
+            />
+            {planOptions.length > 0 ? (
+              <QuickForm
+                title={t("hse.m7.newExercice")}
+                endpoint="/api/hse/exercices-urgence/"
+                fields={[
+                  { name: "plan", label: t("hse.m7.plan"), type: "select", required: true, options: planOptions },
+                  { name: "date_exercice", label: t("hse.m7.dateExercice"), type: "date", required: true },
+                  { name: "participants", label: t("hse.m7.participants"), type: "number", defaultValue: "0", min: 0 },
+                  {
+                    name: "resultat",
+                    label: t("hse.m7.resultat"),
+                    type: "select",
+                    required: true,
+                    defaultValue: "satisfaisant",
+                    options: [
+                      { value: "satisfaisant", label: t("hse.m7.satisfaisant") },
+                      { value: "insuffisant", label: t("hse.m7.insuffisant") },
+                    ],
+                  },
+                  { name: "observations", label: t("hse.m7.observations"), type: "textarea" },
+                ]}
+              />
+            ) : null}
+          </SectionActions>
+        }
+      >
         <PagedDataGrid list={plans} columns={planCols} caption={t("hse.m7.plans")} searchPlaceholder={t("hse.m7.searchPlans")} />
       </SectionCard>
     </>
