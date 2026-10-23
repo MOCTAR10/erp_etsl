@@ -9,10 +9,15 @@
     "preview": "vite preview",
     "typecheck": "tsc",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "ladle": "ladle serve",
+    "ladle:build": "ladle build",
+    "test:visual": "playwright test -c playwright.visuel.config.ts",
+    "lighthouse": "npx --yes lighthouse@13.5.0 http://127.0.0.1:4173/login --preset=desktop --only-categories=performance,accessibility,best-practices --output=html --output=json --output-path=./lighthouse-connexion --chrome-flags=--headless=new"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
+    "@ladle/react": "^5.1.1",
     "@playwright/test": "^1.63.0",
     "@tanstack/react-query-devtools": "^5.103.2",
     "@testing-library/jest-dom": "^7.0.1",
