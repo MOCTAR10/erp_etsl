@@ -20,7 +20,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write("Seed M8 - Maintenance & GMAO (demo)")
+        self.stdout.write("Seed M8 - Maintenance & GMAO")
 
         maint = User.objects.filter(role=User.Role.MAINTENANCE).first()
         if maint is None:
@@ -56,19 +56,19 @@ class Command(BaseCommand):
                 signe_618=bool(gr),
             ),
             Actif.objects.create(
-                designation="Chariot elevateur 3t",
+                designation="Chariot élévateur 3t",
                 categorie=Actif.Categorie.ENGIN,
                 fabricant="Toyota",
                 modele="3F-Series",
                 numero_serie="TY-80123",
-                site="Depot principal",
+                site="Dépôt principal",
                 date_mise_en_service=today - timedelta(days=1100),
                 compteur_type=Actif.Compteur.HEURES,
                 compteur_value=3210,
                 statut=Actif.Statut.EN_PANNE,
             ),
             Actif.objects.create(
-                designation="Potence lievage line A",
+                designation="Potence de levage ligne A",
                 categorie=Actif.Categorie.LEVAGE,
                 fabricant="Magrini",
                 modele="MP-2000",
@@ -84,8 +84,8 @@ class Command(BaseCommand):
             actif=actifs[1],
             type_ot=OrdreTravail.TypeOT.CORRECTIF,
             priorite=OrdreTravail.Priorite.HAUTE,
-            description="Panne hydraulique - fuite verin de levage",
-            cause="Joint de verin use",
+            description="Panne hydraulique - fuite vérin de levage",
+            cause="Joint de vérin usé",
             demandeur=maint,
             technicien=maint,
             date_demande=today - timedelta(days=2),
@@ -98,7 +98,7 @@ class Command(BaseCommand):
             actif=actifs[0],
             type_ot=OrdreTravail.TypeOT.PREVENTIF,
             priorite=OrdreTravail.Priorite.MOYENNE,
-            description="Maintenance preventive 500h - vidange + filtration",
+            description="Maintenance préventive 500h - vidange + filtration",
             demandeur=maint,
             technicien=maint,
             date_demande=today,
@@ -111,7 +111,7 @@ class Command(BaseCommand):
             actif=actifs[2],
             type_ot=OrdreTravail.TypeOT.INSPECTION,
             priorite=OrdreTravail.Priorite.MOYENNE,
-            description="Inspection reglementaire annuelle potence",
+            description="Inspection réglementaire annuelle potence",
             demandeur=maint,
             technicien=maint,
             date_demande=today - timedelta(days=30),
@@ -121,7 +121,7 @@ class Command(BaseCommand):
             heures_mo=3,
             tarif_horaire=1500,
             cout_pieces=0,
-            rapport="Inspection OK, palan desmonte et controle.",
+            rapport="Inspection OK, palan démonté et contrôlé.",
             statut=OrdreTravail.Statut.CLOTURE,
             created_by=maint,
         )
@@ -134,7 +134,7 @@ class Command(BaseCommand):
             organisme="tiers",
             organisme_libelle="Apave Gabon",
             resultat=Inspection.Resultat.CONFORME,
-            constat="Aucun defaut constate.",
+            constat="Aucun défaut constaté.",
             intervenant=maint,
             statut=Inspection.Statut.REALISEE,
         )
@@ -161,11 +161,11 @@ class Command(BaseCommand):
         unit, _ = UnitOfMeasure.objects.get_or_create(code="U", defaults={"label": "Unité"})
         article, _ = Article.objects.get_or_create(
             code="PR-JOINT-VERIN", defaults={
-                "label": "Joint de verin hydraulique", "article_type": "consommable", "unit": unit,
+                "label": "Joint de vérin hydraulique", "article_type": "consommable", "unit": unit,
                 "is_stockable": True, "purchase_price": Decimal("45000"),
             },
         )
-        depot, _ = Depot.objects.get_or_create(code="DEP-PIECES", defaults={"label": "Magasin pieces de rechange"})
+        depot, _ = Depot.objects.get_or_create(code="DEP-PIECES", defaults={"label": "Magasin pièces de rechange"})
         ArticleStock.objects.get_or_create(article=article, defaults={"seuil_minimal": Decimal("6")})
         if not MouvementStock.objects.filter(article=article, destination=depot).exists():
             apply_move(MouvementStock.objects.create(

@@ -35,7 +35,7 @@ class Command(ParcoursA):
         self.parcours_qualite()
         self.parcours_hse()
         self.parcours_stocks()
-        self.stdout.write(self.style.SUCCESS("Parcours demo lot C pret."))
+        self.stdout.write(self.style.SUCCESS("Parcours lot C pret."))
 
     # -- M4 -> M8 : grille GR, retour en retard, préventif ---------------------------------------------------
     def _tarif(self, partenaire, equipement, jours_effet, tarif, penalite):
@@ -51,7 +51,7 @@ class Command(ParcoursA):
         actif = Actif.objects.filter(equipement_gr=equipement).first()
         if actif is None:
             actif = Actif.objects.get(pk=self.call("atelier@etls.local", "post", "/api/maintenance/actifs/", {
-                "designation": f"{equipement.label} (actif GR demo)", "categorie": "engin", "is_global_rental": True,
+                "designation": f"{equipement.label} (actif GR)", "categorie": "engin", "is_global_rental": True,
                 "equipement_gr": str(equipement.pk), "compteur_type": "heures", "site": equipement.site or "Libreville",
             })["id"])
         return actif
@@ -122,9 +122,9 @@ class Command(ParcoursA):
         if of.joints.exists():
             return
         # Instruments : un en service (échéance lointaine), un à étalonner sous 30 j, un bloqué (hors tolérance).
-        manometre = self._instrument("Manometre 0-100 bar (demo)", "MAN-DEMO-001", 180)
-        self._instrument("Pied a coulisse 300 mm (demo)", "PAC-DEMO-002", 20)
-        bloque = self._instrument("Jauge de soudure (demo)", "JAU-DEMO-003", 60)
+        manometre = self._instrument("Manomètre 0-100 bar", "MAN-DEMO-001", 180)
+        self._instrument("Pied à coulisse 300 mm", "PAC-DEMO-002", 20)
+        bloque = self._instrument("Jauge de soudure", "JAU-DEMO-003", 60)
         if bloque.statut == "actif":
             self.call(qa, "post", f"/api/qualite/instruments/{bloque.pk}/etalonner/", {"conforme": False, "certificat": "CERT-DEMO-NC"})
         wps = WpsWpqr.objects.filter(statut="valide", type="wps").first()
@@ -141,10 +141,10 @@ class Command(ParcoursA):
         self.call(qa, "post", f"/api/qualite/wps/{wps.pk}/diffuser/", {"ordre": str(of.pk)})
         # ITP : 3 points (arret / observation / arret) -> approbation -> levée dans l'ordre.
         itp = self.call(qa, "post", "/api/qualite/controles/", {
-            "type_controle": "itp", "affaire": str(of.affaire_id), "ordre": str(of.pk), "point_controle": f"ITP spools {of.code} (demo)",
+            "type_controle": "itp", "affaire": str(of.affaire_id), "ordre": str(of.pk), "point_controle": f"ITP spools {of.code}",
         })
-        for n, (desc, typ) in enumerate((("Verification matiere et coulees", "arret"), ("Fit-up avant soudage", "observation"),
-                                         ("Controle final dimensionnel", "arret")), start=1):
+        for n, (desc, typ) in enumerate((("Vérification matière et coulées", "arret"), ("Fit-up avant soudage", "observation"),
+                                         ("Contrôle final dimensionnel", "arret")), start=1):
             self.call(qa, "post", "/api/qualite/points-inspection/", {"controle": itp["id"], "ordre": n, "description": desc, "type_point": typ})
         self.call(qa, "post", f"/api/qualite/controles/{itp['id']}/approuver/")
         # Joints soudés (registre en inscription seule) : exigent l'ITP approuvé et un soudeur qualifié.
@@ -161,15 +161,15 @@ class Command(ParcoursA):
         for n in (1, 2):
             self.call(qa, "post", "/api/qualite/joints/", {
                 "ordre": str(of.pk), "repere": f"J-{n:03d}", "soudeur": str(soudeur.pk), "wps": str(wps.pk),
-                "numero_coulee": f"COUL-DEMO-{n}", "consommable": "Electrode E7018 lot DEMO",
+                "numero_coulee": f"COUL-DEMO-{n}", "consommable": "Électrode E7018",
             })
         for point in ControleQualite.objects.get(pk=itp["id"]).points.order_by("ordre"):
-            self.call(qa, "post", f"/api/qualite/points-inspection/{point.pk}/lever/", {"resultat": "conforme", "commentaire": "OK (demo)"})
+            self.call(qa, "post", f"/api/qualite/points-inspection/{point.pk}/lever/", {"resultat": "conforme", "commentaire": "OK"})
         self.call(qa, "patch", f"/api/qualite/controles/{itp['id']}/", {"statut": "valide", "resultat": "conforme"})
         # CND radiographie (RT) sur les joints, avec l'instrument en service.
         cnd = self.call(qa, "post", "/api/qualite/controles/", {
             "type_controle": "cnd", "methode_cnd": "RT", "affaire": str(of.affaire_id), "ordre": str(of.pk),
-            "instrument": str(manometre.pk), "point_controle": "Radiographie joints J-001/J-002 (demo)", "wps": str(wps.pk),
+            "instrument": str(manometre.pk), "point_controle": "Radiographie joints J-001/J-002", "wps": str(wps.pk),
         })
         self.call(qa, "patch", f"/api/qualite/controles/{cnd['id']}/", {"statut": "valide", "resultat": "conforme"})
         # Épreuve hydraulique : 60 bar maintenus 30 min, chute max 2 bar.
@@ -185,7 +185,7 @@ class Command(ParcoursA):
         self.call("atelier@etls.local", "post", f"/api/operations/ordres/{of.pk}/liberer/")
         # Réception interne : PV prononcé sans réserve -> dossier qualité de l OF scellé en GED (10 ans).
         pv = self.call(qa, "post", "/api/qualite/pvs/", {
-            "affaire": str(of.affaire_id), "ordre": str(of.pk), "intitule": f"Reception interne spools {of.code} (demo)",
+            "affaire": str(of.affaire_id), "ordre": str(of.pk), "intitule": f"Réception interne spools {of.code}",
         })
         self.call(qa, "post", f"/api/qualite/pvs/{pv['id']}/levee-reserve/", {"reserve": False})
 
@@ -202,9 +202,9 @@ class Command(ParcoursA):
         if not Duer.objects.filter(annee=annee, perimetre="Atelier Libreville (demo)").exists():
             duer = self.call(pdg, "post", "/api/hse/duer/", {"annee": annee, "perimetre": "Atelier Libreville (demo)"})
             for lieux, activite, desc, proba, gravite, mesure in (
-                ("Atelier soudure", "Soudage", "Projections et fumees de soudage", 4, 3, "Ecrans, aspiration, EPI soudeur"),
-                ("Zone de levage", "Manutention", "Chute de charge lors du levage de spools", 2, 5, "Elingues verifiees, balisage, plan de levage"),
-                ("Stockage", "Stockage", "Encombrement des allees", 2, 1, ""),
+                ("Atelier soudure", "Soudage", "Projections et fumées de soudage", 4, 3, "Écrans, aspiration, EPI soudeur"),
+                ("Zone de levage", "Manutention", "Chute de charge lors du levage de spools", 2, 5, "Élingues vérifiées, balisage, plan de levage"),
+                ("Stockage", "Stockage", "Encombrement des allées", 2, 1, ""),
             ):
                 self.call(hse, "post", "/api/hse/evaluations-risques/", {
                     "duer": duer["id"], "lieux": lieux, "activite": activite, "description": desc,
@@ -219,14 +219,14 @@ class Command(ParcoursA):
             })
             self.call(hse, "post", f"/api/hse/audits/{audit['id']}/realiser/", {"score": 82})
             action = self.call(hse, "post", "/api/hse/actions/", {
-                "type": "corrective", "description": "Reprendre le marquage au sol des allees (demo)",
+                "type": "corrective", "description": "Reprendre le marquage au sol des allées",
                 "echeance": str(self.today + timedelta(days=15)),
             })
             self.call(hse, "post", f"/api/hse/actions/{action['id']}/cloturer/", {"efficace": True})
             self.call(hse, "post", "/api/hse/constats-audit/", {
-                "audit": audit["id"], "description": "Marquage au sol efface (demo)", "gravite": "mineur", "action": action["id"],
+                "audit": audit["id"], "description": "Marquage au sol effacé", "gravite": "mineur", "action": action["id"],
             })
-            self.call(hse, "post", "/api/hse/constats-audit/", {"audit": audit["id"], "description": "Extincteurs a jour (demo)", "gravite": "conforme"})
+            self.call(hse, "post", "/api/hse/constats-audit/", {"audit": audit["id"], "description": "Extincteurs à jour", "gravite": "conforme"})
             self.call(hse, "post", f"/api/hse/audits/{audit['id']}/cloturer/")
             self.call(hse, "post", "/api/hse/audits/", {
                 "type_audit": "inspection", "zone": "Chantier tuyauterie (demo)", "referentiel": "ISO 45001",
@@ -239,7 +239,7 @@ class Command(ParcoursA):
             })
             self.call(hse, "post", "/api/hse/exercices-urgence/", {
                 "plan": plan["id"], "date_exercice": str(self.today - timedelta(days=40)), "participants": 24,
-                "resultat": "satisfaisant", "observations": "Evacuation en 4 min (demo)",
+                "resultat": "satisfaisant", "observations": "Évacuation en 4 min",
             })
 
     # -- M5 : transfert vers le chantier, consommation imputée à l'affaire ------------------------------------

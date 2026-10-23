@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
 interface Parametre {
@@ -139,7 +139,7 @@ const PHASES = ["pre_contentieux", "tribunal", "arbitrage", "appel"];
 const PROBAS = ["faible", "moyenne", "forte", "certaine"];
 const TYPES_ACTION = ["audience", "conclusions", "courrier", "expertise", "negociation", "decision", "autre"];
 const NIVEAU_TONE = { eleve: "err", moyen: "warn", faible: "ok", non_cote: "brand" } as const;
-const fcfa = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null) => (v === null ? "—" : formatMoney(Number(v)));
 const rows = <T,>(p: T[] | { results: T[] } | undefined): T[] => (Array.isArray(p) ? p : (p?.results ?? []));
 
 function useListe<T>(key: string, path: string): T[] {

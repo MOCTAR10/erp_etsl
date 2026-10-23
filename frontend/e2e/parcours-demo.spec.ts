@@ -53,7 +53,7 @@ test.describe("Parcours démo : direction", () => {
     await page.goto("/juridique");
 
     await page.getByPlaceholder("Rechercher un dossier Global Rental (code, contrat)…").fill("intra-groupe");
-    const dossier = page.getByRole("row").filter({ hasText: "Location d'equipement intra-groupe (demo)" });
+    const dossier = page.getByRole("row").filter({ hasText: "Location d'équipement intra-groupe" });
     await expect(dossier).toHaveCount(1);
     await expect(dossier).toContainText("Ouvert");
     await expect(dossier).toContainText("618");

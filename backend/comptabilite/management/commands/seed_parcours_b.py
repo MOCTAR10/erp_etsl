@@ -45,7 +45,7 @@ class Command(ParcoursA):
         self.parcours_situations()
         self.parcours_achats()
         self.parcours_inventaire()
-        self.stdout.write(self.style.SUCCESS("Parcours demo lot B pret."))
+        self.stdout.write(self.style.SUCCESS("Parcours lot B pret."))
 
     # -- M3 -> M10 : situations, facture, encaissement, lettrage ---------------------------------------------
     def _situation(self, affaire, label, montant, avancement, decalage):
@@ -185,7 +185,7 @@ class Command(ParcoursA):
             self.call(email, "post", f"{base}/relancer/")
             self.call(email, "post", f"{base}/escalader/")
         elif suite == "resolu":
-            self.call(email, "post", f"{base}/resoudre/", {"resolution": "Avoir fournisseur obtenu (demo)"})
+            self.call(email, "post", f"{base}/resoudre/", {"resolution": "Avoir fournisseur obtenu"})
         else:
             self.call(email, "post", f"{base}/relancer/")
 

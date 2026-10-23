@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, Pagination, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, EmptyState, ErrorState, Kpi, PageHeader, Pagination, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { usePagedList } from "../lib/usePagedList";
 import type {
   BulletinPaie,
@@ -74,7 +74,7 @@ function BulletinCard({ b }: { b: BulletinPaie }) {
       <span className="meta muted">
         {b.has_amount_access && b.net !== null ? (
           <>
-            Net {formatNumber(b.net)} F · Brut {formatNumber(b.brut)} F
+            Net {formatMoney(b.net)} · Brut {formatMoney(b.brut)}
           </>
         ) : (
           "••••••"
@@ -226,8 +226,8 @@ export function RhPaiePage() {
       <div className="kpi-grid">
         <Kpi label={t("rhPaie.effectif")} value={s.effectif} hint={`${t("rhPaie.enConge")} · ${s.en_conge} · ${t("rhPaie.contratsExpirants")} · ${s.contrats_expirants_30}`} icon={Users} tone="brand" delay={0} />
         <Kpi label={t("rhPaie.congesEnAttente")} value={enAttente || s.conges_en_attente} hint={`${t("rhPaie.qualsExpirees")} · ${s.qualifications_expirees}`} icon={CalendarClock} tone="warn" delay={0.05} />
-        <Kpi label={t("rhPaie.bulletinsMois")} value={s.bulletins_mois} hint={`${m.mois} · ${t("rhPaie.masseBrute")} ${formatNumber(m.brut_total)} F`} icon={FileText} tone="brand" delay={0.1} />
-        <Kpi label={t("rhPaie.masseNette")} value={`${formatNumber(m.net_total)} F`} hint={`${t("rhPaie.bulletins")} · ${m.bulletins}`} icon={Banknote} tone="accent" delay={0.15} />
+        <Kpi label={t("rhPaie.bulletinsMois")} value={s.bulletins_mois} hint={`${m.mois} · ${t("rhPaie.masseBrute")} ${formatMoney(m.brut_total)}`} icon={FileText} tone="brand" delay={0.1} />
+        <Kpi label={t("rhPaie.masseNette")} value={m.net_total} kind="money" hint={`${t("rhPaie.bulletins")} · ${m.bulletins}`} icon={Banknote} tone="accent" delay={0.15} />
       </div>
 
       <div style={{ overflowX: "auto" }}>
@@ -263,7 +263,7 @@ export function RhPaiePage() {
           {employesAll.length === 0 ? (
             <EmptyState icon={Inbox} label={t("common.empty")} />
           ) : (
-            <DataTable rows={employesAll} columns={employeColumns} caption={t("rhPaie.employes")} />
+            <DataGrid rows={employesAll} columns={employeColumns} caption={t("rhPaie.employes")} />
           )}
           <Pagination
             page={employes.page}

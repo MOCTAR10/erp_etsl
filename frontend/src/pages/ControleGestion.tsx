@@ -11,9 +11,9 @@ import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaire
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { EcartsM11Section } from "../components/controleGestion/EcartsM11Section";
 import { BalanceAgeeGestionSection, MargesTerminaisonSection } from "../components/suivi/SuiviSections";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { pagedQuery } from "../lib/usePagedList";
 import type {
   AnalyseEcart,
@@ -68,7 +68,7 @@ export function BudgetCard({ b, index }: { b: Budget; index: number }) {
       <div className="meta">{b.label}</div>
       <div className="meta">
         {b.has_amount_access && b.montant !== null
-          ? `${formatNumber(b.montant)} F`
+          ? formatMoney(b.montant)
           : "••••••"}
         {b.analytic_code ? ` · ${b.axis_code ?? "axe"}:${b.analytic_code}` : ""}
         {b.nb_revisions > 0 ? ` · R${b.nb_revisions}` : ""}
@@ -91,7 +91,7 @@ export function BudgetCard({ b, index }: { b: Budget; index: number }) {
 type T = (key: string, opts?: Record<string, unknown>) => string;
 type MargeLigne = MargeRow & { id: string };
 
-const money = (access: boolean, v: string | number | null) => (access && v !== null ? `${formatNumber(v)} F` : "••••••");
+const money = (access: boolean, v: string | number | null) => (access && v !== null ? formatMoney(v) : "••••••");
 
 function margeColumns(t: T): Column<MargeLigne>[] {
   return [
@@ -104,9 +104,9 @@ function margeColumns(t: T): Column<MargeLigne>[] {
         </>
       ),
     },
-    { key: "produits", header: t("controleGestion.produits"), num: true, render: (r) => `${formatNumber(r.produits)} F` },
-    { key: "charges", header: t("controleGestion.charges"), num: true, render: (r) => `${formatNumber(r.charges)} F` },
-    { key: "marge", header: t("controleGestion.marge"), num: true, render: (r) => `${formatNumber(r.marge)} F` },
+    { key: "produits", header: t("controleGestion.produits"), num: true, render: (r) => formatMoney(r.produits) },
+    { key: "charges", header: t("controleGestion.charges"), num: true, render: (r) => formatMoney(r.charges) },
+    { key: "marge", header: t("controleGestion.marge"), num: true, render: (r) => formatMoney(r.marge) },
     {
       key: "taux",
       header: t("controleGestion.col.taux"),
@@ -284,7 +284,7 @@ export function ControleGestionPage() {
         <Kpi label={t("controleGestion.budgets")} value={enCours} hint={t("controleGestion.variance")} icon={PieChart} tone="brand" delay={0} />
         <Kpi label={t("controleGestion.revisions")} value={appliquees} hint="R1 - R4" icon={Target} tone="warn" delay={0.05} />
         <Kpi label={t("controleGestion.clotures")} value={stats ? `${stats.conformes_j4}/${stats.periodes}` : "—"} hint={t("controleGestion.realizeesJ4")} icon={CalendarCheck} tone="brand" delay={0.1} />
-        <Kpi label={t("controleGestion.marge")} value={m && m.totals.marge_hors_gr !== null ? `${formatNumber(m.totals.marge_hors_gr)} F` : "••••••"} hint={`${t("controleGestion.coutGr")} ${m ? formatNumber(m.totals.cout_gr) : "—"} F`} icon={Coins} tone="accent" delay={0.15} />
+        <Kpi label={t("controleGestion.marge")} value={m && m.totals.marge_hors_gr !== null ? m.totals.marge_hors_gr : "••••••"} kind="money" hint={`${t("controleGestion.coutGr")} ${m ? formatMoney(m.totals.cout_gr) : "—"}`} icon={Coins} tone="accent" delay={0.15} />
       </div>
 
       <SearchField value={budSearch} onChange={setBudSearch} placeholder={t("controleGestion.searchBudgets")} />
@@ -313,7 +313,7 @@ export function ControleGestionPage() {
 
       {m && m.rows.length > 0 && (
         <SectionCard title={`${t("controleGestion.marges")} · ${m.rows.length}`}>
-          <DataTable
+          <DataGrid
             rows={m.rows.map((r, i) => ({ ...r, id: String(r.analytic ?? `${r.code_axe}-${i}`) }))}
             columns={margeColumns(t)}
             caption={t("controleGestion.marges")}
@@ -361,13 +361,13 @@ export function ControleGestionPage() {
 
       {closed.length > 0 && (
         <SectionCard title={`${t("controleGestion.clotures")} · ${closed.length}`}>
-          <DataTable rows={closed} columns={clotureColumns(t)} caption={t("controleGestion.clotures")} />
+          <DataGrid rows={closed} columns={clotureColumns(t)} caption={t("controleGestion.clotures")} />
         </SectionCard>
       )}
 
       {revs.length > 0 && (
         <SectionCard title={`${t("controleGestion.revisions")} · ${revs.length}`}>
-          <DataTable rows={revs} columns={revisionColumns(t)} caption={t("controleGestion.revisions")} />
+          <DataGrid rows={revs} columns={revisionColumns(t)} caption={t("controleGestion.revisions")} />
         </SectionCard>
       )}
 

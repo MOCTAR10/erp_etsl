@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
 interface Catalogue {
@@ -64,7 +64,7 @@ interface Employe {
 
 const POSTES = ["decoupe", "tuyauterie", "soudure", "chaudronnerie", "structure", "montage", "controle"];
 const TYPES_QUALIF = ["habilitation", "permis", "certificat", "diplome"];
-const fcfa = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null) => (v === null ? "—" : formatMoney(Number(v)));
 
 /** Écarts M9-C : catalogue et plan de formation (budget, coût, ROI), qualifications, matrice habilitation ↔ poste. */
 export function EcartsM9cSection() {

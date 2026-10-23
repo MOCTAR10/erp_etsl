@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { ActionBar, Badge, PagedDataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, PagedDataGrid, QuickForm, SectionCard } from "../ui";
 import type { ActionDef } from "../ui";
 import type { Column } from "../ui";
 import { formatDate } from "../../lib/format";
@@ -108,7 +108,7 @@ export function ConformiteHse() {
             { name: "date_prevue", label: t("hse.m7.datePrevue"), type: "date", required: true },
           ]}
         />
-        <PagedDataTable list={audits} columns={auditCols} caption={t("hse.m7.audits")} searchPlaceholder={t("hse.m7.searchAudits")} />
+        <PagedDataGrid list={audits} columns={auditCols} caption={t("hse.m7.audits")} searchPlaceholder={t("hse.m7.searchAudits")} />
       </SectionCard>
 
       <SectionCard title={`${t("hse.m7.duer")} · ${duers.count}`}>
@@ -120,7 +120,7 @@ export function ConformiteHse() {
             { name: "perimetre", label: t("hse.m7.perimetre"), required: true },
           ]}
         />
-        <PagedDataTable list={duers} columns={duerCols} caption={t("hse.m7.duer")} searchPlaceholder={t("hse.m7.searchDuer")} />
+        <PagedDataGrid list={duers} columns={duerCols} caption={t("hse.m7.duer")} searchPlaceholder={t("hse.m7.searchDuer")} />
       </SectionCard>
 
       <SectionCard title={`${t("hse.m7.plans")} · ${plans.count}`}>
@@ -155,7 +155,7 @@ export function ConformiteHse() {
             ]}
           />
         ) : null}
-        <PagedDataTable list={plans} columns={planCols} caption={t("hse.m7.plans")} searchPlaceholder={t("hse.m7.searchPlans")} />
+        <PagedDataGrid list={plans} columns={planCols} caption={t("hse.m7.plans")} searchPlaceholder={t("hse.m7.searchPlans")} />
       </SectionCard>
     </>
   );

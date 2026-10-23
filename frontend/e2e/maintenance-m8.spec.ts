@@ -32,8 +32,8 @@ test.describe("M8 Maintenance : fiabilité, pièces de rechange, coût vers M11"
     await page.goto("/maintenance");
     const section = page.getByTestId("pieces-rechange");
     await section.getByLabel("OT", { exact: true }).selectOption({ index: 1 });
-    await section.getByLabel("Pièce", { exact: true }).selectOption({ label: "PR-JOINT-VERIN — Joint de verin hydraulique" });
-    await section.getByLabel("Dépôt", { exact: true }).selectOption({ label: "DEP-PIECES — Magasin pieces de rechange" });
+    await section.getByLabel("Pièce", { exact: true }).selectOption({ label: "PR-JOINT-VERIN — Joint de vérin hydraulique" });
+    await section.getByLabel("Dépôt", { exact: true }).selectOption({ label: "DEP-PIECES — Magasin pièces de rechange" });
     await section.getByLabel("Quantité", { exact: true }).fill("1");
     await section.getByRole("button", { name: "Sortir la pièce" }).click();
     await expect(section.getByTestId("pieces-info")).toContainText("Pièce sortie du stock");
@@ -70,8 +70,9 @@ test.describe("M8 Maintenance : plans préventifs, qualification et historique",
 
     const plans = section.getByRole("table", { name: "Plans préventifs et calendrier" });
     const form = page.getByRole("form", { name: "Nouveau plan préventif" });
-    await section.getByRole("button", { name: "Nouveau plan préventif" }).click();
+    // Le formulaire s'ouvre dans un panneau latéral, refermé après chaque enregistrement.
     const saisir = async (libelle: string, periodicite: string, derniere: string) => {
+      await section.getByRole("button", { name: "Nouveau plan préventif" }).click();
       const equipement = form.getByLabel(/Équipement/);
       await expect(equipement.locator("option").nth(1)).toBeAttached();
       await equipement.selectOption({ index: 1 });

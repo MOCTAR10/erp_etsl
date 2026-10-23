@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
 interface Option {
@@ -70,7 +70,7 @@ function useOptions<T>(key: string, path: string) {
   return useQuery({ queryKey: ["m9a", key], queryFn: () => api.listAll<T>(path), retry: 0 }).data ?? [];
 }
 
-const montant = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} F`);
+const montant = (v: string | null) => (v === null ? "—" : formatMoney(Number(v)));
 
 /** Écarts M9-A : saisies RH / paie, bulletin préparé depuis le contrat, absences, carrière, grille, échéances. */
 export function EcartsM9aSection() {
@@ -90,7 +90,7 @@ export function EcartsM9aSection() {
 
   const employeOpts = employes.map((e) => ({ value: e.id, label: `${e.code} · ${e.nom_complet}` }));
   const contratOpts = contrats.map((c) => ({ value: c.id, label: `${c.code} · ${c.employe_nom}` }));
-  const grilleOpts = grilles.map((g) => ({ value: g.id, label: `${g.code} · ${formatNumber(Number(g.salaire_base))} F` }));
+  const grilleOpts = grilles.map((g) => ({ value: g.id, label: `${g.code} · ${formatMoney(Number(g.salaire_base))}` }));
   const gainOpts = rubriques.filter((r) => r.nature === "gain").map((r) => ({ value: r.id, label: `${r.code} · ${r.label}` }));
   const choix = (vals: string[], prefix: string) => vals.map((v) => ({ value: v, label: t(`${prefix}.${v}`) }));
 

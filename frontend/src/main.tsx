@@ -12,6 +12,7 @@ import "./styles/global.css";
 import "./styles/primitives.css";
 import "./styles/pages/shell.css";
 import "./styles/pages/listes.css";
+import "./styles/pages/formulaires.css";
 import { registerServiceWorker, startAutoSync } from "./lib/offline";
 
 const storedTheme = localStorage.getItem("etls.theme");

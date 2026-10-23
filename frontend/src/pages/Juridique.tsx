@@ -6,9 +6,9 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { EcartsM12Section } from "../components/juridique/EcartsM12Section";
 import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   AlertesResult,
@@ -58,7 +58,7 @@ function ConventionCard({ c, index }: { c: Convention; index: number }) {
       </div>
       <div className="meta">{c.titre}</div>
       <div className="meta">
-        {c.has_amount_access && c.montant !== null ? `${formatNumber(c.montant)} F` : "••••••"} ·{" "}
+        {c.has_amount_access && c.montant !== null ? formatMoney(c.montant) : "••••••"} ·{" "}
         {c.partenaire_name ?? "—"}
       </div>
       <div className="meta">
@@ -91,7 +91,7 @@ const REUNION_TONE: Record<StatutReunion, Tone> = { planifiee: "warn", tenue: "o
 const GR_TONE: Record<StatutDossierGR, Tone> = { brouillon: "warn", ouvert: "brand", cloture: "ok" };
 
 const amount = (access: boolean, value: string | number | null) =>
-  access && value !== null ? `${formatNumber(value)} F` : "••••••";
+  access && value !== null ? formatMoney(value) : "••••••";
 const dateOr = (iso: string | null | undefined) => (iso ? formatDate(iso) : "—");
 const daysLeft = (t: T, d: number | null) => (d === null ? "—" : `${d} ${t("juridique.jours")}`);
 
@@ -272,36 +272,40 @@ export function JuridiquePage() {
 
   return (
     <>
-      <PageHeader title={t("juridique.title")} />
-      <QuickForm
-        title={t("juridique.form.title")}
-        endpoint="/api/juridique/courriers/"
-        fields={[
-          {
-            name: "sens",
-            label: t("juridique.col.sens"),
-            type: "select",
-            required: true,
-            defaultValue: "entrant",
-            options: [
-              { value: "entrant", label: t("juridique.form.entrant") },
-              { value: "sortant", label: t("juridique.form.sortant") },
-            ],
-          },
-          {
-            name: "type",
-            label: t("juridique.col.type"),
-            type: "select",
-            required: true,
-            defaultValue: "lettre",
-            options: ["lettre", "email", "note", "convocation", "proces", "autre"].map((v) => ({ value: v, label: t(`juridique.form.types.${v}`) })),
-          },
-          { name: "objet", label: t("juridique.col.objet"), required: true },
-          { name: "reference", label: t("juridique.form.reference") },
-          { name: "expediteur", label: t("juridique.form.expediteur") },
-          { name: "destinataire", label: t("juridique.form.destinataire") },
-          { name: "date_courrier", label: t("juridique.form.dateCourrier"), type: "date" },
-        ]}
+      <PageHeader
+        title={t("juridique.title")}
+        actions={
+          <QuickForm
+            title={t("juridique.form.title")}
+            endpoint="/api/juridique/courriers/"
+            fields={[
+              {
+                name: "sens",
+                label: t("juridique.col.sens"),
+                type: "select",
+                required: true,
+                defaultValue: "entrant",
+                options: [
+                  { value: "entrant", label: t("juridique.form.entrant") },
+                  { value: "sortant", label: t("juridique.form.sortant") },
+                ],
+              },
+              {
+                name: "type",
+                label: t("juridique.col.type"),
+                type: "select",
+                required: true,
+                defaultValue: "lettre",
+                options: ["lettre", "email", "note", "convocation", "proces", "autre"].map((v) => ({ value: v, label: t(`juridique.form.types.${v}`) })),
+              },
+              { name: "objet", label: t("juridique.col.objet"), required: true },
+              { name: "reference", label: t("juridique.form.reference") },
+              { name: "expediteur", label: t("juridique.form.expediteur") },
+              { name: "destinataire", label: t("juridique.form.destinataire") },
+              { name: "date_courrier", label: t("juridique.form.dateCourrier"), type: "date" },
+            ]}
+          />
+        }
       />
 
       <div className="kpi-grid">
@@ -390,22 +394,22 @@ export function JuridiquePage() {
 
       {(cautions.count > 0 || cautions.search) && (
         <SectionCard title={`${t("juridique.cautions")} · ${cautions.count}`}>
-          <PagedDataTable list={cautions} columns={cautionColumns(t)} caption={t("juridique.cautions")} searchPlaceholder={t("juridique.searchCautions")} />
+          <PagedDataGrid list={cautions} columns={cautionColumns(t)} caption={t("juridique.cautions")} searchPlaceholder={t("juridique.searchCautions")} />
         </SectionCard>
       )}
       {(assurances.count > 0 || assurances.search) && (
         <SectionCard title={`${t("juridique.assurances")} · ${assurances.count}`}>
-          <PagedDataTable list={assurances} columns={assuranceColumns(t)} caption={t("juridique.assurances")} searchPlaceholder={t("juridique.searchAssurances")} />
+          <PagedDataGrid list={assurances} columns={assuranceColumns(t)} caption={t("juridique.assurances")} searchPlaceholder={t("juridique.searchAssurances")} />
         </SectionCard>
       )}
       {(contentieux.count > 0 || contentieux.search) && (
         <SectionCard title={`${t("juridique.contentieux")} · ${contentieux.count}`}>
-          <PagedDataTable list={contentieux} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} searchPlaceholder={t("juridique.searchContentieux")} />
+          <PagedDataGrid list={contentieux} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} searchPlaceholder={t("juridique.searchContentieux")} />
         </SectionCard>
       )}
       {(dossiersGr.count > 0 || dossiersGr.search) && (
         <SectionCard title={`GLOBAL RENTAL · ${dossiersGr.count}`}>
-          <PagedDataTable list={dossiersGr} columns={grColumns(t)} caption="GLOBAL RENTAL" searchPlaceholder={t("juridique.searchGr")} />
+          <PagedDataGrid list={dossiersGr} columns={grColumns(t)} caption="GLOBAL RENTAL" searchPlaceholder={t("juridique.searchGr")} />
         </SectionCard>
       )}
       <RechercheJuridiqueSection />
@@ -414,12 +418,12 @@ export function JuridiquePage() {
 
       {(courriers.count > 0 || courriers.search) && (
         <SectionCard title={`${t("juridique.courriers")} · ${courriers.count}`}>
-          <PagedDataTable list={courriers} columns={courrierColumns(t)} caption={t("juridique.courriers")} searchPlaceholder={t("juridique.searchCourriers")} />
+          <PagedDataGrid list={courriers} columns={courrierColumns(t)} caption={t("juridique.courriers")} searchPlaceholder={t("juridique.searchCourriers")} />
         </SectionCard>
       )}
       {(reunions.count > 0 || reunions.search) && (
         <SectionCard title={`${t("juridique.reunions")} · ${reunions.count}`}>
-          <PagedDataTable list={reunions} columns={reunionColumns(t)} caption={t("juridique.reunions")} searchPlaceholder={t("juridique.searchReunions")} />
+          <PagedDataGrid list={reunions} columns={reunionColumns(t)} caption={t("juridique.reunions")} searchPlaceholder={t("juridique.searchReunions")} />
         </SectionCard>
       )}
     </>
