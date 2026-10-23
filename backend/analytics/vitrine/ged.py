@@ -61,10 +61,10 @@ class VitrineGed:
         types = {t.code: t for t in DocumentType.objects.all()}
         for k in range(MOIS - 1, -1, -1):
             mois = debut_mois(self.today, k)
-            r = alea(f"ged-{mois}")
             for code_type, gabarit, par_mois, partie in FLUX_GED:
                 nombre = int(par_mois) if par_mois >= 1 else int(k % 2 == 0)
                 for n in range(nombre):
+                    r = alea(f"ged-{mois}-{code_type}-{n}")  # un tirage par document : rejouable à l'identique
                     tiers = r.choice(clients if partie == "client" else fournisseurs)
                     titre = gabarit.format(client=tiers.name, fournisseur=tiers.name, mois=f"{mois:%m/%Y}")
                     if nombre > 1:
