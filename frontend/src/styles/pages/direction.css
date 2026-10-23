@@ -1192,6 +1192,33 @@
       font-size: var(--fs-xs);
       color: var(--text-muted);
     }
+    /* Délai et menu ⋯ visibles sans défilement : le nom de l'étape passe à la ligne
+       (la grille impose `nowrap` sous 900 px, hors couche : d'où !important), colonnes serrées. */
+    .circ-card .ui-grid {
+      display: table !important;
+      width: 100%;
+      table-layout: auto;
+    }
+    .circ-card .ui-grid :is(th, td) {
+      padding-left: var(--space-2);
+      padding-right: var(--space-2);
+    }
+    .circ-card .ui-grid td:nth-child(2) {
+      white-space: normal !important;
+      overflow-wrap: anywhere;
+    }
+    .circ-card .ui-grid :is(th, td):first-child {
+      width: 30px !important;
+      padding-right: 0;
+    }
+    .circ-card .ui-grid :is(th, td):nth-child(4) {
+      width: auto !important;
+      white-space: nowrap !important;
+    }
+    .circ-card .ui-grid .ui-grid-actions {
+      padding-left: 0;
+      padding-right: 0;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

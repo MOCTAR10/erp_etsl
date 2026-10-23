@@ -9,7 +9,8 @@
  */
 
 export const motionTokens = {
-  duration: { fast: 0.16, base: 0.3, slow: 0.55 },
+  /** 120–200 ms pour l'interface (survol, entrée de page, cartes) ; `slow` réservé à l'écran de connexion. */
+  duration: { instant: 0.12, fast: 0.16, base: 0.2, slow: 0.55 },
   ease: { out: [0.16, 1, 0.3, 1] as const, inOut: [0.65, 0, 0.35, 1] as const },
   stagger: { quick: 0.05, base: 0.1 },
   distance: { xs: 4, sm: 8, md: 16, lg: 28 },
@@ -57,6 +58,12 @@ export interface ThemeColors {
   brandSoft: string;
   brandTint: string;
   onBrand: string;
+  /** Aplat de marque (bouton primaire, onglet actif, pastilles pleines) : en sombre, bleu royal soutenu sous texte clair. */
+  brandSolid: string;
+  brandSolidHover: string;
+  onBrandSolid: string;
+  /** Fond des champs de saisie (en sombre : légèrement en creux par rapport à la carte). */
+  field: string;
   ring: string;
   accent: string;
   accentSoft: string;
@@ -92,6 +99,10 @@ export const palette = {
     brandSoft: "#e9edfa",
     brandTint: "#d8e0f7",
     onBrand: "#ffffff",
+    brandSolid: "#12308f",
+    brandSolidHover: "#0a1f66",
+    onBrandSolid: "#ffffff",
+    field: "#ffffff",
     ring: "rgba(18, 48, 143, 0.40)",
     accent: "#d4142a",
     accentSoft: "#fde9ec",
@@ -125,17 +136,21 @@ export const palette = {
     brandSoft: "rgba(127, 156, 245, 0.14)",
     brandTint: "rgba(127, 156, 245, 0.24)",
     onBrand: "#0b1020",
+    brandSolid: "#3d5bd6",
+    brandSolidHover: "#4562da",
+    onBrandSolid: "#f4f6fc",
+    field: "#10172b",
     ring: "rgba(127, 156, 245, 0.60)",
     accent: "#f0475a",
     accentSoft: "rgba(240, 71, 90, 0.14)",
     steel: "#a3b2d6",
     steelSoft: "rgba(163, 178, 214, 0.14)",
-    ok: "#34d399",
-    okSoft: "rgba(52, 211, 153, 0.14)",
-    okText: "#34d399",
-    warn: "#fbbf24",
-    warnSoft: "rgba(251, 191, 36, 0.14)",
-    warnText: "#fbbf24",
+    ok: "#3fcf8e",
+    okSoft: "rgba(63, 207, 142, 0.14)",
+    okText: "#4fd69a",
+    warn: "#e9a945",
+    warnSoft: "rgba(233, 169, 69, 0.14)",
+    warnText: "#f0b95a",
     err: "#f87171",
     errSoft: "rgba(248, 113, 113, 0.14)",
     errText: "#f87171",

@@ -51,11 +51,17 @@ textarea {
 
 /* !important dans la couche la plus basse = priorité maximale : rien ne l'annule. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
     transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
   }
 }
 } /* fin @layer reset */
@@ -89,6 +95,12 @@ textarea {
   --brand-tint: #d8e0f7;
   /* Texte posé sur un aplat --brand (boutons primaires, onglet actif, lien d'évitement). */
   --on-brand: #ffffff;
+  /* Aplat de marque (bouton primaire, onglet actif, pastilles pleines) et son texte. */
+  --brand-solid: #12308f;
+  --brand-solid-hover: #0a1f66;
+  --on-brand-solid: #ffffff;
+  /* Fond des champs de saisie */
+  --field: #ffffff;
   --accent: #d4142a;
   --accent-soft: #fde9ec;
   --steel: #4f5f86;
@@ -195,16 +207,23 @@ textarea {
   --brand-soft: rgba(127, 156, 245, 0.14);
   --brand-tint: rgba(127, 156, 245, 0.24);
   --on-brand: #0b1020;
+  /* Aplat soutenu sous texte clair : le pervenche (--brand) reste réservé aux textes, liens et icônes. */
+  --brand-solid: #3d5bd6;
+  --brand-solid-hover: #4562da;
+  --on-brand-solid: #f4f6fc;
+  /* Champs légèrement en creux par rapport aux cartes */
+  --field: #10172b;
   --accent: #f0475a;
   --accent-soft: rgba(240, 71, 90, 0.14);
   --steel: #a3b2d6;
   --steel-soft: rgba(163, 178, 214, 0.14);
-  --ok: #34d399;
-  --ok-soft: rgba(52, 211, 153, 0.14);
-  --ok-text: #34d399;
-  --warn: #fbbf24;
-  --warn-soft: rgba(251, 191, 36, 0.14);
-  --warn-text: #fbbf24;
+  /* Sémantiques désaturées (pas de vert néon ni de jaune vif sur fond nuit) */
+  --ok: #3fcf8e;
+  --ok-soft: rgba(63, 207, 142, 0.14);
+  --ok-text: #4fd69a;
+  --warn: #e9a945;
+  --warn-soft: rgba(233, 169, 69, 0.14);
+  --warn-text: #f0b95a;
   --err: #f87171;
   --err-soft: rgba(248, 113, 113, 0.14);
   --err-text: #f87171;
@@ -312,7 +331,7 @@ h3 {
   padding: 0 var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background-color: var(--surface);
+  background-color: var(--field);
   color: var(--text);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
@@ -520,6 +539,33 @@ h3 {
   flex: 0 0 auto;
 }
 
+/* En-tête compact sur mobile : titre 22/28, sous-titre 13/18, actions sur une ligne qui passe à la ligne */
+@media (max-width: 640px) {
+  .page-header {
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
+  .page-header > :first-child {
+    flex-basis: 100%;
+  }
+  .page-header h2 {
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .page-header h2::after {
+    width: 24px;
+    margin-top: 6px;
+  }
+  .page-header .sub {
+    margin-top: 6px;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-sm);
+  }
+  .page-header-actions {
+    flex: 1 1 100%;
+  }
+}
+
 /* Titre de section : 18/26, casse de phrase (l'uppercase est réservé aux groupes de navigation) */
 .section-title {
   display: flex;
@@ -593,6 +639,8 @@ h3 {
   gap: var(--space-2);
   min-height: 112px;
   overflow: hidden;
+  /* Unités `cqi` : la valeur se réduit avec la largeur de la carte (montant exact, jamais tronqué). */
+  container-type: inline-size;
 }
 
 .kpi-head {
@@ -623,13 +671,22 @@ h3 {
   overflow-wrap: break-word;
 }
 
-/* Montants longs : la police se réduit, le nombre reste exact (jamais « 25 M ») */
+/* Chiffre d'une grille KPI : jamais de coupure au milieu d'un nombre ou de « FCFA »
+   (espaces insécables du format) ; les cartes « kpi » de texte libre gardent le retour à la ligne. */
+:is(.kpis, .kpi-grid) .kpi-value,
+.kpi-value:is(.kpi-value-md, .kpi-value-sm) {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+/* Montants longs : la police se réduit (palier selon la longueur, puis selon la largeur de la carte),
+   le nombre reste exact (jamais « 25 M »). ~9 cadratins pour « 210 000 000 FCFA ». */
 .kpi-value.kpi-value-md {
-  font-size: 22px;
+  font-size: min(22px, 10.5cqi);
   line-height: 28px;
 }
 .kpi-value.kpi-value-sm {
-  font-size: 18px;
+  font-size: min(18px, 9cqi);
   line-height: 24px;
 }
 
@@ -682,8 +739,16 @@ h3 {
     gap: var(--space-1);
   }
   .kpi-value {
-    font-size: 22px;
+    font-size: min(22px, 12cqi);
     line-height: 28px;
+  }
+  .kpi-value.kpi-value-md {
+    font-size: min(18px, 10.5cqi);
+    line-height: 24px;
+  }
+  .kpi-value.kpi-value-sm {
+    font-size: min(16px, 9cqi);
+    line-height: 22px;
   }
   .kpi-icon {
     display: none;
@@ -786,8 +851,21 @@ a.banner-action:hover {
 .banner.neutral > svg { color: var(--text-muted); }
 
 @media (max-width: 640px) {
+  /* Icône en tête, texte sur toute la largeur, action en dessous alignée sur le texte */
   .banner {
     flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
+  .banner > svg {
+    margin-top: 1px;
+  }
+  .banner-body {
+    flex: 1 1 calc(100% - 30px);
+    flex-direction: column;
+    align-items: flex-start;
   }
   .banner-action {
     margin-left: 30px;
@@ -906,7 +984,8 @@ a.banner-action:hover {
   font-weight: var(--fw-medium);
 }
 
-.task-card:hover {
+/* Survol réservé aux cartes cliquables (lien, bouton) : une carte de lecture ne « bouge » pas. */
+.task-card:is(a, button, [role="button"], .is-clickable):hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
 }
@@ -954,7 +1033,8 @@ a.banner-action:hover {
   transition: background 0.14s var(--ease-out);
 }
 
-.table tbody tr:hover {
+/* Survol de ligne seulement si la ligne mène quelque part (clic de ligne ou lien) */
+.table tbody tr:is(.is-clickable, :has(> td > a[href])):hover {
   background: var(--surface-2);
 }
 
@@ -1032,13 +1112,13 @@ a.banner-action:hover {
 
 /* Primaire : aplat de marque, sans halo coloré */
 .btn.primary {
-  background: var(--brand);
-  color: var(--on-brand);
+  background: var(--brand-solid);
+  color: var(--on-brand-solid);
   box-shadow: var(--shadow-xs);
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: var(--brand-hover);
+  background: var(--brand-solid-hover);
 }
 
 /* Secondaire (fantôme) : surface + bordure, texte plein */
@@ -1412,7 +1492,7 @@ kbd {
   min-height: var(--control-h);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--field);
   color: var(--text);
   padding: 0 var(--space-3);
   outline: none;
@@ -1780,7 +1860,7 @@ kbd {
     width: min(280px, 85vw);
     z-index: 40;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
+    transition: transform 0.2s var(--ease-out);
     box-shadow: var(--shadow-pop);
   }
   .sidebar.open {
@@ -1809,6 +1889,9 @@ kbd {
     z-index: 30;
     background: rgb(7 20 71 / 0.45);
   }
+  :root[data-theme="dark"] .nav-backdrop {
+    background: rgb(2 6 18 / 0.6);
+  }
   .topbar {
     padding: 0.7rem var(--page-pad-x);
   }
@@ -1817,6 +1900,10 @@ kbd {
   }
   .user-chip .user-meta {
     display: none;
+  }
+  /* Jamais de défilement horizontal de la page : les débordements restent locaux (tableaux, boards) */
+  .main {
+    overflow-x: hidden;
   }
 }
 
@@ -1828,8 +1915,8 @@ kbd {
   z-index: 1000;
   padding: 0.6rem 1rem;
   border-radius: var(--radius-md);
-  background: var(--brand);
-  color: var(--on-brand);
+  background: var(--brand-solid);
+  color: var(--on-brand-solid);
   font-weight: 600;
 }
 
@@ -2650,7 +2737,7 @@ kbd {
   white-space: nowrap;
   cursor: pointer;
 }
-.terrain-tabs button.active { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.terrain-tabs button.active { background: var(--brand-solid); border-color: var(--brand-solid); color: var(--on-brand-solid); }
 .terrain-toast { color: var(--ok-text); font-weight: 600; margin: 0 0 0.8rem; }
 .terrain-form { display: grid; gap: 0.9rem; max-width: 560px; }
 .terrain-form .field input,
@@ -2717,7 +2804,7 @@ kbd {
 .gaz-form input, .itp-add input { flex: 1; min-width: 180px; }
 .bareme-form input, .gaz-form input, .itp-add input {
   min-height: var(--control-h); padding: 0 var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  background: var(--surface); color: var(--text);
+  background: var(--field); color: var(--text);
 }
 .itp-list { display: grid; gap: 1rem; }
 .itp { display: grid; gap: 0.6rem; }
@@ -2736,7 +2823,7 @@ kbd {
 .sign-signers li { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; }
 .sign-panel { display: grid; gap: 0.6rem; padding: 0.8rem; border: 1px dashed var(--brand); border-radius: var(--radius-lg); background: var(--brand-soft); }
 .sign-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.sign-row input { flex: 1; min-width: 150px; min-height: var(--control-h); padding: 0 var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+.sign-row input { flex: 1; min-width: 150px; min-height: var(--control-h); padding: 0 var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--field); color: var(--text); }
 .cert { display: grid; gap: 0.4rem; padding: 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .cert-head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .cert-hash { word-break: break-all; font-size: 12px; color: var(--text-muted); }
@@ -2781,8 +2868,61 @@ kbd {
   border: 0;
 }
 
-/* Écarts transverses (EX-G-08) : impression des écrans — sans navigation ni commandes, tableaux complets. */
+/* Survol sans déplacement quand l'utilisateur demande moins de mouvement */
+@media (prefers-reduced-motion: reduce) {
+  .card-hover:hover,
+  .kpi-link:hover .kpi,
+  .btn:active {
+    transform: none;
+  }
+}
+
+/* Écarts transverses (EX-G-08) : impression des écrans — Direction et tableaux sur fond blanc,
+   sans navigation ni commandes, tableaux complets (pas de zone défilante ni d'en-tête collant).
+   Le thème sombre éventuel est neutralisé : on imprime toujours la charte claire. */
 @media print {
+  :root,
+  :root[data-theme] {
+    color-scheme: light;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f1f3f8;
+    --field: #ffffff;
+    --border: #d5dbe6;
+    --border-strong: #b9c2d3;
+    --text: #0f172a;
+    --text-muted: #4b5567;
+    --text-subtle: #6b7488;
+    --brand: #12308f;
+    --brand-solid: #12308f;
+    --brand-soft: #e9edfa;
+    --on-brand: #ffffff;
+    --on-brand-solid: #ffffff;
+    --accent: #d4142a;
+    --steel: #4f5f86;
+    --steel-soft: #eaedf4;
+    --ok: #16a34a;
+    --ok-soft: #e7f6ec;
+    --ok-text: #14743a;
+    --warn: #d97706;
+    --warn-soft: #fdeed7;
+    --warn-text: #9a4a07;
+    --err: #dc2626;
+    --err-soft: #fde8e8;
+    --err-text: #b91c1c;
+    --info: #2563eb;
+    --info-soft: #e8effd;
+    --info-text: #1d4ed8;
+    --shadow-xs: none;
+    --shadow-md: none;
+    --shadow-pop: none;
+  }
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
   .sidebar,
   .topbar,
   .nav-backdrop,
@@ -2791,13 +2931,24 @@ kbd {
   .quick-form,
   .btn,
   .icon-btn,
-  .pagination {
+  .pagination,
+  .page-header-actions,
+  .list-toolbar,
+  .filter-bar,
+  .search-field,
+  .card-actions,
+  .ui-menu-trigger,
+  .ui-grid-actions,
+  .dir-attn-toggle,
+  .dir-tabs,
+  [data-sonner-toaster] {
     display: none !important;
   }
   .app-shell,
   .main-col,
   .main {
     display: block !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
@@ -2805,20 +2956,80 @@ kbd {
   body {
     background: #fff !important;
     color: #000 !important;
+    font-size: 11pt;
+  }
+  /* Couleurs de statut (badges, jauges, barres) conservées à l'impression */
+  .badge,
+  .progress-fill,
+  .board-dot,
+  .dir-gauge,
+  .dir-gauge-fill,
+  .kpi-icon {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .card {
     box-shadow: none !important;
     break-inside: avoid;
   }
+  .page-header {
+    margin-bottom: 12pt;
+  }
+  .page-header h2::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .kpis,
+  .kpi-grid {
+    gap: 8pt;
+  }
+  .kpi {
+    min-height: 0;
+  }
+  /* Animations d'entrée figées dans leur état final */
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+  [style*="opacity: 0"] {
+    opacity: 1 !important;
+  }
+  /* Tableaux : pleine hauteur, en-tête répété sur chaque page, lignes insécables */
   .table-wrap,
+  .ui-grid-wrap,
   .main .table {
+    max-height: none !important;
     overflow: visible !important;
+  }
+  .main .table {
+    display: table !important;
   }
   .table thead {
     display: table-header-group;
   }
+  .table thead th,
+  .ui-grid thead th {
+    position: static !important;
+    background: #f1f3f8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .table tr {
     break-inside: avoid;
+  }
+  .table tbody tr:hover {
+    background: transparent !important;
+  }
+  /* Kanban : les colonnes passent à la ligne au lieu de défiler */
+  .board {
+    display: grid !important;
+    grid-auto-flow: row !important;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+    overflow: visible !important;
+    mask-image: none !important;
+  }
+  a[href]::after {
+    content: none !important;
   }
 }
 

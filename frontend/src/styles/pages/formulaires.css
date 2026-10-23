@@ -155,8 +155,8 @@
     height: 20px;
     padding: 0 6px;
     border-radius: var(--radius-full);
-    background: var(--brand);
-    color: var(--on-brand);
+    background: var(--brand-solid);
+    color: var(--on-brand-solid);
     font-size: var(--fs-2xs);
     font-weight: var(--fw-bold);
     font-variant-numeric: tabular-nums;
@@ -327,9 +327,9 @@
   .terrain-tabs button:hover { color: var(--text); border-color: var(--border-strong); }
   .terrain-tabs button:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
   .terrain-tabs button.active {
-    background: var(--brand);
-    border-color: var(--brand);
-    color: var(--on-brand);
+    background: var(--brand-solid);
+    border-color: var(--brand-solid);
+    color: var(--on-brand-solid);
   }
   .terrain-toast {
     margin: 0 0 var(--space-4);

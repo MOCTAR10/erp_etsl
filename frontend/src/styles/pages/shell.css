@@ -310,8 +310,8 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    background: var(--brand);
-    color: var(--on-brand);
+    background: var(--brand-solid);
+    color: var(--on-brand-solid);
     font-size: 12px;
     font-weight: var(--fw-semibold);
     letter-spacing: 0.02em;
