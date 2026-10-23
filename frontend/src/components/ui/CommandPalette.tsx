@@ -36,7 +36,7 @@ export interface CommandPaletteProps {
   onSelect?: (item: CommandItemDef) => void;
   /**
    * Mode « recherche asynchrone » : appelé (avec délai `debounce`) dès `minQuery` caractères ; les groupes
-   * renvoyés s'affichent sous les entrées statiques, sans refiltrage local (le serveur a déjà filtré).
+   * renvoyés s'affichent AU-DESSUS des entrées statiques, sans refiltrage local (le serveur a déjà filtré).
    * Le `signal` est annulé si la saisie change avant la réponse.
    */
   search?: (query: string, signal: AbortSignal) => Promise<CommandGroupDef[]>;
@@ -49,6 +49,14 @@ export interface CommandPaletteProps {
   /** Nom accessible de la boîte de dialogue. */
   label?: string;
 }
+
+/**
+ * Score minimal d'une correspondance floue locale (cmdk / command-score) : un saut de caractères au milieu
+ * d'un mot vaut ~0,17 ; deux sauts (~0,03) ne sont plus une correspondance crédible et sont masqués.
+ */
+export const MIN_FUZZY_SCORE = 0.1;
+/** Score des entités trouvées par le serveur : toujours au-dessus des entrées locales (max 1). */
+const REMOTE_SCORE = 2;
 
 /** Casse + accents : « comptabilite » trouve « Comptabilité ». */
 export function normalizeSearch(text: string): string {
@@ -141,9 +149,16 @@ export function CommandPalette({
     for (const g of groups) for (const it of g.items) m.set(it.id, normalizeSearch(it.label));
     return m;
   }, [groups]);
+  // Entités serveur (déjà filtrées côté API) : en tête de liste, jamais masquées par le seuil flou.
+  // Lu par référence : cmdk peut noter un élément au montage, avant la mise à jour de ses props.
+  const remoteIds = useRef<Set<string>>(new Set());
+  remoteIds.current = new Set(remote.flatMap((g) => g.items.map((it) => it.id)));
   const filter = useCallback(
-    (value: string, q: string, keywords?: string[]) =>
-      defaultFilter(index.get(value) ?? normalizeSearch(value), normalizeSearch(q), keywords?.map(normalizeSearch)),
+    (value: string, q: string, keywords?: string[]) => {
+      if (remoteIds.current.has(value)) return REMOTE_SCORE;
+      const score = defaultFilter(index.get(value) ?? normalizeSearch(value), normalizeSearch(q), keywords?.map(normalizeSearch));
+      return score >= MIN_FUZZY_SCORE ? score : 0;
+    },
     [index],
   );
 
@@ -193,17 +208,17 @@ export function CommandPalette({
             <Command.List className="ui-cmd-list">
               {loading ? <Command.Loading label={t("ui.command.loading")}>{null}</Command.Loading> : null}
               {!loading && !remote.some((g) => g.items.length) ? <Command.Empty className="ui-cmd-empty">{emptyLabel ?? t("ui.command.empty")}</Command.Empty> : null}
-              {groups.map((g, gi) =>
-                g.items.length ? (
-                  <Command.Group key={g.id ?? `g-${gi}`} heading={g.heading} className="ui-cmd-group">
-                    {g.items.map((it) => renderItem(it))}
-                  </Command.Group>
-                ) : null,
-              )}
               {remote.map((g, gi) =>
                 g.items.length ? (
                   <Command.Group key={g.id ?? `r-${gi}`} heading={g.heading} forceMount className="ui-cmd-group">
                     {g.items.map((it) => renderItem(it, true))}
+                  </Command.Group>
+                ) : null,
+              )}
+              {groups.map((g, gi) =>
+                g.items.length ? (
+                  <Command.Group key={g.id ?? `g-${gi}`} heading={g.heading} className="ui-cmd-group">
+                    {g.items.map((it) => renderItem(it))}
                   </Command.Group>
                 ) : null,
               )}

@@ -80,6 +80,31 @@ describe("<CommandPalette /> (cmdk)", () => {
     expect(search).toHaveBeenLastCalledWith("bc42", expect.any(AbortSignal));
   });
 
+  it("entités serveur en tête, correspondances floues faibles masquées", async () => {
+    const search = vi.fn(async () => [
+      { heading: "Documents", items: [{ id: "doc-1", label: "Contrat cadre maintenance", hint: "GED", icon: Receipt }] },
+    ]);
+    const user = userEvent.setup();
+    const statiques: CommandGroupDef[] = [
+      {
+        heading: "Pages",
+        items: [
+          { id: "contrats", label: "Contrats", icon: Home },
+          // « contrat » n'y figure qu'en lettres éparses (plusieurs sauts) : bruit à masquer
+          { id: "bruit", label: "Coût net de la tarification", icon: Home },
+        ],
+      },
+    ];
+    render(<CommandPalette open groups={statiques} search={search} debounce={10} />);
+    const input = await screen.findByRole("combobox");
+    await user.type(input, "contrat");
+    expect(await screen.findByText("Contrat cadre maintenance")).toBeInTheDocument();
+    await waitFor(() => expect(options()).toEqual([expect.stringContaining("Contrat cadre maintenance"), expect.stringContaining("Contrats")]));
+    expect(screen.queryByText("Coût net de la tarification")).toBeNull();
+    const headings = Array.from(document.querySelectorAll("[cmdk-group-heading]")).map((h) => h.textContent);
+    expect(headings).toEqual(["Documents", "Pages"]);
+  });
+
   it("libellés anglais", async () => {
     await act(() => i18n.changeLanguage("en"));
     render(<CommandPalette open groups={groups()} />);

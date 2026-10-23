@@ -24,6 +24,12 @@ type Props = {
 };
 
 const money = (n: number) => formatMoney(n);
+const UNIT = " FCFA";
+/** Montant sans l'unité (« 25 000 000 ») — l'unité est rendue à part pour ne jamais être coupée. */
+const moneyBody = (n: number) => {
+  const text = formatMoney(n);
+  return text.endsWith(UNIT) ? text.slice(0, -UNIT.length) : text;
+};
 const percent = (n: number) => formatPercent(n);
 const FORMATS: Record<KpiKind, (n: number) => string> = {
   number: formatNumber,
@@ -46,13 +52,27 @@ export function Kpi({ label, value, hint, icon: Icon, tone = "brand", delay = 0,
   const fmt = format ?? FORMATS[kind];
   let text: string;
   let display: ReactNode;
+  const moneyUnit = !format && kind === "money";
   if (typeof value === "number") {
     text = fmt(value);
-    display = <AnimatedNumber value={value} format={fmt} />;
+    display = moneyUnit ? <AnimatedNumber value={value} format={moneyBody} /> : <AnimatedNumber value={value} format={fmt} />;
   } else {
     // Chaîne : montant API formaté si `kind="money"`, sinon telle quelle (« — » masqué inclus).
     text = kind === "money" ? formatMoney(value) : (value ?? "—");
     display = text;
+  }
+  // Montant : « 25 000 000 » et « FCFA » restent chacun d'un bloc ; sur une carte étroite, seule la coupure
+  // entre le nombre et l'unité est permise (jamais au milieu de « FCFA »). Texte lu : « 25 000 000 FCFA ».
+  if (moneyUnit && text.endsWith(UNIT)) {
+    const body = typeof value === "number" ? display : text.slice(0, -UNIT.length);
+    display = (
+      <>
+        <span className="ui-kpi-num">{body}</span>
+        {" "}
+        <wbr />
+        <span className="ui-kpi-unit">FCFA</span>
+      </>
+    );
   }
 
   return (

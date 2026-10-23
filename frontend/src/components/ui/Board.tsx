@@ -130,14 +130,23 @@ export function BoardCard({
   children,
   delay = 0,
   className = "",
+  layout,
 }: {
   children: ReactNode;
   delay?: number;
   className?: string;
+  /**
+   * Animation de position entre colonnes (`"position"`, sous `AnimatePresence` côté board). Désactivée par
+   * défaut (coût de rendu sur les grands boards).
+   * TODO intégration : brancher le preset `boardCardMotion` de `lib/motion.ts` (vague 3, E2) à la place
+   * de l'entrée ci-dessous et passer `layout="position"`.
+   */
+  layout?: boolean | "position";
 }) {
-  // Entrée en fondu court, sans échelle ni `layout` (coût de rendu sur les grands boards).
+  // Entrée en fondu court, sans échelle (coût de rendu sur les grands boards).
   return (
     <motion.div
+      layout={layout}
       initial={{ opacity: 0, y: motionTokens.distance.xs }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
