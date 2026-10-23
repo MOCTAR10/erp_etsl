@@ -1024,6 +1024,10 @@
     color: var(--text-muted);
   }
 
+  .circ-actor-inline {
+    display: none;
+  }
+
   /* ------------------------------------------------------- Responsive */
   @media (max-width: 1240px) {
     .dir-heroes {
@@ -1073,6 +1077,16 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 2px;
+    }
+    /* Montant exact d'un KPI : jamais coupé au milieu de « FCFA » (défaut du Kpi de vague 1 contourné ici) */
+    .dir-modules .kpi-value {
+      overflow-wrap: normal;
+      word-break: normal;
+      white-space: nowrap;
+    }
+    .dir-modules :is(.kpi-value-sm, .kpi-value-md) {
+      font-size: 17px;
+      line-height: 24px;
     }
     .dir-hero-hint {
       padding-top: var(--space-2);
@@ -1168,6 +1182,15 @@
     }
     .circ-actions {
       margin-left: auto;
+    }
+    /* Acteur sous le nom de l'étape : pas de défilement horizontal du tableau */
+    .circ-card .table :is(th, td):nth-child(3) {
+      display: none;
+    }
+    .circ-actor-inline {
+      display: block;
+      font-size: var(--fs-xs);
+      color: var(--text-muted);
     }
   }
 

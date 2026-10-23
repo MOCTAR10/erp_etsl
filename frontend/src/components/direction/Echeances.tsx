@@ -78,7 +78,7 @@ export function EcheancesSection({ a }: { a: AlertesAgregees }) {
     <section id="echeances" className="dir-section" aria-labelledby="dir-echeances-title">
       <h3 id="dir-echeances-title" className="section-title">
         {t("direction2.echeances.titre")}
-        <span className="dir-count">{formatNumber(total)}</span>
+        <span className="dir-count">{formatNumber(lignes.length)}</span>
       </h3>
       <div className="card dir-echeances">
         <div className="dir-bands" data-testid="alertes-calendaires">

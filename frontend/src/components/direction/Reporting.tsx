@@ -95,7 +95,7 @@ function Qhse({ p }: { p: ReportingPetrolier }) {
 function ItpCndCard({ q }: { q: Required<ItpCnd> }) {
   const { t } = useTranslation();
   const methodes = Object.entries(q.cnd.par_methode)
-    .map(([m, n]) => `${m} ${formatNumber(n)}`)
+    .map(([m, n]) => `${m === "non_precisee" ? t("direction2.reporting.nonPrecisee") : m.replace(/_/g, " ")} ${formatNumber(n)}`)
     .join(" · ");
   return (
     <section className="card dir-card" aria-labelledby="dir-itp-title" data-testid="petrolier-itp-cnd">

@@ -140,7 +140,13 @@ function CircuitCard({ circuit, gestion, roleOpts }: { circuit: Circuit; gestion
 
   const columns: GridColumn<CircuitStep>[] = [
     { key: "order", header: "#", width: 48, render: (s) => <span className="circ-order">{s.order}</span> },
-    { key: "name", header: t("circuits2.etape"), render: (s) => <strong className="circ-step">{s.name}</strong> },
+    { key: "name", header: t("circuits2.etape"), render: (s) => (
+        <>
+          <strong className="circ-step">{s.name}</strong>
+          <span className="circ-actor-inline">{s.actor_role_label}</span>
+        </>
+      ),
+    },
     { key: "actor", header: t("circuits.actor"), render: (s) => <span className="circ-actor">{s.actor_role_label}</span> },
     { key: "days", header: t("circuits2.delai"), num: true, width: 110, render: (s) => t("circuits2.jours", { count: s.max_days }) },
   ];

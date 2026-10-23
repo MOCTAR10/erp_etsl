@@ -3576,6 +3576,7 @@ export const en = {
       itp: "Inspection and non-destructive testing",
       plans_one: "{{count}} inspection plan",
       plans_other: "{{count}} inspection plans",
+      nonPrecisee: "method not specified",
     },
     capa: {
       titre: "Corrective and preventive actions",
