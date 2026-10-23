@@ -3,13 +3,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatDateTime, formatNumber } from "../../lib/format";
+import { formatDate, formatDateTime, formatMoney, formatNumber } from "../../lib/format";
 import { ActionBar, Badge, SectionCard } from "../ui";
 
 /* Lot de suivi inter-modules : M3 → M11 (marge à terminaison), M10 → M11 (balance âgée), M3 → M5 (réservations),
    M1 → M10 (retenue de garantie), import du grand livre / gabarit SAGE, M4 → M3 (flux machines, compteurs, BL). */
 
-const fcfa = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatMoney(v));
 const pct = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${formatNumber(Number(v))} %`);
 
 // --------------------------------------------------------------------------------------------- M3 → M11

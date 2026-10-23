@@ -3,13 +3,16 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_LANDING, landingForRole } from "./landing";
 
 describe("landingForRole", () => {
-  it("laisse la gouvernance sur le tableau de bord", () => {
+  it("laisse l'administrateur et le chef de service sur le tableau de bord", () => {
     // `admin` sur `/` : contrat de `auth.spec.ts` (« atterrit sur le tableau de bord »).
     expect(landingForRole("admin")).toBe("/");
-    expect(landingForRole("pdg")).toBe("/");
-    expect(landingForRole("dga")).toBe("/");
-    expect(landingForRole("direction")).toBe("/");
     expect(landingForRole("chef_service")).toBe("/");
+  });
+
+  it("envoie la Direction générale sur Direction / BI", () => {
+    expect(landingForRole("pdg")).toBe("/direction");
+    expect(landingForRole("dga")).toBe("/direction");
+    expect(landingForRole("direction")).toBe("/direction");
   });
 
   it("envoie chaque métier sur son module", () => {

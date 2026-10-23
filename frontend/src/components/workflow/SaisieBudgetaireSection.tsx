@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { Budget, ConsommationsStock, PeriodeRef } from "../../types";
 import { DataTable, QuickForm, SectionCard } from "../ui";
@@ -21,7 +21,7 @@ interface AnalyticRef {
   label: string;
 }
 
-const money = (v: string | null) => (v === null ? "••••••" : `${formatNumber(v)} F`);
+const money = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 
 /**
  * Saisie budgétaire M11 : création des budgets (V0), lignes mensuelles, révisions R1-R4 et clôtures de gestion,
