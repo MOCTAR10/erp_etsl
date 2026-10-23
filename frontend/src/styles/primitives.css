@@ -757,13 +757,11 @@
   .ui-grid-wrap {
     max-height: none !important;
   }
-  /* Mobile : colonnes texte d'une largeur lisible, la grille défile dans sa carte, jamais la page. */
-  .ui-grid td:not(.num, .ui-grid-actions, :empty) {
-    min-width: 6rem;
-  }
-  .ui-grid tr.ui-grid-empty td {
-    min-width: 0;
-    max-width: none;
+  /* Mobile : colonnes à la largeur de leur contenu (aucune colonne étroite élargie) ; la grille défile dans sa carte. */
+  .ui-grid th,
+  .ui-grid td {
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
   }
   .ui-grid tr.ui-grid-empty .empty-state {
     position: sticky;
