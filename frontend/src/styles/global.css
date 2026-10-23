@@ -1956,7 +1956,7 @@ kbd {
   --login-red: #d4142a;
   --login-cta: #12308f;
   --login-cta-hover: #0a1f66;
-  --login-cta-shadow: 0 1px 0 rgb(255 255 255 / 0.14) inset, 0 8px 20px -8px rgb(10 31 102 / 0.7);
+  --login-cta-shadow: 0 1px 0 rgb(255 255 255 / 0.14) inset, 0 1px 2px rgb(15 23 42 / 0.12);
   --login-field-border: #cdd4e1;
   --login-field-hover: #aab4c6;
   --login-field-bg: #ffffff;
@@ -1976,7 +1976,7 @@ kbd {
 :root[data-theme="dark"] .login {
   --login-cta: #3d5fe0;
   --login-cta-hover: #4d6ef0;
-  --login-cta-shadow: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 10px 24px -10px rgb(61 95 224 / 0.6);
+  --login-cta-shadow: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 1px 2px rgb(0 0 0 / 0.3);
   --login-field-border: #2c3757;
   --login-field-hover: #3b4870;
   --login-field-bg: #0f1528;

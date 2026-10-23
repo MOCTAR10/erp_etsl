@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { describeError } from "../../lib/offlineQueue";
 import { motionTokens } from "../../theme/tokens";
-import { itemRefresh } from "../../lib/motion";
+import { boardCardMotion } from "../../lib/motion";
 import type { ActionDef } from "./ActionBar";
 import type { BadgeTone } from "./Badge";
 import { Menu } from "./Menu";
@@ -138,19 +138,17 @@ export function BoardCard({
   /**
    * Animation de position entre colonnes (`"position"`, sous `AnimatePresence` côté board). Désactivée par
    * défaut (coût de rendu sur les grands boards).
-   * TODO intégration : brancher le preset `boardCardMotion` de `lib/motion.ts` (vague 3, E2) à la place
-   * de l'entrée ci-dessous et passer `layout="position"`.
    */
   layout?: boolean | "position";
 }) {
-  // Entrée en fondu court, sans échelle (coût de rendu sur les grands boards).
+  // Preset commun `boardCardMotion` : entrée en fondu court sans échelle, sortie en fondu, glissement de colonne.
   return (
     <motion.div
       layout={layout}
-      initial={{ opacity: 0, y: motionTokens.distance.xs }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ ...itemRefresh, delay }}
+      initial={boardCardMotion.initial}
+      animate={boardCardMotion.animate}
+      exit={boardCardMotion.exit}
+      transition={{ ...boardCardMotion.transition, delay }}
       className={`task-card ${className}`.trim()}
     >
       {children}

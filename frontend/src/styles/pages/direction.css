@@ -216,10 +216,10 @@
   }
 
   .dir-trend-chart {
-    height: auto;
-    flex: 1;
-    min-height: 116px;
-    margin: 0 -6px;
+    /* Hauteur fixe et calme (6 points au plus) : la carte ne s'étire plus pour suivre « À traiter ». */
+    flex: 0 0 auto;
+    height: 96px;
+    margin: auto -6px 0;
   }
 
   /* « À traiter maintenant » */
