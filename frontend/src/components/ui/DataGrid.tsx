@@ -256,9 +256,9 @@ export function DataGrid<T extends { id: string | number }>({
       <div
         className="table-wrap ui-grid-wrap"
         style={wrapStyle}
-        tabIndex={scrollable ? 0 : undefined}
-        role={scrollable ? "group" : undefined}
-        aria-label={scrollable ? (caption ?? t("finition.gridScroll")) : undefined}
+        tabIndex={0} /* toujours : le débordement horizontal dépend de la largeur d'écran */
+        role="group"
+        aria-label={caption ?? t("finition.gridScroll")}
       >
         <table className={`table ui-grid ui-grid--${density}${loading && !showSkeleton ? " is-loading" : ""}`} aria-busy={loading || undefined}>
           {caption ? <caption className="sr-only">{caption}</caption> : null}

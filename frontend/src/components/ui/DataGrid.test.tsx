@@ -125,14 +125,14 @@ describe("<DataGrid />", () => {
     expect(open).toHaveBeenCalledWith(rows[1]);
   });
 
-  it("zone défilante atteignable au clavier (nommée), sauf sans limite de hauteur", () => {
+  it("zone défilante toujours atteignable au clavier et nommée (le débordement horizontal dépend de l'écran)", () => {
     const { rerender } = render(<DataGrid columns={columns} rows={rows} caption="Bons de commande" />);
     const zone = screen.getByRole("group", { name: "Bons de commande" });
     expect(zone).toHaveAttribute("tabindex", "0");
     rerender(<DataGrid columns={columns} rows={rows} />);
     expect(screen.getByRole("group", { name: "Tableau défilant" })).toHaveAttribute("tabindex", "0");
     rerender(<DataGrid columns={columns} rows={rows} maxHeight="none" />);
-    expect(screen.queryByRole("group")).toBeNull();
+    expect(screen.getByRole("group", { name: "Tableau défilant" })).toHaveAttribute("tabindex", "0");
   });
 
   it("états : chargement (squelette + statut) puis vide (EmptyState) ; densité compacte", () => {

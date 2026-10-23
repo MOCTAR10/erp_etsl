@@ -4022,6 +4022,7 @@ export const en = {
   // Agent E1 « finition » (vague 3) : composants & cohérence.
   finition: {
     gridScroll: "Scrollable table",
+    boardScroll: "Columns by status",
   },
   // "tableaux" agent (wave 3): grids and section headers of module sections (one sub-key per folder).
   tableaux: {

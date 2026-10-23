@@ -4022,6 +4022,7 @@ export const fr = {
   // Agent E1 « finition » (vague 3) : composants & cohérence.
   finition: {
     gridScroll: "Tableau défilant",
+    boardScroll: "Colonnes par statut",
   },
   // Agent « tableaux » (vague 3) : grilles et en-têtes des sections de modules (une sous-clé par dossier).
   tableaux: {

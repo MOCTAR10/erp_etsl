@@ -17,8 +17,9 @@ import { notify } from "./Toaster";
 
 /**
  * Kanban horizontal : colonnes de largeur fixe (≥ 260 px, étirées si la place le permet) côte à côte,
- * défilement horizontal propre (fondu sur le bord qui cache des colonnes). Avec `label`, la zone défilante
- * devient une région nommée, atteignable au clavier (←/→ font défiler).
+ * défilement horizontal propre (fondu sur le bord qui cache des colonnes). La zone défilante est toujours une
+ * région nommée atteignable au clavier (←/→ font défiler ; axe « scrollable-region-focusable ») : `label` ou,
+ * à défaut, un nom générique.
  */
 export function Board({
   children,
@@ -32,6 +33,7 @@ export function Board({
   /** Nom accessible de la zone défilante (ex. « Bons de commande par statut »). */
   label?: string;
 }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: false, end: false });
 
@@ -62,7 +64,9 @@ export function Board({
       style={style}
       data-overflow-start={edges.start || undefined}
       data-overflow-end={edges.end || undefined}
-      {...(label ? { role: "region", "aria-label": label, tabIndex: 0 } : {})}
+      role="region"
+      aria-label={label ?? t("finition.boardScroll")}
+      tabIndex={0}
     >
       {children}
     </div>
