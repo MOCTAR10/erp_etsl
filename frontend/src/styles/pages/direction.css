@@ -160,6 +160,10 @@
     align-items: stretch;
   }
 
+  .dir-trends {
+    display: flex;
+    flex-direction: column;
+  }
   .dir-trends .card-header {
     margin-bottom: var(--space-3);
   }
@@ -168,6 +172,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-5);
+    flex: 1;
   }
 
   .dir-trend {
@@ -211,7 +216,9 @@
   }
 
   .dir-trend-chart {
-    height: 116px;
+    height: auto;
+    flex: 1;
+    min-height: 116px;
     margin: 0 -6px;
   }
 
@@ -1117,7 +1124,9 @@
       padding-top: var(--space-4);
     }
     .dir-trend-chart {
-      height: 72px;
+      flex: none;
+      height: 88px;
+      min-height: 0;
     }
 
     .dir-donut {

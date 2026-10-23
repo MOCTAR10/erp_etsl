@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Lock, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from "recharts";
@@ -15,25 +14,13 @@ import { Badge, DataGrid, Menu, ProgressBar } from "../ui";
 import type { GridColumn } from "../ui";
 import { CubesSection } from "../workflow/CubesSection";
 import { ConfirmDialog, useServerAction } from "../workflow/actions";
+import { Stat } from "./Stat";
 import { Tabs } from "./Tabs";
 import type { TabDef } from "./Tabs";
 import type { EtatBi, IndicateursCommerciaux, Pilotage, Scelle, SeuilBudget } from "./types";
 
 const NIVEAU_TONE: Record<string, "warn" | "err"> = { alerte: "warn", atteint: "warn", depasse: "err" };
 const num = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
-
-/** Ligne « libellé … valeur » d'une liste de chiffres (valeur alignée à droite, chiffres tabulaires). */
-export function Stat({ label, value, hint, tone }: { label: ReactNode; value: ReactNode; hint?: ReactNode; tone?: "ok" | "warn" | "err" }) {
-  return (
-    <div className="dir-stat">
-      <dt>{label}</dt>
-      <dd className={tone ? `tone-${tone}` : undefined}>
-        <span className="num">{value}</span>
-        {hint ? <span className="dir-stat-hint">{hint}</span> : null}
-      </dd>
-    </div>
-  );
-}
 
 /* ---------------------------------------------------------------- Trésorerie */
 

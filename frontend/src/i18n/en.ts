@@ -3499,7 +3499,7 @@ export const en = {
       accidents_other: "accidents",
       jours_one: "day without accident",
       jours_other: "days without accident",
-      objectif: "Target: zero accidents",
+      objectif: "Target: 0 accidents",
       aucunAccident_one: "No accident reported · {{count}} open incident",
       aucunAccident_other: "No accident reported · {{count}} open incidents",
       incidents_one: "{{count}} open HSE incident",
@@ -3758,6 +3758,8 @@ export const en = {
     empreinte: "Fingerprint",
     integrite: "Integrity",
     lecture: "Cube reading",
+    oui: "Yes",
+    non: "No",
   },
 } as const;
 

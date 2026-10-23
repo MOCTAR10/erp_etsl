@@ -129,7 +129,7 @@ export function DirectionPage() {
   const dispoEcart = Math.round(dispo - OBJECTIF_DISPO.ok);
   // Héros 3 — sécurité.
   const jsa = p.hse.jours_sans_accident;
-  const securiteTone = p.hse.accidents > 0 && (jsa ?? 0) < 30 ? "err" : p.hse.incidents_ouverts > 0 ? "warn" : "ok";
+  const securiteTone = jsa === null ? "ok" : jsa < 30 ? "err" : jsa < 90 ? "warn" : "ok";
   // Héros 4 — clôtures mensuelles dans les délais.
   const j4 = d.controle_gestion.conformite_j4;
   const clotureTaux = j4.taux * 100;

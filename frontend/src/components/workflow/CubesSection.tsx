@@ -105,7 +105,7 @@ function ParametresCube() {
                   ) : estTexte(p) ? (
                     lisible(texte(p))
                   ) : (
-                    `${valeur(p.valeur)} ${p.unite}`
+                    p.unite === "0/1" ? (Number(p.valeur) ? t("cube2.oui") : t("cube2.non")) : `${valeur(p.valeur)} ${p.unite}`
                   )}
                 </td>
                 <td>

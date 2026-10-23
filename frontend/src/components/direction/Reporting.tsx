@@ -9,7 +9,7 @@ import { paletteFor } from "../../theme/tokens";
 import type { ReportingPetrolier } from "../../types";
 import { Badge, DataGrid } from "../ui";
 import type { GridColumn } from "../ui";
-import { Stat } from "./Pilotage";
+import { Stat } from "./Stat";
 import type { CapaLigne, EtatBi, ItpCnd } from "./types";
 
 /** Parc matériel (ASMR) : anneau de répartition + légende chiffrée. */

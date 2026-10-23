@@ -3499,7 +3499,7 @@ export const fr = {
       accidents_other: "accidents",
       jours_one: "jour sans accident",
       jours_other: "jours sans accident",
-      objectif: "Objectif : zéro accident",
+      objectif: "Objectif : 0 accident",
       aucunAccident_one: "Aucun accident déclaré · {{count}} incident ouvert",
       aucunAccident_other: "Aucun accident déclaré · {{count}} incidents ouverts",
       incidents_one: "{{count}} incident HSE ouvert",
@@ -3758,6 +3758,8 @@ export const fr = {
     empreinte: "Empreinte",
     integrite: "Intégrité",
     lecture: "Lecture du cube",
+    oui: "Oui",
+    non: "Non",
   },
 } as const;
 
