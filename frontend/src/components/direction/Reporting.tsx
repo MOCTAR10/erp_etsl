@@ -132,7 +132,7 @@ function Capa({ lignes }: { lignes: CapaLigne[] }) {
       key: "delai",
       header: t("ecarts_a4.capa.delai"),
       num: true,
-      render: (c) => (c.delai_moyen_cloture_jours === null || c.delai_moyen_cloture_jours < 0 ? "—" : t("direction2.capa.jours", { n: formatNumber(c.delai_moyen_cloture_jours, { decimals: 0 }) })),
+      render: (c) => (c.delai_moyen_cloture_jours === null || Number(c.delai_moyen_cloture_jours) < 0 ? "—" : t("direction2.capa.jours", { n: formatNumber(c.delai_moyen_cloture_jours, { decimals: 0 }) })),
     },
     {
       key: "efficacite",
