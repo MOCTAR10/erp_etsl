@@ -86,6 +86,55 @@ describe("<DataGrid />", () => {
     expect(open).toHaveBeenCalledWith(rows[1]);
   });
 
+  it("clic sur un bouton, un lien ou le menu « ⋯ » d'une ligne : n'ouvre pas la ligne", async () => {
+    const open = vi.fn();
+    const voir = vi.fn();
+    const action = vi.fn();
+    const user = userEvent.setup();
+    const cols: GridColumn<Bc>[] = [
+      { key: "code", header: "Code", render: (r) => r.code },
+      {
+        key: "btn",
+        header: "Action",
+        render: (r) => (
+          <button type="button" onClick={() => action(r.id)}>
+            Valider <span>{r.code}</span>
+          </button>
+        ),
+      },
+    ];
+    render(
+      <DataGrid
+        columns={cols}
+        rows={rows}
+        onRowClick={open}
+        rowActions={(r) => [{ label: `Voir ${r.code}`, icon: Eye, onSelect: () => voir(r.id) }]}
+      />,
+    );
+    // clic sur un enfant du bouton de cellule
+    await user.click(screen.getAllByText("BC-9")[1]);
+    expect(action).toHaveBeenCalledWith(1);
+    // ouverture du menu à la souris puis choix d'une entrée (rendue dans un portail)
+    await user.click(screen.getAllByRole("button", { name: "Actions de la ligne" })[0]);
+    await user.click(await screen.findByRole("menuitem", { name: "Voir BC-9" }));
+    expect(voir).toHaveBeenCalledWith(1);
+    expect(open).not.toHaveBeenCalled();
+    // clic sur une cellule texte : ouvre la ligne
+    await user.click(screen.getAllByText("BC-10")[0]);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith(rows[1]);
+  });
+
+  it("zone défilante atteignable au clavier (nommée), sauf sans limite de hauteur", () => {
+    const { rerender } = render(<DataGrid columns={columns} rows={rows} caption="Bons de commande" />);
+    const zone = screen.getByRole("group", { name: "Bons de commande" });
+    expect(zone).toHaveAttribute("tabindex", "0");
+    rerender(<DataGrid columns={columns} rows={rows} />);
+    expect(screen.getByRole("group", { name: "Tableau défilant" })).toHaveAttribute("tabindex", "0");
+    rerender(<DataGrid columns={columns} rows={rows} maxHeight="none" />);
+    expect(screen.queryByRole("group")).toBeNull();
+  });
+
   it("états : chargement (squelette + statut) puis vide (EmptyState) ; densité compacte", () => {
     const { rerender, container } = render(<DataGrid columns={columns} rows={[]} loading density="compact" />);
     expect(screen.getByRole("status")).toHaveTextContent("Chargement des lignes…");

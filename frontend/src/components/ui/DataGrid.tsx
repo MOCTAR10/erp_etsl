@@ -101,6 +101,19 @@ function compare(a: string | number, b: string | number): number {
 
 const isSortable = <T,>(c: GridColumn<T>) => c.sortable ?? Boolean(c.sortValue || c.sortKey);
 
+/** Éléments interactifs d'une cellule : leur clic ne doit pas « ouvrir » la ligne. */
+const INTERACTIVE = "a, button, input, select, textarea, label, summary, [role='button'], [role='menuitem'], [role='checkbox'], [role='switch'], [data-no-row-click]";
+
+/**
+ * Vrai si le clic doit ouvrir la ligne : il vient de la ligne elle-même (pas d'un portail — menu « ⋯ »,
+ * dialogue — dont les événements remontent l'arbre React) et pas d'un bouton / lien / champ de la ligne.
+ */
+export function isRowActivation(target: EventTarget | null, row: Element): boolean {
+  if (!(target instanceof Element) || !row.contains(target)) return false;
+  const hit = target.closest(INTERACTIVE);
+  return !hit || !row.contains(hit) || hit === row;
+}
+
 /**
  * Grille de données (TanStack Table v9) — remplaçant de `DataTable` page par page, même rendu de base
  * (`<table className="table">`, `num` à droite en chiffres tabulaires) + tri par colonne (`aria-sort`),
@@ -177,7 +190,8 @@ export function DataGrid<T extends { id: string | number }>({
   const bodyRows = table.getRowModel().rows;
   const colCount = columns.length + (rowActions ? 1 : 0);
   const height = maxHeight ?? "min(70vh, 760px)";
-  const wrapStyle: CSSProperties | undefined = height === "none" ? undefined : { maxHeight: height };
+  const scrollable = height !== "none";
+  const wrapStyle: CSSProperties | undefined = scrollable ? { maxHeight: height } : undefined;
   const showSkeleton = loading && rows.length === 0;
 
   let body: ReactNode;
@@ -208,7 +222,13 @@ export function DataGrid<T extends { id: string | number }>({
           key={r.id}
           className={onRowClick ? "is-clickable" : undefined}
           tabIndex={onRowClick ? 0 : undefined}
-          onClick={onRowClick ? () => onRowClick(row) : undefined}
+          onClick={
+            onRowClick
+              ? (e) => {
+                  if (isRowActivation(e.target, e.currentTarget)) onRowClick(row);
+                }
+              : undefined
+          }
           onKeyDown={
             onRowClick
               ? (e) => {
@@ -232,7 +252,14 @@ export function DataGrid<T extends { id: string | number }>({
 
   return (
     <div className="ui-grid-root">
-      <div className="table-wrap ui-grid-wrap" style={wrapStyle}>
+      {/* Zone défilante atteignable au clavier (flèches) : axe « scrollable-region-focusable » */}
+      <div
+        className="table-wrap ui-grid-wrap"
+        style={wrapStyle}
+        tabIndex={scrollable ? 0 : undefined}
+        role={scrollable ? "group" : undefined}
+        aria-label={scrollable ? (caption ?? t("finition.gridScroll")) : undefined}
+      >
         <table className={`table ui-grid ui-grid--${density}${loading && !showSkeleton ? " is-loading" : ""}`} aria-busy={loading || undefined}>
           {caption ? <caption className="sr-only">{caption}</caption> : null}
           <thead>
