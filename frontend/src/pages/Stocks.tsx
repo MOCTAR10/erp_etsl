@@ -195,8 +195,8 @@ export function StocksPage() {
       render: (m) => (
         <>
           <span className="cell-nowrap">
-            {m.source_code ?? (m.type_mouvement === "ajustement" ? "—" : t("revueR2.stocks.exterieur"))} →{" "}
-            {m.destination_code ?? m.ordre_code ?? (m.type_mouvement === "ajustement" ? "—" : t("revueR2.stocks.exterieur"))}
+            {m.source_code ?? (m.type_mouvement === "inventaire" ? "—" : t("revueR2.stocks.exterieur"))} →{" "}
+            {m.destination_code ?? m.ordre_code ?? (m.type_mouvement === "inventaire" ? "—" : t("revueR2.stocks.exterieur"))}
           </span>
           {m.ordre_code && m.destination_code ? <span className="cell-sub">{m.ordre_code}</span> : null}
         </>
