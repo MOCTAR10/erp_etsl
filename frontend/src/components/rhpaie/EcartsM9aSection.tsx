@@ -75,8 +75,16 @@ function useOptions<T>(key: string, path: string) {
 type LigneEcheance = Echeance & { id: string };
 
 /** Écarts M9-A : saisies RH / paie, bulletin préparé depuis le contrat, absences, carrière, grille, échéances. */
+/** Période de déclaration lisible : « 2026-07-01 » → « Juillet 2026 ». */
+function moisLisible(iso: string, langue: string): string {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const texte = d.toLocaleDateString(langue, { month: "long", year: "numeric" });
+  return texte.charAt(0).toUpperCase() + texte.slice(1);
+}
+
 export function EcartsM9aSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const employes = useOptions<EmployeOption>("employes", "/api/rh-paie/employes/");
   const contrats = useOptions<ContratOption>("contrats", "/api/rh-paie/contrats/");
   const grilles = useOptions<Grille>("grilles", "/api/rh-paie/grilles-salaire/");
@@ -133,7 +141,12 @@ export function EcartsM9aSection() {
     {
       key: "periode",
       header: t("m9a.f.periode"),
-      render: (e) => `${formatDate(e.periode_debut)}${e.periode_fin !== e.periode_debut ? ` → ${formatDate(e.periode_fin)}` : ""}`,
+      render: (e) => (
+        <span className="r3-nowrap">
+          {moisLisible(e.periode_debut, i18n.language)}
+          {e.periode_fin !== e.periode_debut ? ` → ${moisLisible(e.periode_fin, i18n.language)}` : ""}
+        </span>
+      ),
     },
     {
       key: "statut",

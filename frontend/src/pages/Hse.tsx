@@ -50,25 +50,34 @@ const INC_VALID = new Set<StatutIncident>(INC_ORDER);
 function PermisCard({ permis }: { permis: PermisTravail }) {
   const { t } = useTranslation();
   const badge =
-    permis.statut === "actif" ? "ok" : permis.statut === "valide" ? "brand" : permis.statut === "refuse" || permis.statut === "annule" ? "err" : "warn";
+    permis.statut === "actif"
+      ? "ok"
+      : permis.statut === "valide"
+        ? "brand"
+        : permis.statut === "refuse"
+          ? "err"
+          : permis.statut === "cloture" || permis.statut === "annule"
+            ? "neutral"
+            : "warn";
   return (
-    <div className="card kpi" key={permis.id}>
-      <span className="kpi-label">
-        {permis.code} · {t(`hse.permis_types.${permis.type_permis}`, { defaultValue: permis.type_label })}
-      </span>
-      <span className="kpi-value">{permis.emplacement}</span>
-      <span className="meta muted">
+    <div className="card r3-permis" key={permis.id}>
+      <div className="r3-permis-top">
+        <span className="card-code">
+          {permis.code} · {t(`hse.permis_types.${permis.type_permis}`, { defaultValue: permis.type_label })}
+        </span>
+        <Badge tone={badge}>{t(`hse.permis_statut.${permis.statut}`)}</Badge>
+      </div>
+      <div className="r3-permis-titre">{permis.emplacement}</div>
+      <div className="meta muted">
         {formatDate(permis.date_debut)} → {permis.date_fin ? formatDate(permis.date_fin) : "…"}
         {permis.affaire_code ? ` · ${permis.affaire_code}` : ""}
-        <span className={`badge ${badge}`}> {t(`hse.permis_statut.${permis.statut}`)}</span>
-        {permis.gaz_obligatoire && (
-          <span
-            className={`badge ${
-              permis.test_gaz_resultat === "non_conforme" ? "err" : permis.test_gaz_valide ? "ok" : "warn"
-            }`}
+      </div>
+      {permis.gaz_obligatoire && !["cloture", "annule", "expire", "refuse"].includes(permis.statut) && (
+        <div>
+          <Badge
+            tone={permis.test_gaz_resultat === "non_conforme" ? "err" : permis.test_gaz_valide ? "ok" : "warn"}
             title={permis.test_gaz_valeur || undefined}
           >
-            {" "}
             {t(
               permis.test_gaz_resultat === "non_conforme"
                 ? "hse.gaz.nonConforme"
@@ -76,9 +85,9 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
                   ? "hse.gaz.conforme"
                   : "hse.gaz.aFaire",
             )}
-          </span>
-        )}
-      </span>
+          </Badge>
+        </div>
+      )}
       <PermisActions permis={permis} />
       <PermisPieces permis={permis} />
     </div>

@@ -117,7 +117,7 @@ type LigneGr =
 /** Paramètres d'un gabarit lisibles : la note en clair, puis « Seuil : 0 · Comptes : 632, 622 » (jamais de JSON brut). */
 function parametresLisibles(p: Record<string, unknown>, t: (k: string, o?: Record<string, unknown>) => string) {
   const valeur = (v: unknown): string =>
-    Array.isArray(v) ? v.map(valeur).join(", ") : v !== null && typeof v === "object" ? Object.values(v as object).map(valeur).join(", ") : String(v ?? "—");
+    Array.isArray(v) ? v.map(valeur).join(", ") : v !== null && typeof v === "object" ? Object.values(v as object).map(valeur).join(", ") : String(v ?? "—").replace(/_/g, " ");
   const autres = Object.entries(p)
     .filter(([k]) => k !== "note")
     .map(([k, v]) => `${t(`revueR3.gabarit.${k}`, { defaultValue: k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, " ") })} : ${valeur(v)}`);
@@ -132,7 +132,10 @@ function parametresLisibles(p: Record<string, unknown>, t: (k: string, o?: Recor
 /** Cellule d'état : montants complets en FCFA, lignes de total en gras. */
 function cellule(col: Colonne, l: LigneEtat) {
   const v = l[col.key];
-  const texte = v === null || v === undefined || v === "" ? "" : col.montant ? formatMoney(Number(v)) : String(v);
+  const total = Boolean(l.total || l.total_ligne || l.entete);
+  // Montant nul laissé en blanc (usage des balances) : seuls les mouvements ressortent ; les totaux restent affichés.
+  const vide = v === null || v === undefined || v === "" || (col.montant && Number(v) === 0 && !total);
+  const texte = vide ? "" : col.montant ? formatMoney(Number(v)) : String(v);
   return l.total || l.total_ligne || l.entete ? <strong>{texte}</strong> : texte;
 }
 
@@ -168,8 +171,8 @@ export function EcartsM10Section() {
 
   const colsTreso: Column<Semaine & { id: string }>[] = [
     { key: "semaine", header: t("ecarts_m10.treso.semaine"), render: (r) => `S${r.numero} · ${formatDate(r.semaine)}`, sortValue: (r) => r.numero },
-    { key: "prevuEnc", header: t("ecarts_m10.treso.prevuEnc"), num: true, render: (r) => fcfa(r.prevu_encaissements) },
-    { key: "prevuDec", header: t("ecarts_m10.treso.prevuDec"), num: true, render: (r) => fcfa(r.prevu_decaissements) },
+    { key: "prevuEnc", header: t("ecarts_m10.treso.prevuEnc"), num: true, render: (r) => (Number(r.prevu_encaissements) ? fcfa(r.prevu_encaissements) : "—") },
+    { key: "prevuDec", header: t("ecarts_m10.treso.prevuDec"), num: true, render: (r) => (Number(r.prevu_decaissements) ? fcfa(r.prevu_decaissements) : "—") },
     { key: "reelEnc", header: t("ecarts_m10.treso.reelEnc"), num: true, render: (r) => fcfa(r.realise_encaissements) },
     { key: "reelDec", header: t("ecarts_m10.treso.reelDec"), num: true, render: (r) => fcfa(r.realise_decaissements) },
     {
@@ -325,6 +328,7 @@ export function EcartsM10Section() {
                     key: c.key,
                     header: t(`ecarts_m10.col.${c.key}`, { defaultValue: c.label }),
                     num: c.montant,
+                    width: c.key === "libelle" ? 220 : undefined,
                     render: (l) => cellule(c, l),
                   }))}
                   rows={tab.lignes.map((l, i) => ({ ...l, id: i }))}

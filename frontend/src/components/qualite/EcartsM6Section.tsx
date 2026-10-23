@@ -10,6 +10,17 @@ import type { ActionCorrective, NonConformite, ParametreStock } from "../../type
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
+
+/** Douze derniers mois, libellés dans la langue de l'interface (le champ « month » natif suit la langue du navigateur). */
+function derniersMois(langue: string): { value: string; label: string }[] {
+  const now = new Date();
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = d.toLocaleDateString(langue, { month: "long", year: "numeric" });
+    return { value: `${d.getFullYear()}-${d.getMonth() + 1}`, label: label.charAt(0).toUpperCase() + label.slice(1) };
+  });
+}
 
 interface Option {
   id: string;
@@ -97,7 +108,7 @@ export function EcartsM6Section() {
   return (
     <>
       <SectionCard title={t("m6e.saisies.title")}>
-        <div data-testid="saisies-m6">
+        <div data-testid="saisies-m6" className="r3-saisies">
           <SectionActions>
             <QuickForm
               title={t("m6e.saisies.soudeur")}
@@ -336,18 +347,10 @@ function CapaSection() {
       ),
       sortValue: (a) => a.echeance,
     },
-    {
-      key: "actions",
-      header: <span className="sr-only">{t("ui.actions")}</span>,
-      render: (a) => (
-        <ActionBar
-          actions={[
-            { label: t("m6e.capa.efficace"), path: `/api/qualite/actions-correctives/${a.id}/cloturer/`, body: { efficace: true }, confirm: t("actions.confirmCloturer") },
-            { label: t("m6e.capa.inefficace"), path: `/api/qualite/actions-correctives/${a.id}/cloturer/`, body: { efficace: false }, tone: "ghost", confirm: t("actions.confirmCloturer") },
-          ]}
-        />
-      ),
-    },
+    actionsColumn<ActionCorrective>(t("ui.actions"), (a) => [
+      { label: t("m6e.capa.efficace"), path: `/api/qualite/actions-correctives/${a.id}/cloturer/`, body: { efficace: true }, confirm: t("actions.confirmCloturer") },
+      { label: t("m6e.capa.inefficace"), path: `/api/qualite/actions-correctives/${a.id}/cloturer/`, body: { efficace: false }, tone: "ghost", confirm: t("actions.confirmCloturer") },
+    ]),
   ];
   return (
     <div data-testid="capa-m6" style={CONTENTS}>
@@ -437,7 +440,7 @@ function PunchListSection({ ofOpts, itpOpts }: { ofOpts: { value: string; label:
 }
 
 function IndicateursSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const now = new Date();
   const [annee, setAnnee] = useState(now.getFullYear());
   const [mois, setMois] = useState(now.getMonth() + 1);
@@ -453,11 +456,10 @@ function IndicateursSection() {
         title={t("m6e.ind.title")}
         actions={
           <SectionActions>
-            <input
-              type="month"
+            <select
               className="control"
               aria-label={t("m6e.ind.periode")}
-              value={`${annee}-${String(mois).padStart(2, "0")}`}
+              value={`${annee}-${mois}`}
               onChange={(e) => {
                 const [a, m] = e.target.value.split("-").map(Number);
                 if (a && m) {
@@ -465,7 +467,13 @@ function IndicateursSection() {
                   setMois(m);
                 }
               }}
-            />
+            >
+              {derniersMois(i18n.language).map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
             <button type="button" className="btn ghost" onClick={() => void api.download(`/api/qualite/indicateurs/?annee=${annee}&mois=${mois}&export=pdf`, `rapport-qualite-${annee}-${mois}.pdf`)}>
               <FileDown size={14} aria-hidden="true" /> {t("m6e.ind.rapport")}
             </button>

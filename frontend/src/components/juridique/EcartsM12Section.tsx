@@ -543,7 +543,7 @@ export function EcartsM12Section() {
                 header: t("tableaux.juridique.duree"),
                 num: true,
                 sortValue: (ty) => ty.retention_years,
-                render: (ty) => (ty.retention_years === null ? t("ecarts_m12.archivage.sansEcheance") : t("ecarts_m12.archivage.ans", { n: ty.retention_years })),
+                render: (ty) => (ty.retention_years === null ? t("ecarts_m12.archivage.sansEcheance") : t("revueR3.ans", { count: ty.retention_years })),
               },
               {
                 key: "statut",

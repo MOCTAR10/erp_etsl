@@ -122,3 +122,36 @@
   }
 }
 }
+
+@layer pages {
+/* Carte de permis de travail : code et statut en tête, emplacement en titre (pas en chiffre KPI). */
+.card.r3-permis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.r3-permis-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.r3-permis-top .card-code {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-muted);
+}
+.r3-permis-titre {
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  line-height: var(--lh-h3);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+}
+
+@layer pages {
+.r3-toolbar > .field {
+  flex: 0 1 220px;
+}
+}

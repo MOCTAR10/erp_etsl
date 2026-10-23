@@ -272,7 +272,7 @@ export function EcartsA2Section() {
         ),
     },
     actionsColumn<LigneRav>(t("ui.actions"), (r) =>
-      r.erreur
+      r.erreur || !Number(r.ecart)
         ? []
         : [
             {

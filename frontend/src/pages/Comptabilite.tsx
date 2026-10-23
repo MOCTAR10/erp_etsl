@@ -32,11 +32,11 @@ import type {
 
 type EngagementGroups = Record<StatutEngagement, Engagement[]>;
 
-const ENG_BADGE: Record<StatutEngagement, "ok" | "warn" | "err" | "brand"> = {
+const ENG_BADGE: Record<StatutEngagement, "ok" | "warn" | "neutral" | "brand"> = {
   brouillon: "warn",
   soumis: "brand",
   approuve: "ok",
-  annule: "err",
+  annule: "neutral",
 };
 const ENG_ORDER: StatutEngagement[] = ["brouillon", "soumis", "approuve", "annule"];
 const ENG_VALID = new Set<StatutEngagement>(ENG_ORDER);
@@ -293,7 +293,7 @@ export function ComptabilitePage() {
           label={t("comptabilite.banques")}
           value={banquesAll.length}
           hint={t("revueR3.compta.soldesOuverture", { montant: formatMoney(banquesAll.reduce((n, b) => n + Number(b.solde_initial || 0), 0)) })} icon={Landmark} tone="brand" delay={0} />
-        <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("comptabilite.engagementsEnCours")} icon={ClipboardList} tone="warn" delay={0.05} />
+        <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("revueR3.compta.engagementsEnCours", { count: enCours })} icon={ClipboardList} tone="warn" delay={0.05} />
         <Kpi label={t("comptabilite.paiements")} value={valides.length} hint={t("comptabilite.paiementsValides")} icon={CreditCard} tone="brand" delay={0.1} />
         <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
       </div>

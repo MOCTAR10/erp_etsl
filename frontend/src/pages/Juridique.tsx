@@ -43,6 +43,8 @@ const BANDE_BADGE: Record<BandeEcheance, "ok" | "warn" | "err"> = {
   expiree: "err",
 };
 const BANDES: BandeEcheance[] = ["expiree", "j0", "j15", "j30", "j60", "j90"];
+/** Alertes affichées d'emblée (les plus urgentes) ; la liste complète reste à un clic. */
+const ALERTES_VISIBLES = 8;
 
 /** Alertes d'échéance (conventions, cautions, assurances), de la plus urgente à la plus lointaine. */
 function alerteColumns(t: T): Column<AlerteEcheance & { id: string }>[] {
@@ -260,6 +262,7 @@ export function JuridiquePage() {
   const courriers = usePagedList<Courrier>("juridique-courriers", (q) => api.courriersJuridique(q));
 
   const [convSearch, setConvSearch] = useState("");
+  const [toutesAlertes, setToutesAlertes] = useState(false);
   const conventions = useQuery({
     queryKey: ["juridique-conventions", convSearch],
     queryFn: () => api.conventionsJuridique(pagedQuery(1, 500, convSearch)),
@@ -363,13 +366,23 @@ export function JuridiquePage() {
 
       {a.total > 0 ? (
         <>
-          <SectionCard title={`${t("juridique.alertes")} · ${a.total}`} subtitle={t("revueR3.juridique.alertesSub")}>
+          <SectionCard
+            title={`${t("juridique.alertes")} · ${a.total}`}
+            subtitle={t("revueR3.juridique.alertesSub")}
+            actions={
+              a.total > ALERTES_VISIBLES ? (
+                <button type="button" className="btn ghost sm" onClick={() => setToutesAlertes((v) => !v)} aria-expanded={toutesAlertes}>
+                  {toutesAlertes ? t("revueR3.cg.reduire") : t("revueR3.juridique.toutVoir", { count: a.total })}
+                </button>
+              ) : null
+            }
+          >
             <DataTable
               rows={BANDES.flatMap((bande) =>
                 [...a.conventions, ...a.cautions, ...a.assurances]
                   .filter((el) => el.bande === bande)
                   .map((el) => ({ ...el, id: `${el.type}-${el.code}` })),
-              )}
+              ).slice(0, toutesAlertes ? undefined : ALERTES_VISIBLES)}
               columns={alerteColumns(t)}
               caption={t("juridique.alertes")}
               density="compact"
