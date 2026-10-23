@@ -393,7 +393,7 @@ td .card-actions--choice {
 
 @media (max-width: 900px) {
   .board {
-    grid-auto-columns: minmax(248px, 82vw);
+    grid-auto-columns: minmax(240px, 76vw);
   }
   .list-toolbar .search-field,
   .list-toolbar .field {
