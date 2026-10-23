@@ -163,6 +163,7 @@
   .dir-trends {
     display: flex;
     flex-direction: column;
+    align-self: start; /* ne s'étire plus à la hauteur de « À traiter maintenant » */
   }
   .dir-trends .card-header {
     margin-bottom: var(--space-3);
@@ -172,7 +173,6 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-5);
-    flex: 1;
   }
 
   .dir-trend {
@@ -219,7 +219,7 @@
     /* Hauteur fixe et calme (6 points au plus) : la carte ne s'étire plus pour suivre « À traiter ». */
     flex: 0 0 auto;
     height: 96px;
-    margin: auto -6px 0;
+    margin: var(--space-2) -6px 0;
   }
 
   /* « À traiter maintenant » */
