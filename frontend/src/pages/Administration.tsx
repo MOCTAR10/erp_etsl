@@ -351,7 +351,7 @@ export function AdministrationPage() {
             ))}
           </select>
         </div>
-        <PagedDataGrid list={comptes} columns={colComptes} caption={t("ecarts_tr.admin.comptes")} searchPlaceholder={t("common.searchPlaceholder")} rowActions={actionsCompte} />
+        <PagedDataGrid list={comptes} columns={colComptes} caption={t("ecarts_tr.admin.comptes")} searchPlaceholder={t("common.searchPlaceholder")} rowActions={actionsCompte} maxHeight="none" />
         </div>
       </SectionCard>
 
@@ -491,7 +491,7 @@ export function AdministrationPage() {
             onChange={(e) => setModule(e.target.value.trim())}
           />
         </div>
-        <PagedDataGrid list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" />
+        <PagedDataGrid list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" maxHeight="none" />
         </div>
       </SectionCard>
 

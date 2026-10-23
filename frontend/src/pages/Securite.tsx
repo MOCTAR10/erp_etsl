@@ -202,7 +202,7 @@ export function SecuritePage() {
               ))}
             </select>
           </div>
-          <PagedDataGrid list={journal} columns={journalColumns} caption={t("securite.journal")} density="compact" />
+          <PagedDataGrid list={journal} columns={journalColumns} caption={t("securite.journal")} density="compact" maxHeight="none" />
         </SectionCard>
       ) : null}
 
