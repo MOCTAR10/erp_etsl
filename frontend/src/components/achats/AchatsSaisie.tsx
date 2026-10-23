@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -22,8 +21,6 @@ interface Commande { id: string; code: string; supplier_name: string | null; ord
 interface Facture { id: string; code: string; order_code: string; supplier_name: string | null; invoice_ref: string; invoice_date: string; status: string; total: string | null; total_tva: string | null; total_ttc: string | null; move_number: string | null }
 
 const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
-/** Codes de pièce et dates : jamais coupés en fin de ligne. */
-const NOWRAP: CSSProperties = { whiteSpace: "nowrap" };
 const num = (v: string | undefined) => (v === undefined ? undefined : Number(v));
 
 function StatusBadge({ status }: { status: string }) {
@@ -68,10 +65,10 @@ function ConsultationsSection() {
   const ouvertes = useRefOptions<{ id: string; code: string; subject: string }>("consultations-ouvertes", "/api/achats/consultations/?status=ouverte", (c) => `${c.code} — ${c.subject}`);
 
   const colC: Column<Consultation>[] = [
-    { key: "code", header: t("achatsSaisie.col.code"), render: (c) => <span style={NOWRAP}>{c.code}</span> },
+    { key: "code", header: t("achatsSaisie.col.code"), render: (c) => <span className="cell-nowrap">{c.code}</span> },
     { key: "subject", header: t("achatsSaisie.col.objet"), render: (c) => c.subject },
-    { key: "da", header: t("achatsSaisie.col.da"), render: (c) => <span style={NOWRAP}>{c.request_code ?? "—"}</span> },
-    { key: "due", header: t("achatsSaisie.col.echeance"), render: (c) => <span style={NOWRAP}>{c.due_date ? formatDate(c.due_date) : "—"}</span> },
+    { key: "da", header: t("achatsSaisie.col.da"), render: (c) => <span className="cell-nowrap">{c.request_code ?? "—"}</span> },
+    { key: "due", header: t("achatsSaisie.col.echeance"), render: (c) => <span className="cell-nowrap">{c.due_date ? formatDate(c.due_date) : "—"}</span> },
     { key: "offres", header: t("achatsSaisie.col.offres"), num: true, render: (c) => c.offers_total },
     {
       key: "status",
@@ -84,7 +81,7 @@ function ConsultationsSection() {
     ]),
   ];
   const colO: Column<Offre>[] = [
-    { key: "consultation", header: t("achatsSaisie.col.consultation"), render: (o) => <span style={NOWRAP}>{o.consultation_code}</span> },
+    { key: "consultation", header: t("achatsSaisie.col.consultation"), render: (o) => <span className="cell-nowrap">{o.consultation_code}</span> },
     { key: "fournisseur", header: t("achatsSaisie.col.fournisseur"), render: (o) => o.supplier_name ?? "—" },
     { key: "montant", header: t("achatsSaisie.col.montant"), num: true, render: (o) => montant(o.amount) },
     { key: "delai", header: t("achatsSaisie.col.delai"), num: true, render: (o) => o.delivery_days ?? "—" },
@@ -172,7 +169,7 @@ function CommandesSection() {
       header: t("achatsSaisie.col.code"),
       sortValue: (o) => o.code,
       render: (o) => (
-        <span style={NOWRAP}>
+        <span className="cell-nowrap">
           {o.code}
           {o.is_global_rental && (
             <>
@@ -186,7 +183,7 @@ function CommandesSection() {
       ),
     },
     { key: "fournisseur", header: t("achatsSaisie.col.fournisseur"), render: (o) => o.supplier_name ?? "—" },
-    { key: "date", header: t("achatsSaisie.col.date"), render: (o) => <span style={NOWRAP}>{formatDate(o.order_date)}</span> },
+    { key: "date", header: t("achatsSaisie.col.date"), render: (o) => <span className="cell-nowrap">{formatDate(o.order_date)}</span> },
     { key: "total", header: t("achatsSaisie.col.total"), num: true, render: (o) => montant(o.total) },
     { key: "status", header: t("achatsSaisie.col.statut"), render: (o) => <StatusBadge status={o.status} /> },
     actionsColumn<Commande>(t("listes.col.actions"), actions),
@@ -271,8 +268,8 @@ function FacturesSection() {
       sortValue: (f) => f.code,
       render: (f) => (
         <>
-          <span style={NOWRAP}>{f.code}</span>
-          <span className="cell-sub" style={NOWRAP}>
+          <span className="cell-nowrap">{f.code}</span>
+          <span className="cell-sub cell-nowrap">
             {f.order_code}
           </span>
         </>
@@ -281,6 +278,7 @@ function FacturesSection() {
     {
       key: "fournisseur",
       header: t("achatsSaisie.col.fournisseur"),
+      width: "24%",
       render: (f) => (
         <>
           {f.supplier_name ?? "—"}
@@ -288,12 +286,30 @@ function FacturesSection() {
         </>
       ),
     },
-    { key: "date", header: t("achatsSaisie.col.date"), sortValue: (f) => f.invoice_date, render: (f) => <span style={NOWRAP}>{formatDate(f.invoice_date)}</span> },
+    { key: "date", header: t("achatsSaisie.col.date"), sortValue: (f) => f.invoice_date, render: (f) => <span className="cell-nowrap">{formatDate(f.invoice_date)}</span> },
     { key: "ht", header: t("achatsSaisie.col.total"), num: true, render: (f) => montant(f.total) },
-    { key: "tva", header: t("achatsSaisie.col.tva"), num: true, render: (f) => montant(f.total_tva) },
-    { key: "ttc", header: t("achatsSaisie.col.ttc"), num: true, render: (f) => montant(f.total_ttc) },
-    { key: "ecr", header: t("achatsSaisie.col.ecriture"), render: (f) => <span style={NOWRAP}>{f.move_number ?? "—"}</span> },
-    { key: "status", header: t("achatsSaisie.col.statut"), render: (f) => <StatusBadge status={f.status} /> },
+    // TVA en ligne secondaire du TTC et écriture sous le statut : 2 colonnes de moins, l'action de ligne reste visible.
+    {
+      key: "ttc",
+      header: t("achatsSaisie.col.ttc"),
+      num: true,
+      render: (f) => (
+        <>
+          {montant(f.total_ttc)}
+          <span className="cell-sub cell-nowrap">{t("revueR2.purchases.dontTva", { montant: montant(f.total_tva) })}</span>
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: t("achatsSaisie.col.statut"),
+      render: (f) => (
+        <>
+          <StatusBadge status={f.status} />
+          {f.move_number ? <span className="cell-sub cell-nowrap">{f.move_number}</span> : null}
+        </>
+      ),
+    },
     actionsColumn<Facture>(t("listes.col.actions"), actions),
   ];
 

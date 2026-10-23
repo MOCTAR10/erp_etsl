@@ -9,7 +9,7 @@ import { ActionBar, Badge, DataTable, Kpi, Menu, QuickForm, SectionCard } from "
 import type { ActionDef, Column } from "../ui";
 import { CardActions } from "../ui/Board";
 import { actionsColumn } from "../ui/DataTable";
-import { decimales, NOWRAP, statutLabel, useClientPage } from "./outils";
+import { decimales, statutLabel, useClientPage } from "./outils";
 
 interface Parametre {
   id: string;
@@ -202,7 +202,9 @@ const qte = (v: string) => formatNumber(Number(v), { decimals: decimales(v) });
 const nombre = (v: string | null) => (v === null ? null : Number(v));
 const telecharger = (path: string, name: string) => void api.download(path, name).catch(() => undefined);
 /** Colonne d'actions qui ne passe pas à la ligne (boutons « Valoriser par les attachements », « Transférer en paie »…). */
-const sansRetour = <T,>(col: Column<T>): Column<T> => ({ ...col, render: (row) => <span style={NOWRAP}>{col.render(row)}</span> });
+const sansRetour = <T,>(col: Column<T>): Column<T> => ({ ...col, render: (row) => <span className="cell-nowrap">{col.render(row)}</span> });
+/** Rapport d'exécution archivé : titre et type rendus dans la langue de l'interface (l'archive GED reste en français). */
+const RAPPORT_EXEC = /^Rapport d'exécution\s+(\S+)$/;
 /** Unités de paramètres traduites ; « 0 / 1 » (booléen) et « code » sont rendus à part. */
 const UNITES_TRADUITES = new Set(["jours", "semaines", "ans"]);
 /** Type de document du registre sans code de module (« Rapports d'exécution (M3) » → « Rapports d'exécution »). */
@@ -286,7 +288,7 @@ export function EcartsM3Section() {
         const valeur = formatNumber(n, { decimals: decimales(p.valeur) });
         if (p.unite === "code" || !p.unite) return valeur;
         const unite = UNITES_TRADUITES.has(p.unite) ? t(`revueR2.operations.unites.${p.unite}`) : p.unite;
-        return <span style={NOWRAP}>{`${valeur} ${unite}`}</span>;
+        return <span className="cell-nowrap">{`${valeur} ${unite}`}</span>;
       },
     },
     {
@@ -456,7 +458,7 @@ export function EcartsM3Section() {
       sortValue: (s) => s.code,
       render: (s) => (
         <>
-          <span style={NOWRAP}>{s.code}</span> · {s.label}
+          <span className="cell-nowrap">{s.code}</span> · {s.label}
         </>
       ),
     },
@@ -481,10 +483,10 @@ export function EcartsM3Section() {
     ])),
   ];
   const colsPointages: Column<Pointage>[] = [
-    { key: "code", header: k("code"), sortValue: (p) => p.code, render: (p) => <span style={NOWRAP}>{p.code}</span> },
-    { key: "of", header: k("of"), sortValue: (p) => p.ordre_code, render: (p) => <span style={NOWRAP}>{p.ordre_code}</span> },
+    { key: "code", header: k("code"), sortValue: (p) => p.code, render: (p) => <span className="cell-nowrap">{p.code}</span> },
+    { key: "of", header: k("of"), sortValue: (p) => p.ordre_code, render: (p) => <span className="cell-nowrap">{p.ordre_code}</span> },
     { key: "salarie", header: k("pointages.salarie"), sortValue: (p) => p.worker_name_filled, render: (p) => p.worker_name_filled ?? "—" },
-    { key: "date", header: k("date"), sortValue: (p) => p.date, render: (p) => <span style={NOWRAP}>{formatDate(p.date)}</span> },
+    { key: "date", header: k("date"), sortValue: (p) => p.date, render: (p) => <span className="cell-nowrap">{formatDate(p.date)}</span> },
     {
       key: "heures",
       header: k("pointages.heures"),
@@ -492,8 +494,8 @@ export function EcartsM3Section() {
       sortValue: (p) => Number(p.hours),
       render: (p) => (
         <>
-          <span style={NOWRAP}>{formatNumber(Number(p.hours), { decimals: decimales(p.hours) })} h</span>
-          <span className="cell-sub">{p.hours_type ? statutLabel("heures", p.hours_type, p.hours_type_label) : p.hours_type_label}</span>
+          <span className="cell-nowrap">{formatNumber(Number(p.hours), { decimals: decimales(p.hours) })} h</span>
+          {p.hours_type && p.hours_type !== "normal" ? <span className="cell-sub">{statutLabel("heures", p.hours_type, p.hours_type_label)}</span> : null}
         </>
       ),
     },
@@ -534,7 +536,7 @@ export function EcartsM3Section() {
       sortValue: (o) => o.code,
       render: (o) => (
         <>
-          <span style={NOWRAP}>{o.code}</span> · {o.label}
+          <span className="cell-nowrap">{o.code}</span> · {o.label}
         </>
       ),
     },
@@ -560,7 +562,7 @@ export function EcartsM3Section() {
       sortValue: (o) => o.planned_start,
       render: (o) => (
         <>
-          <span style={NOWRAP}>
+          <span className="cell-nowrap">
             {o.planned_start ? formatDate(o.planned_start) : "—"} → {o.planned_end ? formatDate(o.planned_end) : "—"}
           </span>
           {o.motif_replanification ? <span className="cell-sub">{o.motif_replanification}</span> : null}
@@ -594,7 +596,7 @@ export function EcartsM3Section() {
     },
   ];
   const colsCharge: Column<ChargeLigne>[] = [
-    { key: "date", header: k("date"), sortValue: (l) => l.date, render: (l) => <span style={NOWRAP}>{formatDate(l.date)}</span> },
+    { key: "date", header: k("date"), sortValue: (l) => l.date, render: (l) => <span className="cell-nowrap">{formatDate(l.date)}</span> },
     { key: "perimetre", header: k("charge.perimetre"), sortValue: (l) => l.scope, render: (l) => perimetre(l.scope) },
     { key: "ressource", header: k("charge.ressource"), render: (l) => k(`charge.${l.resource}`) },
     {
@@ -604,7 +606,12 @@ export function EcartsM3Section() {
       sortValue: (l) => Number(l.planned_hours),
       render: (l) => (
         <>
-          {l.overload && <Badge tone="warn">{k("charge.surcharge")}</Badge>} <span style={NOWRAP}>{formatNumber(Number(l.planned_hours))} h</span>
+          {l.overload && l.capacity !== null && Number(l.capacity) > 0 ? (
+            <Badge tone="warn" title={k("charge.surcharge")}>
+              +{formatNumber(Math.round((Number(l.planned_hours) / Number(l.capacity) - 1) * 100))} %
+            </Badge>
+          ) : null}{" "}
+          <span className="cell-nowrap">{formatNumber(Number(l.planned_hours))} h</span>
         </>
       ),
     },
@@ -615,16 +622,27 @@ export function EcartsM3Section() {
       key: "document",
       header: k("registre.document"),
       sortValue: (d) => d.titre,
-      render: (d) => (
-        <>
-          {d.titre}
-          {d.reference && !d.titre.includes(d.reference) ? <span className="muted"> {d.reference}</span> : null}
-        </>
-      ),
+      render: (d) => {
+        const m = RAPPORT_EXEC.exec(d.titre);
+        return (
+          <>
+            {m ? t("revueR2.operations.registre.rapport", { code: m[1] }) : d.titre}
+            {d.reference && !d.titre.includes(d.reference) ? <span className="muted"> {d.reference}</span> : null}
+          </>
+        );
+      },
     },
-    { key: "type", header: k("registre.type"), render: (d) => (d.type ? sansModule(d.type) : "—") },
+    {
+      key: "type",
+      header: k("registre.type"),
+      render: (d) => {
+        if (!d.type) return "—";
+        const type = sansModule(d.type);
+        return type === "Rapports d'exécution" ? t("revueR2.operations.registre.typeRapports") : type;
+      },
+    },
     { key: "objet", header: k("registre.objet"), render: (d) => d.objet },
-    { key: "date", header: k("date"), sortValue: (d) => d.lie_le, render: (d) => <span style={NOWRAP}>{formatDate(d.lie_le)}</span> },
+    { key: "date", header: k("date"), sortValue: (d) => d.lie_le, render: (d) => <span className="cell-nowrap">{formatDate(d.lie_le)}</span> },
   ];
   const colsDossiers: Column<Dossier>[] = [
     { key: "dossier", header: k("registre.dossier"), sortValue: (d) => d.ordre_code, render: (d) => d.ordre_code },
@@ -928,7 +946,7 @@ export function EcartsM3Section() {
 
       <SectionCard title={k("registre.title")}>
         <div data-testid="m3-registre">
-          <DataTable columns={colsRegistre} rows={registre} caption={k("registre.title")} emptyLabel={t("tableaux.operations.aucunDocument")} />
+          <DataTable columns={registre.every((d) => d.objet === d.titre) ? colsRegistre.filter((c) => c.key !== "objet") : colsRegistre} rows={registre} caption={k("registre.title")} emptyLabel={t("tableaux.operations.aucunDocument")} />
         </div>
         <h4>{t("tableaux.operations.dossiers")}</h4>
         <div data-testid="m3-dossiers">

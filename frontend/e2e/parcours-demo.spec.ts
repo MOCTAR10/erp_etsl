@@ -43,10 +43,10 @@ test.describe("Parcours démo : direction", () => {
     await expect(gr).toHaveCount(1);
     await expect(chantier).toContainText("Actif");
     await expect(gr).toContainText("Actif");
-    // Colonne « Avenants » (6e cellule : client et affaire sont regroupés) : l'avenant n°1 signé est compté sur le
-    // contrat chantier, aucun sur le contrat GR.
-    await expect(chantier.getByRole("cell").nth(5)).toHaveText("1");
-    await expect(gr.getByRole("cell").nth(5)).toHaveText("0");
+    // Colonne « Avenants » (5e cellule : profil sous le code, client et affaire regroupés) : l'avenant n°1 signé est
+    // compté sur le contrat chantier, aucun sur le contrat GR.
+    await expect(chantier.getByRole("cell").nth(4)).toHaveText("1");
+    await expect(gr.getByRole("cell").nth(4)).toHaveText("0");
   });
 
   test("le dossier GLOBAL RENTAL du parcours est ouvert et imputé au 618", async ({ page }) => {

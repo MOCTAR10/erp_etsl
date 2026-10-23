@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -72,8 +71,6 @@ const TON: Record<string, "ok" | "warn" | "err" | "brand" | "neutral"> = {
 };
 
 const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
-/** Codes de pièce (« EST00001 · v1 », « AFF-00001 ») : jamais coupés en fin de ligne. */
-const NOWRAP: CSSProperties = { whiteSpace: "nowrap" };
 /** Bande d'échéance du contrat (OK / J90…J0 / EXPIRED) → badge lisible, rien si le contrat n'approche pas de son terme. */
 function Expiration({ status }: { status: string }) {
   const { t } = useTranslation();
@@ -145,7 +142,7 @@ export function CommercialSections() {
   );
 
   const colOffres: Column<Offre>[] = [
-    { key: "code", header: t("commercial.col.code"), render: (o) => <span style={NOWRAP}>{`${o.code} · v${o.version}`}</span>, sortValue: (o) => o.code },
+    { key: "code", header: t("commercial.col.code"), render: (o) => <span className="cell-nowrap">{`${o.code} · v${o.version}`}</span>, sortValue: (o) => o.code },
     { key: "titre", header: t("commercial.col.titre"), render: (o) => o.title },
     { key: "client", header: t("commercial.col.client"), render: (o) => o.client_name ?? "—" },
     { key: "montant", header: t("commercial.col.montant"), num: true, render: (o) => montant(o.montant_offre), sortValue: (o) => (o.montant_offre === null ? null : Number(o.montant_offre)) },
@@ -153,7 +150,7 @@ export function CommercialSections() {
     actionsColumn<Offre>(t("ui.actions"), (o) => actionsOffre(o, t)),
   ];
   const colAffaires: Column<Affaire>[] = [
-    { key: "code", header: t("commercial.col.code"), render: (a) => <span style={NOWRAP}>{a.code}</span>, sortValue: (a) => a.code },
+    { key: "code", header: t("commercial.col.code"), render: (a) => <span className="cell-nowrap">{a.code}</span>, sortValue: (a) => a.code },
     { key: "titre", header: t("commercial.col.titre"), render: (a) => a.title },
     { key: "client", header: t("commercial.col.client"), render: (a) => a.client_name ?? "—" },
     { key: "resp", header: t("commercial.col.responsable"), render: (a) => a.responsable_email ?? "—" },
@@ -161,16 +158,25 @@ export function CommercialSections() {
     actionsColumn<Affaire>(t("ui.actions"), (a) => actionsAffaire(a, t)),
   ];
   const colContrats: Column<Contrat>[] = [
-    { key: "code", header: t("commercial.col.code"), render: (c) => <span style={NOWRAP}>{c.code}</span>, sortValue: (c) => c.code },
+    // Profil contractuel en ligne secondaire sous le code : une colonne de moins, client et affaire respirent.
     {
-      key: "profil",
-      header: t("commercial.col.profil"),
-      render: (c) => (c.profile ? t(`revueR2.pipeline.profils.${c.profile}`, { defaultValue: c.profile_label }) : c.profile_label),
+      key: "code",
+      header: t("commercial.col.code"),
+      sortValue: (c) => c.code,
+      render: (c) => (
+        <>
+          <span className="cell-nowrap">{c.code}</span>
+          <span className="cell-sub cell-nowrap">
+            {c.profile ? t(`revueR2.pipeline.profils.${c.profile}`, { defaultValue: c.profile_label }) : c.profile_label}
+          </span>
+        </>
+      ),
     },
     // Client et affaire regroupés : l'intitulé d'affaire (long) passe en ligne secondaire au lieu d'écraser une colonne.
     {
       key: "client",
       header: t("revueR2.pipeline.clientAffaire"),
+      width: "30%",
       sortValue: (c) => c.client_name,
       render: (c) => (
         <>
@@ -187,7 +193,7 @@ export function CommercialSections() {
       render: (c) =>
         c.end_date ? (
           <>
-            <span style={NOWRAP}>{formatDate(c.end_date)}</span>
+            <span className="cell-nowrap">{formatDate(c.end_date)}</span>
             <Expiration status={c.expiry_status} />
           </>
         ) : (

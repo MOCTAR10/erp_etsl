@@ -120,7 +120,7 @@ export function CoutsMaintenanceSection() {
         r.nb_ot === null ? (
           <strong>{r.centre}</strong>
         ) : (
-          <span title={r.libelle} style={{ whiteSpace: "nowrap" }}>
+          <span title={r.libelle} className="cell-nowrap">
             {r.centre}
             <span className="cell-sub">{t("tableaux.maintenance.nbOt", { count: r.nb_ot })}</span>
           </span>
@@ -136,7 +136,7 @@ export function CoutsMaintenanceSection() {
       header: t("ecarts_m5m8.maint.machine"),
       render: (r) => (
         <>
-          <span style={{ whiteSpace: "nowrap" }}>{r.actif}</span>
+          <span className="cell-nowrap">{r.actif}</span>
           <span className="cell-sub">{r.designation}</span>
         </>
       ),
@@ -168,7 +168,7 @@ export function CoutsMaintenanceSection() {
       header: t("ecarts_m5m8.maint.machine"),
       render: (a) => (
         <>
-          <span style={{ whiteSpace: "nowrap" }}>{a.code}</span>
+          <span className="cell-nowrap">{a.code}</span>
           <span className="cell-sub">{a.designation}</span>
         </>
       ),
@@ -222,9 +222,11 @@ export function CoutsMaintenanceSection() {
               <span className="muted"> · {t("tableaux.maintenance.gr618")}</span> <span className="amount">{fcfa(c.totaux.gr_618)}</span>
               <span className="muted"> · {t("ecarts_m5m8.maint.horsGr")}</span> <span className="amount">{fcfa(c.totaux.hors_gr)}</span>
             </p>
+            <h4>{t("revueR2.maintenance.parMois")}</h4>
             <div data-testid="couts-centres">
               <DataTable caption={t("ecarts_m5m8.maint.title")} density="compact" columns={colsMatrice} rows={lignesMatrice} />
             </div>
+            <h4>{t("revueR2.maintenance.parMachine")}</h4>
             <div data-testid="couts-machines">
               <DataTable caption={t("tableaux.maintenance.coutsMachines")} columns={colsMachines} rows={c.machines.map((r) => ({ ...r, id: r.actif }))} />
             </div>

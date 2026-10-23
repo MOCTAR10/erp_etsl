@@ -94,15 +94,11 @@ function OtCard({ ot, index }: { ot: OrdreTravail; index: number }) {
         <span className="card-code">
           {ot.code} · {t(`maintenance.ot_types.${ot.type_ot}`)}
         </span>
-        {prioVisible ? (
-          <span className="card-tags">
-            <Badge tone={prio}>{t(`maintenance.ot_priorites.${ot.priorite}`)}</Badge>
-          </span>
-        ) : null}
       </div>
       <div className="title">{ot.description || ot.actif_designation || "—"}</div>
       <div className="meta">{[ot.actif_code, ot.actif_designation].filter(Boolean).join(" · ") || "—"}</div>
       <div className="card-foot">
+        {prioVisible ? <Badge tone={prio}>{t(`maintenance.ot_priorites.${ot.priorite}`)}</Badge> : null}
         <span>{[formatDate(ot.date_demande), ot.technicien_name].filter(Boolean).join(" · ")}</span>
         {ot.has_amount_access && ot.cout_total !== null && Number(ot.cout_total) > 0 ? <span className="amount">{formatMoney(ot.cout_total)}</span> : null}
       </div>
@@ -171,7 +167,7 @@ export function MaintenancePage() {
     .reduce((sum, [, arr]) => sum + arr.length, 0);
 
   const actifColumns: Column<Actif>[] = [
-    { key: "code", header: t("maintenance.col.code"), sortValue: (a) => a.code, render: (a) => <span style={{ whiteSpace: "nowrap" }}>{a.code}</span> },
+    { key: "code", header: t("maintenance.col.code"), sortValue: (a) => a.code, render: (a) => <span className="cell-nowrap">{a.code}</span> },
     {
       key: "designation",
       header: t("maintenance.col.designation"),
@@ -194,7 +190,7 @@ export function MaintenancePage() {
     ),
   ];
   const inspectionColumns: Column<Inspection>[] = [
-    { key: "code", header: t("maintenance.col.code"), sortValue: (i) => i.code, render: (i) => <span style={{ whiteSpace: "nowrap" }}>{i.code}</span> },
+    { key: "code", header: t("maintenance.col.code"), sortValue: (i) => i.code, render: (i) => <span className="cell-nowrap">{i.code}</span> },
     { key: "actif", header: t("maintenance.col.designation"), render: (i) => i.actif_designation },
     { key: "type", header: t("maintenance.col.type"), render: (i) => t(`maintenance.inspection_types.${i.type_inspection}`) },
     { key: "date", header: t("maintenance.col.date"), sortValue: (i) => i.date_inspection, render: (i) => formatDate(i.date_inspection, lang) },

@@ -83,23 +83,21 @@ function EquipementCard({ eq, index }: { eq: EquipementParc; index: number }) {
 
 type T = (key: string) => string;
 
-const NOWRAP = { whiteSpace: "nowrap" } as const;
-
 function locationColumns(t: T, lbl: Lbl): Column<LocationGR>[] {
   return [
-    { key: "code", header: t("logistique.col.code"), sortValue: (l) => l.code, render: (l) => <span style={NOWRAP}>{l.code}</span> },
+    { key: "code", header: t("logistique.col.code"), sortValue: (l) => l.code, render: (l) => <span className="cell-nowrap">{l.code}</span> },
     {
       key: "equip",
       header: t("logistique.col.equipement"),
       render: (l) => (
         <>
-          <span style={NOWRAP}>{l.equipement_code}</span>
+          <span className="cell-nowrap">{l.equipement_code}</span>
           {l.equipement_label ? <span className="cell-sub">{l.equipement_label}</span> : null}
         </>
       ),
     },
     { key: "partner", header: t("logistique.col.partenaire"), render: (l) => l.partenaire_name ?? "—" },
-    { key: "period", header: t("logistique.col.periodicite"), render: (l) => <span style={NOWRAP}>{lbl(`revueR2.logistique.periodicite.${l.periodicite}`, l.periodicite_label)}</span> },
+    { key: "period", header: t("logistique.col.periodicite"), render: (l) => <span className="cell-nowrap">{lbl(`revueR2.logistique.periodicite.${l.periodicite}`, l.periodicite_label)}</span> },
     {
       key: "conso",
       header: t("logistique.col.consommation"),
@@ -117,7 +115,7 @@ function locationColumns(t: T, lbl: Lbl): Column<LocationGR>[] {
       key: "statut",
       header: t("logistique.col.statut"),
       render: (l) => (
-        <span style={NOWRAP}>
+        <span className="cell-nowrap">
           <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
             {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
           </Badge>
@@ -145,7 +143,7 @@ function locationColumns(t: T, lbl: Lbl): Column<LocationGR>[] {
 
 function demandeColumns(t: T, lbl: Lbl): Column<DemandeMobilisation>[] {
   return [
-    { key: "code", header: t("logistique.col.code"), render: (d) => <span style={NOWRAP}>{d.code}</span> },
+    { key: "code", header: t("logistique.col.code"), render: (d) => <span className="cell-nowrap">{d.code}</span> },
     { key: "label", header: t("logistique.col.besoin"), render: (d) => d.label },
     { key: "dept", header: t("logistique.col.departement"), render: (d) => d.departement || "—" },
     { key: "debut", header: t("logistique.debut"), sortValue: (d) => d.date_debut, render: (d) => formatDate(d.date_debut) },

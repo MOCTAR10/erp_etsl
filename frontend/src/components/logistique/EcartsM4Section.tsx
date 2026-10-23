@@ -136,11 +136,10 @@ const num = (v: string | null | undefined) => {
   const n = Number(v);
   return Number.isInteger(n) ? formatNumber(n) : formatNumber(n, { decimals: 2 });
 };
-const NOWRAP = { whiteSpace: "nowrap" } as const;
 /** Code (sur une ligne) et libellé en dessous : la colonne ne se fragmente plus mot à mot sur mobile. */
 const codeLibelle = (code: string, libelle?: string | null) => (
   <>
-    <span style={NOWRAP}>{code}</span>
+    <span className="cell-nowrap">{code}</span>
     {libelle ? <span className="cell-sub">{libelle}</span> : null}
   </>
 );
@@ -240,7 +239,7 @@ export function EcartsM4Section() {
           {e.compteur_type === "forfait" ? (
             <span className="muted">{unite(e)}</span>
           ) : (
-            <span style={NOWRAP}>
+            <span className="cell-nowrap">
               {num(e.compteur_value)} <span className="muted">{unite(e)}</span>
             </span>
           )}
@@ -252,7 +251,7 @@ export function EcartsM4Section() {
       header: t("ecarts_m4.parc.plafond"),
       num: true,
       render: (e) => (
-        <span style={NOWRAP}>
+        <span className="cell-nowrap">
           {num(e.plafond_compteur)}{" "}
           {e.plafond_pct !== null && <Badge tone={Number(e.plafond_pct) >= 90 ? "warn" : "ok"}>{formatNumber(Number(e.plafond_pct))} %</Badge>}
         </span>
@@ -281,7 +280,7 @@ export function EcartsM4Section() {
       sortValue: (a) => a.code,
       render: (a) => (
         <>
-          <span style={NOWRAP}>
+          <span className="cell-nowrap">
             {a.code} · {a.equipement_code}
           </span>{" "}
           {a.photo && (
@@ -309,7 +308,7 @@ export function EcartsM4Section() {
       header: t("ecarts_m4.location"),
       sortValue: (l) => l.code,
       render: (l) => (
-        <span style={NOWRAP}>
+        <span className="cell-nowrap">
           {l.code} · {l.equipement_code}{" "}
           <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
             {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
@@ -324,7 +323,7 @@ export function EcartsM4Section() {
         <>
           {l.validations.m2 && <Badge tone={l.validations.m2_ok ? "ok" : "warn"}>{t("tableaux.logistique.validAchats")}</Badge>}{" "}
           {l.validations.dr && <Badge tone={l.validations.dr_ok ? "ok" : "warn"}>{t("tableaux.logistique.validDirection")}</Badge>}
-          {!l.validations.m2 && !l.validations.dr && <span className="muted">{t("ecarts_m4.commandes.sousSeuil")}</span>}
+          {!l.validations.m2 && !l.validations.dr && <span className="muted cell-nowrap">{t("ecarts_m4.commandes.sousSeuil")}</span>}
         </>
       ),
     },
@@ -332,7 +331,7 @@ export function EcartsM4Section() {
       key: "achats",
       header: t("ecarts_m4.commandes.achats"),
       render: (l) => (
-        <span style={NOWRAP}>
+        <span className="cell-nowrap">
           {l.bon_commande_code ?? "—"} / {l.facture_code ?? "—"}{" "}
           {l.facture_conforme !== null && (
             <Badge tone={l.facture_conforme ? "ok" : "err"}>{l.facture_conforme ? t("ecarts_m4.commandes.conforme") : t("ecarts_m4.commandes.ecart")}</Badge>
@@ -418,7 +417,7 @@ export function EcartsM4Section() {
       header: t("ecarts_m4.location"),
       sortValue: (l) => l.code,
       render: (l) => (
-        <span style={NOWRAP}>
+        <span className="cell-nowrap">
           {l.code} · {l.equipement_code} {l.g?.provisoire && <Badge tone="warn">{t("ecarts_m4.provisoire")}</Badge>}
         </span>
       ),
@@ -449,7 +448,7 @@ export function EcartsM4Section() {
       sortValue: (r) => r.equipement,
       render: (r) => (
         <>
-          <span style={NOWRAP}>
+          <span className="cell-nowrap">
             {r.equipement} {r.gr && <Badge tone="brand">GR</Badge>}
           </span>
           <span className="cell-sub">{r.label}</span>

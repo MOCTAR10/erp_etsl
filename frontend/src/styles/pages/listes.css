@@ -439,6 +439,13 @@ td .card-actions--choice {
 .overload-bar.err > span {
   background: var(--err);
 }
+/* Repère de capacité sur la barre de charge */
+.overload-bar > .overload-cap,
+.overload-bar.err > .overload-cap {
+  width: 2px;
+  border-radius: 0;
+  background: var(--text-muted);
+}
 .overload-list li > .badge {
   justify-self: end;
 }

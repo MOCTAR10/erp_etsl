@@ -149,7 +149,9 @@ export function InventaireAnnuelSection() {
           valeur: (
             <>
               {t("revueR2.stocks.passages", { count: a.passages_prevus.length })}
-              <span className="cell-sub">{a.passages_prevus.map((d) => formatDate(d, i18n.language)).join(" · ")}</span>
+              <span className="cell-sub">
+                {a.passages_prevus.map((d) => new Date(d).toLocaleDateString(i18n.language || "fr", { day: "2-digit", month: "2-digit" })).join(" · ")}
+              </span>
             </>
           ),
         },
@@ -193,7 +195,7 @@ export function InventaireAnnuelSection() {
       header: t("ecarts_m5m8.stocks.article"),
       render: (l) => (
         <>
-          <span style={{ whiteSpace: "nowrap" }}>{l.article}</span>
+          <span className="cell-nowrap">{l.article}</span>
           <span className="cell-sub">{l.article_label}</span>
         </>
       ),
@@ -239,7 +241,7 @@ export function InventaireAnnuelSection() {
       header: t("ecarts_m5m8.stocks.inventaire"),
       render: (r) => (
         <>
-          <span style={{ whiteSpace: "nowrap" }}>{r.inventaire}</span>
+          <span className="cell-nowrap">{r.inventaire}</span>
           <span className="cell-sub">{formatDate(r.date, i18n.language)}</span>
         </>
       ),
@@ -250,7 +252,7 @@ export function InventaireAnnuelSection() {
       header: t("ecarts_m5m8.stocks.article"),
       render: (r) => (
         <>
-          <span style={{ whiteSpace: "nowrap" }}>{r.article}</span>
+          <span className="cell-nowrap">{r.article}</span>
           <span className="cell-sub">{r.article_label}</span>
         </>
       ),
@@ -297,7 +299,7 @@ export function InventaireAnnuelSection() {
             <select id="inv-annuel-plan" className="control" value={plan} onChange={(ev) => setPlanId(ev.target.value)}>
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.code} · {p.depot_label}
+                  {p.depot_label ?? p.code}
                 </option>
               ))}
             </select>
@@ -325,7 +327,7 @@ export function InventaireAnnuelSection() {
                 <select id="inv-annuel-inventaire" className="control" value={inv} onChange={(ev) => { setInvId(ev.target.value); setSaisie({}); }}>
                   {ouverts.map((o) => (
                     <option key={o.id} value={o.id}>
-                      {o.code} · {o.depot_label} · {formatDate(o.date, i18n.language)}
+                      {o.code} · {formatDate(o.date, i18n.language)}
                     </option>
                   ))}
                 </select>

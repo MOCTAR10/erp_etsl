@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -51,8 +50,6 @@ interface Reporting {
 
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
 const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
-/** Codes de pièce et dates : jamais coupés en fin de ligne. */
-const NOWRAP: CSSProperties = { whiteSpace: "nowrap" };
 
 function actionsLitige(l: Litige, t: (k: string) => string): ActionDef[] {
   if (l.statut === "resolu") return [];
@@ -84,8 +81,8 @@ export function AchatsPilotage() {
   });
 
   const colReceptions: Column<Reception>[] = [
-    { key: "code", header: t("achatsPilotage.col.reception"), render: (r) => <span style={NOWRAP}>{`${r.code} · ${r.order_code}`}</span> },
-    { key: "date", header: t("achatsPilotage.col.date"), render: (r) => <span style={NOWRAP}>{formatDate(r.received_at)}</span> },
+    { key: "code", header: t("achatsPilotage.col.reception"), render: (r) => <span className="cell-nowrap">{`${r.code} · ${r.order_code}`}</span> },
+    { key: "date", header: t("achatsPilotage.col.date"), render: (r) => <span className="cell-nowrap">{formatDate(r.received_at)}</span> },
     {
       key: "qc",
       header: t("achatsPilotage.col.controle"),
@@ -98,7 +95,7 @@ export function AchatsPilotage() {
           : t(`revueR2.purchases.qcStatuts.${qc.statut}`, { defaultValue: qc.statut });
         return (
           <Badge tone={qc.resultat === "non_conforme" ? "err" : qc.statut === "valide" ? "ok" : "warn"}>
-            <span style={NOWRAP}>{`${qc.code} · ${etat}`}</span>
+            <span className="cell-nowrap">{`${qc.code} · ${etat}`}</span>
           </Badge>
         );
       },
@@ -131,8 +128,8 @@ export function AchatsPilotage() {
       header: t("achatsPilotage.col.litige"),
       render: (l) => (
         <>
-          <span style={NOWRAP}>{l.code}</span>
-          <span className="cell-sub" style={NOWRAP}>
+          <span className="cell-nowrap">{l.code}</span>
+          <span className="cell-sub cell-nowrap">
             {l.order_code}
           </span>
         </>
@@ -150,7 +147,7 @@ export function AchatsPilotage() {
             {t(`revueR2.purchases.litigeStatuts.${l.statut}`, { defaultValue: l.statut_label })}
           </Badge>
           {l.contentieux_code ? (
-            <span className="cell-sub" style={NOWRAP}>
+            <span className="cell-sub cell-nowrap">
               {l.contentieux_code}
             </span>
           ) : null}

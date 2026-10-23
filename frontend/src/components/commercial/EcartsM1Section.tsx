@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
-import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -168,8 +167,6 @@ const liste = <T,>(path: string) => () => api.listAll<T>(path);
 /** Décimal API (« 12.50 ») au format français, décimales seulement si utiles. */
 const dec = (v: string | number | null | undefined) => formatNumber(v, { decimals: Number.isInteger(Number(v)) ? 0 : 2 });
 const taux = (v: string | number | null | undefined) => formatPercent(v, { decimals: Number.isInteger(Number(v)) ? 0 : 1 });
-/** Codes de pièce : jamais coupés en fin de ligne. */
-const NOWRAP: CSSProperties = { whiteSpace: "nowrap" };
 /** Valeur d'un champ de saisie sans zéros inutiles (« 5.00 » → « 5 », « 0.15 » inchangé) ; le point reste celui de l'API. */
 const saisieBrute = (v: string) => (v.includes(".") ? v.replace(/\.?0+$/, "") : v);
 /** Unités des paramètres (libellés serveur) → clés traduites ; « % », « 0/1 »… restent tels quels. */
@@ -242,7 +239,7 @@ function ParametresM1() {
               <textarea
                 className="control"
                 // Hauteur ajustée au texte : la définition reste lisible sans défilement interne.
-                rows={Math.min(8, Math.max(2, Math.ceil(texte.length / 42)))}
+                rows={Math.min(8, Math.max(1, Math.ceil(texte.length / 42)))}
                 style={{ width: "100%", resize: "vertical" }}
                 aria-label={`${p.label} — ${t("ecarts_suivi.texte")}`}
                 value={texte}
@@ -290,7 +287,7 @@ function ParametresM1() {
   return (
     <SectionCard title={t("ecarts_m1.params.title")}>
       {provisoires > 0 && (
-        <div className="banner warn" role="note" data-testid="alerte-provisoire-m1" style={{ marginBottom: "var(--space-3)" }}>
+        <div className="banner warn" role="note" data-testid="alerte-provisoire-m1">
           <SlidersHorizontal size={18} aria-hidden />
           <div className="banner-body">
             <span className="banner-title">{t("ecarts_m1.params.warn", { count: provisoires })}</span>
@@ -438,7 +435,7 @@ function AlertesEcheances() {
         rows={opp.data?.lignes ?? []}
         caption={t("ecarts_m1.alertes.opportunites", { jours: opp.data ? dec(opp.data.jours) : "" })}
         columns={[
-          { key: "code", header: t("commercial.col.code"), render: (o) => <span style={NOWRAP}>{o.code}</span>, sortValue: (o) => o.code },
+          { key: "code", header: t("commercial.col.code"), render: (o) => <span className="cell-nowrap">{o.code}</span>, sortValue: (o) => o.code },
           { key: "objet", header: t("commercial.col.titre"), render: (o) => o.objet },
           { key: "etape", header: t("ecarts_m1.alertes.etape"), render: (o) => (ETAPE_CODE[o.etape] ? t(`pipeline.${ETAPE_CODE[o.etape]}`) : o.etape) },
           { key: "client", header: t("commercial.col.client"), render: (o) => o.client ?? "—" },
@@ -452,9 +449,9 @@ function AlertesEcheances() {
         caption={t("ecarts_m1.alertes.echeancesCaption")}
         columns={[
           { key: "type", header: t("ecarts_m1.alertes.type"), render: (e) => t(`ecarts_m1.alertes.types.${e.type}`) },
-          { key: "code", header: t("commercial.col.code"), render: (e) => <span style={NOWRAP}>{e.code}</span> },
+          { key: "code", header: t("commercial.col.code"), render: (e) => <span className="cell-nowrap">{e.code}</span> },
           { key: "lib", header: t("ecarts_m1.alertes.objet"), render: (e) => e.libelle },
-          { key: "date", header: t("ecarts_m1.alertes.date"), render: (e) => <span style={NOWRAP}>{formatDate(e.date_echeance)}</span>, sortValue: (e) => e.date_echeance },
+          { key: "date", header: t("ecarts_m1.alertes.date"), render: (e) => <span className="cell-nowrap">{formatDate(e.date_echeance)}</span>, sortValue: (e) => e.date_echeance },
           {
             key: "palier",
             header: t("ecarts_m1.alertes.palier"),
@@ -593,7 +590,7 @@ function Chiffrage() {
             sortValue: (d) => d.code,
             render: (d) => (
               <>
-                <span style={NOWRAP}>{d.code}</span> · {d.titre}
+                <span className="cell-nowrap">{d.code}</span> · {d.titre}
               </>
             ),
           },
@@ -775,7 +772,7 @@ function RaoRc() {
         rows={rcs.data ?? []}
         caption={t("ecarts_m1.rao.rcs")}
         columns={[
-          { key: "aff", header: t("commercial.col.affaire"), render: (r) => <span style={NOWRAP}>{r.affaire_code}</span> },
+          { key: "aff", header: t("commercial.col.affaire"), render: (r) => <span className="cell-nowrap">{r.affaire_code}</span> },
           {
             key: "type",
             header: t("ecarts_m1.rao.typeRevue"),
