@@ -381,7 +381,6 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
     setDlError(null);
     api.download(`${BASE}/reportings/donnees/?cloture=${cloture}&type=${type}&export=pdf`, `reporting-${type}.pdf`).catch((e) => setDlError(describeError(e)));
   };
-  const actionsHeader = <span className="sr-only">{t("ui.actions")}</span>;
 
   return (
     <>
