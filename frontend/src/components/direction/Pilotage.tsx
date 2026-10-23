@@ -204,7 +204,7 @@ function Commercial({ ic }: { ic: IndicateursCommerciaux }) {
   return (
     <div className="dir-panel" data-testid="indicateurs-commerciaux">
       <dl className="dir-stats">
-        <Stat label={t("ecarts_cd.commercial.prixMoyen")} value={formatMoney(ic.prix_moyen)} hint={t("ecarts_cd.commercial.gagnees", { n: ic.offres_gagnees })} />
+        <Stat label={t("ecarts_cd.commercial.prixMoyen")} value={formatMoney(ic.prix_moyen)} hint={t("ecarts_cd.commercial.gagnees", { count: ic.offres_gagnees })} />
         <Stat
           label={t("ecarts_cd.commercial.transformation")}
           value={ic.taux_transformation_pct === null ? "—" : formatPercent(ic.taux_transformation_pct, { decimals: 1 })}

@@ -104,16 +104,17 @@ function ItpCndCard({ q }: { q: Required<ItpCnd> }) {
           <h4 id="dir-itp-title" className="card-title">
             {t("direction2.reporting.itp")}
           </h4>
-          <p className="card-sub">{t("ecarts_cd.itpCnd.approuves", { n: q.itp.plans_approuves })} · {t("direction2.reporting.plans", { count: q.itp.plans })}</p>
+          <p className="card-sub">{t("ecarts_cd.itpCnd.approuves", { count: q.itp.plans_approuves })} · {t("direction2.reporting.plans", { count: q.itp.plans })}</p>
         </div>
       </header>
       <dl className="dir-stats">
         <Stat label={t("ecarts_cd.itpCnd.points")} value={`${formatNumber(q.itp.points_leves)} / ${formatNumber(q.itp.points)}`} hint={formatPercent(q.itp.taux_levee * 100, { decimals: 1 })} />
         <Stat label={t("ecarts_cd.itpCnd.arretsAttente")} value={formatNumber(q.itp.points_arret_en_attente)} tone={q.itp.points_arret_en_attente ? "warn" : undefined} />
         <Stat label={t("ecarts_cd.itpCnd.pointsNc")} value={formatNumber(q.itp.points_non_conformes)} tone={q.itp.points_non_conformes ? "err" : undefined} />
-        <Stat label={t("ecarts_cd.itpCnd.cnd")} value={formatNumber(q.cnd.controles)} hint={methodes || t("ecarts_cd.itpCnd.enCours", { n: q.cnd.en_cours })} />
+        <Stat label={t("ecarts_cd.itpCnd.cnd")} value={formatNumber(q.cnd.controles)} hint={t("ecarts_cd.itpCnd.enCours", { n: q.cnd.en_cours })} />
         <Stat label={t("ecarts_cd.itpCnd.rejet")} value={formatPercent(q.cnd.taux_rejet * 100, { decimals: 1 })} hint={`${formatNumber(q.cnd.conformes)} / ${formatNumber(q.cnd.sous_reserve)} / ${formatNumber(q.cnd.non_conformes)}`} />
       </dl>
+      {methodes ? <p className="dir-card-note">{t("revueR1.dir.methodes", { liste: methodes })}</p> : null}
     </section>
   );
 }
@@ -131,7 +132,7 @@ function Capa({ lignes }: { lignes: CapaLigne[] }) {
       key: "delai",
       header: t("ecarts_a4.capa.delai"),
       num: true,
-      render: (c) => (c.delai_moyen_cloture_jours === null ? "—" : t("direction2.capa.jours", { n: formatNumber(c.delai_moyen_cloture_jours, { decimals: 0 }) })),
+      render: (c) => (c.delai_moyen_cloture_jours === null || c.delai_moyen_cloture_jours < 0 ? "—" : t("direction2.capa.jours", { n: formatNumber(c.delai_moyen_cloture_jours, { decimals: 0 }) })),
     },
     {
       key: "efficacite",

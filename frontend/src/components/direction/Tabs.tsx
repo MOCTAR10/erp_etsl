@@ -14,9 +14,10 @@ export interface TabDef {
  */
 export function Tabs({ tabs, label, initial }: { tabs: TabDef[]; label: string; initial?: string }) {
   const uid = useId();
-  const [active, setActive] = useState(initial ?? tabs[0]?.id);
+  // Sans choix explicite, le premier onglet DISPONIBLE est actif (les onglets financiers arrivent après le chargement).
+  const [active, setActive] = useState<string | undefined>(initial);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const index = Math.max(0, tabs.findIndex((t) => t.id === active));
+  const index = active === undefined ? 0 : Math.max(0, tabs.findIndex((t) => t.id === active));
   const current = tabs[index];
   if (!current) return null;
 

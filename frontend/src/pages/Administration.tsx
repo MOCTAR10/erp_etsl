@@ -110,7 +110,7 @@ function Referentiel({ path, cle }: { path: string; cle: string }) {
   const columns: GridColumn<RefRow>[] = [
     { key: "code", header: t("ecarts_tr.admin.code"), width: 160, sortValue: (r) => r.code, render: (r) => <span className="num">{r.code}</span> },
     { key: "label", header: t("ecarts_tr.admin.libelle"), sortValue: (r) => r.name ?? r.label, render: (r) => r.name ?? r.label ?? "—" },
-    { key: "info", header: "", render: (r) => <span className="muted">{r.kind_label ?? r.article_type_label ?? r.unit_code ?? ""}</span> },
+    { key: "info", header: t("revueR1.admin.nature"), render: (r) => <span className="muted">{r.kind_label ?? r.article_type_label ?? r.unit_code ?? ""}</span> },
     {
       key: "actif",
       header: t("ecarts_tr.admin.etat"),
@@ -119,6 +119,20 @@ function Referentiel({ path, cle }: { path: string; cle: string }) {
     },
   ];
   return <PagedDataGrid list={list} columns={columns} caption={t(`ecarts_tr.admin.ref.${cle}`)} searchPlaceholder={t("common.searchPlaceholder")} density="compact" />;
+}
+
+/** Applications filtrables dans la piste d'audit (libellé lisible, valeur = application Django). */
+const APPS_AUDIT = [
+  "commercial", "achats", "operations", "logistique", "stocks", "qualite", "hse", "maintenance", "rh_paie",
+  "comptabilite", "controle_gestion", "juridique", "documents", "workflow", "users", "referentiels", "analytics", "integrations",
+];
+
+/** Module d'un objet audité (« qualite.criterecontrole » → « Qualité ») ; le nom technique reste en infobulle. */
+function zoneObjet(type: string, tr: (cle: string) => string): string {
+  const app = (type.split(".")[0] ?? "").replace(/_/g, "-");
+  const cle = `revueR1.secu.zones.${app}`;
+  const v = tr(cle);
+  return v === cle ? type : v;
 }
 
 /** Administration (EX-G-01) : comptes et rôles, matrice rôle → modules, référentiels centraux, piste d'audit. */
@@ -233,8 +247,8 @@ export function AdministrationPage() {
       key: "objet",
       header: t("ecarts_tr.audit.objet"),
       render: (a) => (
-        <span className="audit-objet">
-          {a.object_type} <span className="muted num">{a.object_id.slice(0, 8)}</span>
+        <span className="audit-objet" title={a.object_type}>
+          {zoneObjet(a.object_type, (k) => t(k))} <span className="muted num">#{a.object_id.slice(0, 8)}</span>
         </span>
       ),
     },
@@ -250,8 +264,12 @@ export function AdministrationPage() {
               </li>
             ))}
           </ul>
+        ) : a.detail.apres || a.detail.avant ? (
+          <span className="muted">
+            {t(a.detail.apres ? "revueR1.audit.renseignes" : "revueR1.audit.supprimes", { count: Object.keys(a.detail.apres ?? a.detail.avant ?? {}).length })}
+          </span>
         ) : (
-          <span className="muted audit-brut">{court(a.detail.apres ?? a.detail.avant ?? a.detail)}</span>
+          <span className="muted audit-brut">{court(a.detail)}</span>
         ),
     },
   ];
@@ -483,13 +501,14 @@ export function AdministrationPage() {
           <label className="sr-only" htmlFor="audit-module">
             {t("shell.admin.filtreModule")}
           </label>
-          <input
-            id="audit-module"
-            className="control"
-            value={module}
-            placeholder={t("shell.admin.filtreModuleAide")}
-            onChange={(e) => setModule(e.target.value.trim())}
-          />
+          <select id="audit-module" className="control" value={module} onChange={(e) => setModule(e.target.value)}>
+            <option value="">{t("revueR1.audit.tousModules")}</option>
+            {APPS_AUDIT.map((a) => (
+              <option key={a} value={a}>
+                {zoneObjet(a, (k) => t(k))}
+              </option>
+            ))}
+          </select>
         </div>
         <PagedDataGrid list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" maxHeight="none" />
         </div>

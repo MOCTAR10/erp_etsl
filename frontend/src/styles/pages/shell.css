@@ -710,10 +710,15 @@
     white-space: nowrap;
     font-weight: var(--fw-semibold);
     color: var(--text-muted);
+    vertical-align: bottom;
   }
   .table.matrice th.matrice-mod {
     text-align: center;
-    min-width: 76px;
+    min-width: 0;
+    max-width: 92px;
+    padding-inline: 6px;
+    font-size: var(--fs-xs);
+    hyphens: auto;
     white-space: normal;
     line-height: 1.25;
     vertical-align: bottom;
@@ -798,5 +803,145 @@
     .seg > button {
       transition: none;
     }
+  }
+}
+
+/* ── Revue finale R1 : Signatures (liste en lignes, formulaire, enrôlement) ─────────────────────────── */
+@layer pages {
+  .sig-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+  .sig-page > .page-header {
+    margin-bottom: 0;
+  }
+  .sig-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .sig-item {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--border);
+  }
+  .sig-item:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .sig-item:last-child {
+    padding-bottom: 0;
+  }
+  .sig-main {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+  .sig-icon {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text-muted);
+  }
+  .sig-item.is-mine .sig-icon {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+  .sig-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+  }
+  .sig-title {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body, 20px);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .sig-meta {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+  }
+  .sig-side {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .sig-signers {
+    padding-left: 44px;
+  }
+  .sig-item .sign-panel,
+  .sig-item .cert {
+    margin-left: 44px;
+  }
+  .sig-item .sign-panel {
+    border-style: solid;
+    border-color: var(--border);
+    background: var(--surface-2);
+  }
+  .sig-enrol-body:empty {
+    display: none;
+  }
+  .sig-enrol-body {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .sig-form {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .sig-form-wide {
+    grid-column: 1 / -1;
+  }
+  .sig-form-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+  @media (max-width: 900px) {
+    .sig-form {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .sig-main {
+      flex-wrap: wrap;
+    }
+    .sig-text {
+      flex-basis: calc(100% - 44px);
+    }
+    .sig-side {
+      margin-left: 44px;
+    }
+    .sig-signers,
+    .sig-item .sign-panel,
+    .sig-item .cert {
+      margin-left: 0;
+      padding-left: 0;
+    }
+  }
+}
+
+@layer pages {
+  /* Sécurité : état de la vérification en deux étapes en clair, zone fonctionnelle au lieu du chemin d'API. */
+  .mfa-etat {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+  }
+  .shell-zone {
+    color: var(--text-muted);
   }
 }

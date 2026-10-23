@@ -5,7 +5,6 @@ import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { formatNumber } from "../lib/format";
 import { cleanLabel } from "../components/workflow/libelle";
 import { ConfirmDialog, useServerAction } from "../components/workflow/actions";
 import { Badge, BoardSkeleton, DataGrid, EmptyState, ErrorState, Menu, PageHeader, Sheet, SheetClose } from "../components/ui";
@@ -140,7 +139,7 @@ function CircuitCard({ circuit, gestion, roleOpts }: { circuit: Circuit; gestion
 
   const columns: GridColumn<CircuitStep>[] = [
     { key: "order", header: "#", width: 48, render: (s) => <span className="circ-order">{s.order}</span> },
-    { key: "name", header: t("circuits2.etape"), render: (s) => (
+    { key: "name", header: t("circuits2.etape"), width: "44%", render: (s) => (
         <>
           <strong className="circ-step">{s.name}</strong>
           <span className="circ-actor-inline">{s.actor_role_label}</span>
@@ -176,7 +175,7 @@ function CircuitCard({ circuit, gestion, roleOpts }: { circuit: Circuit; gestion
             {label}
           </h3>
           <p className="card-sub">
-            {t("circuits2.resume", { count: steps.length, jours: formatNumber(circuit.max_days) })}
+            {t("circuits2.resume", { count: steps.length, duree: t("circuits2.jours", { count: circuit.max_days }) })}
           </p>
         </div>
         <Badge tone={circuit.is_active ? "ok" : "neutral"}>{circuit.is_active ? t("circuits.active") : t("circuits.inactive")}</Badge>

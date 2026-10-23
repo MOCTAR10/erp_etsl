@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, FileText } from "lucide-react";
+import { CalendarDays, FileText, KeyRound, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -79,13 +79,16 @@ export function MonEspacePage() {
       <>
         <PageHeader
           title={t("monEspace.title")}
+          subtitle={t("revueR1.monEspace.sub")}
           actions={
             <Link className="btn ghost" to="/mon-mot-de-passe">
-              {t("ecarts_tr.mdp.menu")}
+              <KeyRound size={15} aria-hidden="true" /> {t("ecarts_tr.mdp.menu")}
             </Link>
           }
         />
-        <EmptyState label={t("monEspace.pasDeFiche")} />
+        <SectionCard>
+          <EmptyState icon={UserRound} label={t("monEspace.pasDeFiche")} hint={t("revueR1.monEspace.sansFicheAide")} />
+        </SectionCard>
       </>
     ) : (
       <ErrorState message={t("common.error")} onRetry={() => void profil.refetch()} retryLabel={t("common.retry")} />
@@ -162,7 +165,7 @@ export function MonEspacePage() {
         subtitle={`${p.nom_complet} · ${t("monEspace.subtitle")}`}
         actions={
           <Link className="btn ghost" to="/mon-mot-de-passe">
-            {t("ecarts_tr.mdp.menu")}
+            <KeyRound size={15} aria-hidden="true" /> {t("ecarts_tr.mdp.menu")}
           </Link>
         }
       />
