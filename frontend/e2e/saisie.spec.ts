@@ -22,8 +22,10 @@ test.describe("Régression : saisie depuis l'interface", () => {
 
     const card = page.locator(".task-card", { hasText: label });
     await expect(card).toBeVisible();
-    await card.getByRole("button", { name: "Planifier" }).click();
-    await expect(page.locator(".task-card", { hasText: label }).getByRole("button", { name: "Planifier" })).toHaveCount(0);
+    // Carte sobre : action principale en bouton, les autres dans le menu « ⋯ ».
+    await card.getByRole("button", { name: "Plus d'actions" }).click();
+    await page.getByRole("menuitem", { name: "Planifier" }).click();
+    await expect(page.locator(".task-card", { hasText: label }).getByRole("button", { name: "Démarrer" })).toBeVisible();
   });
 
   test("Achats : une demande d'achat se crée, se soumet puis s'approuve", async ({ page }) => {

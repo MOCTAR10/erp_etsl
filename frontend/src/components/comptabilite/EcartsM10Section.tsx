@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
@@ -90,7 +90,7 @@ const ETATS = [
 ] as const;
 type EtatCode = (typeof ETATS)[number];
 
-const fcfa = (v: string | null | undefined) => (v === null || v === undefined || v === "" ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null | undefined) => formatMoney(v);
 
 function urlEtat(code: EtatCode, p: { from: string; to: string; exercice: string; compte: string }) {
   const q = new URLSearchParams();

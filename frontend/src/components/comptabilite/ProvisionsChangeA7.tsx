@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney } from "../../lib/format";
 import { Badge } from "../ui";
 
 interface Provision {
@@ -19,7 +19,7 @@ interface Provision {
   date_contre_passation: string | null;
 }
 
-const fcfa = (v: string | null) => (v === null || v === "" ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null) => formatMoney(v);
 
 /** Lot a7 : provisions pour perte de change latente (Dr 697 / Cr 499), dotées par « Réévaluer tout » et
  * contre-passées au calcul suivant. Paramètre provisoire DEVISE_PROVISION_PERTE (Comptabilité → Paramètres). */

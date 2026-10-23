@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 import { ProvisionsChangeA7 } from "./ProvisionsChangeA7";
@@ -97,7 +97,7 @@ interface Ref {
   account_class?: number;
 }
 
-const fcfa = (v: string | null | undefined) => (v === null || v === undefined || v === "" ? "—" : `${formatNumber(Number(v))} F`);
+const fcfa = (v: string | null | undefined) => formatMoney(v);
 
 /** Écarts a2 : cours de change et opérations en devise (EX-G-04), revenu à l'avancement, export des écritures vers SAGE. */
 export function EcartsA2Section() {

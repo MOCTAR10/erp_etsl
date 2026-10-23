@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence } from "motion/react";
 import { Layers, Scale, Target, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney, formatPercent } from "../lib/format";
 import { CommercialSections } from "../components/commercial/CommercialSections";
 import { EcartsM1Section } from "../components/commercial/EcartsM1Section";
-import { ActionBar, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { CardActions } from "../components/ui/Board";
 import type { Opportunity, OpportunityStage, Paginated } from "../types";
 
 const COLUMNS: Array<{ stage: OpportunityStage; badge: "brand" | "warn" | "ok" | "err" }> = [
@@ -36,18 +36,22 @@ function OppCard({ opp, index }: { opp: Opportunity; index: number }) {
   const { t } = useTranslation();
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        <span className="muted">{opp.code}</span> · {opp.subject}
+      <div className="card-top">
+        <span className="card-code">{opp.code}</span>
+        <span className="card-tags">
+          <Badge tone="neutral" title={t("listes.pipeline.probabilite")}>
+            {formatPercent(opp.probability)}
+          </Badge>
+        </span>
       </div>
-      <div className="meta">
-        {opp.client_name ?? "—"} {opp.expected_close ? `· ${t("pipeline.echeance")} ${formatDate(opp.expected_close)}` : ""}
-      </div>
-      <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="badge brand">{opp.probability}%</span>
-        <span>{opp.amount === null ? t("pipeline.masked") : formatNumber(opp.amount)}</span>
+      <div className="title">{opp.subject}</div>
+      <div className="meta">{opp.client_name ?? "—"}</div>
+      <div className="card-foot">
+        <span>{opp.expected_close ? `${t("pipeline.echeance")} ${formatDate(opp.expected_close)}` : null}</span>
+        <span className="amount">{opp.amount === null ? t("pipeline.masked") : formatMoney(opp.amount)}</span>
       </div>
       {opp.stage !== "gagne" && opp.stage !== "perdu" ? (
-        <ActionBar
+        <CardActions
           actions={[
             {
               label: t("ecarts_m1.pipe.changer"),
@@ -64,6 +68,12 @@ function OppCard({ opp, index }: { opp: Opportunity; index: number }) {
       ) : null}
     </BoardCard>
   );
+}
+
+/** Somme des montants visibles d'une étape (`null` si tous masqués). */
+function stageTotal(opps: Opportunity[]): number | null {
+  const visible = opps.filter((o) => o.amount !== null);
+  return visible.length ? visible.reduce((s, o) => s + Number(o.amount), 0) : null;
 }
 
 export function PipelinePage() {
@@ -85,18 +95,19 @@ export function PipelinePage() {
   const s = stats.data;
 
   return (
-    <>
-      <PageHeader title={t("pipeline.title")} />
+    <div className="listes-page">
+      <PageHeader title={t("pipeline.title")} subtitle={t("listes.sub.pipeline")} />
 
       {s ? (
         <div className="kpi-grid">
-          <Kpi label={t("pipeline.wonTotal")} value={s.won_total} icon={TrendingUp} tone="ok" delay={0} />
-          <Kpi label={t("pipeline.conversion")} value={`${(s.conversion_rate * 100).toFixed(1)}%`} icon={Target} tone="accent" delay={0.05} />
+          <Kpi label={t("pipeline.wonTotal")} value={s.won_total} kind="money" icon={TrendingUp} tone="ok" delay={0} />
+          <Kpi label={t("pipeline.conversion")} value={formatPercent(s.conversion_rate, { ratio: true, decimals: 1 })} icon={Target} tone="accent" delay={0.05} />
           <Kpi label={t("pipeline.activeSegments")} value={Object.keys(s.margin_by_segment).length} icon={Layers} tone="brand" delay={0.1} />
           {s.pipe_pondere ? (
             <Kpi
               label={t("pipeline.pipePondere")}
-              value={formatNumber(s.pipe_pondere.total)}
+              value={s.pipe_pondere.total}
+              kind="money"
               hint={t("pipeline.pipePondereHint")}
               icon={Scale}
               tone="accent"
@@ -106,29 +117,29 @@ export function PipelinePage() {
         </div>
       ) : null}
 
-      <div style={{ overflowX: "auto" }}>
-        <Board>
-          {COLUMNS.map((col, ci) => (
+      <Board label={t("listes.boardLabel.pipeline")}>
+        {COLUMNS.map((col, ci) => {
+          const sum = stageTotal(groups[col.stage]);
+          return (
             <BoardColumn
               key={col.stage}
               title={t(`pipeline.${col.stage}`)}
               count={groups[col.stage].length}
               tone={col.badge}
-              delay={ci * 0.05}
-              minWidth={240}
+              delay={ci * 0.04}
+              limit={20}
+              summary={groups[col.stage].length && sum !== null ? formatMoney(sum) : undefined}
             >
-              <AnimatePresence initial={false}>
-                {groups[col.stage].map((opp, i) => (
-                  <OppCard key={opp.id} opp={opp} index={i} />
-                ))}
-              </AnimatePresence>
+              {groups[col.stage].map((opp, i) => (
+                <OppCard key={opp.id} opp={opp} index={i} />
+              ))}
             </BoardColumn>
-          ))}
-        </Board>
-      </div>
+          );
+        })}
+      </Board>
 
       <CommercialSections />
       <EcartsM1Section />
-    </>
+    </div>
   );
 }

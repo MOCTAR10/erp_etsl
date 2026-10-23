@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { EmptyState, QuickForm, SectionCard } from "../ui";
 
 interface Ordre {
@@ -115,8 +115,8 @@ export function ConsommationOfSection() {
                 <th>{t("ecarts_a3.conso.cols.lot")}</th>
                 <th>{t("ecarts_a3.conso.cols.coulee")}</th>
                 <th>{t("ecarts_a3.conso.cols.depot")}</th>
-                <th>{t("ecarts_a3.conso.cols.quantite")}</th>
-                <th>{t("ecarts_a3.conso.cols.valeur")}</th>
+                <th className="num">{t("ecarts_a3.conso.cols.quantite")}</th>
+                <th className="num">{t("ecarts_a3.conso.cols.valeur")}</th>
               </tr>
             </thead>
             <tbody>
@@ -130,8 +130,8 @@ export function ConsommationOfSection() {
                   <td>{l.lot_code ?? "—"}</td>
                   <td>{l.numero_coulee || "—"}</td>
                   <td>{l.depot_code ?? "—"}</td>
-                  <td>{formatNumber(Number(l.quantite))}</td>
-                  <td>{l.valeur === null ? "—" : `${formatNumber(Number(l.valeur))} F`}</td>
+                  <td className="num">{formatNumber(Number(l.quantite))}</td>
+                  <td className="num">{formatMoney(l.valeur)}</td>
                 </tr>
               ))}
             </tbody>

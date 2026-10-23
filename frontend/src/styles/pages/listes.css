@@ -1,0 +1,415 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Écrans de listes (agent « listes », vague 2) : kanban horizontal, cartes sobres,
+ * barres de recherche / filtres, piles de sections — Achats, Logistique, Stocks,
+ * Opérations, Maintenance, Comptabilité, Pipeline (et tous les boards de l'ERP).
+ * Couche `pages` : l'emporte sur `components` sans spécificité supplémentaire.
+ * ═════════════════════════════════════════════════════════════════════════ */
+@layer pages {
+
+/* ── Pile de page : un rythme vertical unique de 24 px entre blocs ── */
+.listes-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.listes-page > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.listes-page > .page-header {
+  margin-bottom: 0;
+}
+/* Bloc « barre d'outils + board / tableau » : 12 px entre la barre et la liste */
+.listes-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.listes-block > * {
+  margin: 0;
+}
+.listes-note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-muted);
+}
+
+/* ── Barre de recherche et de filtres compacte ── */
+.list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+.list-toolbar .search-field {
+  margin: 0;
+  flex: 0 1 360px;
+  min-width: 0;
+}
+.list-toolbar .search-field input {
+  width: 100%;
+}
+.list-toolbar .field {
+  margin: 0;
+  gap: 0;
+  flex: 0 1 240px;
+  max-width: 240px !important;
+}
+/* Le libellé « Site » reste lu par les lecteurs d'écran ; l'option « Tous les sites » parle d'elle-même */
+.list-toolbar .site-filter label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.list-toolbar-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* Recherche posée seule au-dessus d'un tableau paginé : 360 px, sans décalage */
+.listes-page .search-field input {
+  width: 360px;
+}
+.card-body > .search-field {
+  margin-bottom: var(--space-2);
+}
+/* Actions de section (boutons de création) alignées à droite du titre de la carte */
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.card-header > .btn,
+.card-header > .section-actions,
+.card-header > .action-bar {
+  flex: none;
+}
+.card-header > .action-bar {
+  margin-top: 0;
+}
+
+/* ── Kanban horizontal (P2-6) ── */
+.board {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--space-1);
+  padding-bottom: var(--space-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  border-radius: var(--radius-lg);
+}
+.board:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+/* Fondu sur le bord qui cache des colonnes (affordance de défilement) */
+.board[data-overflow-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+.board[data-overflow-start] {
+  mask-image: linear-gradient(to right, transparent, #000 56px);
+}
+.board[data-overflow-start][data-overflow-end] {
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
+
+.board-col {
+  scroll-snap-align: start;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  gap: var(--space-2);
+  min-width: 0;
+}
+.board-col-head {
+  padding: 6px 6px 2px;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+}
+.board-col-head .title {
+  min-width: 0;
+  gap: var(--space-2);
+}
+.board-col-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--text-subtle);
+}
+.board-dot.brand { background: var(--brand); }
+.board-dot.ok { background: var(--ok); }
+.board-dot.warn { background: var(--warn); }
+.board-dot.err { background: var(--err); }
+.board-dot.info { background: var(--info); }
+.board-dot.accent { background: var(--steel); }
+.board-count {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.board-col-summary {
+  padding: 0 6px 2px;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.board-empty {
+  margin: 0;
+  padding: var(--space-2) 6px var(--space-3);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-muted);
+}
+.board-more {
+  align-self: stretch;
+}
+
+/* ── Carte kanban sobre (P2-5, P1-12) : lecture + 1 action + menu ⋯ ── */
+.task-card {
+  padding: var(--space-3);
+  gap: 6px;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+}
+.task-card .card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.task-card .card-code {
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-card .card-tags {
+  display: inline-flex;
+  gap: var(--space-1);
+  flex: none;
+}
+.task-card .card-tags .badge {
+  padding: 0 6px;
+}
+.task-card > .title {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.task-card .meta {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-muted);
+}
+.task-card .card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.task-card .card-foot > .badge {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-card .card-foot .amount {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  white-space: nowrap;
+}
+/* Barre d'actions héritée (ActionBar) dans une carte : compacte, séparée par un filet */
+.task-card .action-bar {
+  margin-top: 2px;
+}
+.task-card .action-bar .btn {
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.task-card .card-actions {
+  margin-top: 4px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+.card-actions .btn.sm {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  box-shadow: none;
+}
+.card-actions .ui-menu-trigger {
+  margin-left: auto;
+}
+.card-actions--end {
+  justify-content: flex-end;
+}
+.card-actions--end .ui-menu-trigger {
+  margin-left: 0;
+}
+.card-actions--choice {
+  flex-direction: column;
+  align-items: stretch;
+}
+.card-actions-row {
+  display: flex;
+  gap: 6px;
+}
+td .card-actions--choice {
+  min-width: 200px;
+}
+
+/* ── Tableaux des écrans de listes ── */
+.listes-page .ui-grid td .badge + .badge {
+  margin-left: var(--space-1);
+}
+.cell-sub {
+  display: block;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-muted);
+}
+.cell-mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+/* Un seul bouton primaire par écran (en-tête de page) : les créations de section sont secondaires */
+.card-header > .btn.primary,
+.section-actions > .btn.primary,
+.list-toolbar-end > .btn.primary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+.card-header > .btn.primary:hover:not(:disabled),
+.section-actions > .btn.primary:hover:not(:disabled),
+.list-toolbar-end > .btn.primary:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+/* ── Surcharge de capacité (Opérations, P2-10) ── */
+.overload-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.overload-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  font-variant-numeric: tabular-nums;
+}
+.overload-list li:last-child {
+  border-bottom: 0;
+}
+.overload-bar {
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.overload-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--warn);
+}
+.overload-bar.err > span {
+  background: var(--err);
+}
+.overload-hours {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .board {
+    grid-auto-columns: minmax(240px, 76vw);
+  }
+  .list-toolbar .search-field,
+  .list-toolbar .field {
+    flex: 1 1 100%;
+    max-width: none !important;
+  }
+  .list-toolbar-end {
+    margin-left: 0;
+  }
+  .overload-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .overload-list .overload-bar {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+
+} /* fin @layer pages */

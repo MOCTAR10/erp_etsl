@@ -1,11 +1,12 @@
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { useFiltresListe } from "../../lib/useFiltresListe";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { ActionBar, Badge, FilterBar, PagedDataTable, QuickForm, SectionCard, type ActionDef, type Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
 import { useAnalytiques, useRefOptions } from "./refs";
 
 type Tone = "ok" | "warn" | "err" | "brand";
@@ -19,7 +20,7 @@ interface Offre { id: string; consultation_code: string; supplier_name: string |
 interface Commande { id: string; code: string; supplier_name: string | null; order_date: string; status: string; is_global_rental: boolean; total: string | null; lines_count: number }
 interface Facture { id: string; code: string; order_code: string; supplier_name: string | null; invoice_ref: string; invoice_date: string; status: string; total: string | null; total_tva: string | null; total_ttc: string | null; move_number: string | null }
 
-const montant = (v: string | null) => (v === null ? "••••" : formatNumber(v));
+const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 const num = (v: string | undefined) => (v === undefined ? undefined : Number(v));
 
 function StatusBadge({ status }: { status: string }) {
@@ -72,18 +73,12 @@ function ConsultationsSection() {
     {
       key: "status",
       header: t("achatsSaisie.col.statut"),
-      render: (c) => (
-        <>
-          <StatusBadge status={c.status} />
-          <ActionBar
-            actions={[
-              ...(c.status === "brouillon" ? [{ label: t("achatsSaisie.ouvrir"), path: `/api/achats/consultations/${c.id}/ouvrir/` }] : []),
-              ...(c.status === "ouverte" ? [{ label: t("achatsSaisie.cloturer"), path: `/api/achats/consultations/${c.id}/cloturer/` }] : []),
-            ]}
-          />
-        </>
-      ),
+      render: (c) => <StatusBadge status={c.status} />,
     },
+    actionsColumn<Consultation>(t("listes.col.actions"), (c) => [
+      ...(c.status === "brouillon" ? [{ label: t("achatsSaisie.ouvrir"), path: `/api/achats/consultations/${c.id}/ouvrir/` }] : []),
+      ...(c.status === "ouverte" ? [{ label: t("achatsSaisie.cloturer"), path: `/api/achats/consultations/${c.id}/cloturer/` }] : []),
+    ]),
   ];
   const colO: Column<Offre>[] = [
     { key: "consultation", header: t("achatsSaisie.col.consultation"), render: (o) => o.consultation_code },
@@ -103,7 +98,10 @@ function ConsultationsSection() {
   ];
 
   return (
-    <SectionCard title={`${t("achatsSaisie.consultations")} · ${consultations.count}`}>
+    <SectionCard
+      title={`${t("achatsSaisie.consultations")} · ${consultations.count}`}
+      actions={
+        <div className="section-actions">
       <QuickForm
         title={t("achatsSaisie.newConsultation")}
         endpoint="/api/achats/consultations/"
@@ -124,6 +122,9 @@ function ConsultationsSection() {
         ]}
         transform={(v) => ({ ...v, amount: num(v.amount), delivery_days: num(v.delivery_days) })}
       />
+        </div>
+      }
+    >
       {(consultations.count > 0 || consultations.search) && (
         <PagedDataTable list={consultations} columns={colC} caption={t("achatsSaisie.consultations")} searchPlaceholder={t("achatsSaisie.searchConsultations")} />
       )}
@@ -160,11 +161,12 @@ function CommandesSection() {
     return [];
   };
   const cols: Column<Commande>[] = [
-    { key: "code", header: t("achatsSaisie.col.code"), render: (o) => <>{o.code} {o.is_global_rental && <Badge tone="err">GR</Badge>}</> },
+    { key: "code", header: t("achatsSaisie.col.code"), sortValue: (o) => o.code, render: (o) => <>{o.code} {o.is_global_rental && <Badge tone="brand" title={t("purchases.gr")}>GR</Badge>}</> },
     { key: "fournisseur", header: t("achatsSaisie.col.fournisseur"), render: (o) => o.supplier_name ?? "—" },
     { key: "date", header: t("achatsSaisie.col.date"), render: (o) => formatDate(o.order_date) },
     { key: "total", header: t("achatsSaisie.col.total"), num: true, render: (o) => montant(o.total) },
-    { key: "status", header: t("achatsSaisie.col.statut"), render: (o) => <><StatusBadge status={o.status} /><ActionBar actions={actions(o)} /></> },
+    { key: "status", header: t("achatsSaisie.col.statut"), render: (o) => <StatusBadge status={o.status} /> },
+    actionsColumn<Commande>(t("listes.col.actions"), actions),
   ];
   const ouiNon = [
     { value: "false", label: t("achatsSaisie.f.non") },
@@ -172,7 +174,10 @@ function CommandesSection() {
   ];
 
   return (
-    <SectionCard title={`${t("achatsSaisie.commandes")} · ${commandes.count}`}>
+    <SectionCard
+      title={`${t("achatsSaisie.commandes")} · ${commandes.count}`}
+      actions={
+        <div className="section-actions">
       <QuickForm
         title={t("achatsSaisie.newBc")}
         endpoint="/api/achats/orders/"
@@ -199,6 +204,9 @@ function CommandesSection() {
         ]}
         transform={(v) => ({ ...v, quantity: num(v.quantity), unit_price: num(v.unit_price) })}
       />
+        </div>
+      }
+    >
       <FilterBar defs={filtresBc.defs} value={filtresBc.criteres} onChange={filtresBc.setCriteres} idPrefix="bc-f" />
       {(commandes.count > 0 || commandes.search || filtresBc.extra) && (
         <PagedDataTable list={commandes} columns={cols} caption={t("achatsSaisie.commandes")} searchPlaceholder={t("achatsSaisie.searchCommandes")} />
@@ -241,11 +249,15 @@ function FacturesSection() {
     { key: "tva", header: t("achatsSaisie.col.tva"), num: true, render: (f) => montant(f.total_tva) },
     { key: "ttc", header: t("achatsSaisie.col.ttc"), num: true, render: (f) => montant(f.total_ttc) },
     { key: "ecr", header: t("achatsSaisie.col.ecriture"), render: (f) => f.move_number ?? "—" },
-    { key: "status", header: t("achatsSaisie.col.statut"), render: (f) => <><StatusBadge status={f.status} /><ActionBar actions={actions(f)} /></> },
+    { key: "status", header: t("achatsSaisie.col.statut"), render: (f) => <StatusBadge status={f.status} /> },
+    actionsColumn<Facture>(t("listes.col.actions"), actions),
   ];
 
   return (
-    <SectionCard title={`${t("achatsSaisie.factures")} · ${factures.count}`}>
+    <SectionCard
+      title={`${t("achatsSaisie.factures")} · ${factures.count}`}
+      actions={
+        <div className="section-actions">
       <QuickForm
         title={t("achatsSaisie.newFacture")}
         endpoint="/api/achats/invoices/"
@@ -268,6 +280,9 @@ function FacturesSection() {
         ]}
         transform={(v) => ({ ...v, quantity: num(v.quantity), unit_price: num(v.unit_price) })}
       />
+        </div>
+      }
+    >
       <FilterBar defs={filtresFf.defs} value={filtresFf.criteres} onChange={filtresFf.setCriteres} idPrefix="ff-f" />
       {(factures.count > 0 || factures.search || filtresFf.extra) && (
         <PagedDataTable list={factures} columns={cols} caption={t("achatsSaisie.factures")} searchPlaceholder={t("achatsSaisie.searchFactures")} />

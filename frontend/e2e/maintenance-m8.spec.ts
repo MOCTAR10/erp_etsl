@@ -68,7 +68,7 @@ test.describe("M8 Maintenance : plans préventifs, qualification et historique",
     await page.goto("/maintenance");
     const section = page.getByTestId("plans-preventifs");
 
-    const plans = section.getByRole("table", { name: "Plans préventifs et calendrier (M8.2)" });
+    const plans = section.getByRole("table", { name: "Plans préventifs et calendrier" });
     const form = page.getByRole("form", { name: "Nouveau plan préventif" });
     await section.getByRole("button", { name: "Nouveau plan préventif" }).click();
     const saisir = async (libelle: string, periodicite: string, derniere: string) => {

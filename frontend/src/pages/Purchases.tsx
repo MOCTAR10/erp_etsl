@@ -4,9 +4,9 @@ import { CheckCircle2, ShoppingCart, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { pagedQuery } from "../lib/usePagedList";
-import { Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SearchField } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SearchField } from "../components/ui";
 import type { Paginated, PoStatus, PurchaseOrder } from "../types";
 import { DemandesAchat } from "../components/workflow/DemandesAchat";
 import { AchatsPilotage } from "../components/achats/AchatsPilotage";
@@ -15,7 +15,7 @@ import { EcartsM2Section } from "../components/achats/EcartsM2Section";
 
 type Groups = Record<PoStatus, PurchaseOrder[]>;
 
-const STATUS_BADGE: Record<PoStatus, "ok" | "warn" | "err" | "brand"> = {
+const STATUS_TONE: Record<PoStatus, "ok" | "warn" | "err" | "brand"> = {
   brouillon: "brand",
   confirmee: "warn",
   partielle: "warn",
@@ -24,28 +24,37 @@ const STATUS_BADGE: Record<PoStatus, "ok" | "warn" | "err" | "brand"> = {
   previ: "brand",
 };
 const VALID_STATUSES = new Set<PoStatus>(["brouillon", "confirmee", "partielle", "cloturee", "annulee"]);
+const BOARD_ORDER: PoStatus[] = ["brouillon", "confirmee", "partielle", "cloturee"];
+
+/** Somme des montants visibles d'une colonne (« — » si tous masqués). */
+function columnTotal(orders: PurchaseOrder[]): number | null {
+  const visible = orders.filter((o) => o.total !== null);
+  return visible.length ? visible.reduce((s, o) => s + Number(o.total), 0) : null;
+}
 
 function OrderCard({ order, index }: { order: PurchaseOrder; index: number }) {
   const { t } = useTranslation();
+  // Le statut est porté par la colonne : la carte ne le répète pas (évite les libellés longs qui débordent).
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        <span className="muted">{order.code}</span> · {order.supplier_name ?? "—"}
-        {order.is_global_rental ? <span className="badge err">GR</span> : null}
+      <div className="card-top">
+        <span className="card-code">{order.code}</span>
+        {order.is_global_rental ? (
+          <span className="card-tags">
+            <Badge tone="brand" title={t("purchases.gr")}>
+              GR
+            </Badge>
+          </span>
+        ) : null}
       </div>
+      <div className="title">{order.supplier_name ?? "—"}</div>
       <div className="meta">
-        {order.request_code ? `${order.request_code} · ` : ""}
-        {t("purchases.lines")}: {order.lines_count}
+        {[order.request_code, t("listes.purchases.lignes", { count: order.lines_count })].filter(Boolean).join(" · ")}
       </div>
-      <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className={`badge ${STATUS_BADGE[order.status] ?? "brand"}`}>{order.status_label}</span>
-        <span>{order.total === null ? t("purchases.masked") : formatNumber(order.total)}</span>
+      <div className="card-foot">
+        <span>{order.expected_date ? t("listes.purchases.livraison", { date: formatDate(order.expected_date) }) : null}</span>
+        <span className="amount">{order.total === null ? t("purchases.masked") : formatMoney(order.total)}</span>
       </div>
-      {order.expected_date ? (
-        <div className="meta muted">
-          {t("purchases.expected")} {formatDate(order.expected_date)}
-        </div>
-      ) : null}
     </BoardCard>
   );
 }
@@ -84,8 +93,8 @@ export function PurchasesPage() {
   const total = data.count;
 
   return (
-    <>
-      <PageHeader title={t("purchases.title")} />
+    <div className="listes-page">
+      <PageHeader title={t("purchases.title")} subtitle={t("listes.sub.purchases")} />
 
       <div className="kpi-grid">
         <Kpi label={t("purchases.orders")} value={total} icon={ShoppingCart} tone="brand" delay={0} />
@@ -93,31 +102,31 @@ export function PurchasesPage() {
         <Kpi label={t("purchases.gr")} value={data.grCount} icon={Truck} tone="warn" delay={0.1} />
       </div>
 
-      <SearchField value={search} onChange={setSearch} placeholder={t("purchases.search")} />
-
-      <div style={{ overflowX: "auto" }}>
-        <Board>
-          {(["confirmee", "partielle", "cloturee", "brouillon"] as PoStatus[]).map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={t(`purchases.${st}`)}
-              count={groups[st].length}
-              tone={STATUS_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={260}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                  {t("common.empty")}
-                </p>
-              ) : (
-                groups[st].map((o, i) => <OrderCard key={o.id} order={o} index={i} />)
-              )}
-            </BoardColumn>
-          ))}
+      <section className="listes-block">
+        <div className="list-toolbar">
+          <SearchField value={search} onChange={setSearch} placeholder={t("purchases.search")} />
+        </div>
+        <Board label={t("listes.boardLabel.purchases")}>
+          {BOARD_ORDER.map((st, ci) => {
+            const sum = columnTotal(groups[st]);
+            return (
+              <BoardColumn
+                key={st}
+                title={t(`purchases.${st}`)}
+                count={groups[st].length}
+                tone={STATUS_TONE[st]}
+                delay={ci * 0.04}
+                limit={20}
+                summary={groups[st].length && sum !== null ? formatMoney(sum) : undefined}
+              >
+                {groups[st].map((o, i) => (
+                  <OrderCard key={o.id} order={o} index={i} />
+                ))}
+              </BoardColumn>
+            );
+          })}
         </Board>
-      </div>
+      </section>
 
       <DemandesAchat />
 
@@ -126,6 +135,6 @@ export function PurchasesPage() {
       <AchatsPilotage />
 
       <EcartsM2Section />
-    </>
+    </div>
   );
 }

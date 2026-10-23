@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { ActionBar, Badge, DataTable, PagedDataTable, SectionCard } from "../ui";
@@ -68,7 +68,7 @@ const TON: Record<string, "ok" | "warn" | "err" | "brand" | "neutral"> = {
   cloture: "neutral",
 };
 
-const montant = (v: string | null) => (v === null ? "••••" : formatNumber(v));
+const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 
 function actionsOffre(o: Offre, t: (k: string) => string): ActionDef[] {
   const base = `/api/commercial/estimates/${o.id}`;

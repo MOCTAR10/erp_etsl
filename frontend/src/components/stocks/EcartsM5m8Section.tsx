@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
 
@@ -78,7 +78,7 @@ interface Etat {
 }
 
 const num = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatNumber(Number(v)));
-const fcfa = (v: string | null) => (v === null ? "—" : `${formatNumber(Number(v))} FCFA`);
+const fcfa = (v: string | null) => formatMoney(v);
 
 /** Écarts M5 (lot m5m8) : plan d'inventaire annuel, écran de comptage, régularisation MAD, état des écarts. */
 export function InventaireAnnuelSection() {
