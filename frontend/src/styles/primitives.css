@@ -397,7 +397,7 @@
   min-height: var(--control-h);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--field, var(--surface));
   color: var(--text);
   font: inherit;
   font-size: var(--fs-body);
@@ -565,7 +565,7 @@
 .ui-calendar .rdp-selected .rdp-day_button,
 .ui-calendar .rdp-selected .rdp-day_button:hover,
 .ui-calendar .rdp-selected.rdp-today:not(.rdp-outside) .rdp-day_button {
-  background: var(--brand);
+  background: var(--brand-solid, var(--brand));
   color: var(--on-brand);
 }
 .ui-calendar .rdp-range_middle .rdp-day_button,
