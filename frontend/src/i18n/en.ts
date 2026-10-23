@@ -843,7 +843,7 @@ export const en = {
     previ: "Forecast",
   },
   ecarts_a7: {
-    provisoire: "provisional — to be confirmed or changed by ETSL",
+    provisoire: "Provisional — to be confirmed or changed by ETSL",
     provision: {
       title: "Provisions for unrealised exchange losses (697 / 499)",
       subtitle:
@@ -993,7 +993,7 @@ export const en = {
     annule: "Cancelled",
   },
   ecarts_a3: {
-    provisoire: "provisional — to be confirmed or changed by ETSL",
+    provisoire: "Provisional — to be confirmed or changed by ETSL",
     terrain: {
       conflicts: "{{count}} in conflict",
       lastSync: "Last sync: {{date}}",
@@ -1655,7 +1655,7 @@ export const en = {
       point: "Inspected point / joint",
       date: "Inspection date",
       of: "Work order",
-      aide: "An inspection entrusted to an approved body must cite a body from the register, approved on the inspection date and for the method (provisional parameter CND_ORGANISME_REFERENTIEL).",
+      aide: "An inspection entrusted to an approved body must cite a body from the register, approved on the inspection date and for the method.",
     },
     wps: {
       title: "WPS required by contract profile",
@@ -1669,7 +1669,7 @@ export const en = {
       libre: "No requirement for job {{affaire}}: any WPS allowed.",
       conforme: "Required WPS approved",
       nonConforme: "Required WPS not approved",
-      aide: "Contract requirements override profile requirements. An inspection, a release to a work order or a weld joint using a WPS not listed is refused (provisional parameter WPS_PROFIL_BLOQUANT).",
+      aide: "Contract requirements override profile requirements. An inspection, a release to a work order or a weld joint using a WPS not listed is refused (provisional rule, to be confirmed by ETSL).",
       profils: { marche_travaux: "Works contract", maintenance: "Maintenance contract" },
     },
     listes: {
@@ -1762,7 +1762,7 @@ export const en = {
       prestataireAgree: "Approved contractor",
       enlevement: "Collection date",
       destination: "Destination (outlet)",
-      aide: "A waste note is issued and processed only with a contractor approved for the waste type and still valid (provisional parameter BSD_AGREMENT_OBLIGATOIRE).",
+      aide: "A waste note is issued and processed only with a contractor approved for the waste type and still valid (provisional rule, to be confirmed by ETSL).",
       tous: "All types",
       valide: "Approved",
       expire: "Approval expired",
@@ -4267,6 +4267,7 @@ export const en = {
       capaHint: "{{ouvertes}} open CAPAs out of {{total}}",
       surWps: "out of {{total}} WPS / WPQR",
       pvHint: "{{total}} reports · archived for 10 years",
+      compte: "Account {{compte}}",
     },
     hse: {
       incidents: "Incidents",

@@ -516,7 +516,18 @@ function ParametresQualiteSection() {
   const provisoires = q.data.filter((p) => p.est_provisoire).length;
   const cols: Column<ParametreStock>[] = [
     { key: "libelle", header: t("tableaux.qualite.parametre"), render: (p) => p.label, sortValue: (p) => p.label },
-    { key: "valeur", header: t("tableaux.qualite.valeur"), num: true, render: (p) => `${valeurParam(p.valeur)} ${p.unite}` },
+    {
+      key: "valeur",
+      header: t("tableaux.qualite.valeur"),
+      num: true,
+      // Compte comptable sans séparateur de milliers, interrupteur 0/1 en Oui / Non : jamais « 624 000 compte » ni « 1 0/1 ».
+      render: (p) =>
+        p.unite === "compte"
+          ? t("revueR3.qualite.compte", { compte: p.valeur })
+          : p.unite === "0/1"
+            ? t(Number(p.valeur) ? "revueR3.oui" : "revueR3.non")
+            : `${valeurParam(p.valeur)} ${p.unite}`,
+    },
     {
       key: "statut",
       header: t("qualite.col.statut"),
@@ -526,7 +537,7 @@ function ParametresQualiteSection() {
       key: "actions",
       header: <span className="sr-only">{t("ui.actions")}</span>,
       render: (p) => (
-        <div className="action-bar-buttons">
+        <div className="action-bar-buttons r3-nowrap">
           <button
             type="button"
             className="btn ghost sm"
@@ -538,7 +549,7 @@ function ParametresQualiteSection() {
             {t("m5e.params.modifier")}
           </button>
           {p.est_provisoire && (
-            <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/qualite/parametres/${p.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer") }]} />
+            <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/qualite/parametres/${p.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer"), tone: "ghost" }]} />
           )}
         </div>
       ),

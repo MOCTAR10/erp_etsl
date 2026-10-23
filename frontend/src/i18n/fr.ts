@@ -843,7 +843,7 @@ export const fr = {
     previ: "Prévisionnel",
   },
   ecarts_a7: {
-    provisoire: "provisoire — à confirmer ou modifier par ETSL",
+    provisoire: "Provisoire — à confirmer ou modifier par ETSL",
     provision: {
       title: "Provisions pour perte de change latente (697 / 499)",
       subtitle:
@@ -993,7 +993,7 @@ export const fr = {
     annule: "Annulé",
   },
   ecarts_a3: {
-    provisoire: "provisoire — à confirmer ou modifier par ETSL",
+    provisoire: "Provisoire — à confirmer ou modifier par ETSL",
     terrain: {
       conflicts: "{{count}} en conflit",
       lastSync: "Dernière synchronisation : {{date}}",
@@ -1655,7 +1655,7 @@ export const fr = {
       point: "Point / joint contrôlé",
       date: "Date du contrôle",
       of: "OF",
-      aide: "Un contrôle confié à un organisme agréé doit citer un organisme du référentiel, agréé à la date du contrôle et pour la méthode (paramètre provisoire CND_ORGANISME_REFERENTIEL).",
+      aide: "Un contrôle confié à un organisme agréé doit citer un organisme du référentiel, agréé à la date du contrôle et pour la méthode.",
     },
     wps: {
       title: "WPS requis par profil contractuel",
@@ -1669,7 +1669,7 @@ export const fr = {
       libre: "Aucune exigence pour l'affaire {{affaire}} : WPS libres.",
       conforme: "WPS requis validés",
       nonConforme: "WPS requis non validé",
-      aide: "Les exigences d'un contrat priment sur celles de son profil. Un contrôle, une diffusion sur OF ou un joint soudé avec un WPS non prévu est refusé (paramètre provisoire WPS_PROFIL_BLOQUANT).",
+      aide: "Les exigences d'un contrat priment sur celles de son profil. Un contrôle, une diffusion sur OF ou un joint soudé avec un WPS non prévu est refusé (règle provisoire, à confirmer par ETSL).",
       profils: { marche_travaux: "Marché de travaux", maintenance: "Contrat de maintenance" },
     },
     listes: {
@@ -1762,7 +1762,7 @@ export const fr = {
       prestataireAgree: "Prestataire agréé",
       enlevement: "Date d'enlèvement",
       destination: "Destination (exutoire)",
-      aide: "Un BSD ne s'émet et ne se traite qu'avec un prestataire agréé en cours de validité pour le type de déchet (paramètre provisoire BSD_AGREMENT_OBLIGATOIRE).",
+      aide: "Un BSD ne s'émet et ne se traite qu'avec un prestataire agréé en cours de validité pour le type de déchet (règle provisoire, à confirmer par ETSL).",
       tous: "Tous types",
       valide: "Agréé",
       expire: "Agrément expiré",
@@ -4267,6 +4267,7 @@ export const fr = {
       capaHint: "{{ouvertes}} CAPA ouvertes sur {{total}}",
       surWps: "sur {{total}} WPS / WPQR",
       pvHint: "{{total}} PV · archivés 10 ans",
+      compte: "Compte {{compte}}",
     },
     hse: {
       incidents: "Incidents",
