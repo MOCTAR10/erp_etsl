@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface Ref {
   id: string;
@@ -65,7 +66,6 @@ interface Synthese {
   has_amount_access: boolean;
 }
 
-const fcfa = (v: string | null) => (v === null ? "—" : formatMoney(Number(v)));
 function useListe<T>(key: string, path: string): T[] {
   return useQuery({ queryKey: ["a3", key], queryFn: () => api.listAll<T>(path), retry: 0 }).data ?? [];
 }
@@ -100,10 +100,95 @@ export function EcartsA3Section() {
     retry: 0,
   }).data;
 
+  const actionsHeader = <span className="sr-only">{t("ui.actions")}</span>;
+
+  const jointCols: Column<Joint>[] = [
+    {
+      key: "repere",
+      header: t("ecarts_a3.joints.repere"),
+      render: (j) => (
+        <>
+          {j.code} · {j.repere}
+        </>
+      ),
+      sortValue: (j) => j.code,
+    },
+    { key: "ordre", header: t("ecarts_a3.joints.ordre"), render: (j) => j.ordre_code, sortValue: (j) => j.ordre_code },
+    { key: "soudeur", header: t("ecarts_a3.joints.soudeur"), render: (j) => j.soudeur_nom, sortValue: (j) => j.soudeur_nom },
+    { key: "lot", header: t("ecarts_a3.joints.lot"), render: (j) => j.lot_code ?? "—" },
+    { key: "coulee", header: t("ecarts_a3.joints.coulee"), render: (j) => j.numero_coulee || "—" },
+    {
+      key: "certificat",
+      header: t("ecarts_a3.joints.certificat"),
+      render: (j) =>
+        j.certificats.length === 0 ? (
+          <span className="muted">{t("ecarts_a3.joints.aucunCert")}</span>
+        ) : (
+          j.certificats.map((c) => (
+            <Badge key={c.id} tone={c.valide && c.conforme ? "ok" : "warn"}>
+              {c.type_label} {c.numero_certificat}
+            </Badge>
+          ))
+        ),
+    },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (j) => (
+        <button type="button" className="btn ghost sm" aria-expanded={ouvert === j.id} onClick={() => setOuvert(ouvert === j.id ? null : j.id)}>
+          {t("ecarts_a3.joints.tracer")}
+        </button>
+      ),
+    },
+  ];
+
+  const cnqCols: Column<Cnq>[] = [
+    { key: "code", header: t("ecarts_a3.cnq.cols.code"), render: (c) => c.code, sortValue: (c) => c.code },
+    { key: "nc", header: t("ecarts_a3.cnq.nc"), render: (c) => c.nc_code, sortValue: (c) => c.nc_code },
+    { key: "nature", header: t("ecarts_a3.cnq.nature"), render: (c) => c.nature_label },
+    { key: "date", header: t("ecarts_a3.cnq.cols.date"), render: (c) => formatDate(c.date), sortValue: (c) => c.date },
+    {
+      key: "montant",
+      header: t("ecarts_a3.cnq.cols.montant"),
+      num: true,
+      render: (c) => formatMoney(c.montant),
+      sortValue: (c) => (c.montant === null ? null : Number(c.montant)),
+    },
+    {
+      key: "statut",
+      header: t("ecarts_a3.cnq.cols.statut"),
+      render: (c) => (
+        <>
+          <Badge tone={c.statut === "comptabilise" ? "ok" : "warn"}>{c.statut_label}</Badge>
+          {c.ecriture_numero ? <span className="muted"> {c.ecriture_numero}</span> : null}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: actionsHeader,
+      render: (c) =>
+        c.statut === "saisi" ? (
+          <ActionBar
+            actions={[
+              {
+                label: t("ecarts_a3.cnq.comptabiliser"),
+                path: `/api/qualite/couts-non-qualite/${c.id}/comptabiliser/`,
+                tone: "primary",
+                confirm: t("ecarts_a3.cnq.confirm"),
+              },
+            ]}
+          />
+        ) : null,
+    },
+  ];
+
   return (
     <>
-      <SectionCard title={t("ecarts_a3.joints.title")} subtitle={t("ecarts_a3.joints.hint")}>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_a3.joints.title")}
+        subtitle={t("ecarts_a3.joints.hint")}
+        actions={
           <QuickForm
             title={t("ecarts_a3.joints.ajouter")}
             endpoint="/api/qualite/joints/"
@@ -123,47 +208,11 @@ export function EcartsA3Section() {
               { name: "numero_coulee", label: t("ecarts_a3.joints.coulee") },
             ]}
           />
+        }
+      >
+        <div data-testid="joints-tracabilite">
+          <DataTable columns={jointCols} rows={joints} caption={t("ecarts_a3.joints.title")} />
         </div>
-        <table className="table" data-testid="joints-tracabilite">
-          <thead>
-            <tr>
-              <th>{t("ecarts_a3.joints.repere")}</th>
-              <th>{t("ecarts_a3.joints.ordre")}</th>
-              <th>{t("ecarts_a3.joints.soudeur")}</th>
-              <th>{t("ecarts_a3.joints.lot")}</th>
-              <th>{t("ecarts_a3.joints.coulee")}</th>
-              <th>{t("ecarts_a3.joints.certificat")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {joints.map((j) => (
-              <tr key={j.id}>
-                <td>
-                  {j.code} · {j.repere}
-                </td>
-                <td>{j.ordre_code}</td>
-                <td>{j.soudeur_nom}</td>
-                <td>{j.lot_code ?? "—"}</td>
-                <td>{j.numero_coulee || "—"}</td>
-                <td>
-                  {j.certificats.length === 0
-                    ? t("ecarts_a3.joints.aucunCert")
-                    : j.certificats.map((c) => (
-                        <Badge key={c.id} tone={c.valide && c.conforme ? "ok" : "warn"}>
-                          {c.type_label} {c.numero_certificat}
-                        </Badge>
-                      ))}
-                </td>
-                <td>
-                  <button type="button" className="btn ghost" onClick={() => setOuvert(ouvert === j.id ? null : j.id)}>
-                    {t("ecarts_a3.joints.tracer")}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
         {ouvert && trace && (
           <div className="card" data-testid="trace-joint">
             <strong>
@@ -182,11 +231,10 @@ export function EcartsA3Section() {
         )}
       </SectionCard>
 
-      <SectionCard title={t("ecarts_a3.cnq.title")} subtitle={t("ecarts_a3.cnq.hint")}>
-        <p>
-          <Badge tone="warn">{t("ecarts_a3.provisoire")}</Badge>
-        </p>
-        <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_a3.cnq.title")}
+        subtitle={t("ecarts_a3.cnq.hint")}
+        actions={
           <QuickForm
             title={t("ecarts_a3.cnq.saisir")}
             endpoint="/api/qualite/couts-non-qualite/"
@@ -201,55 +249,20 @@ export function EcartsA3Section() {
               { name: "description", label: t("ecarts_a3.cnq.description") },
             ]}
           />
-        </div>
+        }
+      >
+        <p>
+          <Badge tone="warn">{t("ecarts_a3.provisoire")}</Badge>
+        </p>
         {synthese && (
           <p className="muted" data-testid="cnq-synthese">
-            {synthese.par_nature.map((n) => `${n.label} : ${fcfa(n.montant)}`).join(" · ")} — {t("ecarts_a3.cnq.total")} :{" "}
-            {fcfa(synthese.total)}
+            {synthese.par_nature.map((n) => `${n.label} : ${formatMoney(n.montant)}`).join(" · ")} — {t("ecarts_a3.cnq.total")} :{" "}
+            {formatMoney(synthese.total)}
           </p>
         )}
-        <table className="table" data-testid="couts-non-qualite">
-          <thead>
-            <tr>
-              <th>{t("ecarts_a3.cnq.cols.code")}</th>
-              <th>{t("ecarts_a3.cnq.nc")}</th>
-              <th>{t("ecarts_a3.cnq.nature")}</th>
-              <th>{t("ecarts_a3.cnq.cols.date")}</th>
-              <th>{t("ecarts_a3.cnq.cols.montant")}</th>
-              <th>{t("ecarts_a3.cnq.cols.statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {couts.map((c) => (
-              <tr key={c.id}>
-                <td>{c.code}</td>
-                <td>{c.nc_code}</td>
-                <td>{c.nature_label}</td>
-                <td>{formatDate(c.date)}</td>
-                <td>{fcfa(c.montant)}</td>
-                <td>
-                  <Badge tone={c.statut === "comptabilise" ? "ok" : "warn"}>{c.statut_label}</Badge>
-                  {c.ecriture_numero ? ` ${c.ecriture_numero}` : ""}
-                </td>
-                <td>
-                  {c.statut === "saisi" && (
-                    <ActionBar
-                      actions={[
-                        {
-                          label: t("ecarts_a3.cnq.comptabiliser"),
-                          path: `/api/qualite/couts-non-qualite/${c.id}/comptabiliser/`,
-                          tone: "primary",
-                          confirm: t("ecarts_a3.cnq.confirm"),
-                        },
-                      ]}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="couts-non-qualite">
+          <DataTable columns={cnqCols} rows={couts} caption={t("ecarts_a3.cnq.title")} />
+        </div>
       </SectionCard>
     </>
   );

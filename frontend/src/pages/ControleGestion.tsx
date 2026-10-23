@@ -11,8 +11,9 @@ import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaire
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { EcartsM11Section } from "../components/controleGestion/EcartsM11Section";
 import { BalanceAgeeGestionSection, MargesTerminaisonSection } from "../components/suivi/SuiviSections";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
+import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { pagedQuery } from "../lib/usePagedList";
 import type {
@@ -165,6 +166,61 @@ function clotureColumns(t: T): Column<ClotureGestion>[] {
   ];
 }
 
+/** Écarts budgétaires > 10 % en attente d'analyse : une ligne par écart, action « Rendre l'analyse ». */
+function analyseColumns(t: T): Column<AnalyseEcart>[] {
+  return [
+    {
+      key: "budget",
+      header: t("tableaux.entetes.colBudget"),
+      sortValue: (a) => a.code,
+      render: (a) => (
+        <>
+          {a.budget_label}
+          <br />
+          <span className="muted">
+            {a.code} · {a.budget_code} — {a.period_label}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "ecart",
+      header: t("tableaux.entetes.colEcart"),
+      num: true,
+      sortValue: (a) => Number(a.ecart_pct),
+      render: (a) => (
+        <Badge tone={a.en_retard ? "err" : "warn"}>
+          {Number(a.ecart_pct) > 0 ? "+" : ""}
+          {a.ecart_pct} %
+        </Badge>
+      ),
+    },
+    {
+      key: "echeance",
+      header: t("tableaux.entetes.colEcheance"),
+      sortValue: (a) => a.echeance,
+      render: (a) => (
+        <>
+          {t("controleGestion.echeanceAnalyse")} {formatDate(a.echeance)}
+          {a.en_retard ? (
+            <>
+              {" "}
+              <Badge tone="err">{t("tableaux.entetes.enRetard")}</Badge>
+            </>
+          ) : null}
+        </>
+      ),
+    },
+    actionsColumn<AnalyseEcart>(t("ui.actions"), (a) => [
+      {
+        label: t("controleGestion.analyser"),
+        path: `/api/controle-gestion/analyses-ecart/${a.id}/analyser/`,
+        prompt: { name: "analyse", label: t("controleGestion.analyseLabel") },
+      },
+    ]),
+  ];
+}
+
 export function revisionColumns(t: T): Column<BudgetRevision>[] {
   return [
     { key: "code", header: t("controleGestion.col.code"), render: (r) => r.code },
@@ -278,13 +334,13 @@ export function ControleGestionPage() {
 
   return (
     <>
-      <PageHeader title={t("controleGestion.title")} />
+      <PageHeader title={t("controleGestion.title")} subtitle={t("tableaux.entetes.controleGestion")} />
 
       <div className="kpi-grid">
-        <Kpi label={t("controleGestion.budgets")} value={enCours} hint={t("controleGestion.variance")} icon={PieChart} tone="brand" delay={0} />
-        <Kpi label={t("controleGestion.revisions")} value={appliquees} hint="R1 - R4" icon={Target} tone="warn" delay={0.05} />
-        <Kpi label={t("controleGestion.clotures")} value={stats ? `${stats.conformes_j4}/${stats.periodes}` : "—"} hint={t("controleGestion.realizeesJ4")} icon={CalendarCheck} tone="brand" delay={0.1} />
-        <Kpi label={t("controleGestion.marge")} value={m && m.totals.marge_hors_gr !== null ? m.totals.marge_hors_gr : "••••••"} kind="money" hint={`${t("controleGestion.coutGr")} ${m ? formatMoney(m.totals.cout_gr) : "—"}`} icon={Coins} tone="accent" delay={0.15} />
+        <Kpi label={t("controleGestion.budgets")} value={enCours} hint={t("tableaux.entetes.budgetsHint")} icon={PieChart} tone="brand" delay={0} />
+        <Kpi label={t("controleGestion.revisions")} value={appliquees} hint={t("tableaux.entetes.revisionsHint")} icon={Target} tone="warn" delay={0.05} />
+        <Kpi label={t("controleGestion.clotures")} value={stats ? `${stats.conformes_j4}/${stats.periodes}` : "—"} hint={t("tableaux.entetes.cloturesHint")} icon={CalendarCheck} tone="brand" delay={0.1} />
+        <Kpi label={t("tableaux.entetes.margeHorsGr")} value={m && m.totals.marge_hors_gr !== null ? m.totals.marge_hors_gr : "••••••"} kind="money" hint={t("tableaux.entetes.coutGr", { montant: m ? formatMoney(m.totals.cout_gr) : "—" })} icon={Coins} tone="accent" delay={0.15} />
       </div>
 
       <SearchField value={budSearch} onChange={setBudSearch} placeholder={t("controleGestion.searchBudgets")} />
@@ -323,30 +379,11 @@ export function ControleGestionPage() {
 
       {(analyses.data?.length ?? 0) > 0 && (
         <SectionCard title={`${t("controleGestion.analysesEcart")} · ${analyses.data?.length}`}>
-          {analyses.data?.map((a) => (
-            <div key={a.id} className="card" style={{ marginBottom: "0.5rem" }}>
-              <div className="title">
-                {a.code} · {a.budget_code} — {a.period_label}{" "}
-                <Badge tone={a.en_retard ? "err" : "warn"}>
-                  {Number(a.ecart_pct) > 0 ? "+" : ""}
-                  {a.ecart_pct} %
-                </Badge>
-              </div>
-              <div className="meta">
-                {a.budget_label} · {t("controleGestion.echeanceAnalyse")} {formatDate(a.echeance)}
-                {a.en_retard ? ` · ${t("controleGestion.enRetard")}` : ""}
-              </div>
-              <ActionBar
-                actions={[
-                  {
-                    label: t("controleGestion.analyser"),
-                    path: `/api/controle-gestion/analyses-ecart/${a.id}/analyser/`,
-                    prompt: { name: "analyse", label: t("controleGestion.analyseLabel") },
-                  },
-                ]}
-              />
-            </div>
-          ))}
+          <DataTable
+            rows={analyses.data ?? []}
+            columns={analyseColumns(t)}
+            caption={t("controleGestion.analysesEcart")}
+          />
         </SectionCard>
       )}
 

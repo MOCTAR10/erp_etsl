@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatMoney } from "../../lib/format";
-import { Badge } from "../ui";
+import { formatDate, formatMoney } from "../../lib/format";
+import { Badge, DataTable } from "../ui";
+import type { Column } from "../ui";
 
 interface Provision {
   id: string;
@@ -22,7 +23,7 @@ interface Provision {
 const fcfa = (v: string | null) => formatMoney(v);
 
 /** Lot a7 : provisions pour perte de change latente (Dr 697 / Cr 499), dotées par « Réévaluer tout » et
- * contre-passées au calcul suivant. Paramètre provisoire DEVISE_PROVISION_PERTE (Comptabilité → Paramètres). */
+ * contre-passées au calcul suivant (activation paramétrable dans Comptabilité → Paramètres). */
 export function ProvisionsChangeA7() {
   const { t } = useTranslation();
   const q = useQuery({
@@ -31,6 +32,27 @@ export function ProvisionsChangeA7() {
     retry: 0,
   });
   const rows = q.data?.results ?? [];
+  const columns: Column<Provision>[] = [
+    { key: "date", header: t("ecarts_a7.provision.date"), render: (p) => formatDate(p.date_cloture), sortValue: (p) => p.date_cloture },
+    { key: "pertes", header: t("ecarts_a7.provision.pertes"), num: true, render: (p) => fcfa(p.perte_latente) },
+    { key: "gains", header: t("ecarts_a7.provision.gains"), num: true, render: (p) => fcfa(p.gain_latent) },
+    { key: "montant", header: t("ecarts_a7.provision.montant"), num: true, render: (p) => fcfa(p.montant) },
+    {
+      key: "statut",
+      header: t("ecarts_a7.provision.statut"),
+      render: (p) => (
+        <>
+          <Badge tone={p.statut === "active" ? "warn" : "neutral"}>{p.statut_label}</Badge>
+          {p.date_contre_passation && <span className="muted"> {formatDate(p.date_contre_passation)}</span>}
+        </>
+      ),
+    },
+    {
+      key: "ecritures",
+      header: t("ecarts_a7.provision.ecritures"),
+      render: (p) => `${p.move_number ?? "—"}${p.move_contre_passation_number ? ` / ${p.move_contre_passation_number}` : ""}`,
+    },
+  ];
   return (
     <div className="a7-provisions">
       <h4>
@@ -41,38 +63,7 @@ export function ProvisionsChangeA7() {
       {rows.length === 0 ? (
         <p className="muted">{t("ecarts_a7.provision.vide")}</p>
       ) : (
-        <div className="table-wrap" tabIndex={0} role="region" aria-label={t("ecarts_a7.provision.title")}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t("ecarts_a7.provision.date")}</th>
-                <th>{t("ecarts_a7.provision.pertes")}</th>
-                <th>{t("ecarts_a7.provision.gains")}</th>
-                <th>{t("ecarts_a7.provision.montant")}</th>
-                <th>{t("ecarts_a7.provision.statut")}</th>
-                <th>{t("ecarts_a7.provision.ecritures")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.date_cloture}</td>
-                  <td>{fcfa(p.perte_latente)}</td>
-                  <td>{fcfa(p.gain_latent)}</td>
-                  <td>{fcfa(p.montant)}</td>
-                  <td>
-                    <Badge tone={p.statut === "active" ? "warn" : "neutral"}>{p.statut_label}</Badge>
-                    {p.date_contre_passation && <span className="muted"> {p.date_contre_passation}</span>}
-                  </td>
-                  <td>
-                    {p.move_number ?? "—"}
-                    {p.move_contre_passation_number && ` / ${p.move_contre_passation_number}`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable caption={t("ecarts_a7.provision.title")} columns={columns} rows={rows} />
       )}
     </div>
   );

@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { describeError } from "../../lib/offlineQueue";
-import { Badge, SectionCard } from "../ui";
+import { Badge, DataTable, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface OtGr {
   id: string;
@@ -46,6 +47,58 @@ export function LiaisonBcGrSection() {
     onError: (e) => setError(describeError(e)),
   });
 
+  const columns: Column<OtGr>[] = [
+    { key: "ot", header: t("ecarts_correctif.maint.ot"), render: (o) => o.code, sortValue: (o) => o.code },
+    { key: "actif", header: t("ecarts_correctif.maint.actif"), render: (o) => o.actif_code, sortValue: (o) => o.actif_code },
+    { key: "statut", header: t("ecarts_correctif.maint.statut"), render: (o) => o.statut_label },
+    {
+      key: "ecriture",
+      header: t("ecarts_correctif.maint.ecriture"),
+      render: (o) =>
+        o.ecriture_numero ? (
+          <span title={o.motif_ecriture}>
+            {o.ecriture_numero} {o.ecriture_statut === "reversed" && <Badge tone="warn">{t("ecarts_correctif.maint.extournee")}</Badge>}
+          </span>
+        ) : (
+          o.motif_ecriture || "—"
+        ),
+    },
+    {
+      key: "bc",
+      header: t("ecarts_correctif.maint.bc"),
+      render: (o) =>
+        o.bc_gr_code ? (
+          <Badge tone="ok">{o.bc_gr_code}</Badge>
+        ) : (
+          <span className="action-bar-buttons">
+            <select
+              className="control"
+              aria-label={t("ecarts_correctif.maint.choisirBc")}
+              value={choix[o.id] ?? ""}
+              onChange={(e) => setChoix({ ...choix, [o.id]: e.target.value })}
+            >
+              <option value="">{t("ecarts_correctif.maint.choisirBc")}</option>
+              {bcs.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.code} · {b.fournisseur}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn ghost sm"
+              disabled={!choix[o.id] || lier.isPending}
+              onClick={() => {
+                if (window.confirm(t("ecarts_correctif.maint.confirm"))) lier.mutate({ ot: o.id, bc: choix[o.id] });
+              }}
+            >
+              {t("ecarts_correctif.maint.lier")}
+            </button>
+          </span>
+        ),
+    },
+  ];
+
   return (
     <SectionCard title={t("ecarts_correctif.maint.title")}>
       <div data-testid="liaison-bc-gr">
@@ -55,72 +108,7 @@ export function LiaisonBcGrSection() {
             {error}
           </p>
         )}
-        {ots.length === 0 ? (
-          <p className="muted">{t("ecarts_correctif.maint.aucun")}</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_correctif.maint.ot")}</th>
-                  <th>{t("ecarts_correctif.maint.actif")}</th>
-                  <th>{t("ecarts_correctif.maint.statut")}</th>
-                  <th>{t("ecarts_correctif.maint.ecriture")}</th>
-                  <th>{t("ecarts_correctif.maint.bc")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ots.map((o) => (
-                  <tr key={o.id}>
-                    <td>{o.code}</td>
-                    <td>{o.actif_code}</td>
-                    <td>{o.statut_label}</td>
-                    <td title={o.motif_ecriture}>
-                      {o.ecriture_numero ? (
-                        <>
-                          {o.ecriture_numero}{" "}
-                          {o.ecriture_statut === "reversed" && <Badge tone="warn">{t("ecarts_correctif.maint.extournee")}</Badge>}
-                        </>
-                      ) : (
-                        o.motif_ecriture || "—"
-                      )}
-                    </td>
-                    <td>
-                      {o.bc_gr_code ? (
-                        <Badge tone="ok">{o.bc_gr_code}</Badge>
-                      ) : (
-                        <span className="action-bar-buttons">
-                          <select
-                            aria-label={t("ecarts_correctif.maint.choisirBc")}
-                            value={choix[o.id] ?? ""}
-                            onChange={(e) => setChoix({ ...choix, [o.id]: e.target.value })}
-                          >
-                            <option value="">{t("ecarts_correctif.maint.choisirBc")}</option>
-                            {bcs.map((b) => (
-                              <option key={b.id} value={b.id}>
-                                {b.code} · {b.fournisseur}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            className="btn ghost"
-                            disabled={!choix[o.id] || lier.isPending}
-                            onClick={() => {
-                              if (window.confirm(t("ecarts_correctif.maint.confirm"))) lier.mutate({ ot: o.id, bc: choix[o.id] });
-                            }}
-                          >
-                            {t("ecarts_correctif.maint.lier")}
-                          </button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable caption={t("ecarts_correctif.maint.title")} columns={columns} rows={ots} emptyLabel={t("ecarts_correctif.maint.aucun")} />
       </div>
     </SectionCard>
   );

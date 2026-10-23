@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { Badge, QuickForm, SectionCard } from "../ui";
+import { formatDate, formatMoney, formatNumber, formatPercent } from "../../lib/format";
+import { SectionActions } from "../sections/SectionActions";
+import { Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface Account {
   id: string;
@@ -39,40 +41,43 @@ interface CoutOf {
 }
 
 const ROLES = ["brut", "patronal", "net", "organismes", "impot", "autres_retenues", "provision_charge", "provision_dette"];
-const fcfa = (v: string) => formatMoney(Number(v));
+type LigneCoutOf = CoutOf & { id: string };
 
-/** Coût de main-d'œuvre chargé des pointages transférés en paie, par OF (aval M3 / M11). Masqué hors cercle des montants. */
+/** Heures exactes (décimales significatives conservées). */
+const heures = (v: string) => {
+  const dec = (String(Number(v)).split(".")[1] ?? "").length;
+  return formatNumber(v, { decimals: Math.min(dec, 2) });
+};
+
+/** Coût de main-d'œuvre chargé des pointages transférés en paie, par OF (aval opérations / contrôle de gestion). Masqué hors cercle des montants. */
 export function CoutMainOeuvreSection() {
   const { t } = useTranslation();
   const lignes =
     useQuery({ queryKey: ["m9b", "cout-mo"], queryFn: () => api.get<CoutOf[]>("/api/rh-paie/cout-main-oeuvre/"), retry: 0 }).data ?? null;
   if (lignes === null) return null;
+  const rows: LigneCoutOf[] = lignes.map((l) => ({ ...l, id: l.ordre }));
+  const columns: Column<LigneCoutOf>[] = [
+    { key: "of", header: t("m9b.cout.of"), sortValue: (l) => l.ordre_code, render: (l) => l.ordre_code },
+    { key: "affaire", header: t("m9b.cout.affaire"), render: (l) => l.affaire ?? "—" },
+    {
+      key: "heures",
+      header: t("m9b.cout.heures"),
+      sortValue: (l) => Number(l.heures),
+      render: (l) => (
+        <>
+          {heures(l.heures)} h{l.heures_prevues ? ` / ${heures(l.heures_prevues)} h` : ""}{" "}
+          {Number(l.heures_non_valorisees) > 0 && <Badge tone="warn">{t("m9b.cout.nonValorisees", { n: heures(l.heures_non_valorisees) })}</Badge>}
+          {l.depassement && <Badge tone="err">{t("m9b.cout.depassement")}</Badge>}
+        </>
+      ),
+    },
+    { key: "cout", header: t("m9b.cout.cout"), num: true, sortValue: (l) => Number(l.cout), render: (l) => formatMoney(l.cout) },
+  ];
   return (
     <SectionCard title={t("m9b.cout.title")}>
-      <table className="table" data-testid="cout-main-oeuvre">
-        <thead>
-          <tr>
-            <th>{t("m9b.cout.of")}</th>
-            <th>{t("m9b.cout.affaire")}</th>
-            <th>{t("m9b.cout.heures")}</th>
-            <th>{t("m9b.cout.cout")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lignes.map((l) => (
-            <tr key={l.ordre}>
-              <td>{l.ordre_code}</td>
-              <td>{l.affaire ?? "—"}</td>
-              <td>
-                {formatNumber(Number(l.heures))} h{l.heures_prevues ? ` / ${formatNumber(Number(l.heures_prevues))} h` : ""}
-                {Number(l.heures_non_valorisees) > 0 && <Badge tone="warn">{t("m9b.cout.nonValorisees", { n: l.heures_non_valorisees })}</Badge>}
-                {l.depassement && <Badge tone="err">{t("m9b.cout.depassement")}</Badge>}
-              </td>
-              <td>{fcfa(l.cout)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div data-testid="cout-main-oeuvre">
+        <DataTable columns={columns} rows={rows} caption={t("m9b.cout.title")} />
+      </div>
       <p className="muted">{t("m9b.cout.note")}</p>
     </SectionCard>
   );
@@ -85,74 +90,67 @@ export function EcartsM9bSection() {
   const provisions = useQuery({ queryKey: ["m9b", "provisions"], queryFn: () => api.listAll<Provision>("/api/rh-paie/provisions-conges/"), retry: 0 }).data ?? [];
   const plan = useQuery({ queryKey: ["m9b", "plan"], queryFn: () => api.listAll<Account>("/api/referentiels/accounts/"), retry: 0 }).data ?? [];
   const planOpts = plan.map((a) => ({ value: a.id, label: `${a.code} · ${a.label}` }));
+  const colComptes: Column<ComptePaie>[] = [
+    { key: "role", header: t("m9b.comptes.role"), sortValue: (c) => c.role_label, render: (c) => c.role_label },
+    { key: "organisme", header: t("m9b.comptes.organisme"), render: (c) => c.organisme || "—" },
+    { key: "compte", header: t("m9b.comptes.compte"), sortValue: (c) => c.compte_code, render: (c) => `${c.compte_code} · ${c.compte_label}` },
+  ];
+  const colProvisions: Column<Provision>[] = [
+    { key: "periode", header: t("m9b.provision.periode"), sortValue: (p) => p.periode, render: (p) => formatDate(p.periode) },
+    { key: "base", header: t("m9b.provision.base"), num: true, render: (p) => formatMoney(p.base_brut) },
+    {
+      key: "taux",
+      header: t("m9b.provision.taux"),
+      num: true,
+      render: (p) => (
+        <>
+          {p.taux_provisoire && <Badge tone="warn">{t("m9a.provisoire")}</Badge>} {formatPercent(p.taux, { decimals: 2 })}
+        </>
+      ),
+    },
+    { key: "montant", header: t("m9b.provision.montant"), num: true, sortValue: (p) => Number(p.montant), render: (p) => formatMoney(p.montant) },
+    { key: "ecriture", header: t("m9b.provision.ecriture"), render: (p) => p.move_number ?? "—" },
+  ];
 
   return (
     <>
-      <SectionCard title={t("m9b.comptes.title")}>
-        <div className="action-bar-buttons">
-          <QuickForm
-            title={t("m9b.comptes.ajouter")}
-            endpoint="/api/rh-paie/comptes-paie/"
-            fields={[
-              { name: "role", label: t("m9b.comptes.role"), type: "select", required: true, defaultValue: "organismes", options: ROLES.map((r) => ({ value: r, label: t(`m9b.roles.${r}`) })) },
-              { name: "organisme", label: t("m9b.comptes.organisme") },
-              { name: "compte", label: t("m9b.comptes.compte"), type: "select", required: true, options: planOpts },
-            ]}
-          />
-          <QuickForm
-            title={t("m9b.provision.passer")}
-            endpoint="/api/rh-paie/provisions-conges/"
-            fields={[{ name: "periode", label: t("m9b.provision.periode"), type: "date", required: true }]}
-          />
+      <SectionCard
+        title={t("m9b.comptes.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("m9b.comptes.ajouter")}
+              endpoint="/api/rh-paie/comptes-paie/"
+              fields={[
+                { name: "role", label: t("m9b.comptes.role"), type: "select", required: true, defaultValue: "organismes", options: ROLES.map((r) => ({ value: r, label: t(`m9b.roles.${r}`) })) },
+                { name: "organisme", label: t("m9b.comptes.organisme") },
+                { name: "compte", label: t("m9b.comptes.compte"), type: "select", required: true, options: planOpts },
+              ]}
+            />
+          </SectionActions>
+        }
+      >
+        <div data-testid="comptes-paie">
+          <DataTable columns={colComptes} rows={comptes} caption={t("m9b.comptes.title")} />
         </div>
-        <table className="table" data-testid="comptes-paie">
-          <thead>
-            <tr>
-              <th>{t("m9b.comptes.role")}</th>
-              <th>{t("m9b.comptes.organisme")}</th>
-              <th>{t("m9b.comptes.compte")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {comptes.map((c) => (
-              <tr key={c.id}>
-                <td>{c.role_label}</td>
-                <td>{c.organisme || "—"}</td>
-                <td>
-                  {c.compte_code} · {c.compte_label}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
         <p className="muted">{t("m9b.comptes.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("m9b.provision.title")}>
-        <table className="table" data-testid="provisions-conges">
-          <thead>
-            <tr>
-              <th>{t("m9b.provision.periode")}</th>
-              <th>{t("m9b.provision.base")}</th>
-              <th>{t("m9b.provision.taux")}</th>
-              <th>{t("m9b.provision.montant")}</th>
-              <th>{t("m9b.provision.ecriture")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {provisions.map((p) => (
-              <tr key={p.id}>
-                <td>{formatDate(p.periode)}</td>
-                <td>{fcfa(p.base_brut)}</td>
-                <td>
-                  {formatNumber(Number(p.taux))} % {p.taux_provisoire && <Badge tone="warn">{t("m9a.provisoire")}</Badge>}
-                </td>
-                <td>{fcfa(p.montant)}</td>
-                <td>{p.move_number ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <SectionCard
+        title={t("m9b.provision.title")}
+        actions={
+          <SectionActions>
+            <QuickForm
+              title={t("m9b.provision.passer")}
+              endpoint="/api/rh-paie/provisions-conges/"
+              fields={[{ name: "periode", label: t("m9b.provision.periode"), type: "date", required: true }]}
+            />
+          </SectionActions>
+        }
+      >
+        <div data-testid="provisions-conges">
+          <DataTable columns={colProvisions} rows={provisions} caption={t("m9b.provision.title")} />
+        </div>
       </SectionCard>
 
       <CoutMainOeuvreSection />

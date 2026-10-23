@@ -5,7 +5,10 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { SectionActions } from "../sections/SectionActions";
+import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import type { Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
 
 interface Equipement {
   id: string;
@@ -120,6 +123,10 @@ interface FactureAchat {
   purchase_order: string;
 }
 
+type Suivi = Location & { g: Glissant | undefined };
+type LigneReporting = Reporting["rows"][number] & { id: string };
+type LigneFlux = Flux["rows"][number] & { id: string };
+
 const num = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatNumber(Number(v)));
 const fcfa = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 const moisCourant = () => new Date().toISOString().slice(0, 7);
@@ -185,12 +192,246 @@ export function EcartsM4Section() {
   const locOpts = (ls: Location[]) => ls.map((l) => ({ value: l.id, label: `${l.code} · ${l.equipement_code}` }));
   const brouillons = locations.filter((l) => l.statut === "brouillon" && !l.emis_le);
 
+  const actionsHeader = t("ui.actions");
+  const suivis: Suivi[] = actives.map((l, i) => ({ ...l, g: glissants[i]?.data }));
+
+  const colsParc: Column<Equipement>[] = [
+    { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (e) => e.code, render: (e) => `${e.code} · ${e.label}` },
+    {
+      key: "compteur",
+      header: t("ecarts_m4.parc.compteur"),
+      num: true,
+      sortValue: (e) => Number(e.compteur_value),
+      render: (e) => (
+        <>
+          {num(e.compteur_value)} <span className="muted">{e.compteur_type_label}</span>
+        </>
+      ),
+    },
+    {
+      key: "plafond",
+      header: t("ecarts_m4.parc.plafond"),
+      num: true,
+      render: (e) => (
+        <>
+          {num(e.plafond_compteur)}{" "}
+          {e.plafond_pct !== null && <Badge tone={Number(e.plafond_pct) >= 90 ? "warn" : "ok"}>{formatNumber(Number(e.plafond_pct))} %</Badge>}
+        </>
+      ),
+    },
+    actionsColumn<Equipement>(actionsHeader, (e) => [
+      { label: t("ecarts_m4.parc.fixerPlafond"), path: `/api/logistique/equipements/${e.id}/plafond/`, prompt: { name: "plafond_compteur", label: t("ecarts_m4.parc.plafond") } },
+    ]),
+  ];
+  const colsReleves: Column<Releve>[] = [
+    { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (r) => r.equipement_code, render: (r) => r.equipement_code },
+    { key: "date", header: t("ecarts_m4.date"), sortValue: (r) => r.date, render: (r) => formatDate(r.date) },
+    { key: "valeur", header: t("ecarts_m4.parc.valeur"), num: true, render: (r) => num(r.valeur) },
+    { key: "source", header: t("ecarts_m4.parc.source"), render: (r) => `${r.source_label}${r.saisi_par_name ? ` · ${r.saisi_par_name}` : ""}` },
+  ];
+  const colsAudits: Column<Audit>[] = [
+    {
+      key: "code",
+      header: t("ecarts_m4.audit.code"),
+      sortValue: (a) => a.code,
+      render: (a) => (
+        <>
+          {a.code} · {a.equipement_code}{" "}
+          {a.photo && (
+            <a href={a.photo} target="_blank" rel="noreferrer">
+              {t("ecarts_m4.audit.voirPhoto")}
+            </a>
+          )}
+        </>
+      ),
+    },
+    { key: "date", header: t("ecarts_m4.date"), sortValue: (a) => a.date_audit, render: (a) => formatDate(a.date_audit) },
+    { key: "etat", header: t("ecarts_m4.audit.etat"), render: (a) => a.etat_label },
+    { key: "empreinte", header: t("ecarts_m4.audit.empreinte"), render: (a) => <code title={a.photo_sha256}>{a.photo_sha256.slice(0, 12)}…</code> },
+    { key: "conservation", header: t("ecarts_m4.audit.conservation"), sortValue: (a) => a.conserver_jusqu_au, render: (a) => formatDate(a.conserver_jusqu_au) },
+  ];
+  const colsHistorique: Column<Historique>[] = [
+    { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (h) => h.equipement_code, render: (h) => h.equipement_code },
+    { key: "champ", header: t("ecarts_m4.audit.champ"), render: (h) => h.champ },
+    { key: "avantApres", header: t("ecarts_m4.audit.avantApres"), render: (h) => `${h.ancienne_valeur || "—"} → ${h.nouvelle_valeur || "—"}` },
+    { key: "par", header: t("ecarts_m4.audit.par"), sortValue: (h) => h.modifie_le, render: (h) => `${h.modifie_par_name ?? "—"} · ${formatDate(h.modifie_le)}` },
+  ];
+  const colsLocations: Column<Location>[] = [
+    {
+      key: "location",
+      header: t("ecarts_m4.location"),
+      sortValue: (l) => l.code,
+      render: (l) => (
+        <>
+          {l.code} · {l.equipement_code} <Badge tone="brand">{l.statut_label}</Badge>
+        </>
+      ),
+    },
+    {
+      key: "validations",
+      header: t("ecarts_m4.commandes.validations"),
+      render: (l) => (
+        <>
+          {l.validations.m2 && <Badge tone={l.validations.m2_ok ? "ok" : "warn"}>{t("tableaux.logistique.validAchats")}</Badge>}{" "}
+          {l.validations.dr && <Badge tone={l.validations.dr_ok ? "ok" : "warn"}>{t("tableaux.logistique.validDirection")}</Badge>}
+          {!l.validations.m2 && !l.validations.dr && <span className="muted">{t("ecarts_m4.commandes.sousSeuil")}</span>}
+        </>
+      ),
+    },
+    {
+      key: "achats",
+      header: t("ecarts_m4.commandes.achats"),
+      render: (l) => (
+        <>
+          {l.bon_commande_code ?? "—"} / {l.facture_code ?? "—"}{" "}
+          {l.facture_conforme !== null && (
+            <Badge tone={l.facture_conforme ? "ok" : "err"}>{l.facture_conforme ? t("ecarts_m4.commandes.conforme") : t("ecarts_m4.commandes.ecart")}</Badge>
+          )}{" "}
+          <Badge tone="neutral" title={t("tableaux.logistique.compte618")}>
+            618
+          </Badge>
+        </>
+      ),
+    },
+    {
+      key: "attendu",
+      header: t("ecarts_m4.commandes.attendu"),
+      num: true,
+      sortValue: (l) => (l.montant_attendu === null ? null : Number(l.montant_attendu)),
+      render: (l) => fcfa(l.montant_attendu),
+    },
+    actionsColumn<Location>(actionsHeader, (l) => [
+      ...(l.statut === "brouillon" && !l.emis_le && l.validations.m2 && !l.validations.m2_ok
+        ? [{ label: t("ecarts_m4.commandes.validerM2"), path: `/api/logistique/locations/${l.id}/valider-m2/` }]
+        : []),
+      ...(l.statut === "brouillon" && !l.emis_le && l.validations.dr && !l.validations.dr_ok
+        ? [{ label: t("ecarts_m4.commandes.validerDr"), path: `/api/logistique/locations/${l.id}/valider-dr/` }]
+        : []),
+      ...(!l.bon_commande_code
+        ? [
+            {
+              label: t("ecarts_m4.commandes.lierBc"),
+              path: `/api/logistique/locations/${l.id}/lier-bc-achat/`,
+              prompt: { name: "bon_commande_achat", label: t("ecarts_m4.commandes.choisirBc"), options: bcs.map((b) => ({ value: b.id, label: b.code })) },
+            },
+          ]
+        : []),
+      ...(!l.facture_code
+        ? [
+            {
+              label: t("ecarts_m4.commandes.rapprocher"),
+              path: `/api/logistique/locations/${l.id}/rapprocher-facture/`,
+              prompt: { name: "facture_achat", label: t("ecarts_m4.commandes.choisirFacture"), options: factures.map((f) => ({ value: f.id, label: f.code })) },
+            },
+          ]
+        : []),
+      ...(l.statut === "brouillon" || l.statut === "active"
+        ? [
+            {
+              label: t("ecarts_m4.commandes.receptionnerBl"),
+              path: `/api/logistique/locations/${l.id}/receptionner-bl/`,
+              prompt: { name: "reference_bl", label: t("ecarts_m4.commandes.referenceBl") },
+            },
+          ]
+        : []),
+      { label: t("ecarts_m4.commandes.escalader"), path: `/api/logistique/locations/${l.id}/escalader/`, tone: "danger" as const, prompt: { name: "motif", label: t("ecarts_m4.commandes.motif") } },
+    ]),
+  ];
+  const colsLignes: Column<Ligne>[] = [
+    { key: "location", header: t("ecarts_m4.location"), sortValue: (g) => g.location_code, render: (g) => g.location_code },
+    { key: "designation", header: t("ecarts_m4.commandes.designation"), render: (g) => g.designation },
+    { key: "quantite", header: t("ecarts_m4.commandes.quantite"), num: true, render: (g) => `${num(g.quantite)} ${g.unite}` },
+    { key: "livree", header: t("ecarts_m4.commandes.livree"), num: true, render: (g) => num(g.quantite_livree) },
+    { key: "montant", header: t("ecarts_m4.commandes.montant"), num: true, sortValue: (g) => (g.montant === null ? null : Number(g.montant)), render: (g) => fcfa(g.montant) },
+    actionsColumn<Ligne>(actionsHeader, (g) => [
+      { label: t("ecarts_m4.commandes.livrer"), path: `/api/logistique/lignes-gr/${g.id}/livrer/`, prompt: { name: "quantite_livree", label: t("ecarts_m4.commandes.livree") } },
+    ]),
+  ];
+  const colsReceptions: Column<ReceptionBL>[] = [
+    { key: "bl", header: t("ecarts_m4.commandes.referenceBl"), sortValue: (r) => r.code, render: (r) => `${r.code} · ${r.location_code} · ${r.reference_bl}` },
+    { key: "date", header: t("ecarts_m4.date"), sortValue: (r) => r.date_reception, render: (r) => formatDate(r.date_reception) },
+    { key: "ecart", header: t("ecarts_m4.commandes.ecartPct"), num: true, sortValue: (r) => Number(r.ecart_pct), render: (r) => `${formatNumber(Number(r.ecart_pct))} %` },
+    {
+      key: "escalade",
+      header: t("ecarts_m4.commandes.escaladeM12"),
+      render: (r) =>
+        r.litige ? (
+          <Badge tone="err">{[r.contentieux_code, r.dossier_gr_code].filter(Boolean).join(" · ") || t("ecarts_m4.flux.litige")}</Badge>
+        ) : (
+          <Badge tone="ok">{t("ecarts_m4.commandes.conforme")}</Badge>
+        ),
+    },
+  ];
+  const colsSuivis: Column<Suivi>[] = [
+    {
+      key: "location",
+      header: t("ecarts_m4.location"),
+      sortValue: (l) => l.code,
+      render: (l) => (
+        <>
+          {l.code} · {l.equipement_code} {l.g?.provisoire && <Badge tone="warn">{t("ecarts_m4.provisoire")}</Badge>}
+        </>
+      ),
+    },
+    { key: "dernier", header: t("ecarts_m4.compteurs.dernier"), num: true, render: (l) => num(l.g?.dernier_releve) },
+    { key: "taux", header: t("ecarts_m4.compteurs.taux"), num: true, render: (l) => num(l.g?.taux_jour) },
+    { key: "projection", header: t("ecarts_m4.compteurs.projection"), num: true, render: (l) => num(l.g?.projection_valeur) },
+  ];
+  const colsArchives: Column<Archive>[] = [
+    { key: "location", header: t("ecarts_m4.location"), sortValue: (a) => a.location_code, render: (a) => a.location_code },
+    { key: "consommation", header: t("ecarts_m4.compteurs.consommation"), num: true, render: (a) => num(a.contenu.consommation) },
+    {
+      key: "empreinte",
+      header: t("ecarts_m4.audit.empreinte"),
+      render: (a) => (
+        <>
+          <code title={a.sha256}>{a.sha256.slice(0, 12)}…</code>{" "}
+          <Badge tone={a.integre ? "ok" : "err"}>{a.integre ? t("ecarts_m4.compteurs.integre") : t("ecarts_m4.compteurs.altere")}</Badge>
+        </>
+      ),
+    },
+    { key: "conservation", header: t("ecarts_m4.audit.conservation"), sortValue: (a) => a.conserver_jusqu_au, render: (a) => formatDate(a.conserver_jusqu_au) },
+  ];
+  const colsReporting: Column<LigneReporting>[] = [
+    {
+      key: "equipement",
+      header: t("ecarts_m4.equipement"),
+      sortValue: (r) => r.equipement,
+      render: (r) => (
+        <>
+          {r.equipement} · {r.label} {r.gr && <Badge tone="warn">GR</Badge>}
+        </>
+      ),
+    },
+    { key: "jours", header: t("ecarts_m4.reporting.jours"), num: true, sortValue: (r) => r.jours_mobilises, render: (r) => formatNumber(r.jours_mobilises) },
+    { key: "utilisation", header: t("ecarts_m4.reporting.utilisation"), num: true, sortValue: (r) => Number(r.utilisation_pct), render: (r) => `${formatNumber(Number(r.utilisation_pct))} %` },
+    { key: "economies", header: t("ecarts_m4.reporting.economies"), num: true, render: (r) => (r.gr ? "—" : fcfa(r.economie)) },
+  ];
+  const colsFlux: Column<LigneFlux>[] = [
+    { key: "affaire", header: t("ecarts_m4.flux.affaire"), sortValue: (r) => r.affaire ?? r.titre, render: (r) => (r.affaire ? `${r.affaire} — ${r.titre}` : r.titre) },
+    {
+      key: "machines",
+      header: t("ecarts_m4.flux.machines"),
+      render: (r) => r.machines.map((m) => `${m.equipement}${m.of ? ` (${m.of})` : ""}${m.source === "gr" ? " GR" : ""}`).join(", "),
+    },
+    { key: "consommation", header: t("ecarts_m4.compteurs.consommation"), num: true, render: (r) => num(r.consommation_gr) },
+    {
+      key: "bl",
+      header: t("ecarts_m4.flux.bl"),
+      render: (r) => (
+        <>
+          {r.bl.length} {r.bl.some((b) => b.litige) && <Badge tone="err">{t("ecarts_m4.flux.litige")}</Badge>}
+        </>
+      ),
+    },
+  ];
+
   return (
     <>
-      <SectionCard title={t("ecarts_m4.parc.title")}>
-        <div data-testid="m4-parc">
-          <p className="muted">{t("ecarts_m4.parc.hint")}</p>
-          <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m4.parc.title")}
+        actions={
+          <SectionActions>
             <QuickForm
               title={t("ecarts_m4.parc.releve")}
               endpoint="/api/logistique/releves-parc/"
@@ -201,66 +442,20 @@ export function EcartsM4Section() {
                 { name: "commentaire", label: t("ecarts_m4.parc.commentaire") },
               ]}
             />
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.equipement")}</th>
-                  <th className="num">{t("ecarts_m4.parc.compteur")}</th>
-                  <th className="num">{t("ecarts_m4.parc.plafond")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {equipements.map((e) => (
-                  <tr key={e.id}>
-                    <td>
-                      {e.code} · {e.label}
-                    </td>
-                    <td className="num">
-                      {num(e.compteur_value)} <span className="muted">{e.compteur_type_label}</span>
-                    </td>
-                    <td className="num">
-                      {num(e.plafond_compteur)}{" "}
-                      {e.plafond_pct !== null && <Badge tone={Number(e.plafond_pct) >= 90 ? "warn" : "ok"}>{formatNumber(Number(e.plafond_pct))} %</Badge>}
-                    </td>
-                    <td>
-                      <ActionBar
-                        actions={[{ label: t("ecarts_m4.parc.fixerPlafond"), path: `/api/logistique/equipements/${e.id}/plafond/`, tone: "ghost" as const, prompt: { name: "plafond_compteur", label: t("ecarts_m4.parc.plafond") } }]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          </SectionActions>
+        }
+      >
+        <div data-testid="m4-parc">
+          <p className="muted">{t("ecarts_m4.parc.hint")}</p>
+          <DataTable columns={colsParc} rows={equipements} caption={t("ecarts_m4.parc.title")} emptyLabel={t("tableaux.logistique.aucunEquipement")} />
           <h4>{t("ecarts_m4.parc.historiqueCompteurs")}</h4>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.equipement")}</th>
-                  <th>{t("ecarts_m4.date")}</th>
-                  <th className="num">{t("ecarts_m4.parc.valeur")}</th>
-                  <th>{t("ecarts_m4.parc.source")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {releves.slice(0, 15).map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.equipement_code}</td>
-                    <td>{formatDate(r.date)}</td>
-                    <td className="num">{num(r.valeur)}</td>
-                    <td>
-                      {r.source_label}
-                      {r.saisi_par_name ? ` · ${r.saisi_par_name}` : ""}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={colsReleves}
+            rows={releves.slice(0, 15)}
+            caption={t("ecarts_m4.parc.historiqueCompteurs")}
+            density="compact"
+            emptyLabel={t("tableaux.logistique.aucunReleve")}
+          />
         </div>
       </SectionCard>
 
@@ -314,73 +509,22 @@ export function EcartsM4Section() {
               )}
             </div>
           </form>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.audit.code")}</th>
-                  <th>{t("ecarts_m4.date")}</th>
-                  <th>{t("ecarts_m4.audit.etat")}</th>
-                  <th>{t("ecarts_m4.audit.empreinte")}</th>
-                  <th>{t("ecarts_m4.audit.conservation")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {audits.map((a) => (
-                  <tr key={a.id}>
-                    <td>
-                      {a.code} · {a.equipement_code}{" "}
-                      {a.photo && (
-                        <a href={a.photo} target="_blank" rel="noreferrer">
-                          {t("ecarts_m4.audit.voirPhoto")}
-                        </a>
-                      )}
-                    </td>
-                    <td>{formatDate(a.date_audit)}</td>
-                    <td>{a.etat_label}</td>
-                    <td>
-                      <code>{a.photo_sha256.slice(0, 12)}…</code>
-                    </td>
-                    <td>{formatDate(a.conserver_jusqu_au)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={colsAudits} rows={audits} caption={t("ecarts_m4.audit.title")} emptyLabel={t("tableaux.logistique.aucunAudit")} />
           <h4>{t("ecarts_m4.audit.historique")}</h4>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.equipement")}</th>
-                  <th>{t("ecarts_m4.audit.champ")}</th>
-                  <th>{t("ecarts_m4.audit.avantApres")}</th>
-                  <th>{t("ecarts_m4.audit.par")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historique.slice(0, 20).map((h) => (
-                  <tr key={h.id}>
-                    <td>{h.equipement_code}</td>
-                    <td>{h.champ}</td>
-                    <td>
-                      {h.ancienne_valeur || "—"} → {h.nouvelle_valeur || "—"}
-                    </td>
-                    <td>
-                      {h.modifie_par_name ?? "—"} · {formatDate(h.modifie_le)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={colsHistorique}
+            rows={historique.slice(0, 20)}
+            caption={t("ecarts_m4.audit.historique")}
+            density="compact"
+            emptyLabel={t("tableaux.logistique.aucuneModification")}
+          />
         </div>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m4.commandes.title")}>
-        <div data-testid="m4-commandes">
-          <p className="muted">{t("ecarts_m4.commandes.hint")}</p>
-          <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m4.commandes.title")}
+        actions={
+          <SectionActions>
             <QuickForm
               title={t("ecarts_m4.commandes.ajouterLigne")}
               endpoint="/api/logistique/lignes-gr/"
@@ -392,129 +536,25 @@ export function EcartsM4Section() {
                 { name: "prix_unitaire", label: t("ecarts_m4.commandes.prix"), type: "number", min: 0 },
               ]}
             />
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.location")}</th>
-                  <th>{t("ecarts_m4.commandes.validations")}</th>
-                  <th>{t("ecarts_m4.commandes.achats")}</th>
-                  <th className="num">{t("ecarts_m4.commandes.attendu")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {locations.map((l) => (
-                  <tr key={l.id}>
-                    <td>
-                      {l.code} · {l.equipement_code} <Badge tone="brand">{l.statut_label}</Badge>
-                    </td>
-                    <td>
-                      {l.validations.m2 && <Badge tone={l.validations.m2_ok ? "ok" : "warn"}>M2</Badge>}{" "}
-                      {l.validations.dr && <Badge tone={l.validations.dr_ok ? "ok" : "warn"}>DR</Badge>}
-                      {!l.validations.m2 && !l.validations.dr && <span className="muted">{t("ecarts_m4.commandes.sousSeuil")}</span>}
-                    </td>
-                    <td>
-                      {l.bon_commande_code ?? "—"} / {l.facture_code ?? "—"}{" "}
-                      {l.facture_conforme !== null && (
-                        <Badge tone={l.facture_conforme ? "ok" : "err"}>{l.facture_conforme ? t("ecarts_m4.commandes.conforme") : t("ecarts_m4.commandes.ecart")}</Badge>
-                      )}{" "}
-                      <Badge tone="warn">618</Badge>
-                    </td>
-                    <td className="num">{fcfa(l.montant_attendu)}</td>
-                    <td>
-                      <ActionBar
-                        actions={[
-                          ...(l.statut === "brouillon" && !l.emis_le && l.validations.m2 && !l.validations.m2_ok
-                            ? [{ label: t("ecarts_m4.commandes.validerM2"), path: `/api/logistique/locations/${l.id}/valider-m2/`, tone: "ghost" as const }]
-                            : []),
-                          ...(l.statut === "brouillon" && !l.emis_le && l.validations.dr && !l.validations.dr_ok
-                            ? [{ label: t("ecarts_m4.commandes.validerDr"), path: `/api/logistique/locations/${l.id}/valider-dr/`, tone: "ghost" as const }]
-                            : []),
-                          ...(!l.bon_commande_code
-                            ? [{ label: t("ecarts_m4.commandes.lierBc"), path: `/api/logistique/locations/${l.id}/lier-bc-achat/`, tone: "ghost" as const, prompt: { name: "bon_commande_achat", label: t("ecarts_m4.commandes.choisirBc"), options: bcs.map((b) => ({ value: b.id, label: b.code })) } }]
-                            : []),
-                          ...(!l.facture_code
-                            ? [{ label: t("ecarts_m4.commandes.rapprocher"), path: `/api/logistique/locations/${l.id}/rapprocher-facture/`, tone: "ghost" as const, prompt: { name: "facture_achat", label: t("ecarts_m4.commandes.choisirFacture"), options: factures.map((f) => ({ value: f.id, label: f.code })) } }]
-                            : []),
-                          ...(l.statut === "brouillon" || l.statut === "active"
-                            ? [{ label: t("ecarts_m4.commandes.receptionnerBl"), path: `/api/logistique/locations/${l.id}/receptionner-bl/`, tone: "ghost" as const, prompt: { name: "reference_bl", label: t("ecarts_m4.commandes.referenceBl") } }]
-                            : []),
-                          { label: t("ecarts_m4.commandes.escalader"), path: `/api/logistique/locations/${l.id}/escalader/`, tone: "danger" as const, prompt: { name: "motif", label: t("ecarts_m4.commandes.motif") } },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          </SectionActions>
+        }
+      >
+        <div data-testid="m4-commandes">
+          <p className="muted">{t("ecarts_m4.commandes.hint")}</p>
+          <DataTable columns={colsLocations} rows={locations} caption={t("ecarts_m4.commandes.title")} emptyLabel={t("tableaux.logistique.aucuneCommande")} />
           <h4>{t("ecarts_m4.commandes.lignes")}</h4>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.location")}</th>
-                  <th>{t("ecarts_m4.commandes.designation")}</th>
-                  <th className="num">{t("ecarts_m4.commandes.quantite")}</th>
-                  <th className="num">{t("ecarts_m4.commandes.livree")}</th>
-                  <th className="num">{t("ecarts_m4.commandes.montant")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.map((g) => (
-                  <tr key={g.id}>
-                    <td>{g.location_code}</td>
-                    <td>{g.designation}</td>
-                    <td className="num">
-                      {num(g.quantite)} {g.unite}
-                    </td>
-                    <td className="num">{num(g.quantite_livree)}</td>
-                    <td className="num">{fcfa(g.montant)}</td>
-                    <td>
-                      <ActionBar
-                        actions={[{ label: t("ecarts_m4.commandes.livrer"), path: `/api/logistique/lignes-gr/${g.id}/livrer/`, tone: "ghost" as const, prompt: { name: "quantite_livree", label: t("ecarts_m4.commandes.livree") } }]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={colsLignes} rows={lignes} caption={t("ecarts_m4.commandes.lignes")} emptyLabel={t("tableaux.logistique.aucuneLigne")} />
           <h4>{t("ecarts_m4.commandes.receptions")}</h4>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table" data-testid="m4-receptions-bl">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.commandes.referenceBl")}</th>
-                  <th>{t("ecarts_m4.date")}</th>
-                  <th className="num">{t("ecarts_m4.commandes.ecartPct")}</th>
-                  <th>{t("ecarts_m4.commandes.escaladeM12")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receptions.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      {r.code} · {r.location_code} · {r.reference_bl}
-                    </td>
-                    <td>{formatDate(r.date_reception)}</td>
-                    <td className="num">{formatNumber(Number(r.ecart_pct))} %</td>
-                    <td>{r.litige ? <Badge tone="err">{`${r.contentieux_code ?? ""} · ${r.dossier_gr_code ?? ""}`}</Badge> : <Badge tone="ok">{t("ecarts_m4.commandes.conforme")}</Badge>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div data-testid="m4-receptions-bl">
+            <DataTable columns={colsReceptions} rows={receptions} caption={t("ecarts_m4.commandes.receptions")} emptyLabel={t("tableaux.logistique.aucuneReception")} />
           </div>
         </div>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m4.compteurs.title")}>
-        <div data-testid="m4-compteurs">
-          <p className="muted">{t("ecarts_m4.compteurs.hint")}</p>
-          <div className="action-bar-buttons">
+      <SectionCard
+        title={t("ecarts_m4.compteurs.title")}
+        actions={
+          <SectionActions>
             <QuickForm
               title={t("ecarts_m4.compteurs.saisir")}
               endpoint="/api/logistique/lectures/"
@@ -532,69 +572,24 @@ export function EcartsM4Section() {
                 },
               ]}
             />
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.location")}</th>
-                  <th className="num">{t("ecarts_m4.compteurs.dernier")}</th>
-                  <th className="num">{t("ecarts_m4.compteurs.taux")}</th>
-                  <th className="num">{t("ecarts_m4.compteurs.projection")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {actives.map((l, i) => {
-                  const g = glissants[i]?.data;
-                  return (
-                    <tr key={l.id}>
-                      <td>
-                        {l.code} · {l.equipement_code} {g?.provisoire && <Badge tone="warn">{t("ecarts_m4.provisoire")}</Badge>}
-                      </td>
-                      <td className="num">{num(g?.dernier_releve)}</td>
-                      <td className="num">{num(g?.taux_jour)}</td>
-                      <td className="num">{num(g?.projection_valeur)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          </SectionActions>
+        }
+      >
+        <div data-testid="m4-compteurs">
+          <p className="muted">{t("ecarts_m4.compteurs.hint")}</p>
+          <DataTable columns={colsSuivis} rows={suivis} caption={t("ecarts_m4.compteurs.title")} emptyLabel={t("tableaux.logistique.aucuneLocationActive")} />
           <p className="muted">{t("ecarts_m4.compteurs.formule")}</p>
           <h4>{t("ecarts_m4.compteurs.archives")}</h4>
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.location")}</th>
-                  <th className="num">{t("ecarts_m4.compteurs.consommation")}</th>
-                  <th>{t("ecarts_m4.audit.empreinte")}</th>
-                  <th>{t("ecarts_m4.audit.conservation")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {archives.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.location_code}</td>
-                    <td className="num">{num(a.contenu.consommation)}</td>
-                    <td>
-                      <code>{a.sha256.slice(0, 12)}…</code> <Badge tone={a.integre ? "ok" : "err"}>{a.integre ? t("ecarts_m4.compteurs.integre") : t("ecarts_m4.compteurs.altere")}</Badge>
-                    </td>
-                    <td>{formatDate(a.conserver_jusqu_au)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={colsArchives} rows={archives} caption={t("ecarts_m4.compteurs.archives")} emptyLabel={t("tableaux.logistique.aucuneArchive")} />
         </div>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m4.reporting.title")}>
         <div data-testid="m4-reporting">
-          <label>
-            {t("ecarts_m4.reporting.mois")}{" "}
-            <input type="month" value={periode} onChange={(e) => setPeriode(e.target.value)} aria-label={t("ecarts_m4.reporting.mois")} />
-          </label>
+          <div className="field" style={{ maxWidth: 220 }}>
+            <label htmlFor="m4-reporting-mois">{t("ecarts_m4.reporting.mois")}</label>
+            <input id="m4-reporting-mois" className="control" type="month" value={periode} onChange={(e) => setPeriode(e.target.value)} />
+          </div>
           {reporting?.provisoire && (
             <p className="action-error" role="note">
               {t("ecarts_m4.reporting.warnProvisoire")}
@@ -603,68 +598,38 @@ export function EcartsM4Section() {
           {reporting && (
             <>
               <p>
-                {t("ecarts_m4.reporting.utilisation")} : <strong>{formatNumber(Number(reporting.utilisation_moyenne_pct))} %</strong> · {t("ecarts_m4.reporting.economies")} :{" "}
-                <strong>{fcfa(reporting.economies)}</strong> · {t("ecarts_m4.reporting.rentabilite")} :{" "}
-                <strong>{reporting.rentabilite_pct === null ? "—" : `${formatNumber(Number(reporting.rentabilite_pct))} %`}</strong>
+                {t("ecarts_m4.reporting.utilisation")} : <strong className="num">{formatNumber(Number(reporting.utilisation_moyenne_pct))} %</strong> ·{" "}
+                {t("ecarts_m4.reporting.economies")} : <strong className="amount">{fcfa(reporting.economies)}</strong> · {t("ecarts_m4.reporting.rentabilite")} :{" "}
+                <strong className="num">{reporting.rentabilite_pct === null ? "—" : `${formatNumber(Number(reporting.rentabilite_pct))} %`}</strong>
               </p>
               <p className="muted">{t("ecarts_m4.reporting.formules")}</p>
-              <div style={{ overflowX: "auto" }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>{t("ecarts_m4.equipement")}</th>
-                      <th className="num">{t("ecarts_m4.reporting.jours")}</th>
-                      <th className="num">{t("ecarts_m4.reporting.utilisation")}</th>
-                      <th className="num">{t("ecarts_m4.reporting.economies")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reporting.rows.map((r) => (
-                      <tr key={r.equipement}>
-                        <td>
-                          {r.equipement} · {r.label} {r.gr && <Badge tone="warn">GR</Badge>}
-                        </td>
-                        <td className="num">{r.jours_mobilises}</td>
-                        <td className="num">{formatNumber(Number(r.utilisation_pct))} %</td>
-                        <td className="num">{r.gr ? "—" : fcfa(r.economie)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                columns={colsReporting}
+                rows={reporting.rows.map((r) => ({ ...r, id: r.equipement }))}
+                caption={t("ecarts_m4.reporting.title")}
+                emptyLabel={t("tableaux.logistique.aucunReporting")}
+              />
             </>
           )}
         </div>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m4.flux.title")}>
+      <SectionCard
+        title={t("ecarts_m4.flux.title")}
+        actions={
+          <SectionActions>
+            <ActionBar actions={[{ label: t("ecarts_m4.flux.proposer"), path: "/api/logistique/demandes/proposer/" }]} />
+          </SectionActions>
+        }
+      >
         <div data-testid="m4-flux">
           <p className="muted">{t("ecarts_m4.flux.hint")}</p>
-          <ActionBar actions={[{ label: t("ecarts_m4.flux.proposer"), path: "/api/logistique/demandes/proposer/" }]} />
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("ecarts_m4.flux.affaire")}</th>
-                  <th>{t("ecarts_m4.flux.machines")}</th>
-                  <th className="num">{t("ecarts_m4.compteurs.consommation")}</th>
-                  <th>{t("ecarts_m4.flux.bl")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(flux?.rows ?? []).map((r) => (
-                  <tr key={r.affaire ?? "sans"}>
-                    <td>{r.affaire ? `${r.affaire} — ${r.titre}` : r.titre}</td>
-                    <td>{r.machines.map((m) => `${m.equipement}${m.of ? ` (${m.of})` : ""}${m.source === "gr" ? " GR" : ""}`).join(", ")}</td>
-                    <td className="num">{num(r.consommation_gr)}</td>
-                    <td>
-                      {r.bl.length} {r.bl.some((b) => b.litige) && <Badge tone="err">{t("ecarts_m4.flux.litige")}</Badge>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={colsFlux}
+            rows={(flux?.rows ?? []).map((r) => ({ ...r, id: r.affaire ?? "sans-affaire" }))}
+            caption={t("ecarts_m4.flux.title")}
+            emptyLabel={t("tableaux.logistique.aucunFlux")}
+          />
         </div>
       </SectionCard>
     </>

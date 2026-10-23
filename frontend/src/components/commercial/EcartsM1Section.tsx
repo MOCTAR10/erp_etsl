@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatMoney, formatPercent } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber, formatPercent } from "../../lib/format";
+import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
 
 /** Écarts M1 : paramètres provisoires, scoring 360°, alertes et échéances, pipe par profil, chiffrage et dérive,
  *  profils contractuels, habilitations, RAO / RC archivés, indicateurs commerciaux. */
@@ -158,6 +160,9 @@ const NATURES = ["fourniture", "main_oeuvre", "sous_traitance", "equipement", "f
 const PROFILS = ["marche_travaux", "maintenance"];
 const montant = (v: string | null | undefined) => (v === null || v === undefined ? "••••••" : formatMoney(v));
 const liste = <T,>(path: string) => () => api.listAll<T>(path);
+/** Décimal API (« 12.50 ») au format français, décimales seulement si utiles. */
+const dec = (v: string | number | null | undefined) => formatNumber(v, { decimals: Number.isInteger(Number(v)) ? 0 : 2 });
+const taux = (v: string | number | null | undefined) => formatPercent(v, { decimals: Number.isInteger(Number(v)) ? 0 : 1 });
 
 function ParametresM1() {
   const { t } = useTranslation();
@@ -183,6 +188,72 @@ function ParametresM1() {
   });
   const lignes = params.data ?? [];
   const provisoires = lignes.filter((p) => p.est_provisoire).length;
+  const modifie = (p: Parametre) => (saisie[p.id] !== undefined && saisie[p.id] !== p.valeur) || (saisieTexte[p.id] !== undefined && saisieTexte[p.id] !== p.texte);
+  const cols: Column<Parametre>[] = [
+    { key: "libelle", header: t("ecarts_m1.params.libelle"), render: (p) => p.label, sortValue: (p) => p.label },
+    {
+      key: "valeur",
+      header: t("ecarts_m1.params.valeur"),
+      render: (p) => (
+        <>
+          {p.unite !== "texte" && (
+            <span className="action-bar-buttons" style={{ alignItems: "center" }}>
+              <input
+                className="control"
+                style={{ width: "7rem" }}
+                aria-label={p.label}
+                value={saisie[p.id] ?? p.valeur}
+                onChange={(e) => setSaisie({ ...saisie, [p.id]: e.target.value })}
+              />
+              <span className="muted">{p.unite}</span>
+            </span>
+          )}
+          {p.texte !== undefined && p.texte !== "" && (
+            <textarea
+              className="control"
+              rows={2}
+              aria-label={`${p.label} — ${t("ecarts_suivi.texte")}`}
+              value={saisieTexte[p.id] ?? p.texte}
+              onChange={(e) => setSaisieTexte({ ...saisieTexte, [p.id]: e.target.value })}
+            />
+          )}
+        </>
+      ),
+    },
+    {
+      key: "statut",
+      header: t("ecarts_m1.params.statut"),
+      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`ecarts_m1.params.${p.statut_valeur}`)}</Badge>,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) => (
+        <div className="action-bar-buttons">
+          {modifie(p) && (
+            <button
+              type="button"
+              className="btn primary sm"
+              onClick={() =>
+                enregistrer.mutate({
+                  id: p.id,
+                  ...(saisie[p.id] !== undefined && saisie[p.id] !== p.valeur ? { valeur: saisie[p.id] } : {}),
+                  ...(saisieTexte[p.id] !== undefined && saisieTexte[p.id] !== p.texte ? { texte: saisieTexte[p.id] } : {}),
+                })
+              }
+            >
+              {t("ecarts_m1.params.enregistrer")}
+            </button>
+          )}
+          {p.est_provisoire && (
+            <button type="button" className="btn ghost sm" onClick={() => confirmer.mutate(p.id)}>
+              {t("ecarts_m1.params.confirmer")}
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
   return (
     <SectionCard title={t("ecarts_m1.params.title")}>
       {provisoires > 0 && (
@@ -190,77 +261,13 @@ function ParametresM1() {
           {t("ecarts_m1.params.warn", { count: provisoires })}
         </p>
       )}
-      {erreur && <p className="action-error">{erreur}</p>}
-      <div className="table-wrap">
-        <table className="table" data-testid="parametres-m1">
-          <thead>
-            <tr>
-              <th>{t("ecarts_m1.params.libelle")}</th>
-              <th>{t("ecarts_m1.params.valeur")}</th>
-              <th>{t("ecarts_m1.params.statut")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {lignes.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  {p.label} <span className="muted">({p.code})</span>
-                </td>
-                <td>
-                  {p.unite !== "texte" && (
-                    <>
-                      <input
-                        className="field"
-                        style={{ width: "7rem" }}
-                        aria-label={p.label}
-                        value={saisie[p.id] ?? p.valeur}
-                        onChange={(e) => setSaisie({ ...saisie, [p.id]: e.target.value })}
-                      />{" "}
-                      {p.unite}
-                    </>
-                  )}
-                  {p.texte !== undefined && p.texte !== "" && (
-                    <textarea
-                      className="field"
-                      rows={2}
-                      aria-label={`${p.label} — ${t("ecarts_suivi.texte")}`}
-                      value={saisieTexte[p.id] ?? p.texte}
-                      onChange={(e) => setSaisieTexte({ ...saisieTexte, [p.id]: e.target.value })}
-                    />
-                  )}
-                </td>
-                <td>
-                  <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`ecarts_m1.params.${p.statut_valeur}`)}</Badge>
-                </td>
-                <td>
-                  <div className="action-bar-buttons">
-                    {((saisie[p.id] !== undefined && saisie[p.id] !== p.valeur) || (saisieTexte[p.id] !== undefined && saisieTexte[p.id] !== p.texte)) && (
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() =>
-                          enregistrer.mutate({
-                            id: p.id,
-                            ...(saisie[p.id] !== undefined && saisie[p.id] !== p.valeur ? { valeur: saisie[p.id] } : {}),
-                            ...(saisieTexte[p.id] !== undefined && saisieTexte[p.id] !== p.texte ? { texte: saisieTexte[p.id] } : {}),
-                          })
-                        }
-                      >
-                        {t("ecarts_m1.params.enregistrer")}
-                      </button>
-                    )}
-                    {p.est_provisoire && (
-                      <button type="button" className="btn ghost" onClick={() => confirmer.mutate(p.id)}>
-                        {t("ecarts_m1.params.confirmer")}
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {erreur && (
+        <p className="action-error" role="alert">
+          {erreur}
+        </p>
+      )}
+      <div data-testid="parametres-m1">
+        <DataTable rows={lignes} columns={cols} caption={t("ecarts_m1.params.title")} density="compact" />
       </div>
     </SectionCard>
   );
@@ -281,21 +288,33 @@ function Clients360() {
     retry: 0,
   });
   const cols: Column<ClientSignal>[] = [
-    { key: "client", header: t("ecarts_m1.clients.client"), render: (c) => c.client },
+    { key: "client", header: t("ecarts_m1.clients.client"), render: (c) => c.client, sortValue: (c) => c.client },
     { key: "segment", header: t("ecarts_m1.clients.segment"), render: (c) => c.segment },
-    { key: "score", header: t("ecarts_m1.clients.score"), num: true, render: (c) => `${c.score_calcule} (${c.score_enregistre})` },
-    { key: "contact", header: t("ecarts_m1.clients.dernierContact"), render: (c) => (c.dernier_contact ? formatDate(c.dernier_contact) : "—") },
+    { key: "score", header: t("ecarts_m1.clients.score"), num: true, render: (c) => `${c.score_calcule} (${c.score_enregistre})`, sortValue: (c) => c.score_calcule },
+    { key: "contact", header: t("ecarts_m1.clients.dernierContact"), render: (c) => formatDate(c.dernier_contact), sortValue: (c) => c.dernier_contact },
     {
       key: "signaux",
       header: t("ecarts_m1.clients.signaux"),
       render: (c) =>
-        c.signaux.length ? c.signaux.map((s) => <Badge key={s.code} tone="warn">{s.libelle}</Badge>) : <Badge tone="ok">{t("ecarts_m1.clients.ras")}</Badge>,
+        c.signaux.length ? (
+          <span className="action-bar-buttons">
+            {c.signaux.map((s) => (
+              <Badge key={s.code} tone="warn">
+                {s.libelle}
+              </Badge>
+            ))}
+          </span>
+        ) : (
+          <Badge tone="ok">{t("ecarts_m1.clients.ras")}</Badge>
+        ),
     },
   ];
   const lignes = signaux.data?.lignes ?? [];
   return (
-    <SectionCard title={t("ecarts_m1.clients.title")}>
-      <ActionBar actions={[{ label: t("ecarts_m1.clients.recalculer"), path: "/api/commercial/profiles/recalculer-scores/" }]} />
+    <SectionCard
+      title={t("ecarts_m1.clients.title")}
+      actions={<ActionBar actions={[{ label: t("ecarts_m1.clients.recalculer"), path: "/api/commercial/profiles/recalculer-scores/", tone: "ghost" }]} />}
+    >
       {signaux.data?.provisoire && <p className="muted">{t("ecarts_m1.provisoireNote")}</p>}
       <DataTable rows={lignes} columns={cols} caption={t("ecarts_m1.clients.title")} />
       <label className="field" style={{ marginTop: "0.5rem" }}>
@@ -325,8 +344,8 @@ function Clients360() {
             caption={t("ecarts_m1.clients.composantes")}
             columns={[
               { key: "c", header: t("ecarts_m1.clients.critere"), render: (c) => t(`ecarts_m1.clients.criteres.${c.critere}`) },
-              { key: "p", header: t("ecarts_m1.clients.poids"), num: true, render: (c) => c.poids },
-              { key: "n", header: t("ecarts_m1.clients.note"), num: true, render: (c) => c.note },
+              { key: "p", header: t("ecarts_m1.clients.poids"), num: true, render: (c) => dec(c.poids) },
+              { key: "n", header: t("ecarts_m1.clients.note"), num: true, render: (c) => dec(c.note) },
             ]}
           />
         </div>
@@ -348,14 +367,16 @@ function AlertesEcheances() {
     retry: 0,
   });
   return (
-    <SectionCard title={t("ecarts_m1.alertes.title")}>
-      <ActionBar actions={[{ label: t("ecarts_m1.alertes.relancer"), path: "/api/commercial/pilotage/relancer/" }]} />
+    <SectionCard
+      title={t("ecarts_m1.alertes.title")}
+      actions={<ActionBar actions={[{ label: t("ecarts_m1.alertes.relancer"), path: "/api/commercial/pilotage/relancer/", tone: "ghost" }]} />}
+    >
       <h4>{t("ecarts_m1.alertes.opportunites", { jours: opp.data?.jours ?? "" })}</h4>
       <DataTable
         rows={opp.data?.lignes ?? []}
         caption={t("ecarts_m1.alertes.opportunites", { jours: opp.data?.jours ?? "" })}
         columns={[
-          { key: "code", header: t("commercial.col.code"), render: (o) => o.code },
+          { key: "code", header: t("commercial.col.code"), render: (o) => o.code, sortValue: (o) => o.code },
           { key: "objet", header: t("commercial.col.titre"), render: (o) => o.objet },
           { key: "etape", header: t("ecarts_m1.alertes.etape"), render: (o) => o.etape },
           { key: "client", header: t("commercial.col.client"), render: (o) => o.client ?? "—" },
@@ -371,7 +392,7 @@ function AlertesEcheances() {
           { key: "type", header: t("ecarts_m1.alertes.type"), render: (e) => t(`ecarts_m1.alertes.types.${e.type}`) },
           { key: "code", header: t("commercial.col.code"), render: (e) => e.code },
           { key: "lib", header: t("ecarts_m1.alertes.objet"), render: (e) => e.libelle },
-          { key: "date", header: t("ecarts_m1.alertes.date"), render: (e) => formatDate(e.date_echeance) },
+          { key: "date", header: t("ecarts_m1.alertes.date"), render: (e) => formatDate(e.date_echeance), sortValue: (e) => e.date_echeance },
           {
             key: "palier",
             header: t("ecarts_m1.alertes.palier"),
@@ -397,8 +418,8 @@ function PipeProfilIndicateurs() {
       {i && (
         <div className="kpi-grid">
           <Kpi label={t("ecarts_m1.indic.prixMoyen")} value={montant(i.prix_moyen)} hint={i.definition_prix_moyen} tone="brand" />
-          <Kpi label={t("ecarts_m1.indic.transformation")} value={i.taux_transformation_pct === null ? "—" : `${i.taux_transformation_pct} %`} tone="accent" />
-          <Kpi label={t("ecarts_m1.indic.scoreMoyen")} value={i.score_moyen ?? "—"} tone="ok" />
+          <Kpi label={t("ecarts_m1.indic.transformation")} value={taux(i.taux_transformation_pct)} tone="accent" />
+          <Kpi label={t("ecarts_m1.indic.scoreMoyen")} value={i.score_moyen === null ? "—" : dec(i.score_moyen)} tone="ok" />
           <Kpi label={t("ecarts_m1.indic.sousSeuil")} value={i.clients_sous_seuil} tone="warn" />
         </div>
       )}
@@ -407,11 +428,11 @@ function PipeProfilIndicateurs() {
         caption={t("ecarts_m1.profil.title")}
         columns={[
           { key: "p", header: t("ecarts_m1.profil.profil"), render: (l) => l.libelle },
-          { key: "n", header: t("ecarts_m1.profil.nombre"), num: true, render: (l) => l.nombre },
-          { key: "m", header: t("ecarts_m1.profil.montant"), num: true, render: (l) => montant(l.montant) },
+          { key: "n", header: t("ecarts_m1.profil.nombre"), num: true, render: (l) => formatNumber(l.nombre), sortValue: (l) => l.nombre },
+          { key: "m", header: t("ecarts_m1.profil.montant"), num: true, render: (l) => montant(l.montant), sortValue: (l) => Number(l.montant ?? 0) },
           { key: "pp", header: t("ecarts_m1.profil.pondere"), num: true, render: (l) => montant(l.pondere) },
           { key: "g", header: t("ecarts_m1.profil.gagneesPerdues"), num: true, render: (l) => `${l.gagnees} / ${l.perdues}` },
-          { key: "c", header: t("ecarts_m1.profil.conversion"), num: true, render: (l) => (l.conversion_pct === null ? "—" : `${l.conversion_pct} %`) },
+          { key: "c", header: t("ecarts_m1.profil.conversion"), num: true, render: (l) => taux(l.conversion_pct) },
         ]}
       />
     </SectionCard>
@@ -438,31 +459,35 @@ function Chiffrage() {
     ? [
         ...s.par_nature.map((n) => ({ id: `n-${n.nature}`, poste: n.libelle, montant: n.montant })),
         { id: "ds", poste: t("ecarts_m1.chiffrage.debourse"), montant: s.debourse_sec },
-        { id: "fi", poste: `${t("ecarts_m1.chiffrage.fi")} (${s.taux.frais_indirects} %)`, montant: s.frais_indirects },
-        { id: "al", poste: `${t("ecarts_m1.chiffrage.aleas")} (${s.taux.aleas} %)`, montant: s.aleas },
+        { id: "fi", poste: `${t("ecarts_m1.chiffrage.fi")} (${taux(s.taux.frais_indirects)})`, montant: s.frais_indirects },
+        { id: "al", poste: `${t("ecarts_m1.chiffrage.aleas")} (${taux(s.taux.aleas)})`, montant: s.aleas },
         { id: "pr", poste: t("ecarts_m1.chiffrage.pr"), montant: s.prix_revient },
-        { id: "pv", poste: `${t("ecarts_m1.chiffrage.pv")} (${s.taux.marge} %)`, montant: s.prix_vente_cible },
+        { id: "pv", poste: `${t("ecarts_m1.chiffrage.pv")} (${taux(s.taux.marge)})`, montant: s.prix_vente_cible },
         { id: "po", poste: t("ecarts_m1.chiffrage.prixOffre"), montant: s.prix_offre },
-        { id: "mo", poste: `${t("ecarts_m1.chiffrage.margeOffre")} (${s.taux_marge_offre_pct ?? "—"} %)`, montant: s.marge_offre },
+        { id: "mo", poste: `${t("ecarts_m1.chiffrage.margeOffre")} (${taux(s.taux_marge_offre_pct)})`, montant: s.marge_offre },
       ]
     : [];
   return (
-    <SectionCard title={t("ecarts_m1.chiffrage.title")}>
-      <div className="action-bar-buttons">
-        <QuickForm
-          title={t("ecarts_m1.chiffrage.ajouterLigne")}
-          endpoint="/api/commercial/estimate-lines/"
-          fields={[
-            { name: "estimate", label: t("ecarts_m1.chiffrage.offre"), type: "select", required: true, options: (offres.data ?? []).map((o) => ({ value: o.id, label: `${o.code} v${o.version} · ${o.title}` })) },
-            { name: "lot", label: t("ecarts_m1.chiffrage.lot") },
-            { name: "label", label: t("ecarts_m1.chiffrage.designation"), required: true },
-            { name: "nature", label: t("ecarts_m1.chiffrage.nature"), type: "select", options: NATURES.map((n) => ({ value: n, label: t(`ecarts_m1.natures.${n}`) })) },
-            { name: "quantity", label: t("ecarts_m1.chiffrage.quantite"), type: "number", min: 0, step: "0.01", defaultValue: "1" },
-            { name: "cout_unitaire", label: t("ecarts_m1.chiffrage.cout"), type: "number", min: 0 },
-            { name: "unit_price", label: t("ecarts_m1.chiffrage.prix"), type: "number", min: 0 },
-          ]}
-        />
-      </div>
+    <SectionCard
+      title={t("ecarts_m1.chiffrage.title")}
+      actions={
+        <SectionActions>
+          <QuickForm
+            title={t("ecarts_m1.chiffrage.ajouterLigne")}
+            endpoint="/api/commercial/estimate-lines/"
+            fields={[
+              { name: "estimate", label: t("ecarts_m1.chiffrage.offre"), type: "select", required: true, options: (offres.data ?? []).map((o) => ({ value: o.id, label: `${o.code} v${o.version} · ${o.title}` })) },
+              { name: "lot", label: t("ecarts_m1.chiffrage.lot") },
+              { name: "label", label: t("ecarts_m1.chiffrage.designation"), required: true },
+              { name: "nature", label: t("ecarts_m1.chiffrage.nature"), type: "select", options: NATURES.map((n) => ({ value: n, label: t(`ecarts_m1.natures.${n}`) })) },
+              { name: "quantity", label: t("ecarts_m1.chiffrage.quantite"), type: "number", min: 0, step: "0.01", defaultValue: "1" },
+              { name: "cout_unitaire", label: t("ecarts_m1.chiffrage.cout"), type: "number", min: 0 },
+              { name: "unit_price", label: t("ecarts_m1.chiffrage.prix"), type: "number", min: 0 },
+            ]}
+          />
+        </SectionActions>
+      }
+    >
       <label className="field">
         {t("ecarts_m1.chiffrage.offre")}
         <select value={offre} onChange={(e) => setOffre(e.target.value)} aria-label={t("ecarts_m1.chiffrage.choisirOffre")}>
@@ -498,22 +523,17 @@ function Chiffrage() {
         rows={derives.data?.lignes ?? []}
         caption={t("ecarts_m1.derive.caption")}
         columns={[
-          { key: "code", header: t("commercial.col.code"), render: (d) => `${d.code} · ${d.titre}` },
+          { key: "code", header: t("commercial.col.code"), render: (d) => `${d.code} · ${d.titre}`, sortValue: (d) => d.code },
           { key: "av", header: t("ecarts_m1.derive.avancement"), num: true, render: (d) => formatPercent(d.avancement_pct) },
           { key: "prevu", header: t("ecarts_m1.derive.prevu"), num: true, render: (d) => montant(d.cout_prevu_a_date) },
           { key: "reel", header: t("ecarts_m1.derive.reel"), num: true, render: (d) => montant(d.cout_reel) },
           {
             key: "derive",
             header: t("ecarts_m1.derive.derive"),
-            render: (d) => <Badge tone={d.alerte ? "err" : "ok"}>{d.derive_pct === null ? "—" : `${d.derive_pct} %`}</Badge>,
+            sortValue: (d) => (d.derive_pct === null ? null : Number(d.derive_pct)),
+            render: (d) => <Badge tone={d.alerte ? "err" : "ok"}>{taux(d.derive_pct)}</Badge>,
           },
-          {
-            key: "act",
-            header: "",
-            render: (d) => (
-              <ActionBar actions={[{ label: t("ecarts_m1.derive.besoins"), path: `/api/commercial/affaires/${d.id}/besoins-achat/`, tone: "ghost" }]} />
-            ),
-          },
+          actionsColumn<Derive>(t("ui.actions"), (d) => [{ label: t("ecarts_m1.derive.besoins"), path: `/api/commercial/affaires/${d.id}/besoins-achat/`, tone: "ghost" }]),
         ]}
       />
     </SectionCard>
@@ -549,19 +569,23 @@ function ProfilsContrats() {
   const c = calc.data;
   const choisi = (contrats.data ?? []).find((x) => x.id === contrat);
   return (
-    <SectionCard title={t("ecarts_m1.contrats.title")}>
-      <div className="action-bar-buttons">
-        <QuickForm
-          title={t("ecarts_m1.contrats.ajouterHabilitation")}
-          endpoint="/api/commercial/habilitations-requises/"
-          fields={[
-            { name: "profile", label: t("ecarts_m1.contrats.profil"), type: "select", options: PROFILS.map((p) => ({ value: p, label: t(`ecarts_m1.profils.${p}`) })) },
-            { name: "contract", label: t("ecarts_m1.contrats.contrat"), type: "select", options: (contrats.data ?? []).map((x) => ({ value: x.id, label: x.code })) },
-            { name: "mot_cle", label: t("ecarts_m1.contrats.motCle"), required: true },
-            { name: "libelle", label: t("ecarts_m1.contrats.libelle") },
-          ]}
-        />
-      </div>
+    <SectionCard
+      title={t("ecarts_m1.contrats.title")}
+      actions={
+        <SectionActions>
+          <QuickForm
+            title={t("ecarts_m1.contrats.ajouterHabilitation")}
+            endpoint="/api/commercial/habilitations-requises/"
+            fields={[
+              { name: "profile", label: t("ecarts_m1.contrats.profil"), type: "select", options: PROFILS.map((p) => ({ value: p, label: t(`ecarts_m1.profils.${p}`) })) },
+              { name: "contract", label: t("ecarts_m1.contrats.contrat"), type: "select", options: (contrats.data ?? []).map((x) => ({ value: x.id, label: x.code })) },
+              { name: "mot_cle", label: t("ecarts_m1.contrats.motCle"), required: true },
+              { name: "libelle", label: t("ecarts_m1.contrats.libelle") },
+            ]}
+          />
+        </SectionActions>
+      }
+    >
       <div className="action-bar-buttons">
         <label className="field">
           {t("ecarts_m1.contrats.contrat")}
@@ -602,13 +626,13 @@ function ProfilsContrats() {
           <DataTable
             caption={t("ecarts_m1.contrats.calculs")}
             rows={[
-              { id: "ret", k: `${t("ecarts_m1.contrats.retenue")} (${c.taux_retenue_pct} %)`, v: montant(c.retenue_garantie) },
+              { id: "ret", k: `${t("ecarts_m1.contrats.retenue")} (${taux(c.taux_retenue_pct)})`, v: montant(c.retenue_garantie) },
               { id: "net", k: t("ecarts_m1.contrats.net"), v: montant(c.net_apres_retenue) },
               { id: "pen", k: `${t("ecarts_m1.contrats.penalites")}${c.penalites_plafonnees ? ` (${t("ecarts_m1.contrats.plafond")})` : ""}`, v: montant(c.penalites) },
-              { id: "idx", k: `${t("ecarts_m1.contrats.indexation")}${c.indexation ? ` (× ${c.indexation.coefficient})` : ""}`, v: c.indexation ? montant(c.indexation.montant_indexe) : "—" },
+              { id: "idx", k: `${t("ecarts_m1.contrats.indexation")}${c.indexation ? ` (× ${dec(c.indexation.coefficient)})` : ""}`, v: c.indexation ? montant(c.indexation.montant_indexe) : "—" },
               { id: "duree", k: t("ecarts_m1.contrats.duree"), v: c.duree_mois === null ? "—" : `${c.duree_mois}` },
               { id: "rg", k: t("ecarts_m1.contrats.retenueCumulee"), v: montant(ret.data?.retenue_cumulee) },
-              { id: "lib", k: t("ecarts_m1.contrats.liberation"), v: ret.data?.date_liberation ? formatDate(ret.data.date_liberation) : "—" },
+              { id: "lib", k: t("ecarts_m1.contrats.liberation"), v: formatDate(ret.data?.date_liberation) },
             ]}
             columns={[
               { key: "k", header: t("ecarts_m1.chiffrage.poste"), render: (r) => r.k },
@@ -653,7 +677,7 @@ function RaoRc() {
       {criteres.data && (
         <p className="muted">
           {t("ecarts_m1.rao.criteres", { go: criteres.data.seuil_go, reserve: criteres.data.seuil_reserve })} :{" "}
-          {criteres.data.criteres.map((c) => `${c.libelle} (${c.poids})`).join(" · ")}
+          {criteres.data.criteres.map((c) => `${c.libelle} (${dec(c.poids)})`).join(" · ")}
         </p>
       )}
       <DataTable
@@ -661,15 +685,11 @@ function RaoRc() {
         caption={t("ecarts_m1.rao.raos")}
         columns={[
           { key: "ref", header: t("ecarts_m1.rao.ref"), render: (r) => r.tender_ref || "—" },
-          { key: "score", header: t("ecarts_m1.rao.note"), num: true, render: (r) => (r.score === null ? "—" : `${r.score} %`) },
+          { key: "score", header: t("ecarts_m1.rao.note"), num: true, render: (r) => taux(r.score), sortValue: (r) => (r.score === null ? null : Number(r.score)) },
           { key: "dec", header: t("ecarts_m1.rao.decision"), render: (r) => (r.decision_rao ? t(`ecarts_m1.rao.decisions.${r.decision_rao}`) : "—") },
           { key: "st", header: t("commercial.col.statut"), render: (r) => r.review_status_label },
           { key: "doc", header: t("ecarts_m1.rao.ged"), render: (r) => doc(r.document) },
-          {
-            key: "act",
-            header: "",
-            render: (r) => (r.document ? null : <ActionBar actions={[{ label: t("ecarts_m1.rao.archiver"), path: `/api/commercial/tender-reviews/${r.id}/archiver/`, tone: "ghost" }]} />),
-          },
+          actionsColumn<Rao>(t("ui.actions"), (r) => (r.document ? [] : [{ label: t("ecarts_m1.rao.archiver"), path: `/api/commercial/tender-reviews/${r.id}/archiver/`, tone: "ghost" }])),
         ]}
       />
       <DataTable
@@ -680,11 +700,7 @@ function RaoRc() {
           { key: "type", header: t("ecarts_m1.rao.typeRevue"), render: (r) => r.type_label },
           { key: "st", header: t("commercial.col.statut"), render: (r) => r.statut_label },
           { key: "doc", header: t("ecarts_m1.rao.ged"), render: (r) => doc(r.document) },
-          {
-            key: "act",
-            header: "",
-            render: (r) => (r.document ? null : <ActionBar actions={[{ label: t("ecarts_m1.rao.archiver"), path: `/api/commercial/revues-commande/${r.id}/archiver/`, tone: "ghost" }]} />),
-          },
+          actionsColumn<Rc>(t("ui.actions"), (r) => (r.document ? [] : [{ label: t("ecarts_m1.rao.archiver"), path: `/api/commercial/revues-commande/${r.id}/archiver/`, tone: "ghost" }])),
         ]}
       />
       <p className="muted">{t("ecarts_m1.rao.bs")}</p>

@@ -220,6 +220,8 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
           ...(inc.statut !== "cloture"
             ? [{
                 label: t("actions.cloturer"), path: `/api/hse/incidents/${inc.id}/cloturer/`,
+                // Une seule action pleine par carte : pendant l'enquête, c'est l'arrêt du plan d'action.
+                ...(inc.statut === "en_enquete" ? { tone: "ghost" as const } : {}),
                 prompt: ["quasi_accident", "situation_dangereuse"].includes(inc.type_incident)
                   ? { name: "retour_experience", label: t("m7e.inc.rex") }
                   : { name: "rapport", label: t("hse.act.rapport") },
@@ -230,7 +232,7 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
             : []),
         ]}
       />
-      <button type="button" className="btn ghost" onClick={() => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`)}>
+      <button type="button" className="btn ghost sm" onClick={() => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`)}>
         {t("m7e.inc.pdf")}
       </button>
     </BoardCard>
@@ -309,6 +311,7 @@ export function HsePage() {
     <>
       <PageHeader
         title={t("hse.title")}
+        subtitle={t("tableaux.entetes.hse")}
         actions={
           <QuickForm
             title={t("hse.form.title")}
@@ -344,14 +347,14 @@ export function HsePage() {
       />
 
       <div className="kpi-grid">
-        <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? "∞"} hint={`${t("hse.incidentsOuverts")} · ${s.incidents_ouverts}`} icon={ShieldAlert} tone="ok" delay={0} />
-        <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${t("hse.risquesCritiques")} · ${s.risques_critiques}`} icon={ShieldCheck} tone="brand" delay={0.05} />
-        <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${t("hse.actionsOuvertes")} · ${s.actions_ouvertes}`} icon={Flame} tone="warn" delay={0.1} />
-        <Kpi label={t("hse.epiRenouveler")} value={s.epi_a_renouveler} hint={`${t("hse.formationsPrevues")} · ${s.formations_prevues} · ${t("hse.bsdAttente")} · ${s.bsd_en_attente}`} icon={Activity} tone="warn" delay={0.15} />
+        <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? t("tableaux.entetes.aucunAccident")} hint={`${s.incidents_ouverts} ${t("hse.incidentsOuverts")}`} icon={ShieldAlert} tone="ok" delay={0} />
+        <Kpi label={t("hse.permisActifs")} value={s.permis_actifs} hint={`${s.risques_critiques} ${t("hse.risquesCritiques")}`} icon={ShieldCheck} tone="brand" delay={0.05} />
+        <Kpi label={t("hse.atexQuarantaine")} value={s.atex_quarantaine} hint={`${s.actions_ouvertes} ${t("hse.actionsOuvertes")}`} icon={Flame} tone="warn" delay={0.1} />
+        <Kpi label={t("hse.epiRenouveler")} value={s.epi_a_renouveler} hint={`${s.formations_prevues} ${t("hse.formationsPrevues")} · ${s.bsd_en_attente} ${t("hse.bsdAttente")}`} icon={Activity} tone="warn" delay={0.15} />
         <Kpi
           label={t("hse.trir")}
           value={frequence.data ? formatNumber(frequence.data.trir, { decimals: 2 }) : "—"}
-          hint={`LTIR ${formatNumber(frequence.data?.ltir, { decimals: 2 })} · LTIFR ${formatNumber(frequence.data?.ltifr, { decimals: 2 })} · ${t("hse.joursPerdus")} ${frequence.data?.jours_perdus ?? 0}`}
+          hint={`LTIR ${formatNumber(frequence.data?.ltir, { decimals: 2 })} · LTIFR ${formatNumber(frequence.data?.ltifr, { decimals: 2 })} · ${frequence.data?.jours_perdus ?? 0} ${t("hse.joursPerdus")}`}
           icon={Gauge}
           tone="brand"
           delay={0.2}
