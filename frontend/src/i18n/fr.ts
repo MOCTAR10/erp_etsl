@@ -3629,6 +3629,7 @@ export const fr = {
         acl_revoke: "Droit retiré",
       },
     },
+  },
   // Agent « listes » (vague 2) : kanbans, tableaux et barres de filtres des écrans Achats, Logistique, Stocks,
   // Opérations, Maintenance, Comptabilité et Pipeline.
   listes: {
@@ -3688,6 +3689,7 @@ export const fr = {
       paye: "Payé {{montant}}",
     },
     col: { actions: "Actions" },
+  },
   formulaires: {
     quickForm: {
       toastOk: "Enregistrement effectué",

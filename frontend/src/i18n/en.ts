@@ -3629,6 +3629,7 @@ export const en = {
         acl_revoke: "Right revoked",
       },
     },
+  },
   // "listes" agent (wave 2): kanbans, tables and filter bars of the Purchasing, Logistics, Stock,
   // Operations, Maintenance, Accounting and Pipeline screens.
   listes: {
@@ -3688,6 +3689,7 @@ export const en = {
       paye: "Paid {{montant}}",
     },
     col: { actions: "Actions" },
+  },
   formulaires: {
     quickForm: {
       toastOk: "Saved successfully",
