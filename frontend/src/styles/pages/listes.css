@@ -409,6 +409,16 @@ td .card-actions--choice {
     scroll-snap-type: x mandatory;
     scroll-padding-inline: 0;
   }
+  /* Fondu plus court : la colonne suivante reste lisible (affordance sans voile) */
+  .board[data-overflow-end] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  .board[data-overflow-start] {
+    mask-image: linear-gradient(to right, transparent, #000 24px);
+  }
+  .board[data-overflow-start][data-overflow-end] {
+    mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  }
   .list-toolbar .search-field,
   .list-toolbar .field {
     flex: 1 1 100%;
