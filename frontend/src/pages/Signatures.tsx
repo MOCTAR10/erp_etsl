@@ -73,7 +73,7 @@ export function EnrolementTotp() {
               {t("ecarts_correctif.sig.enrolSecret")} : <code>{cle.secret}</code>
             </p>
             <p className="muted">
-              <a href={cle.otpauth_uri}>{t("ecarts_correctif.sig.enrolLien")}</a>
+              <a className="link-inline" href={cle.otpauth_uri}>{t("ecarts_correctif.sig.enrolLien")}</a>
             </p>
             <div className="sign-row">
               <input
@@ -141,7 +141,7 @@ function SignPanel({ req }: { req: SignatureRequestItem }) {
     <div className="sign-panel">
       {mode?.enrolement_requis ? (
         <p className="action-error" role="alert">
-          {mode.message || t("ecarts_correctif.sig.sansFacteur")} <a href="#enrolement-totp">{t("ecarts_correctif.sig.lienEnrol")}</a>
+          {mode.message || t("ecarts_correctif.sig.sansFacteur")} <a className="link-inline" href="#enrolement-totp">{t("ecarts_correctif.sig.lienEnrol")}</a>
         </p>
       ) : (
         <p className="muted">{methode === "totp" ? t("ecarts_correctif.sig.explainTotp") : t("signatures.explain")}</p>

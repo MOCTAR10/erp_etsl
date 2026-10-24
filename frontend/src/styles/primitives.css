@@ -1324,3 +1324,13 @@
   width: 28px;
   height: 28px;
 }
+
+/* Lien dans un paragraphe : souligné (distinguable sans la couleur, WCAG 1.4.1 / axe link-in-text-block). */
+.link-inline {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-inline:hover {
+  text-decoration-thickness: 2px;
+}
