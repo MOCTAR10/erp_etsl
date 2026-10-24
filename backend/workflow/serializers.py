@@ -59,6 +59,9 @@ class TaskSerializer(serializers.ModelSerializer):
     step_order = serializers.IntegerField(source="step.order", read_only=True)
     circuit_label = serializers.CharField(source="circuit.label", read_only=True)
     assigned_to_email = serializers.EmailField(source="assigned_to.email", read_only=True)
+    # Nom affiché (nom complet, sinon fonction) et rôle de l'assigné : le kanban n'affiche jamais l'e-mail.
+    assigned_to_name = serializers.CharField(source="assigned_to.nom_affiche", read_only=True, default=None)
+    assigned_to_role = serializers.CharField(source="assigned_to.role", read_only=True, default=None)
     comments_count = serializers.IntegerField(
         source="comments.count", read_only=True
     )
@@ -76,6 +79,8 @@ class TaskSerializer(serializers.ModelSerializer):
             "step_order",
             "assigned_to",
             "assigned_to_email",
+            "assigned_to_name",
+            "assigned_to_role",
             "status",
             "due_date",
             "completed_at",

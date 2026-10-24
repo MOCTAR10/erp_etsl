@@ -96,6 +96,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
+    @property
+    def nom_affiche(self):
+        """Nom à afficher dans les libellés et messages : nom complet, sinon fonction — jamais l'adresse e-mail."""
+        return self.get_full_name() or self.get_role_display()
+
     def get_short_name(self):
         return self.first_name
 

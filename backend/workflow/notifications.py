@@ -69,7 +69,7 @@ def escalate_task(task, admin):
     subject = f"Escalade : {task.step.name} en retard — {task.document.title}"
     message = (
         f"La tâche « {task.step.name} » du document « {task.document.title} » "
-        f"(assignée à {(task.assigned_to.get_full_name() or task.assigned_to.email) if task.assigned_to else '—'}) "
+        f"(assignée à {task.assigned_to.nom_affiche if task.assigned_to else '—'}) "
         f"est en retard depuis le {task.due_date:%d/%m/%Y}."
     )
     return notify(admin, subject, message, task=task, kind="escalation")

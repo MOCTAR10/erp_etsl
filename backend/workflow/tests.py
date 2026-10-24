@@ -95,6 +95,10 @@ class WorkflowTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(resp.data["step_order"], 1)
         self.assertEqual(resp.data["assigned_to_email"], self.chef_service.email)
+        # Nom affiché de l'assigné : nom complet, sinon fonction — jamais l'e-mail ; rôle exposé à part.
+        self.assertEqual(resp.data["assigned_to_name"], self.chef_service.nom_affiche)
+        self.assertNotIn("@", resp.data["assigned_to_name"])
+        self.assertEqual(resp.data["assigned_to_role"], self.chef_service.role)
 
         self._auth(self.comptable)
         doc = self.client.get(f"/api/documents/documents/{doc_id}/").data
@@ -380,3 +384,14 @@ class ManualCircuitsSeedTests(TestCase):
         count = CircuitStep.objects.count()
         call_command("seed_manual_circuits")
         self.assertEqual(CircuitStep.objects.count(), count)
+
+
+class NomAfficheTests(TestCase):
+    def test_nom_complet_sinon_fonction_jamais_email(self):
+        from users.models import User
+
+        nomme = User.objects.create_user(email="a.b@etls.local", password="x", first_name="Alice", last_name="Bongo",
+                                         role=User.Role.FINANCE)
+        anonyme = User.objects.create_user(email="sans.nom@etls.local", password="x", role=User.Role.MAINTENANCE)
+        self.assertEqual(nomme.nom_affiche, "Alice Bongo")
+        self.assertEqual(anonyme.nom_affiche, "Maintenance")
