@@ -29,8 +29,12 @@ class ParcoursDemoLotBTests(TestCase):
         call_command("seed_all_demo", verbosity=0)
 
     def test_situations_dans_chaque_etat(self):
-        statuts = set(SituationTravaux.objects.filter(label__contains="(demo)").values_list("status", flat=True))
+        from analytics.vitrine.nettoyage import SITUATIONS_PARCOURS
+
+        libelles = [nouveau for _, nouveau in SITUATIONS_PARCOURS]
+        statuts = set(SituationTravaux.objects.filter(label__in=libelles).values_list("status", flat=True))
         self.assertEqual(statuts, {"brouillon", "soumise", "validee", "facturee"})
+        self.assertFalse(SituationTravaux.objects.filter(label__contains="(demo)").exists())
 
     def test_situation_facturee_emet_une_facture_et_l_ecriture_de_vente(self):
         facture = FactureClient.objects.get(situation__status="facturee")
