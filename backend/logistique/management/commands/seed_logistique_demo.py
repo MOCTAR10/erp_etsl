@@ -26,24 +26,17 @@ class Command(BaseCommand):
             code="XAF", defaults={"label": "Franc CFA (BEAC)", "symbol": "FCFA", "decimals": 0}
         )
 
+        # Un seul tiers GLOBAL RENTAL (GR-0001, référentiel) : propriétaire du parc et loueur (plus de doublons).
         gr1, _ = Partner.objects.get_or_create(
-            code="GR-1000",
+            code="GR-0001",
             defaults={
-                "name": "GLOBAL RENTAL — Parc Gabon",
-                "kind": Partner.Kind.FOURNISSEUR,
+                "name": "GLOBAL RENTAL",
+                "kind": Partner.Kind.BOTH,
                 "currency": currency,
                 "is_global_rental": True,
             },
         )
-        gr2, _ = Partner.objects.get_or_create(
-            code="GR-2000",
-            defaults={
-                "name": "GLOBAL RENTAL — PCG / contractant",
-                "kind": Partner.Kind.AUTRE,
-                "currency": currency,
-                "is_global_rental": True,
-            },
-        )
+        gr2 = gr1
 
         eq_grue, created = EquipementParc.objects.get_or_create(
             code="PAR00001",

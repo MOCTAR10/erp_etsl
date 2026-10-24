@@ -326,7 +326,7 @@ class ClotureGestionViewSet(DjangoValidationMixin, viewsets.ModelViewSet):
         ):
             notify(
                 user, f"Reporting de gestion publié : {cloture.period}",
-                f"Le reporting de {cloture.period} est publié (statut : {cloture.reporting_statut}).",
+                f"Le reporting de {cloture.period} est publié ({cloture.reporting_statut_libelle}).",
                 kind="info",
             )
         return Response(self.get_serializer(cloture).data)

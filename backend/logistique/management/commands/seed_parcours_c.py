@@ -26,9 +26,11 @@ class Command(ParcoursA):
             self._run()
 
     def _run(self):
+        from analytics.vitrine.nettoyage import renommer_libelles_herites
         from users.management.commands.seed_all_demo import _sync_sequences
 
         _sync_sequences()
+        renommer_libelles_herites()  # bases chargées avec les anciens libellés « (demo) » / sans accents
         self.clients = {}
         self.today = timezone.localdate()
         self.parcours_gr()
@@ -64,7 +66,7 @@ class Command(ParcoursA):
         })
 
     def parcours_gr(self):
-        partenaire = Partner.objects.get(code="GR-2000")
+        partenaire = Partner.objects.get(code="GR-0001")
         equipement = EquipementParc.objects.get(code="PAR00009")
         affaire = Affaire.objects.filter(title=PREFIXE + "Prestation GLOBAL RENTAL").first()
         if affaire is None:
@@ -74,7 +76,7 @@ class Command(ParcoursA):
         self._tarif(partenaire, equipement, 30, 165_000, 30_000)
         actif = self._actif_gr(equipement)
         # Seuil compteur : 840 h au départ, intervalle 50 h -> le retour à 900 h déclenche l'OT préventif (M4 -> M8).
-        self._plan(actif, "Vidange et graissage (demo)", intervalle_compteur=50, dernier_compteur=840,
+        self._plan(actif, "Vidange et graissage", intervalle_compteur=50, dernier_compteur=840,
                    derniere_date=self.today - timedelta(days=20))
         if not LocationGR.objects.filter(equipement=equipement, affaire=affaire).exists():
             loc = self.call("logistique@etls.local", "post", "/api/logistique/locations/", {
@@ -199,8 +201,8 @@ class Command(ParcoursA):
             if not ExigenceHabilitation.objects.filter(type_permis=type_permis, mot_cle=mot).exists():
                 self.call(pdg, "post", "/api/hse/exigences-habilitation/", {"type_permis": type_permis, "mot_cle": mot})
         annee = self.today.year
-        if not Duer.objects.filter(annee=annee, perimetre="Atelier Libreville (demo)").exists():
-            duer = self.call(pdg, "post", "/api/hse/duer/", {"annee": annee, "perimetre": "Atelier Libreville (demo)"})
+        if not Duer.objects.filter(annee=annee, perimetre="Atelier Libreville").exists():
+            duer = self.call(pdg, "post", "/api/hse/duer/", {"annee": annee, "perimetre": "Atelier Libreville"})
             for lieux, activite, desc, proba, gravite, mesure in (
                 ("Atelier soudure", "Soudage", "Projections et fumées de soudage", 4, 3, "Écrans, aspiration, EPI soudeur"),
                 ("Zone de levage", "Manutention", "Chute de charge lors du levage de spools", 2, 5, "Élingues vérifiées, balisage, plan de levage"),
@@ -211,10 +213,10 @@ class Command(ParcoursA):
                     "probabilite": proba, "gravite": gravite, "mesure": mesure,
                 })
             self.call(pdg, "post", f"/api/hse/duer/{duer['id']}/approuver/")
-        if not AuditHse.objects.filter(zone="Atelier Libreville (demo)").exists():
+        if not AuditHse.objects.filter(zone="Atelier Libreville").exists():
             # Audit réalisé avec un écart traité par une action corrective clôturée, puis clôturé ; un second reste planifié.
             audit = self.call(hse, "post", "/api/hse/audits/", {
-                "type_audit": "audit", "zone": "Atelier Libreville (demo)", "referentiel": "ISO 45001",
+                "type_audit": "audit", "zone": "Atelier Libreville", "referentiel": "ISO 45001",
                 "date_prevue": str(self.today - timedelta(days=10)),
             })
             self.call(hse, "post", f"/api/hse/audits/{audit['id']}/realiser/", {"score": 82})
@@ -229,12 +231,12 @@ class Command(ParcoursA):
             self.call(hse, "post", "/api/hse/constats-audit/", {"audit": audit["id"], "description": "Extincteurs à jour", "gravite": "conforme"})
             self.call(hse, "post", f"/api/hse/audits/{audit['id']}/cloturer/")
             self.call(hse, "post", "/api/hse/audits/", {
-                "type_audit": "inspection", "zone": "Chantier tuyauterie (demo)", "referentiel": "ISO 45001",
+                "type_audit": "inspection", "zone": "Chantier tuyauterie", "referentiel": "ISO 45001",
                 "date_prevue": str(self.today + timedelta(days=20)),
             })
-        if not PlanUrgence.objects.filter(intitule="Evacuation incendie atelier (demo)").exists():
+        if not PlanUrgence.objects.filter(intitule="Évacuation incendie atelier").exists():
             plan = self.call(hse, "post", "/api/hse/plans-urgence/", {
-                "type_plan": "incendie", "intitule": "Evacuation incendie atelier (demo)", "perimetre": "Atelier Libreville",
+                "type_plan": "incendie", "intitule": "Évacuation incendie atelier", "perimetre": "Atelier Libreville",
                 "periodicite_mois": 6,
             })
             self.call(hse, "post", "/api/hse/exercices-urgence/", {

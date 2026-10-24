@@ -14,6 +14,7 @@ from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
 from django.utils import timezone
 from rest_framework.permissions import BasePermission
 
+from config.nombres import pourcentage_fr
 from users.models import User
 from users.rbac import can_read_app
 
@@ -342,15 +343,20 @@ def detecter_ecarts(budgets=None, today=None):
                 echeance=today + timedelta(days=AnalyseEcart.DELAI_JOURS),
             )
             crees.append(analyse)
+            sujet, message = message_ecart(analyse, ligne["period_label"])
             for user in destinataires:
-                notify(
-                    user,
-                    f"Écart budgétaire {pct:+} % : {budget.code} — {ligne['period_label']}",
-                    f"Le budget « {budget.label} » ({budget.code}) s'écarte de {pct:+} % sur {ligne['period_label']}. "
-                    f"Analyse obligatoire avant le {analyse.echeance:%d/%m/%Y} ({analyse.code}).",
-                    kind="reminder",
-                )
+                notify(user, sujet, message, kind="reminder")
     return crees
+
+
+def message_ecart(analyse, period_label):
+    """(objet, message) de la notification d'un écart > 10 % : « Écart budgétaire −100 % : BUD00001 — 2026-03 »."""
+    budget, pct = analyse.budget, pourcentage_fr(analyse.ecart_pct, signe=True)
+    return (
+        f"Écart budgétaire {pct} : {budget.code} — {period_label}",
+        f"Le budget « {budget.label} » ({budget.code}) s'écarte de {pct} sur {period_label}. "
+        f"Analyse obligatoire avant le {analyse.echeance:%d/%m/%Y} ({analyse.code}).",
+    )
 
 
 # --------------------------------------------------------------------------------------------------
@@ -394,10 +400,32 @@ PARAMETRES_DEFAUT = {
     "POND_EN_COURS": ("Pondération du pipe : offres en cours (offre, négociation)", Decimal("60"), "%", "RGM_POND_PROSPECT"),
     "POND_PROSPECT": ("Pondération du pipe : prospects (prospection, qualification)", Decimal("25"), "%", "RGM_POND_PROSPECT"),
 }
+# Nom et unité des 12 KPI KP-M11 (source unique : libellés des cibles ci-dessous et tableau des KPI d'`ecarts_m11`).
+KPI_NOMS = {
+    "01": ("Taux de marge brute", "%"),
+    "02": ("Taux de marge opérationnelle", "%"),
+    "03": ("Taux de marge nette", "%"),
+    "04": ("Exécution du budget de charges", "%"),
+    "05": ("Réalisation du budget de produits", "%"),
+    "06": ("Taux moyen de sous-activité", "%"),
+    "07": ("Conformité de la doctrine Mix A / B / C", "%"),
+    "08": ("Délai maximal de clôture de gestion", "jours"),
+    "09": ("Reportings publiés à J+4", "%"),
+    "10": ("Analyses d'écart rendues dans le délai", "%"),
+    "11": ("Poids du coût GLOBAL RENTAL (618)", "%"),
+    "12": ("Couverture du budget de produits par le pipe", "%"),
+}
+
+
+def libelle_cible_kpi(num):
+    """« Cible — Taux de marge brute (KP-M11-01) » : nom de l'indicateur d'abord, code en secondaire (constat B06)."""
+    return f"Cible — {KPI_NOMS[num][0]} (KP-M11-{num})"
+
+
 # Cibles des 12 KPI KP-M11 (table KPI_CIBLES)
 for _num, _cible in {"01": 25, "02": 12, "03": 8, "04": 100, "05": 95, "06": 5, "07": 100, "08": 4, "09": 100,
                      "10": 100, "11": 15, "12": 100}.items():
-    PARAMETRES_DEFAUT[f"KPI_{_num}"] = (f"Cible du KPI KP-M11-{_num}", Decimal(_cible), "", "KPI_CIBLES")
+    PARAMETRES_DEFAUT[f"KPI_{_num}"] = (libelle_cible_kpi(_num), Decimal(_cible), KPI_NOMS[_num][1], "KPI_CIBLES")
 
 
 def get_param_gestion(code):
@@ -489,9 +517,10 @@ def alerter_sous_activite(today=None):
                 continue
             crees.append(alerte)
             for user in destinataires:
+                taux = pourcentage_fr(r["taux_sous_activite"])
                 notify(
-                    user, f"Sous-activité {r['taux_sous_activite']} % : {r['code']} (centre 99)",
-                    f"Le budget « {r['label']} » ({r['code']}) est sous-consommé de {r['taux_sous_activite']} % "
+                    user, f"Sous-activité {taux} : {r['code']} (centre 99)",
+                    f"Le budget « {r['label']} » ({r['code']}) est sous-consommé de {taux} "
                     f"sur les périodes écoulées : classement au centre 99.",
                     kind="reminder",
                 )

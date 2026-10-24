@@ -141,12 +141,12 @@ class Command(BaseCommand):
         )
 
         won = next(o for o in opportunities.values() if o.stage == "gagne")
+        # Codes servis par la séquence (AFF00001, CTT00001) : repérage par l'intitulé, pas par un code forcé (B20).
         affaire, _ = Affaire.objects.get_or_create(
-            code="AFF-00001",
+            title="Contrat soudage ateliers 2026",
             defaults={
                 "opportunity": won,
                 "client": profiles["PGR-001"],
-                "title": "Contrat soudage ateliers 2026",
                 "affaire_type": Affaire.AffaireType.ATELIER,
                 "status": Affaire.Status.EN_COURS,
                 "contract_amount": 210_000_000,
@@ -167,11 +167,10 @@ class Command(BaseCommand):
         )
 
         contract, _ = Contract.objects.get_or_create(
-            code="CTT-00001",
+            affaire=affaire,
+            profile=Contract.Profile.MARCHE_TRAVAUX,
             defaults={
-                "affaire": affaire,
                 "client": profiles["PGR-001"],
-                "profile": Contract.Profile.MARCHE_TRAVAUX,
                 "start_date": today - timezone.timedelta(days=60),
                 "end_date": today + timezone.timedelta(days=270),
                 "months": 18,

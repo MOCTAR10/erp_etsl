@@ -347,6 +347,16 @@ class ClotureGestion(models.Model):
             return "j6" if self.date_publication else "en_attente"
         return "hors_delai"
 
+    REPORTING_LIBELLES = {
+        "a_temps": "publié à temps (J+4 au plus)", "j6": "publié entre J+5 et J+6",
+        "hors_delai": "hors délai (au-delà de J+6)", "en_attente": "en attente",
+    }
+
+    @property
+    def reporting_statut_libelle(self):
+        """Statut de reporting lisible pour les messages (jamais le code brut « a_temps »)."""
+        return self.REPORTING_LIBELLES.get(self.reporting_statut, self.reporting_statut)
+
 
 class AnalyseEcart(models.Model):
     """Analyse d'écart budget / réalisé > 10 % — à rendre sous 5 jours (lot 15, CDC M11 §4.4).

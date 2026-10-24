@@ -44,10 +44,10 @@ class Command(BaseCommand):
 
         periods = {p.number: p for p in Period.objects.filter(fiscal_year=fiscal_year)}
 
+        # Codes servis par la séquence (BUD00001, CLO00001) : repérage par le libellé / la période (B20).
         budget, created = Budget.objects.get_or_create(
-            code="BUD-00001",
+            label="Budget charges — Centre Tôlerie 2026",
             defaults={
-                "label": "Budget charges — Centre Tôlerie 2026",
                 "type_budget": Budget.TypeBudget.CHARGE,
                 "fiscal_year": fiscal_year,
                 "axis": axis_cc,
@@ -65,9 +65,8 @@ class Command(BaseCommand):
                 )
 
         budget_prod, created_prod = Budget.objects.get_or_create(
-            code="BUD-00002",
+            label="Budget produits — Affaire Maintenance pipelines",
             defaults={
-                "label": "Budget produits — Affaire Maintenance pipelines",
                 "type_budget": Budget.TypeBudget.PRODUIT,
                 "fiscal_year": fiscal_year,
                 "axis": axis_proj,
@@ -104,19 +103,15 @@ class Command(BaseCommand):
         p1 = periods.get(1)
         if p1:
             ClotureGestion.objects.get_or_create(
-                code="CLO-00001",
+                period=p1,
                 defaults={
-                    "period": p1,
                     "date_cloture": p1.end_date + timedelta(days=2),
                     "statut": ClotureGestion.Statut.REALISEE,
                 },
             )
         p2 = periods.get(2)
         if p2:
-            ClotureGestion.objects.get_or_create(
-                code="CLO-00002",
-                defaults={"period": p2, "statut": ClotureGestion.Statut.EN_ATTENTE},
-            )
+            ClotureGestion.objects.get_or_create(period=p2, defaults={"statut": ClotureGestion.Statut.EN_ATTENTE})
 
         self.stdout.write(
             self.style.SUCCESS(

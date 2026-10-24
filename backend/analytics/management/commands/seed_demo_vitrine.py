@@ -1,8 +1,11 @@
 """Jeu de démonstration « vitrine » : 12 mois glissants d'activité fictive pour présenter l'ERP à la Direction.
 
-À lancer APRÈS `seed_all_demo`, qu'il COMPLÈTE sans modifier ses données (les tests E2E en dépendent) ; volontairement
-absent de `seed_all_demo`. Idempotent : chaque objet est repéré par une clé métier stable (code tiers, intitulé
-d'affaire, libellé de situation, matricule…) ; une seconde exécution ne crée rien.
+À lancer APRÈS `seed_all_demo`, qu'il COMPLÈTE (volontairement absent de `seed_all_demo` : la base E2E n'en dépend
+pas). Seules retouches des données du parcours : horodatages ramenés à une date vraisemblable (pièces GED,
+signatures, notifications, clôtures), libellés et codes hérités remis au propre (`vitrine.nettoyage`, mêmes règles
+que les seeds actuels) ; aucun montant n'est modifié, les statuts ne changent que par les actions de l'API.
+Idempotent : chaque objet est repéré par une clé métier stable (code tiers, intitulé d'affaire, libellé de
+situation, matricule…) ; une seconde exécution ne crée rien.
 
 Méthode : les chaînes qui touchent la comptabilité ou un statut (affaires, situations, factures, encaissements,
 achats, engagements, paie, budgets, clôtures) passent par l'API réelle ou par les services métier (écritures
@@ -23,6 +26,7 @@ from django.utils import timezone
 
 from analytics.vitrine.achats import VitrineAchats
 from analytics.vitrine.commercial import VitrineCommercial
+from analytics.vitrine.finitions import VitrineFinitions
 from analytics.vitrine.ged import VitrineGed
 from analytics.vitrine.pilotage import VitrinePilotage
 from analytics.vitrine.rh import VitrineRH
@@ -31,7 +35,8 @@ from controle_gestion.management.commands.seed_parcours_d import Command as Parc
 from users.models import User
 
 
-class Command(VitrineCommercial, VitrineAchats, VitrineRH, VitrineTerrain, VitrineGed, VitrinePilotage, ParcoursD):
+class Command(VitrineCommercial, VitrineAchats, VitrineRH, VitrineTerrain, VitrineGed, VitrinePilotage, VitrineFinitions,
+              ParcoursD):
     help = "Jeu de demonstration vitrine : 12 mois d'activite (affaires, achats, paie, terrain, GED, pilotage)."
 
     def handle(self, *args, **options):
@@ -61,6 +66,7 @@ class Command(VitrineCommercial, VitrineAchats, VitrineRH, VitrineTerrain, Vitri
         # Exercice précédent : les 12 mois glissants débordent sur l'année N-1 (périodes ouvertes, journaux existants).
         call_command("seed_accounting", year=self.today.year - 1, stdout=io.StringIO())
         self.stdout.write(self.style.MIGRATE_HEADING("Jeu vitrine (12 mois glissants)"))
+        self.etape("libelles et codes herites", self.nettoyer)
         self.etape("tiers et articles", self.tiers_et_articles)
         self.etape("pipeline commercial", self.pipeline)
         self.etape("affaires, situations, factures, encaissements", self.affaires)
@@ -78,4 +84,9 @@ class Command(VitrineCommercial, VitrineAchats, VitrineRH, VitrineTerrain, Vitri
         self.etape("budgets et ecarts", self.budgets)
         self.etape("clotures de gestion", self.clotures)
         self.etape("cubes BI", self.cubes)
+        self.etape("analyses d'ecart", self.analyses_ecart)
+        self.etape("dates des pieces GED du chargement", self.dater_ged)
+        self.etape("signatures avancees", self.signatures)
+        self.etape("relances et escalades des taches en retard", self.relances)
+        self.etape("dates des notifications du chargement", self.dater_notifications)
         self.stdout.write(self.style.SUCCESS("Jeu vitrine pret."))
