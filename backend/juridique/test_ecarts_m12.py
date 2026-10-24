@@ -287,6 +287,9 @@ class LiageEtArchivageAutoTests(EcartsM12Base):
         lien = LienDocument.objects.get(objet_type="juridique.convention", objet_id=str(conv.pk))
         self.assertEqual(lien.document.status, Document.Status.ARCHIVED)
         self.assertEqual(len(lien.document.sha256), 64)
+        # Titre GED lisible : libellé du statut, jamais le code brut « (signe) ».
+        self.assertIn("archivage (Signé (en cours de validité))", lien.document.title)
+        self.assertNotIn("(signe)", lien.document.title)
         # Idempotent : un nouvel enregistrement dans le même statut ne réarchive pas.
         with self.captureOnCommitCallbacks(execute=True):
             conv.save()
