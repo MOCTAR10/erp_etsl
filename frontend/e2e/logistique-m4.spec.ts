@@ -10,6 +10,8 @@ test.describe("M4 Logistique : paramètres GR et coût par affaire", () => {
     await page.goto("/logistique");
     const section = page.getByTestId("parametres-logistique");
     await expect(section.getByTestId("alerte-provisoire-logistique")).toContainText(/provisoire/);
+    // Paramètres repliés dans un panneau compact (B-05) : on les affiche avant de les modifier.
+    await section.getByRole("button", { name: "Afficher", exact: true }).click();
 
     const ligne = section.getByRole("row", { name: /jours par mois facturable/ });
     // Valeur différente de l'actuelle : une valeur inchangée resterait « confirmée » d'une exécution à l'autre.

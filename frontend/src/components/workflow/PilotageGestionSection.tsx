@@ -7,6 +7,7 @@ import { api } from "../../api/client";
 import { EMPTY, formatMoney, formatParametre, formatPercent } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { AtterrissageResult, DoctrineResult, NiveauxMarge, ParametreGestion, SousActiviteResult } from "../../types";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 import { Badge, DataTable, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
@@ -28,8 +29,6 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
-  // Paramètres repliés par défaut, ouverts tant que des valeurs provisoires attendent ETSL ; le choix de l'utilisateur prime ensuite.
-  const [ouvert, setOuvert] = useState<boolean | null>(null);
   const enabled = fiscalYear !== undefined;
 
   const params = useQuery({
@@ -109,7 +108,7 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
     {
       key: "statut",
       header: t("revueKit.fin.statut"),
-      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`pilotageGestion.${p.statut_valeur}`)}</Badge>,
+      render: (p) => <ParamStatusBadge provisoire={p.est_provisoire} />,
       sortValue: (p) => p.statut_valeur,
     },
     {
@@ -274,19 +273,15 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
           <p className="muted">{t("pilotageGestion.nonClasses", { count: doctrine.data.non_classes })}</p>
         )}
 
-        <h4 className="section-heading">{t("pilotageGestion.params")}</h4>
-        {provisoires > 0 && (
-          <div className="banner warn" role="note" data-testid="alerte-provisoire-gestion">
-            <AlertTriangle size={18} aria-hidden />
-            <div className="banner-body">
-              <span className="banner-text">{t("pilotageGestion.warnProvisoire", { count: provisoires })}</span>
-            </div>
-          </div>
-        )}
-        <details className="r3-repli" open={ouvert ?? provisoires > 0} onToggle={(e) => setOuvert(e.currentTarget.open)}>
-          <summary>{t("revueKit.fin.voirParametres", { count: (params.data ?? []).length })}</summary>
+        <ParamsPanel
+          module="controle_gestion"
+          title={t("pilotageGestion.params")}
+          count={params.data ? provisoires : undefined}
+          total={params.data?.length}
+          alertTestId="alerte-provisoire-gestion"
+        >
           <DataTable columns={colonnes} rows={params.data ?? []} caption={t("pilotageGestion.params")} density="compact" />
-        </details>
+        </ParamsPanel>
       </div>
     </SectionCard>
   );

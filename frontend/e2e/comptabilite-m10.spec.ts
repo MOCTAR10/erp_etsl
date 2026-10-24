@@ -8,6 +8,8 @@ test.describe("M10 Comptabilité : paramètres de lettrage", () => {
     await loginAs(page, DEMO_USERS.finance);
     await page.goto("/comptabilite");
     await expect(page.getByTestId("alerte-provisoire-compta")).toContainText(/provisoire/);
+    // Paramètres repliés dans un panneau compact (B-05) : on les affiche avant de les modifier.
+    await page.getByTestId("parametres-compta").getByRole("button", { name: "Afficher", exact: true }).click();
 
     const ligne = page.getByRole("row", { name: /Tolérance d'écart de lettrage/ });
     await ligne.getByRole("button", { name: "Modifier" }).click();

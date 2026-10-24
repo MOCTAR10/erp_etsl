@@ -10,6 +10,8 @@ test.describe("M11 Contrôle de gestion : paramètres de pilotage", () => {
     const section = page.getByTestId("pilotage-gestion");
     await expect(section.getByTestId("alerte-provisoire-gestion")).toContainText(/provisoire/);
     await expect(section.getByRole("cell", { name: "Mix A", exact: true })).toBeVisible();
+    // Paramètres repliés dans un panneau compact (B-05) : on les affiche avant de les modifier.
+    await section.getByRole("button", { name: "Afficher", exact: true }).click();
 
     const ligne = section.getByRole("row", { name: /Sous-activité maximale du centre 90/ });
     // Valeur différente de l'actuelle : une valeur inchangée resterait « confirmée » d'une exécution à l'autre.

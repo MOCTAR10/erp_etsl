@@ -1,6 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { corpsEdition, parModule, SaisieInvalide, type ParametreEtsl } from "./parametres";
+import { corpsEdition, libelleCourt, optionPourValeur, optionsCodees, parModule, SaisieInvalide, type ParametreEtsl } from "./parametres";
+
+describe("paramètres codés (A-12)", () => {
+  const methode =
+    "Calcul du % d'avancement : 1 = heures pointées / prévues, 2 = quantités réalisées / commandées, 3 = dernier % déclaré (rapport d'avancement)";
+  it("lit les options décrites dans le libellé", () => {
+    expect(optionsCodees("Méthode (1 = coûts engagés / budget M11, 2 = situations de travaux M3)")).toEqual({
+      "1": "coûts engagés / budget M11",
+      "2": "situations de travaux M3",
+    });
+    expect(optionsCodees(methode)["3"]).toBe("dernier % déclaré (rapport d'avancement)");
+  });
+  it("affiche l'option retenue plutôt que le chiffre", () => {
+    expect(optionPourValeur(methode, "1.00")).toBe("Heures pointées / prévues");
+    expect(optionPourValeur("Déduction du coût GLOBAL RENTAL (618) : 1 = dès la marge brute, 3 = en marge nette", "3.00")).toBe("En marge nette");
+    expect(optionPourValeur("Sans options", "1")).toBeNull();
+  });
+  it("raccourcit le libellé sans perdre le sens", () => {
+    expect(libelleCourt(methode)).toBe("Calcul du % d'avancement");
+    expect(libelleCourt("Clé de répartition des charges de structure (1 = heures productives, 2 = chiffre d'affaires)")).toBe(
+      "Clé de répartition des charges de structure",
+    );
+    expect(libelleCourt("Déduction du coût GLOBAL RENTAL (618) : 1 = dès la marge brute")).toBe("Déduction du coût GLOBAL RENTAL (618)");
+    expect(libelleCourt("Délai de clôture")).toBe("Délai de clôture");
+  });
+});
 
 const base: ParametreEtsl = {
   id: "1",

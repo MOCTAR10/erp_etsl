@@ -14,6 +14,8 @@ test.describe("M8 Maintenance : fiabilité, pièces de rechange, coût vers M11"
 
     const section = page.getByTestId("parametres-maintenance");
     await expect(section.getByTestId("alerte-provisoire-parametres-m8")).toContainText(/provisoire/);
+    // Paramètres repliés dans un panneau compact (B-05) : on les affiche avant de les modifier.
+    await section.getByRole("button", { name: "Afficher", exact: true }).click();
     const ligne = section.getByRole("row", { name: /heures de service théoriques/ });
     // Valeur différente de l'actuelle : une valeur inchangée resterait « confirmée » d'une exécution à l'autre.
     const actuelle = /(?<![\d.])24(\.00)? heures/.test(await ligne.innerText()) ? "20" : "24";

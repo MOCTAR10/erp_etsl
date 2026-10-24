@@ -9,6 +9,7 @@ import { ActionBar, Badge, DataTable, Kpi, Menu, QuickForm, SectionCard } from "
 import type { ActionDef, Column } from "../ui";
 import { CardActions } from "../ui/Board";
 import { actionsColumn } from "../ui/DataTable";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 import { decimales, statutLabel, useClientPage } from "./outils";
 
 interface Parametre {
@@ -295,7 +296,7 @@ export function EcartsM3Section() {
       key: "statut",
       header: k("parametres.statut"),
       sortValue: (p) => p.est_provisoire,
-      render: (p) => (p.est_provisoire ? <Badge tone="warn">{t("tableaux.operations.provisoire")}</Badge> : <Badge tone="ok">{k("confirme")}</Badge>),
+      render: (p) => <ParamStatusBadge provisoire={p.est_provisoire} />,
     },
     actionsColumn<Parametre>(
       actionsHeader,
@@ -653,16 +654,12 @@ export function EcartsM3Section() {
 
   return (
     <>
-      <SectionCard title={k("parametres.title")} subtitle={t("tableaux.operations.nbParametres", { count: parametres.length })}>
-        {provisoires > 0 && (
-          <p data-testid="m3-provisoire">
-            <Badge tone="warn">{t("tableaux.operations.provisoire")}</Badge> {t("ecarts_m3.parametres.bandeau", { n: provisoires })}
-          </p>
-        )}
+      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
+      <ParamsPanel variant="card" module="operations" title={k("parametres.title")} count={provisoires} total={parametres.length} alertTestId="m3-provisoire">
         <div data-testid="m3-parametres">
           <DataTable columns={colsParametres} rows={parametres} caption={k("parametres.title")} emptyLabel={t("tableaux.operations.aucunParametre")} />
         </div>
-      </SectionCard>
+      </ParamsPanel>
 
       <SectionCard
         title={k("preparation.title")}

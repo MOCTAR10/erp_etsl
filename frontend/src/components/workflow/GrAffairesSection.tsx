@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +8,8 @@ import { formatMoney, formatParametre } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { GrAffairesResult, ParametreLogistique } from "../../types";
 import { Badge, currentMonth, MonthPicker, SectionCard } from "../ui";
+import { ParamsPanel } from "../parametres/ParamsPanel";
+import { ParamValueTable } from "../parametres/ParamValueTable";
 
 const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
 
@@ -89,7 +91,6 @@ export function ParametresLogistiqueSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-  const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
   const params = useQuery({
     queryKey: ["log-parametres"],
     queryFn: () => api.listAll<ParametreLogistique>("/api/logistique/parametres/"),
@@ -99,7 +100,6 @@ export function ParametresLogistiqueSection() {
   const modifier = useMutation({
     mutationFn: (v: { id: string; valeur: string }) => api.patch(`/api/logistique/parametres/${v.id}/`, { valeur: v.valeur }),
     onSuccess: () => {
-      setEdit(null);
       setError(null);
       refresh();
       void qc.invalidateQueries({ queryKey: ["cg-gr-affaires"] });
@@ -118,64 +118,28 @@ export function ParametresLogistiqueSection() {
   if (params.isError) return null;
   const provisoires = (params.data ?? []).filter((p) => p.est_provisoire).length;
   return (
-    <SectionCard title={t("paramLogistique.title")}>
-      <div data-testid="parametres-logistique">
-        <p className="muted">{t("paramLogistique.hint")}</p>
-        {provisoires > 0 && (
-          <div className="banner warn" role="note" data-testid="alerte-provisoire-logistique">
-            <SlidersHorizontal size={18} aria-hidden />
-            <div className="banner-body">
-              <p className="banner-text">{t("paramLogistique.warnProvisoire", { count: provisoires })}</p>
-            </div>
-          </div>
-        )}
-        {error && <p className="action-error" role="alert">{error}</p>}
-        <table className="table">
-          <caption className="sr-only">{t("paramLogistique.title")}</caption>
-          <thead>
-            <tr>
-              <th>{t("revueKit.ops.param.parametre")}</th>
-              <th className="num">{t("revueKit.ops.param.valeur")}</th>
-              <th>{t("revueKit.ops.param.statut")}</th>
-              <th><span className="sr-only">{t("revueKit.ops.param.actions")}</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(params.data ?? []).map((p) => (
-              <tr key={p.id}>
-                <td>{t(`revueKit.ops.param.libelles.${p.code}`, { defaultValue: p.label })}</td>
-                <td className="num cell-nowrap">
-                  {edit?.id === p.id ? (
-                    <input type="number" className="control" min="1" step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-                  ) : (
-                    valeurParametre(p.valeur, p.unite)
-                  )}
-                </td>
-                <td><Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`pilotageGestion.${p.statut_valeur}`)}</Badge></td>
-                <td>
-                  <div className="card-actions card-actions--end">
-                    {edit?.id === p.id ? (
-                      <>
-                        <button type="button" className="btn primary sm" disabled={modifier.isPending} onClick={() => modifier.mutate(edit)}>{t("pilotageGestion.valider")}</button>
-                        <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>{t("pilotageGestion.annuler")}</button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("pilotageGestion.modifier")}</button>
-                        {p.est_provisoire && (
-                          <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("paramLogistique.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                            {t("pilotageGestion.confirmer")}
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </SectionCard>
+    <ParamsPanel
+      variant="card"
+      module="logistique"
+      title={t("paramLogistique.title")}
+      count={params.data ? provisoires : undefined}
+      total={params.data?.length}
+      testId="parametres-logistique"
+      alertTestId="alerte-provisoire-logistique"
+    >
+      <p className="muted">{t("paramLogistique.hint")}</p>
+      {error && <p className="action-error" role="alert">{error}</p>}
+      <ParamValueTable
+        rows={params.data ?? []}
+        caption={t("paramLogistique.title")}
+        libelle={(p) => t(`revueKit.ops.param.libelles.${p.code}`, { defaultValue: p.label })}
+        valeur={(p) => valeurParametre(p.valeur, p.unite)}
+        min="1"
+        pending={modifier.isPending || confirmer.isPending}
+        confirmMessage={t("paramLogistique.confirmConfirmer")}
+        onSave={(id, valeur) => modifier.mutateAsync({ id, valeur })}
+        onConfirm={(id) => confirmer.mutate(id)}
+      />
+    </ParamsPanel>
   );
 }

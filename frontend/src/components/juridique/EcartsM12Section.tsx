@@ -6,6 +6,7 @@ import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 
 interface Parametre {
   id: number;
@@ -241,16 +242,9 @@ export function EcartsM12Section() {
 
   return (
     <div data-testid="ecarts-m12">
-      <SectionCard title={t("ecarts_m12.parametres.title")} subtitle={t("revueR3.juridique.parametresSub")}>
-        {provisoires > 0 && (
-          <p className="r3-note" role="note" data-testid="m12-provisoire">
-            {t("ecarts_m12.parametres.bandeau", { count: provisoires })}
-          </p>
-        )}
-        <details className="r3-repli">
-          <summary>
-            {t("revueR3.juridique.voirParametres", { count: params.length })}
-          </summary>
+      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
+      <ParamsPanel variant="card" module="juridique" title={t("ecarts_m12.parametres.title")} count={provisoires} total={params.length} alertTestId="m12-provisoire">
+        <p className="muted">{t("revueR3.juridique.parametresSub")}</p>
         <div data-testid="m12-parametres">
           <DataTable
             caption={t("ecarts_m12.parametres.title")}
@@ -262,7 +256,7 @@ export function EcartsM12Section() {
               {
                 key: "statut",
                 header: t("tableaux.juridique.statut"),
-                render: (p) => (p.provisoire ? provisoireBadge : <Badge tone="ok">{t("ecarts_m12.confirme")}</Badge>),
+                render: (p) => <ParamStatusBadge provisoire={p.provisoire} />,
               },
               actionsColumn<Parametre>(t("ui.actions"), (p) => [
                 { label: t("ecarts_m12.parametres.modifier"), path: `/api/juridique/parametres/${p.id}/modifier/`, tone: "ghost" as const, prompt: { name: "valeur", label: t("ecarts_m12.parametres.json") } },
@@ -273,8 +267,7 @@ export function EcartsM12Section() {
             ]}
           />
         </div>
-        </details>
-      </SectionCard>
+      </ParamsPanel>
 
       <SectionCard
         title={t("ecarts_m12.contentieux.title")}

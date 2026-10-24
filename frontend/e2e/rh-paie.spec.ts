@@ -29,6 +29,8 @@ test.describe("M9 RH & Paie : paramétrage des barèmes", () => {
   test("les paramètres de paie (SMIG, durée légale) sont visibles", async ({ page }) => {
     await loginAs(page, DEMO_USERS.rh);
     await page.goto("/rh-paie");
+    // Paramètres repliés dans un panneau compact (B-05) : libellé en premier, clé technique en secondaire (B-14).
+    await page.getByTestId("parametres-paie").getByRole("button", { name: "Afficher", exact: true }).click();
     await expect(page.getByText("DUREE_LEGALE_HEBDO")).toBeVisible();
     await expect(page.getByText("SMIG", { exact: true })).toBeVisible();
   });

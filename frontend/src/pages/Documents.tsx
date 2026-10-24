@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Download, FileCheck2, FileText, Send, ShieldCheck, Upload } from "lucide-react";
+import { Archive, Download, FileText, Send, ShieldCheck, Upload } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
+import { ParamsPanel } from "../components/parametres/ParamsPanel";
 import { cleanLabel } from "../components/workflow/libelle";
 import {
   Badge,
@@ -357,17 +357,18 @@ export function DocumentsPage() {
           ]}
         />
       </SectionCard>
-      <SectionCard
+      {/* Durées de conservation : doublon de « Paramètres ETSL › GED » replié en un panneau compact (A-17, chantier « params »). */}
+      <ParamsPanel
+        variant="card"
+        module="documents"
         title={t("ecarts_tr.ged.types")}
-        subtitle={t("ecarts_tr.ged.typesAide")}
-        actions={
-          <Link className="btn ghost sm" to="/parametres">
-            <FileCheck2 size={14} aria-hidden="true" /> {t("formulaires.ged.modifierRetention")}
-          </Link>
-        }
+        count={types.filter((ty) => ty.retention_provisoire).length}
+        total={types.length}
+        testId="ged-durees-conservation"
       >
+        <p className="muted">{t("ecarts_tr.ged.typesAide")}</p>
         <DataGrid rows={types} columns={typeColumns} caption={t("ecarts_tr.ged.types")} density="compact" maxHeight="none" emptyLabel={t("common.empty")} />
-      </SectionCard>
+      </ParamsPanel>
     </>
   );
 }
