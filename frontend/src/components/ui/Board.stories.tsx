@@ -52,3 +52,23 @@ Colonnes.storyName = "Colonnes cartes actions et colonne vide";
 
 export const Sombre: Story = () => <Kanban />;
 Sombre.meta = { theme: "dark" };
+
+/** Colonne très remplie : elle défile pour son compte (en-tête fixe, fondu bas), les colonnes vides se réduisent. */
+const Long = () => (
+  <Board label="Validations par statut">
+    <BoardColumn title="À valider" tone="warn" count={12}>
+      {Array.from({ length: 12 }, (_, i) => (
+        <Carte key={i} c={{ ...COMMANDES[i % 3], id: 100 + i, code: `BC-2026-${String(150 + i).padStart(4, "0")}` }} />
+      ))}
+    </BoardColumn>
+    <BoardColumn title="Délégué" tone="info" count={0} />
+    <BoardColumn title="Validé" tone="ok" count={2}>
+      <Carte c={COMMANDES[1]} />
+      <Carte c={COMMANDES[2]} />
+    </BoardColumn>
+    <BoardColumn title="Rejeté" tone="err" count={0} />
+  </Board>
+);
+
+export const Colonnelongue: Story = () => <Long />;
+Colonnelongue.storyName = "Colonne longue et colonnes vides";

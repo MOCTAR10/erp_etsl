@@ -98,19 +98,16 @@
 }
 
 /* ── Kanban horizontal (P2-6) ── */
+/* Colonnes en flex : une colonne pleine prend au moins 260 px (étirée si la place le permet), une colonne vide
+   se réduit à 184 px (A-07, A-38, B04). Le board ne défile plus qu'en largeur : chaque colonne fait défiler sa
+   propre liste de cartes (.board-col-body), en-tête fixe au-dessus. */
 .board {
-  display: grid;
-  grid-template-columns: none;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(260px, 1fr);
+  display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
-  align-items: start;
   overflow-x: auto;
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
-  /* Hauteur plafonnée (revue R2) : une colonne très remplie défile dans le board au lieu d'allonger
-     la page et de laisser un grand vide sous les colonnes courtes. */
-  max-height: min(76vh, 760px);
-  overflow-y: auto;
   scroll-snap-type: x proximity;
   scroll-padding-inline: var(--space-1);
   padding-bottom: var(--space-2);
@@ -134,6 +131,7 @@
 }
 
 .board-col {
+  flex: 1 0 260px;
   scroll-snap-align: start;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -142,6 +140,67 @@
   gap: var(--space-2);
   min-width: 0;
   transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+/* Colonne vide : largeur réduite, simple mention sous l'en-tête (ne prend plus la moitié du board). */
+.board-col.is-empty {
+  flex: 0 0 184px;
+}
+/* Liste de cartes : défile dans la colonne, fondu bas (et haut) tant qu'il reste des cartes hors champ. */
+.board-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: max(320px, min(calc(100dvh - 300px), 720px));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  /* place de l'anneau de focus et de l'ombre des cartes, sans rogner */
+  margin: -4px;
+  padding: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  border-radius: var(--radius-md);
+}
+.board-col-body[data-overflow-bottom] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+}
+.board-col-body[data-overflow-top] {
+  mask-image: linear-gradient(to bottom, transparent, #000 24px);
+}
+.board-col-body[data-overflow-top][data-overflow-bottom] {
+  mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 40px), transparent);
+}
+.board-col-body:focus {
+  outline: none;
+}
+.board-col-body:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 45%, transparent);
+}
+/* Mobile : colonnes empilées pleine largeur (plus de colonne coupée au bord, plus de 700 px de vide sous une
+   colonne vide) ; une colonne vide se réduit à son en-tête et à son compteur « 0 ». */
+@media (max-width: 640px) {
+  .board {
+    flex-direction: column;
+    align-items: stretch;
+    overflow: visible;
+    scroll-snap-type: none;
+    mask-image: none !important;
+    padding-bottom: 0;
+  }
+  .board-col,
+  .board-col.is-empty {
+    flex: none;
+    width: 100%;
+  }
+  .board-col.is-empty {
+    padding-block: var(--space-1);
+  }
+  .board-col.is-empty .board-empty,
+  .board-col.is-empty .board-col-summary {
+    display: none;
+  }
+  .board-col-body {
+    max-height: min(60dvh, 520px);
+  }
 }
 /* Sombre : la colonne est en retrait (entre le fond et la carte), la carte ressort au-dessus —
    jamais une carte plus sombre que sa colonne. */
@@ -207,7 +266,6 @@
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .board-empty {
@@ -237,7 +295,6 @@
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 .task-card .card-code {
   font-weight: var(--fw-medium);
@@ -260,6 +317,12 @@
   font-weight: var(--fw-semibold);
   color: var(--text);
   overflow-wrap: anywhere;
+  /* A-38 : 3 lignes avant l'ellipse (« Mandji Offshore Exploration - … » restait coupé à 2) */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 .task-card .meta {
   font-size: var(--fs-xs);
@@ -277,7 +340,6 @@
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 .task-card .card-foot > .badge {
   min-width: 0;
@@ -359,7 +421,6 @@ td .card-actions--choice {
   color: var(--text-muted);
 }
 .cell-mono {
-  font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   color: var(--text-muted);
 }
@@ -422,7 +483,6 @@ td .card-actions--choice {
   border-bottom: 1px solid var(--border);
   font-size: var(--fs-sm);
   line-height: var(--lh-sm);
-  font-variant-numeric: tabular-nums;
 }
 .overload-list li:last-child {
   border-bottom: 0;
@@ -459,6 +519,7 @@ td .card-actions--choice {
   text-align: right;
   color: var(--text-muted);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 900px) {

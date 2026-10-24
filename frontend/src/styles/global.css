@@ -690,12 +690,27 @@ h3 {
   line-height: 24px;
 }
 
+/* B15 : montant (Kpi kind="money") — 28 px tant qu'il tient dans la carte, sinon juste assez réduit
+   (largeur estimée --kpi-em posée par Kpi.tsx, 46 px réservés à « FCFA » en 14 px). Seule la coupure
+   entre le nombre et l'unité reste permise. */
+.kpi-value.kpi-value-fit {
+  font-size: clamp(15px, calc((100cqi - 46px) / var(--kpi-em, 9)), var(--kpi-fit-max, 28px));
+  white-space: normal;
+}
+.kpi-value.kpi-value-fit .ui-kpi-unit {
+  font-size: 14px;
+}
+
+/* B16 : carte sans indication → la valeur se cale en bas (hauteurs homogènes, plus de vide sous le chiffre). */
+.kpi:not(:has(.kpi-hint)) > .kpi-value {
+  margin-top: auto;
+}
+
 .kpi-hint {
   margin-top: auto;
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 /* Icône KPI en tonalité douce (boîte 28 px, glyphe 16 px, sans ombre) ;
@@ -750,6 +765,10 @@ h3 {
     font-size: min(16px, 9cqi);
     line-height: 22px;
   }
+  .kpi-value.kpi-value-fit {
+    --kpi-fit-max: 22px;
+    line-height: 28px;
+  }
   .kpi-icon {
     display: none;
   }
@@ -798,7 +817,6 @@ h3 {
 .banner-title {
   font-weight: var(--fw-semibold);
   color: var(--text);
-  font-variant-numeric: tabular-nums;
 }
 
 .banner-text {
@@ -886,7 +904,6 @@ a.banner-action:hover {
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   font-weight: var(--fw-semibold);
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   border: 1px solid transparent;
   vertical-align: middle;
@@ -939,7 +956,6 @@ a.banner-action:hover {
   line-height: var(--lh-sm);
   color: var(--text);
   font-weight: var(--fw-semibold);
-  font-variant-numeric: tabular-nums;
 }
 
 .board-col-head .title {
@@ -997,7 +1013,6 @@ a.banner-action:hover {
 .task-card .meta {
   font-size: var(--fs-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1010,7 +1025,6 @@ a.banner-action:hover {
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
 }
 
 .table th,
@@ -2841,6 +2855,38 @@ kbd {
  * @layer utilities — Utilitaires (gagnent sur tout le reste) + impression
  * ═══════════════════════════════════════════════════════════════════════ */
 @layer utilities {
+
+/* B24 : bouton désactivé = neutre (surface 2, texte discret), jamais un primaire bleu délavé à 55 %.
+   En couche utilities : l'emporte aussi sur les variantes de page (primaires rendus secondaires). */
+.btn:is(:disabled, [aria-disabled="true"]):not(.login-submit) {
+  opacity: 1;
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-subtle);
+  box-shadow: none;
+}
+.btn:is(:disabled, [aria-disabled="true"]):not(.login-submit) > svg {
+  opacity: 0.7;
+}
+
+/* Sélecteur de fichier natif restant (hors FileField) : bouton thémé comme .btn secondaire, clair et sombre. */
+input[type="file"]::file-selector-button {
+  margin-right: var(--space-3);
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+input[type="file"] {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
 
 .tabular-nums,
 .num,

@@ -57,6 +57,13 @@ describe("formatMoney", () => {
     expect(formatMoney(25000000)).not.toContain(" ");
   });
 
+  it("un seul séparateur de milliers pour les nombres et les montants (A-14)", () => {
+    const nombre = formatNumber(323721750);
+    const montant = formatMoney(323721750);
+    expect(montant.startsWith(nombre)).toBe(true);
+    expect(nombre).not.toMatch(/ /);
+  });
+
   it("reste exact, jamais abrégé (y compris les grands montants)", () => {
     expect(sp(formatMoney(1250000000))).toBe("1 250 000 000 FCFA");
     expect(sp(formatMoney(-4500))).toBe("-4 500 FCFA");

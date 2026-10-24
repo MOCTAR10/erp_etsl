@@ -811,6 +811,169 @@
     mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
   }
 }
+/* B23 : colonne `kind: "date"` — une date ne se casse jamais sur 2 ou 3 lignes. */
+.ui-grid td.date {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* B08 : 1re colonne collante dès que le tableau déborde en largeur (le repère de la ligne reste visible) ;
+   le fondu gauche laisse place à une ombre portée par la colonne collante. */
+.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid:has(thead th:nth-child(3)) :is(th, td):first-child,
+.table-wrap:not(.ui-grid-wrap) > .table:has(thead th:nth-child(3)) :is(th, td):first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  background-clip: padding-box;
+}
+.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid:has(thead th:nth-child(3)) thead th:first-child,
+.table-wrap:not(.ui-grid-wrap) > .table:has(thead th:nth-child(3)) thead th:first-child {
+  z-index: 3;
+}
+.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid thead th:first-child {
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid tbody tr:hover > td:first-child {
+  background: var(--ui-hover);
+}
+.ui-grid-wrap[data-overflow-start] > .ui-grid:has(thead th:nth-child(3)) :is(th, td):first-child {
+  box-shadow: 6px 0 8px -6px color-mix(in srgb, var(--text) 22%, transparent);
+}
+.ui-grid-wrap[data-overflow-start]:has(> .ui-grid thead th:nth-child(3)) {
+  mask-image: none;
+}
+.ui-grid-wrap[data-overflow-start][data-overflow-end]:has(> .ui-grid thead th:nth-child(3)) {
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+@media (max-width: 900px) {
+  .ui-grid-wrap[data-overflow-start][data-overflow-end]:has(> .ui-grid thead th:nth-child(3)) {
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  /* La colonne collante ne mange jamais l'écran étroit. */
+  .ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid :is(th, td):first-child,
+  .table-wrap:not(.ui-grid-wrap) > .table :is(th, td):first-child {
+    max-width: 42vw;
+  }
+}
+
+/* B32 : zone de hauteur bornée qui coupe des lignes → fondu bas + « Afficher les N lignes ». */
+.ui-grid-more {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.ui-grid-more[data-fade]::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 100% 0;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+}
+
+/* B31 / A-28 / A-27 : sous 640 px, une ligne = une carte (1re colonne en titre, puis « libellé  valeur »,
+   montants sur une ligne, jamais coupés) — plus aucun tableau tronqué au bord droit. */
+@media (max-width: 640px) {
+  .ui-grid-wrap:has(> .ui-grid--cards) {
+    overflow: visible;
+    mask-image: none !important;
+  }
+  .ui-grid.ui-grid--cards {
+    display: block;
+    min-width: 0 !important;
+  }
+  .ui-grid--cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .ui-grid--cards tbody {
+    display: block;
+  }
+  .ui-grid--cards tbody tr {
+    display: block;
+    padding: var(--space-3) var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .ui-grid--cards tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .ui-grid--cards tbody td,
+  .ui-grid--cards.ui-grid--compact tbody td {
+    display: block;
+    position: relative;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 2px 0 2px 42%;
+    border: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .ui-grid--cards tbody td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 40%;
+    text-align: left;
+    font-size: var(--fs-xs);
+    line-height: 20px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Titre de la carte : 1re colonne, pleine largeur, en gras */
+  .ui-grid--cards tbody td:first-child {
+    padding: 0 0 var(--space-1);
+    text-align: left;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+  }
+  .ui-grid--cards tbody td:first-child::before,
+  .ui-grid--cards tbody td:not([data-label])::before,
+  .ui-grid--cards tbody td.ui-grid-actions::before {
+    content: none;
+  }
+  .ui-grid--cards tbody td:not([data-label]):not(:first-child) {
+    padding-left: 0;
+  }
+  .ui-grid--cards tbody td.num {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    font-weight: var(--fw-semibold);
+    color: var(--text);
+  }
+  .ui-grid--cards tbody td.ui-grid-actions {
+    width: auto !important;
+    padding: var(--space-1) 0 0;
+    text-align: right;
+  }
+  /* Une cellule vide (« — ») reste sur une ligne courte ; l'état vide / le squelette gardent leur rendu. */
+  .ui-grid--cards tbody tr:is(.ui-grid-empty, .ui-grid-skeleton) td {
+    padding: 0;
+    text-align: left;
+  }
+  .ui-grid--cards tbody tr.ui-grid-skeleton td {
+    padding: var(--space-1) 0;
+  }
+  .ui-grid--cards tbody tr.ui-grid-skeleton td::before {
+    content: none;
+  }
+  .ui-grid--cards tr.ui-grid-empty .empty-state {
+    position: static;
+    width: auto;
+  }
+}
+
 @media print {
   .ui-grid-wrap,
   .table-wrap {
@@ -991,4 +1154,154 @@
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text-muted);
+}
+
+/* ── Navigation de sections (SectionNav) ── */
+/* Barre collante sous le PageHeader, pleine largeur de la zone principale, fond translucide flouté.
+   Sous 900 px : défilement horizontal (barre de défilement masquée, ancre active recentrée par le composant). */
+.ui-sectionnav {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  margin-inline: calc(-1 * var(--page-pad-x, 24px));
+  padding-inline: var(--page-pad-x, 24px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.ui-sectionnav-list {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  scroll-padding-inline: var(--space-4);
+}
+.ui-sectionnav-list::-webkit-scrollbar {
+  display: none;
+}
+.ui-sectionnav-list > li {
+  flex: none;
+}
+.ui-sectionnav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--ui-dur-fast) var(--ease-out), border-color var(--ui-dur-fast) var(--ease-out);
+}
+.ui-sectionnav-link:hover {
+  color: var(--text);
+}
+.ui-sectionnav-link.is-active {
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+  border-bottom-color: var(--brand);
+}
+.ui-sectionnav-link:focus {
+  outline: none;
+}
+.ui-sectionnav-link:focus-visible {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+.ui-sectionnav-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.ui-sectionnav-link.is-active .ui-sectionnav-count {
+  background: var(--brand-soft);
+  border-color: transparent;
+  color: var(--brand);
+}
+/* Cible atteinte par une ancre : pas d'anneau de focus au clic (le clavier garde :focus-visible). */
+[tabindex="-1"]:focus:not(:focus-visible) {
+  outline: none;
+}
+@media (max-width: 900px) {
+  .ui-sectionnav-link {
+    height: 40px;
+    padding: 0 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-sectionnav-link {
+    transition: none;
+  }
+}
+
+/* ── Sélecteur de fichier (FileField) ── */
+.ui-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--control-h);
+}
+.ui-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.ui-file-btn {
+  flex: none;
+  cursor: pointer;
+}
+.ui-file-input:focus-visible + .ui-file-btn {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.ui-file.is-disabled .ui-file-btn {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.ui-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.ui-file-name.has-file {
+  color: var(--text);
+  font-weight: var(--fw-medium);
+}
+.ui-file-clear {
+  flex: none;
+  width: 28px;
+  height: 28px;
 }

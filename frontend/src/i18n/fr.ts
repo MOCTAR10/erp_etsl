@@ -4559,6 +4559,22 @@ export const fr = {
       fichesProvisoires: "Les fiches marquées « Provisoire » sont à confirmer ou modifier par ETSL.",
     },
   },
+  // Chantier « kit » (élévation premium) : composants partagés.
+  premiumKit: {
+    sectionNav: {
+      label: "Sections de la page",
+    },
+    grid: {
+      showAll_one: "Afficher la ligne",
+      showAll_other: "Afficher les {{count}} lignes",
+      showLess: "Réduire le tableau",
+    },
+    file: {
+      choose: "Choisir un fichier",
+      none: "Aucun fichier choisi",
+      clear: "Retirer le fichier",
+    },
+  },
 } as const;
 
 export default fr;

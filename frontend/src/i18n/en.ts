@@ -4559,6 +4559,22 @@ export const en = {
       fichesProvisoires: "Sheets marked “Provisional” are to be confirmed or amended by ETSL.",
     },
   },
+  // "kit" workstream (premium elevation): shared components.
+  premiumKit: {
+    sectionNav: {
+      label: "Page sections",
+    },
+    grid: {
+      showAll_one: "Show the row",
+      showAll_other: "Show all {{count}} rows",
+      showLess: "Collapse the table",
+    },
+    file: {
+      choose: "Choose a file",
+      none: "No file chosen",
+      clear: "Remove the file",
+    },
+  },
 } as const;
 
 export default en;

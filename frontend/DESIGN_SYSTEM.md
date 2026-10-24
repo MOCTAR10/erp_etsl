@@ -24,7 +24,7 @@ Principe : **calme, dense, chiffré**. Le bleu structure (navigation, action pri
 
 ### Typographie
 
-Inter (données, `tabular-nums`) + Plus Jakarta Sans (titres), auto-hébergées (`@fontsource-variable`).
+Inter (données) + Plus Jakarta Sans (titres), auto-hébergées (`@fontsource-variable`). Les chiffres tabulaires (`tabular-nums`) sont **réservés** aux nombres : `.num`, `td.num`, `.amount`, `.kpi-value`, colonne `kind: "date"`, compteurs — jamais sur un conteneur de texte (`.table`, `.badge`, méta de carte…), où Inter élargit les traits d'union (« Port ‑ Gentil »). Séparateur de milliers unique (espace insécable U+00A0) pour `formatNumber` et `formatMoney`.
 
 | Jeton | Taille / interligne | Usage |
 |---|---|---|
@@ -32,7 +32,7 @@ Inter (données, `tabular-nums`) + Plus Jakarta Sans (titres), auto-hébergées 
 | `--fs-h1` | 24 / 32 | titre de page (`.page-header h2`) |
 | `--fs-h2` | 18 / 26 | titre de section / carte |
 | `--fs-h3` | 15 / 22 | sous-section, titre de carte kanban |
-| `--fs-kpi` | 28 / 32 | valeur KPI (réduite à 22 puis 18 px si le montant est long) |
+| `--fs-kpi` | 28 / 32 | valeur KPI ; un montant (`kind="money"`) reste à 28 px tant qu'il tient dans la carte, puis se réduit juste assez (unité « FCFA » à 14 px) |
 | `--fs-body` | 14 / 20 | texte courant, cellules |
 | `--fs-sm` | 13 / 18 | méta, sous-titres, boutons |
 | `--fs-xs` | 12 / 16 | libellés KPI, en-têtes de tableau, badges |
@@ -57,13 +57,15 @@ Catalogue vivant de tous les états : `npm run ladle` (§5). Props exactes : lir
 | Composant | API essentielle | Quand l'utiliser |
 |---|---|---|
 | `PageHeader` | `title`, `subtitle`, `actions`, `eyebrow` | En tête de CHAQUE page : un titre, une phrase, l'action principale à droite. |
+| `SectionNav` | `items` (`id`, `label`, `count`), `label`, `offset`, `onNavigate` | Écran long (≥ 4 sections) : barre collante posée **juste sous** le `PageHeader`, une ancre par section (`id` de la cible dans la page). La section lue est surlignée au défilement (IntersectionObserver, `aria-current="location"`) ; saut fluide (instantané si mouvement réduit), focus déplacé sur la section ; sous 900 px, barre défilante horizontale qui garde l'ancre active visible. `<nav>` nommé « Sections de la page ». |
 | `Card`, `SectionCard` | `title`, `subtitle`, `actions`, `children` | Regrouper un bloc ; `SectionCard` dès qu'il a un titre. |
 | `ChartCard` | `title`, `subtitle`, `height`, `children` | Graphique Recharts (Direction, répartition du tableau de bord seulement). |
-| `Kpi` | `label`, `value`, `kind="number\|money\|percent"`, `hint`, `icon`, `tone` | Indicateur chiffré ; `kind="money"` → montant exact en FCFA, police réduite si long, « — » si masqué. |
+| `Kpi` | `label`, `value`, `kind="number\|money\|percent"`, `hint`, `icon`, `tone` | Indicateur chiffré ; `kind="money"` → montant exact en FCFA, 28 px tant qu'il tient (sinon ajusté à la carte), « — » si masqué. Donner un `hint` (« 34 710 000 FCFA engagés ») ; sans `hint`, la valeur se cale en bas de la carte (hauteurs homogènes). |
 | `AnimatedNumber`, `Sparkline`, `ProgressBar` | `value` / `values`, `label`, `tone` | Chiffre animé, tendance miniature, avancement (avec libellé accessible). |
 | `Badge` | `tone="ok\|warn\|err\|brand\|accent\|neutral\|info"`, `icon`, `title` | Statut d'un objet (une couleur = un sens). |
-| `Board`, `BoardColumn`, `BoardCard`, `CardActions` | `label` ; `title`, `count`, `tone`, `summary`, `limit`, `emptyLabel` ; `actions`, `primary` | Kanban horizontal par statut ; une action principale par carte, le reste dans `⋯`. |
-| `DataGrid` / `DataTable` / `PagedDataGrid` | `columns` (`key`, `header`, `render`, `num`, `sortValue`, `width`), `rows`, `caption`, `loading`, `density`, `rowActions`, `onRowClick`, `pagination`, `emptyLabel`, `emptyHint` | Toute liste d'entités ; `PagedDataGrid` pour une liste serveur (`usePagedList`). `actionsColumn(label, actions)` = colonne d'actions de ligne. |
+| `Board`, `BoardColumn`, `BoardCard`, `CardActions` | `label` ; `title`, `count`, `tone`, `summary`, `limit`, `emptyLabel` ; `actions`, `primary` | Kanban horizontal par statut ; une action principale par carte, le reste dans `⋯`. Chaque colonne fait défiler sa liste (en-tête fixe, fondu bas) ; colonne vide réduite à 184 px ; sous 640 px colonnes empilées, colonne vide = en-tête + « 0 ». Titre de carte : 3 lignes au plus. |
+| `DataGrid` / `DataTable` / `PagedDataGrid` | `columns` (`key`, `header`, `render`, `num`, `kind="date"`, `label`, `sortValue`, `width`), `rows`, `caption`, `loading`, `density`, `rowActions`, `onRowClick`, `pagination`, `emptyLabel`, `emptyHint`, `mobile="cards\|scroll"` | Toute liste d'entités ; `PagedDataGrid` pour une liste serveur (`usePagedList`). `actionsColumn(label, actions)` = colonne d'actions de ligne. Débordement en largeur : 1re colonne collante + fondu à droite. Hauteur bornée qui coupe des lignes : fondu bas + « Afficher les N lignes ». Sous 640 px (≥ 3 colonnes) : une carte par ligne (1re colonne en titre, puis libellé / valeur ; `label` si `header` n'est pas un texte) ; `mobile="scroll"` pour garder le tableau. |
+| `FileField` | `accept`, `name`, `id` ou `aria-label`, `onChange(file)` / `onFiles(files)`, `buttonLabel`, `capture`, `multiple`, `disabled` | Tout choix de fichier (imports MT940 / SAGE, pièces jointes, photos) : bouton du kit et mention en français, thémés clair / sombre. Jamais d'`<input type="file">` visible (« Choose File »). |
 | `Pagination`, `SearchField`, `FilterBar` | `page`, `pageSize`, `count` ; `value`, `onChange` ; `defs`, `value`, `primary`, `search`, `more` | Pagination serveur DRF, recherche différée, filtres multicritères (3 en ligne, le reste dans « Plus de filtres »). |
 | `QuickForm` | `title`, `endpoint`, `fields`, `submitLabel`, `transform`, `variant` | Création rapide en panneau latéral (POST direct). Dans une carte, une barre d'actions de section ou une barre d'outils, le déclencheur est rendu secondaire (un seul primaire par écran). |
 | `ActionBar` | `actions: ActionDef[]` (`label`, `path`, `tone`, `confirm`, `prompt`) | Actions de workflow d'un objet (le serveur décide des droits). |
@@ -88,7 +90,7 @@ Utilitaires CSS partagés : `.cell-nowrap` (codes, dates d'une cellule), `.cell-
 2. **Couleurs avec retenue** : bleu = action principale et navigation ; rouge `--accent` = filet de marque uniquement ; rouge `--err` = état critique. Au plus un élément rouge par carte. Pas d'aplat criard, pas d'ombre colorée, pas de bouton plein rouge hors confirmation destructive.
 3. **Un point focal par écran** : une seule action primaire (`.btn.primary`) par en-tête ; les autres en boutons secondaires ou dans `⋯`. Au plus 3 tailles de texte visibles.
 4. **Rédaction sans code technique** : aucun `RF-…`, `H-…`, `(Mx)`, `§`, `proc.`, code de rôle brut ni clé i18n visible. Libellés en casse de phrase, en français avec accents ; toute clé ajoutée existe dans `fr.ts` ET `en.ts`.
-5. **États dessinés** : survol (éléments cliquables seulement), focus visible, actif, désactivé, chargement (squelettes), vide (`EmptyState` avec aide), erreur (`ErrorState` avec « Réessayer »).
+5. **États dessinés** : survol (éléments cliquables seulement), focus visible, actif, désactivé (bouton neutre : `--surface-2`, texte `--text-subtle`, jamais un primaire délavé), chargement (squelettes), vide (`EmptyState` avec aide), erreur (`ErrorState` avec « Réessayer »).
 6. **Mode sombre aussi soigné que le clair** : uniquement des variables, aucun blanc ni noir pur ; vérifier chaque écran dans les deux thèmes (Ladle, tests visuels).
 7. **Mobile (≤ 900 px)** : sidebar en tiroir, KPI en 2 colonnes, aucune barre de défilement horizontale de page (les tableaux défilent dans leur cadre).
 8. **Accessibilité** : 0 violation axe WCAG A/AA, `aria-label` sur chaque `.icon-btn`, contrastes AA (`contrast.test.ts`), mouvement 120–200 ms et `prefers-reduced-motion` respecté.

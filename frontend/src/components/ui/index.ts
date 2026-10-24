@@ -42,3 +42,8 @@ export { DataGrid, PagedDataGrid, toOrdering } from "./DataGrid";
 export type { DataGridProps, GridColumn, GridPagination, GridSort, SortValue } from "./DataGrid";
 export { CommandPalette, normalizeSearch } from "./CommandPalette";
 export type { CommandGroupDef, CommandItemDef, CommandPaletteProps } from "./CommandPalette";
+// Élévation premium (chantier kit) : navigation de sections collante, sélecteur de fichier du kit.
+export { SectionNav } from "./SectionNav";
+export type { SectionNavItem, SectionNavProps } from "./SectionNav";
+export { FileField } from "./FileField";
+export type { FileFieldProps } from "./FileField";

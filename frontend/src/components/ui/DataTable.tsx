@@ -11,6 +11,13 @@ export interface Column<T> {
   render: (row: T) => ReactNode;
   /** Colonne numérique : alignée à droite, chiffres tabulaires. */
   num?: boolean;
+  /** `"date"` : date ou période d'une ligne, jamais coupée (« 03 sept. 2026 » sur une seule ligne), chiffres tabulaires. */
+  kind?: "text" | "date";
+  /**
+   * Libellé texte de la colonne, lu en mode cartes (mobile ≤ 640 px) quand `header` n'est pas une simple chaîne.
+   * Par défaut : `header` s'il s'agit d'un texte.
+   */
+  label?: string;
   /** Tri (voir `GridColumn`) : valeur comparée côté client ; sa présence rend la colonne triable. */
   sortValue?: (row: T) => SortValue;
   sortKey?: string;
