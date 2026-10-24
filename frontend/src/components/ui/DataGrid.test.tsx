@@ -197,8 +197,11 @@ describe("<DataGrid /> — finitions premium (kit)", () => {
       expect(less).toHaveAttribute("aria-expanded", "true");
       expect((container.querySelector(".ui-grid-wrap") as HTMLElement).style.maxHeight).toBe("");
     } finally {
+      // Propriétés héritées d'Element : on retire les surcharges posées sur HTMLElement.
       if (h) Object.defineProperty(HTMLElement.prototype, "scrollHeight", h);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
       if (c) Object.defineProperty(HTMLElement.prototype, "clientHeight", c);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
     }
   });
 
