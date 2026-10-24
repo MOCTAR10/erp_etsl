@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -84,6 +85,10 @@ interface Ref {
 
 const ETAT_TONE = { agree: "ok", a_renouveler: "warn", non_agree: "err", intra_groupe: "brand" } as const;
 const TYPES_ARTICLE = ["matiere", "consommable", "produit", "service"];
+/** Unités des paramètres (libellés serveur) → clés traduites. */
+const UNITE_CLE: Record<string, string> = { jours: "jours", mois: "mois", ans: "ans" };
+/** Nature d'une pièce archivée (libellé serveur) → clé traduite. */
+const NATURE_CLE: Record<string, string> = { "Réception": "reception", BC: "bc", Litige: "litige", Avoir: "avoir" };
 const opt = (rows: Ref[], label: (r: Ref) => string) => rows.map((r) => ({ value: String(r.id), label: label(r) }));
 const useRefs = (key: string, path: string) =>
   useQuery({ queryKey: ["m2e", key], queryFn: () => api.listAll<Ref>(path), retry: 0 }).data ?? [];
@@ -122,7 +127,10 @@ function ParametresAchats() {
         edit?.id === p.id ? (
           <input type="number" min={0} step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
         ) : (
-          `${formatNumber(Number(p.valeur))} ${p.unite === "choix" ? "" : p.unite}`
+          <span style={{ whiteSpace: "nowrap" }}>
+            {formatNumber(Number(p.valeur))}
+            {p.unite === "choix" ? "" : ` ${UNITE_CLE[p.unite] ? t(`revueR2.purchases.unites.${UNITE_CLE[p.unite]}`) : p.unite}`}
+          </span>
         ),
     },
     {
@@ -135,7 +143,7 @@ function ParametresAchats() {
       header: <span className="sr-only">{t("ui.actions")}</span>,
       render: (p) =>
         edit?.id === p.id ? (
-          <div className="action-bar-buttons">
+          <div className="action-bar-buttons" style={{ flexWrap: "nowrap", justifyContent: "flex-end" }}>
             <button type="button" className="btn primary sm" onClick={() => modifier.mutate(edit)}>
               {t("ecarts_m2.params.enregistrer")}
             </button>
@@ -144,7 +152,7 @@ function ParametresAchats() {
             </button>
           </div>
         ) : (
-          <div className="action-bar-buttons">
+          <div className="action-bar-buttons" style={{ flexWrap: "nowrap", justifyContent: "flex-end" }}>
             <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
               {t("ecarts_m2.params.modifier")}
             </button>
@@ -160,9 +168,12 @@ function ParametresAchats() {
   return (
     <div data-testid="parametres-achats">
       {provisoires > 0 && (
-        <p className="action-error" role="note">
-          {t("ecarts_m2.params.warn", { count: provisoires })}
-        </p>
+        <div className="banner warn" role="note" style={{ marginBottom: "var(--space-3)" }}>
+          <SlidersHorizontal size={18} aria-hidden />
+          <div className="banner-body">
+            <span className="banner-title">{t("ecarts_m2.params.warn", { count: provisoires })}</span>
+          </div>
+        </div>
       )}
       {error && (
         <p className="action-error" role="alert">
@@ -273,7 +284,8 @@ export function EcartsM2Section() {
       header: t("ecarts_m2.avoirs.statut"),
       render: (a) => (
         <>
-          <Badge tone={a.statut === "comptabilise" ? "ok" : "warn"}>{a.statut_label}</Badge> {a.move_number ?? ""}
+          <Badge tone={a.statut === "comptabilise" ? "ok" : "warn"}>{t(`revueR2.purchases.avoirStatuts.${a.statut}`, { defaultValue: a.statut_label })}</Badge>
+          {a.move_number ? <span className="cell-sub">{a.move_number}</span> : null}
         </>
       ),
     },
@@ -288,7 +300,12 @@ export function EcartsM2Section() {
   ];
 
   const colsPieces: Column<Piece & { id: string }>[] = [
-    { key: "nature", header: t("ecarts_m2.ged.nature"), render: (p) => p.nature, sortValue: (p) => p.nature },
+    {
+      key: "nature",
+      header: t("ecarts_m2.ged.nature"),
+      render: (p) => (NATURE_CLE[p.nature] ? t(`revueR2.purchases.natures.${NATURE_CLE[p.nature]}`) : p.nature),
+      sortValue: (p) => p.nature,
+    },
     { key: "piece", header: t("ecarts_m2.ged.piece"), render: (p) => p.piece },
     { key: "archive", header: t("ecarts_m2.ged.archive"), render: (p) => formatDate(p.archive_le), sortValue: (p) => p.archive_le },
     { key: "conservation", header: t("ecarts_m2.ged.conservation"), render: (p) => (p.conservation_ans === null ? "—" : t("ecarts_m2.ged.ans", { n: p.conservation_ans })) },
@@ -441,6 +458,8 @@ export function EcartsM2Section() {
           <DataTable
             caption={t("ecarts_m2.ged.title")}
             density="compact"
+            // 30 pièces : défilement dans le cadre (en-têtes collants) plutôt qu'une très longue page.
+            maxHeight={440}
             columns={colsPieces}
             rows={(pieces?.rows ?? []).slice(0, 30).map((p) => ({ ...p, id: `${p.nature}-${p.piece}` }))}
           />

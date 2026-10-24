@@ -146,7 +146,14 @@ export function InventaireAnnuelSection() {
         {
           id: "passages",
           label: t("ecarts_m5m8.stocks.passages"),
-          valeur: `${a.passages_prevus.length} · ${a.passages_prevus.map((d) => formatDate(d, i18n.language)).join(", ")}`,
+          valeur: (
+            <>
+              {t("revueR2.stocks.passages", { count: a.passages_prevus.length })}
+              <span className="cell-sub">
+                {a.passages_prevus.map((d) => new Date(d).toLocaleDateString(i18n.language || "fr", { day: "2-digit", month: "2-digit" })).join(" · ")}
+              </span>
+            </>
+          ),
         },
         { id: "capacite", label: t("ecarts_m5m8.stocks.capacite"), valeur: `${formatNumber(a.capacite)} (${a.articles_par_passage} × ${a.passages_prevus.length})` },
         {
@@ -178,12 +185,22 @@ export function InventaireAnnuelSection() {
       ]
     : [];
   const colsPlan: Column<(typeof lignesPlan)[number]>[] = [
-    { key: "label", header: t("tableaux.stocks.indicateur"), render: (r) => r.label },
+    { key: "label", header: t("tableaux.stocks.indicateur"), width: 280, render: (r) => r.label },
     { key: "valeur", header: t("tableaux.stocks.valeur"), render: (r) => r.valeur },
   ];
 
   const colsComptage: Column<LigneEcart>[] = [
-    { key: "article", header: t("ecarts_m5m8.stocks.article"), render: (l) => `${l.article} · ${l.article_label}`, sortValue: (l) => l.article },
+    {
+      key: "article",
+      header: t("ecarts_m5m8.stocks.article"),
+      render: (l) => (
+        <>
+          <span className="cell-nowrap">{l.article}</span>
+          <span className="cell-sub">{l.article_label}</span>
+        </>
+      ),
+      sortValue: (l) => l.article,
+    },
     { key: "lot", header: t("ecarts_m5m8.stocks.lot"), render: (l) => l.lot ?? "—" },
     { key: "qteSysteme", header: t("ecarts_m5m8.stocks.qteSysteme"), num: true, render: (l) => num(l.quantite_systeme) },
     {
@@ -219,8 +236,28 @@ export function InventaireAnnuelSection() {
   ];
 
   const colsEtat: Column<EtatRow>[] = [
-    { key: "inventaire", header: t("ecarts_m5m8.stocks.inventaire"), render: (r) => `${r.inventaire} · ${formatDate(r.date, i18n.language)}`, sortValue: (r) => r.date },
-    { key: "article", header: t("ecarts_m5m8.stocks.article"), render: (r) => `${r.article} · ${r.article_label}`, sortValue: (r) => r.article },
+    {
+      key: "inventaire",
+      header: t("ecarts_m5m8.stocks.inventaire"),
+      render: (r) => (
+        <>
+          <span className="cell-nowrap">{r.inventaire}</span>
+          <span className="cell-sub">{formatDate(r.date, i18n.language)}</span>
+        </>
+      ),
+      sortValue: (r) => r.date,
+    },
+    {
+      key: "article",
+      header: t("ecarts_m5m8.stocks.article"),
+      render: (r) => (
+        <>
+          <span className="cell-nowrap">{r.article}</span>
+          <span className="cell-sub">{r.article_label}</span>
+        </>
+      ),
+      sortValue: (r) => r.article,
+    },
     {
       key: "ecart",
       header: t("ecarts_m5m8.stocks.ecart"),
@@ -256,20 +293,21 @@ export function InventaireAnnuelSection() {
           <Badge tone="warn">{t("ecarts_m5m8.provisoire")}</Badge> {t("ecarts_m5m8.stocks.provisoireNote")}
         </p>
         {error && <p className="action-error" role="alert">{error}</p>}
-        <div className="action-bar-buttons">
-          <label>
-            {t("ecarts_m5m8.stocks.plan")}{" "}
-            <select value={plan} onChange={(ev) => setPlanId(ev.target.value)}>
+        <div className="list-toolbar">
+          <div className="field">
+            <label htmlFor="inv-annuel-plan">{t("ecarts_m5m8.stocks.plan")}</label>
+            <select id="inv-annuel-plan" className="control" value={plan} onChange={(ev) => setPlanId(ev.target.value)}>
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.code} · {p.depot_label}
+                  {p.depot_label ?? p.code}
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            {t("ecarts_m5m8.annee")} <input type="number" min={2000} max={2100} value={annee} onChange={(ev) => setAnnee(ev.target.value)} style={{ width: "6rem" }} />
-          </label>
+          </div>
+          <div className="field" style={{ flex: "0 0 120px" }}>
+            <label htmlFor="inv-annuel-annee">{t("ecarts_m5m8.annee")}</label>
+            <input id="inv-annuel-annee" className="control" type="number" min={2000} max={2100} value={annee} onChange={(ev) => setAnnee(ev.target.value)} />
+          </div>
         </div>
 
         {a && (
@@ -283,16 +321,18 @@ export function InventaireAnnuelSection() {
           <p className="muted">{t("ecarts_m5m8.stocks.aucunInventaire")}</p>
         ) : (
           <>
-            <label>
-              {t("ecarts_m5m8.stocks.inventaire")}{" "}
-              <select value={inv} onChange={(ev) => { setInvId(ev.target.value); setSaisie({}); }}>
-                {ouverts.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.code} · {o.depot_label} · {formatDate(o.date, i18n.language)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="list-toolbar">
+              <div className="field">
+                <label htmlFor="inv-annuel-inventaire">{t("ecarts_m5m8.stocks.inventaire")}</label>
+                <select id="inv-annuel-inventaire" className="control" value={inv} onChange={(ev) => { setInvId(ev.target.value); setSaisie({}); }}>
+                  {ouverts.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.code} · {formatDate(o.date, i18n.language)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             {e && (
               <>
                 <div data-testid="comptage-inventaire">
@@ -305,7 +345,7 @@ export function InventaireAnnuelSection() {
                   )}
                 </p>
                 <div className="action-bar-buttons">
-                  <button type="button" className="btn primary" disabled={Object.keys(saisie).length === 0 || compter.isPending} onClick={() => compter.mutate()}>
+                  <button type="button" className="btn" disabled={Object.keys(saisie).length === 0 || compter.isPending} onClick={() => compter.mutate()}>
                     {t("ecarts_m5m8.stocks.enregistrer")}
                   </button>
                   <ActionBar
@@ -313,7 +353,7 @@ export function InventaireAnnuelSection() {
                       ...(e.validation_requise && !e.validee && e.peut_valider
                         ? [{ label: t("ecarts_m5m8.stocks.validerMad"), path: `/api/stocks/inventaires/${inv}/valider-ecarts/`, confirm: t("ecarts_m5m8.stocks.validerMadConfirm") }]
                         : []),
-                      { label: t("ecarts_m5m8.stocks.cloturer"), path: `/api/stocks/inventaires/${inv}/cloturer/`, confirm: t("stocks.form.confirmCloture") },
+                      { label: t("ecarts_m5m8.stocks.cloturer"), path: `/api/stocks/inventaires/${inv}/cloturer/`, tone: "ghost", confirm: t("stocks.form.confirmCloture") },
                     ]}
                   />
                 </div>

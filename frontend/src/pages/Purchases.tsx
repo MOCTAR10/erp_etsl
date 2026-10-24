@@ -98,8 +98,10 @@ export function PurchasesPage() {
 
       <div className="kpi-grid">
         <Kpi label={t("purchases.orders")} value={total} icon={ShoppingCart} tone="brand" delay={0} />
-        <Kpi label={t("purchases.confirmed")} value={groups.confirmee.length + groups.partielle.length + groups.cloturee.length} icon={CheckCircle2} tone="ok" delay={0.05} />
-        <Kpi label={t("purchases.gr")} value={data.grCount} icon={Truck} tone="warn" delay={0.1} />
+        {/* « Actives » = confirmées ou partiellement reçues (les commandes clôturées n'en font plus partie). */}
+        <Kpi label={t("purchases.confirmed")} value={groups.confirmee.length + groups.partielle.length} icon={CheckCircle2} tone="ok" delay={0.05} />
+        {/* GLOBAL RENTAL : métrique neutre (pas une alerte) → ton acier. */}
+        <Kpi label={t("purchases.gr")} value={data.grCount} icon={Truck} tone="accent" delay={0.1} />
       </div>
 
       <section className="listes-block">

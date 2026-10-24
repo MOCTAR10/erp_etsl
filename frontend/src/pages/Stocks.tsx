@@ -170,32 +170,35 @@ export function StocksPage() {
   const articleOptions = (articles.data ?? []).map((a) => ({ value: a.id, label: `${a.code} · ${a.label}` }));
 
   const valoColumns: Column<ValoLine>[] = [
-    { key: "article", header: t("stocks.col.article"), sortValue: (r) => r.article, render: (r) => r.article },
-    { key: "depot", header: t("stocks.col.depot"), sortValue: (r) => r.depot, render: (r) => r.depot },
+    { key: "article", header: t("stocks.col.article"), sortValue: (r) => r.article, render: (r) => <span className="cell-nowrap">{r.article}</span> },
+    { key: "depot", header: t("stocks.col.depot"), sortValue: (r) => r.depot, render: (r) => <span className="cell-nowrap">{r.depot}</span> },
     { key: "method", header: t("stocks.col.method"), render: (r) => t(`stocks.methods.${r.method}`) },
     { key: "qty", header: t("stocks.col.qty"), num: true, sortValue: (r) => r.quantity, render: (r) => formatNumber(r.quantity) },
     { key: "pu", header: t("stocks.col.unitCost"), num: true, render: (r) => (r.value === undefined ? "—" : formatMoney(r.unit_cost)) },
     { key: "value", header: t("stocks.col.value"), num: true, sortValue: (r) => r.value, render: (r) => (r.value === undefined ? t("stocks.demi") : formatMoney(r.value)) },
   ];
   const quantColumns: Column<QuantLine>[] = [
-    { key: "article", header: t("stocks.col.article"), render: (q) => <>{q.article_code}<span className="cell-sub">{q.article_label}</span></> },
-    { key: "depot", header: t("stocks.col.depot"), render: (q) => q.depot_code },
-    { key: "lot", header: t("stocks.col.lot"), render: (q) => q.lot_code ?? "—" },
+    { key: "article", header: t("stocks.col.article"), render: (q) => <><span className="cell-nowrap">{q.article_code}</span><span className="cell-sub">{q.article_label}</span></> },
+    { key: "depot", header: t("stocks.col.depot"), render: (q) => <span className="cell-nowrap">{q.depot_code}</span> },
+    { key: "lot", header: t("stocks.col.lot"), render: (q) => <span className="cell-nowrap">{q.lot_code ?? "—"}</span> },
     { key: "qty", header: t("stocks.col.qty"), num: true, render: (q) => formatNumber(Number(q.quantity)) },
     { key: "value", header: t("stocks.col.value"), num: true, render: (q) => (q.stock_value === null ? t("stocks.demi") : formatMoney(q.stock_value)) },
   ];
   const mvtColumns: Column<MouvementStock>[] = [
-    { key: "code", header: t("stocks.col.code"), render: (m) => m.code },
+    { key: "code", header: t("stocks.col.code"), render: (m) => <span className="cell-nowrap">{m.code}</span> },
     { key: "type", header: t("stocks.col.type"), render: (m) => t(`stocks.type_labels.${m.type_mouvement}`) },
-    { key: "article", header: t("stocks.col.article"), render: (m) => m.article_code ?? "—" },
+    { key: "article", header: t("stocks.col.article"), render: (m) => <span className="cell-nowrap">{m.article_code ?? "—"}</span> },
     { key: "qty", header: t("stocks.col.qty"), num: true, sortValue: (m) => Number(m.quantite), render: (m) => formatNumber(Number(m.quantite), { decimals: Number(m.quantite) % 1 ? 2 : 0 }) },
     {
       key: "flow",
       header: t("stocks.col.flow"),
       render: (m) => (
         <>
-          {m.source_code ?? t("stocks.reserved")} → {m.destination_code ?? "—"}
-          {m.ordre_code ? <span className="cell-sub">{m.ordre_code}</span> : null}
+          <span className="cell-nowrap">
+            {m.source_code ?? (m.type_mouvement === "inventaire" ? "—" : t("revueR2.stocks.exterieur"))} →{" "}
+            {m.destination_code ?? m.ordre_code ?? (m.type_mouvement === "inventaire" ? "—" : t("revueR2.stocks.exterieur"))}
+          </span>
+          {m.ordre_code && m.destination_code ? <span className="cell-sub">{m.ordre_code}</span> : null}
         </>
       ),
     },
@@ -211,7 +214,7 @@ export function StocksPage() {
             title={m.document_titre || undefined}
             onClick={() => void api.download(`/api/stocks/mouvements/${m.id}/bon-de-sortie/`, `BS-${m.code}.pdf`)}
           >
-            <FileDown size={14} aria-hidden /> {t("m5e.mvt.bonSortie")}
+            <FileDown size={14} aria-hidden /> <span className="cell-nowrap">{t("m5e.mvt.bonSortie")}</span>
           </button>
         ) : m.document_titre ? (
           <span className="cell-sub">{m.document_titre}</span>
@@ -219,10 +222,10 @@ export function StocksPage() {
     },
   ];
   const certColumns: Column<CertificatMatiere>[] = [
-    { key: "code", header: t("stocks.col.code"), render: (c) => c.code },
+    { key: "code", header: t("stocks.col.code"), render: (c) => <span className="cell-nowrap">{c.code}</span> },
     { key: "type", header: t("stocks.col.type"), render: (c) => (c.type === "mtc" ? t("stocks.mtc") : t("stocks.coc")) },
-    { key: "num", header: t("stocks.col.certNo"), render: (c) => c.numero_certificat },
-    { key: "lot", header: t("stocks.col.lot"), render: (c) => c.lot_code ?? "—" },
+    { key: "num", header: t("stocks.col.certNo"), render: (c) => <span className="cell-nowrap">{c.numero_certificat}</span> },
+    { key: "lot", header: t("stocks.col.lot"), render: (c) => <span className="cell-nowrap">{c.lot_code ?? "—"}</span> },
     { key: "org", header: t("stocks.col.organisme"), render: (c) => c.organisme || "—" },
     {
       key: "statut",
@@ -249,7 +252,7 @@ export function StocksPage() {
     { key: "actions", header: <span className="sr-only">{t("listes.col.actions")}</span>, render: (c) => <CertificatActions cert={c} /> },
   ];
   const invColumns: Column<Inventaire>[] = [
-    { key: "code", header: t("stocks.col.code"), render: (i) => i.code },
+    { key: "code", header: t("stocks.col.code"), render: (i) => <span className="cell-nowrap">{i.code}</span> },
     { key: "depot", header: t("stocks.col.depot"), render: (i) => i.depot_label },
     { key: "date", header: t("stocks.col.date"), render: (i) => formatDate(i.date) },
     {
@@ -266,13 +269,13 @@ export function StocksPage() {
   ];
   const valoMensColumns: Column<ValorisationMensuelle>[] = [
     { key: "periode", header: t("stocks.periode"), sortValue: (v) => v.periode, render: (v) => v.periode },
-    { key: "depot", header: t("stocks.col.depot"), render: (v) => v.depot_code },
+    { key: "depot", header: t("stocks.col.depot"), render: (v) => <span className="cell-nowrap">{v.depot_code}</span> },
     { key: "valeur", header: t("stocks.col.value"), num: true, render: (v) => (v.valeur_stock === null ? t("stocks.demi") : formatMoney(v.valeur_stock)) },
     { key: "conso", header: t("stocks.consoMois"), num: true, render: (v) => (v.consommation === null ? t("stocks.demi") : formatMoney(v.consommation)) },
     { key: "ecriture", header: t("m5e.valo.ecriture"), render: (v) => (v.move_number ? <Badge tone="ok">{v.move_number}</Badge> : <span className="muted">{v.motif_ecriture || "—"}</span>) },
   ];
   const planColumns: Column<PlanInventaireTournant>[] = [
-    { key: "code", header: t("stocks.col.code"), render: (p) => p.code },
+    { key: "code", header: t("stocks.col.code"), render: (p) => <span className="cell-nowrap">{p.code}</span> },
     { key: "depot", header: t("stocks.col.depot"), render: (p) => p.depot_label },
     { key: "per", header: t("stocks.periodicite"), num: true, render: (p) => p.periodicite_jours },
     { key: "pass", header: t("stocks.parPassage"), num: true, render: (p) => p.articles_par_passage },
@@ -461,7 +464,7 @@ export function StocksPage() {
         title={t("stocks.valoMensuelle")}
         actions={
           <ActionBar
-            actions={[{ label: t("stocks.figer"), path: "/api/stocks/valorisations/figer/", confirm: t("stocks.figerConfirm"), prompt: { name: "periode", label: t("stocks.figerPrompt") } }]}
+            actions={[{ label: t("stocks.figer"), path: "/api/stocks/valorisations/figer/", tone: "ghost", confirm: t("stocks.figerConfirm"), prompt: { name: "periode", label: t("stocks.figerPrompt") } }]}
           />
         }
       >
