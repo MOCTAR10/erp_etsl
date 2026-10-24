@@ -4559,6 +4559,11 @@ export const fr = {
       fichesProvisoires: "Les fiches marquées « Provisoire » sont à confirmer ou modifier par ETSL.",
     },
   },
+  premiumPilotage: {
+    people: {
+      unknown: "Utilisateur",
+    },
+  },
 } as const;
 
 export default fr;

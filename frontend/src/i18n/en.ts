@@ -4559,6 +4559,11 @@ export const en = {
       fichesProvisoires: "Sheets marked “Provisional” are to be confirmed or amended by ETSL.",
     },
   },
+  premiumPilotage: {
+    people: {
+      unknown: "User",
+    },
+  },
 } as const;
 
 export default en;
