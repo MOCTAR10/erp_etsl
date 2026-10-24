@@ -76,7 +76,7 @@ jobs:
   backend:
     name: Backend ${{ matrix.shard }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90  # shard noyau-bi : jeu vitrine (≈ 50 min)
     strategy:
       fail-fast: false
       matrix:

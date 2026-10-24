@@ -72,7 +72,12 @@ def _ventiler(montant, parts):
         if m:
             sortie.append((analytic, m))
             reste -= m
-    if reste:
+    if reste < 0 and sortie:
+        # Arrondis cumulés au-delà du montant (parts = 100 %) : l'excédent est repris sur la dernière affaire, sinon
+        # la ligne « sans axe » serait négative et l'écriture refusée par le noyau comptable.
+        analytic, m = sortie[-1]
+        sortie[-1] = (analytic, m + reste)
+    elif reste:
         sortie.append((None, reste))
     return sortie
 
