@@ -4566,6 +4566,7 @@ export const en = {
       tousConfirmes_one: "{{count}} setting, confirmed",
       tousConfirmes_other: "{{count}} settings, all confirmed",
       confirmes: "Settings confirmed",
+      aucun: "No setting visible with your permissions",
       afficher: "Show",
       masquer: "Hide",
       gerer: "Manage in ETSL settings",

@@ -44,9 +44,11 @@ export function ParamsPanel({
   const bodyId = `${uid}-params`;
   const resume = pending
     ? t("premiumParams.panel.aConfirmer", { count })
-    : total !== undefined
-      ? t("premiumParams.panel.tousConfirmes", { count: total })
-      : t("premiumParams.panel.confirmes");
+    : total === 0
+      ? t("premiumParams.panel.aucun")
+      : total !== undefined
+        ? t("premiumParams.panel.tousConfirmes", { count: total })
+        : t("premiumParams.panel.confirmes");
   return (
     <div
       className={`${variant === "card" ? "card params-panel params-panel--card" : "params-panel"}${pending ? " is-pending" : ""}${open ? " is-open" : ""}`}

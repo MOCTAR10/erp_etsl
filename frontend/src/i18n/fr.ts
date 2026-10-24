@@ -4566,6 +4566,7 @@ export const fr = {
       tousConfirmes_one: "{{count}} paramètre, confirmé",
       tousConfirmes_other: "{{count}} paramètres, tous confirmés",
       confirmes: "Paramètres confirmés",
+      aucun: "Aucun paramètre visible avec vos droits",
       afficher: "Afficher",
       masquer: "Masquer",
       gerer: "Gérer dans Paramètres ETSL",
