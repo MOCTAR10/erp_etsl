@@ -692,6 +692,11 @@
     border-radius: var(--radius-md);
     background: var(--surface-2);
   }
+  /* Panneau autonome entre deux cartes : une carte fine (surface claire, pas de double rembourrage). */
+  .params-panel.params-panel--card { margin-top: 0; padding: 0; background: var(--surface); border-radius: var(--radius-lg); }
+  .shell-page > * + .params-panel--card { margin-top: 16px; }
+  .params-panel--card .params-panel-bar { padding: var(--space-3) var(--space-5); }
+  .params-panel--card .params-panel-body { padding: var(--space-4) var(--space-5); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
   .params-panel-bar {
     display: flex;
     flex-wrap: wrap;
