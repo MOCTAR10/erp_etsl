@@ -9,6 +9,7 @@ import { useSites } from "../components/sites/SiteFilter";
 import { SitesSection } from "../components/sites/SitesSection";
 import { Badge, Menu, Modal, PageHeader, PagedDataGrid, QuickForm, SectionCard, SheetClose, notify } from "../components/ui";
 import type { BadgeTone, GridColumn, MenuEntry } from "../components/ui";
+import { champsVisibles, regrouperAudit, valeurLisible } from "../lib/auditLisible";
 import { formatDateTime } from "../lib/format";
 import { APP_NAV_KEY, sansCode, type ErpApp } from "../lib/modules";
 import { describeError } from "../lib/offlineQueue";
@@ -71,11 +72,6 @@ const REFERENTIELS = [
 ] as const;
 
 const AUDIT_TONE: Record<string, BadgeTone> = { create: "ok", delete: "err", update: "info", acl_grant: "brand", acl_revoke: "warn" };
-
-const court = (v: unknown) => {
-  const s = typeof v === "string" ? v : JSON.stringify(v);
-  return s && s.length > 60 ? `${s.slice(0, 60)}…` : (s ?? "—");
-};
 
 /** Champs « clés » d'une fiche, affichés pour une création (au lieu de « 9 champs renseignés », A-25). */
 const CHAMPS_CLES = ["code", "reference", "numero", "titre", "title", "libelle", "label", "name", "nom", "statut", "status", "montant"];
@@ -291,7 +287,10 @@ export function AdministrationPage() {
       render: (c) => <span className="num">{c.last_login ? formatDateTime(c.last_login) : <span className="muted">{t("shell.admin.jamais")}</span>}</span>,
     },
   ];
-  const colAudit: GridColumn<Audit>[] = [
+  // Valeurs du journal rendues lisibles (A03) : null → « — », ISO → date, UUID → référence courte.
+  const court = (v: unknown) => valeurLisible(v, t("ecarts_a1.filtres.oui"), t("ecarts_a1.filtres.non"));
+  const auditGroupe = { ...audit, rows: regrouperAudit(audit.rows) };
+  const colAudit: GridColumn<Audit & { repetitions?: number }>[] = [
     { key: "quand", header: t("ecarts_tr.audit.quand"), width: 170, render: (a) => <span className="num">{formatDateTime(a.created_at)}</span> },
     {
       key: "qui",
@@ -316,10 +315,14 @@ export function AdministrationPage() {
     {
       key: "detail",
       header: t("ecarts_tr.audit.avantApres"),
-      render: (a) =>
-        a.detail.champs ? (
+      render: (a) => (
+        <>
+        {(a.repetitions ?? 1) > 1 ? (
+          <Badge tone="neutral">{t("vague3B.audit.repetitions", { count: a.repetitions })}</Badge>
+        ) : null}
+        {a.detail.champs && champsVisibles(a.detail.champs).length ? (
           <ul className="audit-diff">
-            {a.detail.champs.slice(0, 4).map((k) => (
+            {champsVisibles(a.detail.champs).slice(0, 4).map((k) => (
               <li key={k}>
                 <span className="audit-champ" title={k}>
                   {champLisible(t, k)}
@@ -341,13 +344,17 @@ export function AdministrationPage() {
                 </li>
               ))}
           </ul>
+        ) : a.detail.champs ? (
+          <span className="muted">{t("vague3B.audit.technique")}</span>
         ) : a.detail.apres || a.detail.avant ? (
           <span className="muted">
             {t(a.detail.apres ? "revueR1.audit.renseignes" : "revueR1.audit.supprimes", { count: Object.keys(a.detail.apres ?? a.detail.avant ?? {}).length })}
           </span>
         ) : (
           <span className="muted audit-brut">{court(a.detail)}</span>
-        ),
+        )}
+        </>
+      ),
     },
   ];
 
@@ -608,7 +615,7 @@ export function AdministrationPage() {
             ))}
           </select>
         </div>
-        <PagedDataGrid list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" maxHeight="none" />
+        <PagedDataGrid list={auditGroupe} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" maxHeight="none" />
         </div>
       </SectionCard>
 

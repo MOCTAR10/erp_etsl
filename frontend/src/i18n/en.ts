@@ -742,6 +742,10 @@ export const en = {
   pipeline: {
     pipePondere: "Weighted pipeline",
     pipePondereHint: "signed 90% · ongoing 60% · prospect 25% → management control budget",
+    pipePondereTous: "Weighted pipeline — all horizons",
+    pipePondereExercice: "of which {{annee}} closings: {{montant}} · ",
+    pipePonderePoids: "signed {{signe}}% · ongoing {{enCours}}% · prospect {{prospect}}%",
+    pipePondereInfo: "All active opportunities, whatever their expected closing date. Management control only keeps closings expected in the fiscal year (or undated): that is the “of which closings” amount.",
     echeance: "Due",
     title: "Sales pipeline",
     prospection: "Prospecting",
@@ -3071,14 +3075,15 @@ export const en = {
     },
     pipe: {
       title: "Weighted pipeline → revenue budget", categorie: "Category", nb: "Opportunities", brut: "Gross amount",
-      ponderation: "Weight", pondere: "Weighted amount", total: "Weighted pipeline for the year",
+      ponderation: "Weight", pondere: "Weighted amount", total: "Weighted pipeline for the year", totalAnnee: "Weighted pipeline for fiscal year {{annee}}",
+      perimetre: "Scope: active opportunities expected to close in the fiscal year (or undated). The sales pipeline also shows the all-horizons pipeline, with this same amount as “of which closings”.",
       cat: { signe: "Signed", en_cours: "In progress", prospect: "Prospect" },
       proposer: "Propose a revenue budget", confirm: "Create a draft revenue budget equal to the weighted pipeline?",
     },
     imputation: {
       title: "Allocation of overheads to jobs", cle: "Allocation key", structure: "Overheads",
       part: "Share", margeDirecte: "Direct margin", imputee: "Allocated overhead", margeApres: "Margin after overhead",
-      tauxReel: "Actual rate", tauxStandard: "Standard rate",
+      tauxReel: "Actual rate", tauxStandard: "Standard rate", tauxReelStandard: "Actual rate", standard: "standard {{taux}}",
     },
     kpi: {
       title: "Management control performance indicators", code: "Code", libelle: "Indicator", valeur: "Value", cible: "Target", formule: "Formula",
@@ -3089,7 +3094,7 @@ export const en = {
       title: "Management dashboard by profile, customer, job", par: "Break down by",
       axes: { profil: "Contract profile", client: "Customer", affaire: "Job", responsable: "Manager" },
       affaires: "Jobs", caPrevu: "Planned revenue", margePrevue: "Planned margin", charges: "Costs", coutGr: "GR cost (618)",
-      margeReelle: "Actual margin",
+      margeReelle: "Actual margin", realise: "Actual income", chargesCourt: "costs {{montant}}", grCourt: "GR (618) {{montant}}",
     },
     marges: {
       title: "Job margin approval", ca: "Contract revenue", marge: "Planned margin", validation: "Approval",
@@ -3099,6 +3104,7 @@ export const en = {
     mo: {
       title: "Loaded labour cost by job", ordres: "Work orders", heures: "Hours", nonValorisees: "Unvalued hours",
       cout: "Loaded cost", coutHoraire: "Average hourly cost",
+      nonParametre: "Hourly rate not set — {{pct}} of hours valued. The loaded cost will appear once hourly rates are entered in payroll.",
       note: "Operations time entries transferred to payroll and valued at loaded cost, since January 1st.",
     },
     plans: {
@@ -4593,6 +4599,9 @@ export const en = {
         declares_zero: "No accident reported",
         declares_one: "{{count}} accident reported",
         declares_other: "{{count}} accidents reported",
+        declaresTotal_zero: "No accident reported",
+        declaresTotal_one: "{{count}} accident reported in total",
+        declaresTotal_other: "{{count}} accidents reported in total",
       },
     },
     notifications: {
@@ -4840,6 +4849,22 @@ export const en = {
       SMIG: "Monthly minimum wage (SMIG)",
     },
   },
+  vague3C2: {
+    compta: {
+      montantsFcfa: "Amounts in FCFA",
+      aCalculer: "To be calculated",
+      tvaACalculerHint: "This month's return not yet calculated from accounts 443 / 445",
+    },
+    maintenance: {
+      coutAnnee: "Maintenance cost {{annee}}",
+      dontOuverts: "of which open work orders: {{montant}}",
+    },
+    operations: {
+      surPrevues: "out of {{h}} h planned (workshop + site)",
+      nonSignificatif: "Not meaningful",
+      donneesInsuffisantes: "Insufficient data",
+    },
+  },
   premiumVague2: {
     sections: {
       comptabilite: {
@@ -4949,6 +4974,27 @@ export const en = {
     direction: {
       hypothesesTitre: "Management assumptions",
       hypothesesTexte: "Cash-flow lead times, budget thresholds and retention periods: default values, to be validated by ETSL in the settings.",
+    },
+  },
+  // Wave 3 (batch B): Signatures, audit trail, notifications.
+  vague3B: {
+    sig: {
+      signer: "Sign…",
+      signerTitre: "Sign the document",
+      refuserTitre: "Decline the signature",
+      enrolTitre: "Second factor to set up",
+      enrolTexte: "Enable the authenticator app to sign your documents.",
+      configurer: "Set up my key",
+    },
+    notif: {
+      retard_one: "overdue by {{count}} day",
+      retard_other: "overdue by {{count}} days",
+      groupes: { aujourdhui: "Today", semaine: "This week", ancien: "Older" },
+    },
+    audit: {
+      repetitions_one: "{{count}} change",
+      repetitions_other: "{{count}} changes",
+      technique: "Technical update",
     },
   },
 } as const;

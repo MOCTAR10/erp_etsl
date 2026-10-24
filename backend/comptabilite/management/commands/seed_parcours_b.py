@@ -47,7 +47,14 @@ class Command(ParcoursA):
         self.parcours_situations()
         self.parcours_achats()
         self.parcours_inventaire()
+        self.parcours_tva()
         self.stdout.write(self.style.SUCCESS("Parcours lot B pret."))
+
+    def parcours_tva(self):
+        """Déclarations TVA du mois calculées sur les écritures 443 / 445 (sinon le KPI TVA reste à 0)."""
+        from comptabilite.fiscal import calculer_declarations_annee
+
+        calculer_declarations_annee(self.today.year)
 
     # -- M3 -> M10 : situations, facture, encaissement, lettrage ---------------------------------------------
     def _situation(self, affaire, label, montant, avancement, decalage):

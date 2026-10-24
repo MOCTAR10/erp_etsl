@@ -116,6 +116,30 @@ def compute_declaration_tva(declaration):
     return declaration
 
 
+def calculer_declarations_annee(annee, taux=None):
+    """Déclarations TVA (brouillon) des mois de `annee` portant des écritures 443 / 445 comptabilisées : créées au
+    besoin puis (re)calculées. Lecture seule sur les écritures ; une déclaration déposée n'est jamais recalculée."""
+    from .models import TauxTva
+
+    taux = taux or TauxTva.objects.filter(is_default=True).first()
+    if taux is None:
+        return []
+    mois = sorted({
+        d.replace(day=1)
+        for d in AccountMoveLine.objects.filter(
+            move__status__in=COMPTABILISEES, move__date__year=annee,
+            account__code__regex=r"^44[35]",
+        ).values_list("move__date", flat=True)
+    })
+    declarations = []
+    for m in mois:
+        declaration, _ = DeclarationTva.objects.get_or_create(mois=m, taux_tva=taux)
+        if declaration.statut != DeclarationTva.Statut.DEPOSEE:
+            compute_declaration_tva(declaration)
+        declarations.append(declaration)
+    return declarations
+
+
 # --------------------------------------------------------------------------------------------------
 # Autofacturation (TVA autoliquidée)
 # --------------------------------------------------------------------------------------------------

@@ -742,6 +742,10 @@ export const fr = {
   pipeline: {
     pipePondere: "Pipe pondéré",
     pipePondereHint: "signé 90 % · en cours 60 % · prospect 25 % → budget du contrôle de gestion",
+    pipePondereTous: "Pipe pondéré — tous horizons",
+    pipePondereExercice: "dont clôtures {{annee}} : {{montant}} · ",
+    pipePonderePoids: "signé {{signe}} % · en cours {{enCours}} % · prospect {{prospect}} %",
+    pipePondereInfo: "Toutes les opportunités actives, quelle que soit leur date de clôture prévue. Le contrôle de gestion ne retient que les clôtures prévues dans l'exercice (ou sans date) : c'est le montant « dont clôtures ».",
     echeance: "Échéance",
     title: "Pipeline commercial",
     prospection: "Prospection",
@@ -3071,14 +3075,15 @@ export const fr = {
     },
     pipe: {
       title: "Pipe pondéré → budget de produits", categorie: "Catégorie", nb: "Opportunités", brut: "Montant brut",
-      ponderation: "Pondération", pondere: "Montant pondéré", total: "Pipe pondéré de l'exercice",
+      ponderation: "Pondération", pondere: "Montant pondéré", total: "Pipe pondéré de l'exercice", totalAnnee: "Pipe pondéré de l'exercice {{annee}}",
+      perimetre: "Périmètre : opportunités actives dont la clôture est prévue dans l'exercice (ou sans date). Le Pipeline commercial affiche en plus le pipe tous horizons, avec ce même montant en « dont clôtures ».",
       cat: { signe: "Signé", en_cours: "En cours", prospect: "Prospect" },
       proposer: "Proposer un budget de produits", confirm: "Créer un budget de produits brouillon égal au pipe pondéré ?",
     },
     imputation: {
       title: "Imputation des charges de structure aux affaires", cle: "Clé de répartition", structure: "Charges de structure",
       part: "Quote-part", margeDirecte: "Marge directe", imputee: "Structure imputée", margeApres: "Marge après structure",
-      tauxReel: "Taux réel", tauxStandard: "Taux standard",
+      tauxReel: "Taux réel", tauxStandard: "Taux standard", tauxReelStandard: "Taux réel", standard: "standard {{taux}}",
     },
     kpi: {
       title: "Indicateurs de performance du contrôle de gestion", code: "Code", libelle: "Indicateur", valeur: "Valeur", cible: "Cible", formule: "Formule",
@@ -3089,7 +3094,7 @@ export const fr = {
       title: "Tableau de bord Direction par profil, client, affaire", par: "Ventiler par",
       axes: { profil: "Profil contractuel", client: "Client", affaire: "Affaire", responsable: "Responsable" },
       affaires: "Affaires", caPrevu: "CA prévu", margePrevue: "Marge prévue", charges: "Charges", coutGr: "Coût GR (618)",
-      margeReelle: "Marge réelle",
+      margeReelle: "Marge réelle", realise: "Produits réalisés", chargesCourt: "charges {{montant}}", grCourt: "GR (618) {{montant}}",
     },
     marges: {
       title: "Validation de la marge d'affaire", ca: "CA contractuel", marge: "Marge prévue", validation: "Validation",
@@ -3099,6 +3104,7 @@ export const fr = {
     mo: {
       title: "Coût de main-d'œuvre chargé par affaire", ordres: "Ordres de fabrication", heures: "Heures", nonValorisees: "Heures non valorisées",
       cout: "Coût chargé", coutHoraire: "Coût horaire moyen",
+      nonParametre: "Taux horaire non paramétré — {{pct}} des heures valorisées. Le coût chargé s'affichera dès que les taux horaires seront saisis en paie.",
       note: "Pointages des opérations transférés en paie et valorisés au coût chargé, depuis le 1er janvier.",
     },
     plans: {
@@ -4593,6 +4599,9 @@ export const fr = {
         declares_zero: "Aucun accident déclaré",
         declares_one: "{{count}} accident déclaré",
         declares_other: "{{count}} accidents déclarés",
+        declaresTotal_zero: "Aucun accident déclaré",
+        declaresTotal_one: "{{count}} accident déclaré au total",
+        declaresTotal_other: "{{count}} accidents déclarés au total",
       },
     },
     notifications: {
@@ -4840,6 +4849,22 @@ export const fr = {
       SMIG: "SMIG mensuel",
     },
   },
+  vague3C2: {
+    compta: {
+      montantsFcfa: "Montants en FCFA",
+      aCalculer: "À calculer",
+      tvaACalculerHint: "Déclaration du mois non encore calculée sur les écritures 443 / 445",
+    },
+    maintenance: {
+      coutAnnee: "Coût maintenance {{annee}}",
+      dontOuverts: "dont OT ouverts : {{montant}}",
+    },
+    operations: {
+      surPrevues: "sur {{h}} h prévues (atelier + chantier)",
+      nonSignificatif: "Non significatif",
+      donneesInsuffisantes: "Données insuffisantes",
+    },
+  },
   premiumVague2: {
     sections: {
       comptabilite: {
@@ -4949,6 +4974,27 @@ export const fr = {
     direction: {
       hypothesesTitre: "Hypothèses de pilotage",
       hypothesesTexte: "Délais de trésorerie, seuils budgétaires et durées de conservation : valeurs par défaut, à valider par ETSL dans les paramètres.",
+    },
+  },
+  // Vague 3 (lot B) : Signatures, piste d'audit, notifications.
+  vague3B: {
+    sig: {
+      signer: "Signer…",
+      signerTitre: "Signer le document",
+      refuserTitre: "Refuser la signature",
+      enrolTitre: "Second facteur à configurer",
+      enrolTexte: "Activez l'application d'authentification pour signer vos documents.",
+      configurer: "Configurer ma clé",
+    },
+    notif: {
+      retard_one: "en retard depuis {{count}} j",
+      retard_other: "en retard depuis {{count}} j",
+      groupes: { aujourdhui: "Aujourd'hui", semaine: "Cette semaine", ancien: "Plus ancien" },
+    },
+    audit: {
+      repetitions_one: "{{count}} modification",
+      repetitions_other: "{{count}} modifications",
+      technique: "Mise à jour technique",
     },
   },
 } as const;

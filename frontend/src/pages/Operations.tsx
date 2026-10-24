@@ -115,12 +115,6 @@ export function OperationsPage() {
   });
 
   const situations = usePagedList<SituationTravaux>("situations", (q) => api.situations(q));
-  // Heures déclarées : somme sur toutes les situations, pas seulement la page affichée.
-  const situationsToutes = useQuery({
-    queryKey: ["situations-toutes"],
-    queryFn: () => api.listAll<SituationTravaux>("/api/operations/situations/"),
-  });
-
   const affectations = useQuery({
     queryKey: ["affectations"],
     queryFn: () => api.affectations(`?page_size=100`),
@@ -157,7 +151,6 @@ export function OperationsPage() {
           void byStatus.refetch();
           void charge.refetch();
           void situations.query.refetch();
-          void situationsToutes.refetch();
         }}
         retryLabel={t("common.retry")}
       />
@@ -176,8 +169,10 @@ export function OperationsPage() {
     { value: "chantier", label: t("operations.chantier") },
   ];
   const active = groups.en_cours.length + groups.lance.length + groups.prevu.length;
-  const reported = situationsToutes.data?.reduce((a, s) => a + Number(s.ordered_hours), 0) ?? 0;
   const chargeData = charge.data;
+  // Heures réellement pointées (atelier + chantier) ; le prévu passe en sous-titre (l'ancien KPI sommait le prévu des situations).
+  const pointeesTotal = chargeData ? chargeData.totals.atelier.pointed + chargeData.totals.chantier.pointed : null;
+  const prevuesTotal = chargeData ? chargeData.totals.atelier.calculated + chargeData.totals.chantier.calculated : null;
 
   return (
     <div className="listes-page">
@@ -195,7 +190,14 @@ export function OperationsPage() {
 
       <div className="kpi-grid">
         <Kpi label={t("operations.of")} value={active} icon={HardHat} tone="brand" delay={0} />
-        <Kpi label={t("operations.reported")} value={`${formatNumber(reported)} h`} icon={Clock3} tone="accent" delay={0.05} />
+        <Kpi
+          label={t("operations.reported")}
+          value={pointeesTotal === null ? null : `${formatNumber(pointeesTotal)} h`}
+          hint={prevuesTotal === null ? undefined : t("vague3C2.operations.surPrevues", { h: formatNumber(prevuesTotal) })}
+          icon={Clock3}
+          tone="accent"
+          delay={0.05}
+        />
         {chargeData
           ? (["atelier", "chantier"] as const).map((key, i) => (
               <Kpi

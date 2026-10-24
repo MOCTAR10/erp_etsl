@@ -202,6 +202,8 @@ type ChargeLigne = ChargeJour & { id: string };
 
 const qte = (v: string) => formatNumber(Number(v), { decimals: decimales(v) });
 const nombre = (v: string | null) => (v === null ? null : Number(v));
+/** Avancement (%) sous lequel la marge à terminaison est « non significative ». */
+const SEUIL_MARGE_SIGNIFICATIVE = 5;
 const telecharger = (path: string, name: string) => void api.download(path, name).catch(() => undefined);
 /** Colonne d'actions qui ne passe pas à la ligne (boutons « Valoriser par les attachements », « Transférer en paie »…). */
 const sansRetour = <T,>(col: Column<T>): Column<T> => ({ ...col, render: (row) => <span className="cell-nowrap">{col.render(row)}</span> });
@@ -524,11 +526,15 @@ export function EcartsM3Section() {
       header: k("suivi.marge"),
       num: true,
       sortValue: (a) => nombre(a.marge_a_terminaison),
-      render: (a) => (
-        <>
-          {fcfa(a.marge_a_terminaison)} {a.marge_pct !== null && <span className="muted">({pct(a.marge_pct)})</span>}
-        </>
-      ),
+      // Sous 5 % d'avancement, la marge à terminaison n'a pas de sens (ex. 100 % pour 48 000 FCFA engagés).
+      render: (a) =>
+        a.marge_a_terminaison === null || (nombre(a.avancement_pct) ?? 0) < SEUIL_MARGE_SIGNIFICATIVE ? (
+          <span className="muted">{t("vague3C2.operations.nonSignificatif")}</span>
+        ) : (
+          <>
+            {fcfa(a.marge_a_terminaison)} {a.marge_pct !== null && <span className="muted">({pct(a.marge_pct)})</span>}
+          </>
+        ),
     },
   ];
   const colsOrdres: Column<Of>[] = [
@@ -885,8 +891,18 @@ export function EcartsM3Section() {
       >
         {ind && (
           <div className="kpi-grid">
-            <Kpi label={k("suivi.productivite")} value={pct(ind.productivite_pct)} tone="brand" delay={0} />
-            <Kpi label={k("suivi.rebut")} value={pct(ind.taux_rebut_pct)} tone="accent" delay={0.03} />
+            <Kpi
+              label={k("suivi.productivite")}
+              value={ind.productivite_pct === null ? t("vague3C2.operations.donneesInsuffisantes") : pct(ind.productivite_pct)}
+              tone={ind.productivite_pct === null ? "neutral" : "brand"}
+              delay={0}
+            />
+            <Kpi
+              label={k("suivi.rebut")}
+              value={ind.taux_rebut_pct === null ? t("vague3C2.operations.donneesInsuffisantes") : pct(ind.taux_rebut_pct)}
+              tone={ind.taux_rebut_pct === null ? "neutral" : "accent"}
+              delay={0.03}
+            />
             <Kpi label={k("suivi.directe")} value={`${formatNumber(Number(ind.heures_directes))} h`} hint={`${formatNumber(Number(ind.heures_indirectes))} h ${k("suivi.indirecte")}`} tone="brand" delay={0.06} />
             <Kpi label={k("suivi.retards")} value={ind.of_en_retard} hint={`${ind.ruptures_ouvertes} ${k("suivi.ruptures")}`} tone="accent" delay={0.09} />
           </div>

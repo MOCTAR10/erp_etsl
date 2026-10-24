@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatMoney } from "../../lib/format";
+import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import "./comptabilite.css";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
@@ -129,13 +130,13 @@ function parametresLisibles(p: Record<string, unknown>, t: (k: string, o?: Recor
   );
 }
 
-/** Cellule d'état : montants complets en FCFA, lignes de total en gras. */
+/** Cellule d'état : montants complets (unité FCFA rappelée une fois sous le titre, B02), lignes de total en gras. */
 function cellule(col: Colonne, l: LigneEtat) {
   const v = l[col.key];
   const total = Boolean(l.total || l.total_ligne || l.entete);
   // Montant nul laissé en blanc (usage des balances) : seuls les mouvements ressortent ; les totaux restent affichés.
   const vide = v === null || v === undefined || v === "" || (col.montant && Number(v) === 0 && !total);
-  const texte = vide ? "" : col.montant ? formatMoney(Number(v)) : String(v);
+  const texte = vide ? "" : col.montant ? formatNumber(Number(v)) : String(v);
   return l.total || l.total_ligne || l.entete ? <strong>{texte}</strong> : texte;
 }
 
@@ -321,6 +322,7 @@ export function EcartsM10Section() {
             {etat.data.tableaux.map((tab) => (
               <div className="etat-bloc" key={tab.titre} data-testid={`etat-${code}`}>
                 <h4>{tab.titre}</h4>
+                {tab.colonnes.some((c) => c.montant) && <p className="muted etat-unite">{t("vague3C2.compta.montantsFcfa")}</p>}
                 <DataTable
                   caption={tab.titre}
                   density="compact"
@@ -328,7 +330,7 @@ export function EcartsM10Section() {
                     key: c.key,
                     header: t(`ecarts_m10.col.${c.key}`, { defaultValue: c.label }),
                     num: c.montant,
-                    width: c.key === "libelle" ? 220 : undefined,
+                    width: c.key === "libelle" ? 200 : undefined,
                     render: (l) => cellule(c, l),
                   }))}
                   rows={tab.lignes.map((l, i) => ({ ...l, id: i }))}

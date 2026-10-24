@@ -108,18 +108,15 @@
 }
 
 /* ── Kanban horizontal (P2-6) ── */
-/* Colonnes en flex : une colonne pleine prend au moins 260 px (étirée si la place le permet), une colonne vide
-   se réduit à 184 px (A-07, A-38, B04). Le board ne défile plus qu'en largeur : chaque colonne fait défiler sa
-   propre liste de cartes (.board-col-body), en-tête fixe au-dessus. */
+/* Colonnes en flex qui passent à la ligne (audit B10) : aucune colonne n'est plus coupée au bord droit à 1 440 px.
+   Une colonne pleine prend au moins 180 px (étirée si la place le permet), une colonne vide se réduit à 140 px.
+   Les cartes ne défilent plus dans la colonne (audit A06) : la colonne s'allonge, son en-tête reste collant. */
 .board {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-3);
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
-  scroll-padding-inline: var(--space-1);
+  overflow: visible;
   padding-bottom: var(--space-2);
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
@@ -129,20 +126,9 @@
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
-/* Fondu sur le bord qui cache des colonnes (affordance de défilement) */
-.board[data-overflow-end] {
-  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-}
-.board[data-overflow-start] {
-  mask-image: linear-gradient(to right, transparent, #000 56px);
-}
-.board[data-overflow-start][data-overflow-end] {
-  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
-}
 
 .board-col {
-  flex: 1 0 260px;
-  scroll-snap-align: start;
+  flex: 1 1 180px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -153,31 +139,17 @@
 }
 /* Colonne vide : largeur réduite, simple mention sous l'en-tête (ne prend plus la moitié du board). */
 .board-col.is-empty {
-  flex: 0 0 184px;
+  flex: 0 1 140px;
 }
-/* Liste de cartes : défile dans la colonne, fondu bas (et haut) tant qu'il reste des cartes hors champ. */
+/* Liste de cartes : toutes visibles (plus de hauteur maximale ni de fondu ; « Voir plus » reste géré par `limit`). */
 .board-col-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  max-height: max(320px, min(calc(100dvh - 300px), 720px));
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
   /* place de l'anneau de focus et de l'ombre des cartes, sans rogner */
   margin: -4px;
   padding: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
   border-radius: var(--radius-md);
-}
-.board-col-body[data-overflow-bottom] {
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
-}
-.board-col-body[data-overflow-top] {
-  mask-image: linear-gradient(to bottom, transparent, #000 24px);
-}
-.board-col-body[data-overflow-top][data-overflow-bottom] {
-  mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 40px), transparent);
 }
 .board-col-body:focus {
   outline: none;
@@ -191,9 +163,6 @@
   .board {
     flex-direction: column;
     align-items: stretch;
-    overflow: visible;
-    scroll-snap-type: none;
-    mask-image: none !important;
     padding-bottom: 0;
   }
   .board-col,
@@ -208,9 +177,6 @@
   .board-col.is-empty .board-col-summary,
   .board-col.is-empty .board-col-body:has(> .empty-state:only-child) {
     display: none;
-  }
-  .board-col-body {
-    max-height: min(60dvh, 520px);
   }
 }
 /* Sombre : la colonne est en retrait (entre le fond et la carte), la carte ressort au-dessus —
@@ -238,10 +204,10 @@
   min-width: 0;
   gap: var(--space-2);
 }
+/* Libellé de statut sur 2 lignes si besoin (« Approuvé hiérarchie ») plutôt que tronqué. */
 .board-col-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .board-dot {
   flex: none;
@@ -534,22 +500,6 @@ td .card-actions--choice {
 }
 
 @media (max-width: 900px) {
-  /* Carrousel : une colonne à 84 % de largeur, la suivante dépasse (affordance), aimantation au bord */
-  .board {
-    grid-auto-columns: min(84%, 320px);
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 0;
-  }
-  /* Fondu plus court : la colonne suivante reste lisible (affordance sans voile) */
-  .board[data-overflow-end] {
-    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
-  }
-  .board[data-overflow-start] {
-    mask-image: linear-gradient(to right, transparent, #000 24px);
-  }
-  .board[data-overflow-start][data-overflow-end] {
-    mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
-  }
   .list-toolbar .search-field,
   .list-toolbar .field {
     flex: 1 1 100%;

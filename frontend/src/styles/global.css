@@ -1941,9 +1941,14 @@ kbd {
   outline-offset: -2px;
 }
 
-/* Rythme vertical de la page (DESIGN_SYSTEM §1) : 24 px entre blocs empilés directement dans la zone principale
-   (cartes, KPI, boards…), même sans conteneur de page. Spécificité nulle : toute règle de page l'emporte. */
-:where(.main) > :where(* + *:not(.page-header, [hidden], .sr-only)) {
+/* Rythme vertical de la page (DESIGN_SYSTEM §1) : 24 px entre blocs empilés dans la zone principale
+   (cartes, KPI, boards, navigation de sections…). Les pages sont des fragments rendus dans `.page-root`
+   (`components/Pilot.tsx`) ; `.shell-page` (Administration, Notifications, Sécurité) suit le même rythme.
+   Spécificité nulle : toute règle de page (couche `pages`, ex. `.listes-page`) l'emporte. */
+.page-root {
+  min-width: 0;
+}
+:where(.main, .page-root, .shell-page) > :where(* + *:not(.page-header, [hidden], .sr-only)) {
   margin-top: var(--space-6);
 }
 

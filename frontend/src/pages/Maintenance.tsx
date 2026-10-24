@@ -270,13 +270,14 @@ export function MaintenancePage() {
         <Kpi label={t("maintenance.otOuverts")} value={s.ot_ouverts} hint={t("revueR2.maintenance.hintOuverts", { enCours: formatNumber(s.ot_en_cours), count: s.ot_critiques })} icon={Wrench} tone="brand" delay={0} />
         <Kpi label={t("maintenance.actifsArret")} value={arrete || s.actifs_arret} hint={t("revueR2.maintenance.hintArret", { n: formatNumber(s.actifs_operationnels) })} icon={Hammer} tone="warn" delay={0.05} />
         <Kpi label={t("maintenance.inspectionsPrevues")} value={s.inspections_prevues} hint={t("revueR2.maintenance.hintInspections", { h: formatNumber(s.heures_total) })} icon={ClipboardCheck} tone="accent" delay={0.1} />
+        {/* Le coût de l'année est l'information utile ; celui des OT ouverts (souvent 0 FCFA) passe en sous-titre. */}
         <Kpi
-          label={t("premiumModules.maintenance.coutOuverts")}
-          value={s.cout_total}
+          label={coutsAnnuels.data ? t("vague3C2.maintenance.coutAnnee", { annee }) : t("premiumModules.maintenance.coutOuverts")}
+          value={coutsAnnuels.data ? coutsAnnuels.data.total : s.cout_total}
           kind="money"
           hint={
             coutsAnnuels.data
-              ? t("premiumModules.maintenance.hintCoutAnnuel", { montant: formatMoney(coutsAnnuels.data.total), annee })
+              ? t("vague3C2.maintenance.dontOuverts", { montant: formatMoney(s.cout_total) })
               : t("revueR2.maintenance.hintCout", { n: formatNumber(actifs.count) })
           }
           icon={Coins}

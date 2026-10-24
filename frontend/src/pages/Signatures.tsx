@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, EmptyState, ErrorState, KpiGridSkeleton, PageHeader, SectionCard } from "../components/ui";
+import { Badge, EmptyState, ErrorState, KpiGridSkeleton, Modal, PageHeader, SectionCard, Sheet, SheetClose } from "../components/ui";
 import { formatDateTime } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
 import type { Paginated, SignatureCertificate, SignatureRequestItem } from "../types";
@@ -100,10 +100,16 @@ export function EnrolementTotp() {
   );
 }
 
-function SignPanel({ req }: { req: SignatureRequestItem }) {
+/**
+ * Actions du signataire (A02) : « Signer… » ouvre un panneau (second facteur + mot de passe), « Refuser » une
+ * fenêtre de motif. Plus de formulaire déplié en permanence ni d'erreur rouge par ligne : l'absence de second
+ * facteur est signalée une seule fois en tête de liste (`BanniereEnrolement`).
+ */
+function SignActions({ req }: { req: SignatureRequestItem }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const mode = useModeSignature().data;
+  const [ouvert, setOuvert] = useState<"signer" | "refuser" | null>(null);
   const [choix, setChoix] = useState<"email" | "totp" | null>(null);
   const methode = choix ?? mode?.methode_defaut ?? "email";
   const [otp, setOtp] = useState("");
@@ -111,7 +117,14 @@ function SignPanel({ req }: { req: SignatureRequestItem }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const done = () => void qc.invalidateQueries({ queryKey: ["signatures"] });
+  const fermer = () => {
+    setOuvert(null);
+    setError(null);
+  };
+  const done = () => {
+    fermer();
+    void qc.invalidateQueries({ queryKey: ["signatures"] });
+  };
 
   const sendOtp = useMutation({
     mutationFn: () => api.post(`/api/documents/signatures/${req.id}/otp/`),
@@ -124,7 +137,6 @@ function SignPanel({ req }: { req: SignatureRequestItem }) {
   const sign = useMutation({
     mutationFn: () => api.post(`/api/documents/signatures/${req.id}/sign/`, { otp, password, methode }),
     onSuccess: () => {
-      setError(null);
       setOtp("");
       setPassword("");
       done();
@@ -136,63 +148,115 @@ function SignPanel({ req }: { req: SignatureRequestItem }) {
     onSuccess: done,
     onError: (e) => setError(describeError(e)),
   });
+  const erreur = error ? (
+    <p className="action-error" role="alert">
+      {error}
+    </p>
+  ) : null;
 
   return (
-    <div className="sign-panel">
-      {mode?.enrolement_requis ? (
-        <p className="action-error" role="alert">
-          {mode.message || t("ecarts_correctif.sig.sansFacteur")} <a className="link-inline" href="#enrolement-totp">{t("ecarts_correctif.sig.lienEnrol")}</a>
-        </p>
-      ) : (
+    <div className="sign-row sig-actions">
+      <button type="button" className="btn primary" onClick={() => setOuvert("signer")} disabled={mode?.enrolement_requis}>
+        <FileSignature size={15} aria-hidden="true" /> {t("vague3B.sig.signer")}
+      </button>
+      <button type="button" className="btn ghost" onClick={() => setOuvert("refuser")}>
+        {t("signatures.refuse")}
+      </button>
+
+      <Sheet
+        open={ouvert === "signer"}
+        onOpenChange={(o) => (o ? setOuvert("signer") : fermer())}
+        title={t("vague3B.sig.signerTitre")}
+        description={req.title || req.document_title}
+        preventOutsideClose
+        footer={
+          <>
+            <SheetClose>
+              <button type="button" className="btn ghost">
+                {t("actionBar.annuler")}
+              </button>
+            </SheetClose>
+            <button type="button" className="btn primary" onClick={() => sign.mutate()} disabled={sign.isPending || otp.length !== 6 || !password}>
+              {t("signatures.sign")}
+            </button>
+          </>
+        }
+      >
         <p className="muted">{methode === "totp" ? t("ecarts_correctif.sig.explainTotp") : t("signatures.explain")}</p>
-      )}
-      {(mode?.methodes.length ?? 0) > 1 && (
-        <div className="sign-row" role="radiogroup" aria-label={t("ecarts_correctif.sig.methode")}>
-          {mode!.methodes.map((m) => (
-            <label key={m}>
-              <input type="radio" name={`methode-${req.id}`} checked={methode === m} onChange={() => setChoix(m)} />{" "}
-              {t(`ecarts_correctif.sig.methodes.${m}`)}
-            </label>
-          ))}
-        </div>
-      )}
-      <div className="sign-row">
+        {(mode?.methodes.length ?? 0) > 1 && (
+          <div className="sign-row" role="radiogroup" aria-label={t("ecarts_correctif.sig.methode")}>
+            {mode!.methodes.map((m) => (
+              <label key={m}>
+                <input type="radio" name={`methode-${req.id}`} checked={methode === m} onChange={() => setChoix(m)} />{" "}
+                {t(`ecarts_correctif.sig.methodes.${m}`)}
+              </label>
+            ))}
+          </div>
+        )}
         {methode === "email" && (
-          <button className="btn ghost" onClick={() => sendOtp.mutate()} disabled={sendOtp.isPending}>
+          <button type="button" className="btn ghost" onClick={() => sendOtp.mutate()} disabled={sendOtp.isPending}>
             {sent ? t("signatures.resend") : t("signatures.sendCode")}
           </button>
         )}
-        <input
-          inputMode="numeric"
-          maxLength={6}
-          placeholder={methode === "totp" ? t("ecarts_correctif.sig.codeTotp") : t("signatures.code")}
-          aria-label={methode === "totp" ? t("ecarts_correctif.sig.codeTotp") : t("signatures.code")}
-          value={otp}
-          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-        />
-        <input
-          type="password"
-          autoComplete="current-password"
-          placeholder={t("signatures.password")}
-          aria-label={t("signatures.password")}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button className="btn" onClick={() => sign.mutate()} disabled={sign.isPending || otp.length !== 6 || !password}>
-          {t("signatures.sign")}
-        </button>
+        <div className="field">
+          <label htmlFor={`sig-otp-${req.id}`}>{methode === "totp" ? t("ecarts_correctif.sig.codeTotp") : t("signatures.code")}</label>
+          <input
+            id={`sig-otp-${req.id}`}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`sig-mdp-${req.id}`}>{t("signatures.password")}</label>
+          <input id={`sig-mdp-${req.id}`} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        {erreur}
+      </Sheet>
+
+      <Modal
+        open={ouvert === "refuser"}
+        onOpenChange={(o) => (o ? setOuvert("refuser") : fermer())}
+        title={t("vague3B.sig.refuserTitre")}
+        description={req.title || req.document_title}
+        footer={
+          <>
+            <SheetClose>
+              <button type="button" className="btn ghost">
+                {t("actionBar.annuler")}
+              </button>
+            </SheetClose>
+            <button type="button" className="btn danger" onClick={() => refuse.mutate()} disabled={refuse.isPending || !reason.trim()}>
+              {t("signatures.refuse")}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label htmlFor={`sig-motif-${req.id}`}>{t("signatures.reason")}</label>
+          <textarea id={`sig-motif-${req.id}`} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+        {erreur}
+      </Modal>
+    </div>
+  );
+}
+
+/** Une seule bannière d'information quand aucun second facteur n'est disponible (au lieu d'un message par ligne). */
+function BanniereEnrolement() {
+  const { t } = useTranslation();
+  return (
+    <div className="banner info" role="status" data-testid="sig-enrolement-requis">
+      <KeyRound size={18} aria-hidden="true" />
+      <div className="banner-body">
+        <strong className="banner-title">{t("vague3B.sig.enrolTitre")}</strong>
+        <span className="banner-text">{t("vague3B.sig.enrolTexte")}</span>
       </div>
-      <div className="sign-row">
-        <input placeholder={t("signatures.reason")} aria-label={t("signatures.reason")} value={reason} onChange={(e) => setReason(e.target.value)} />
-        <button className="btn danger" onClick={() => refuse.mutate()} disabled={refuse.isPending || !reason.trim()}>
-          {t("signatures.refuse")}
-        </button>
-      </div>
-      {error && (
-        <p className="action-error" role="alert">
-          {error}
-        </p>
-      )}
+      <a className="banner-action" href="#enrolement-totp">
+        {t("vague3B.sig.configurer")}
+      </a>
     </div>
   );
 }
@@ -301,7 +365,7 @@ function RequestCard({ req }: { req: SignatureRequestItem }) {
         </ol>
       ) : null}
       {peutDebloquer && <Deblocage id={req.id} />}
-      {req.a_mon_tour && <SignPanel req={req} />}
+      {req.a_mon_tour && <SignActions req={req} />}
       {showCert && <Certificate id={req.id} />}
     </li>
   );
@@ -469,6 +533,7 @@ export function SignaturesPage() {
       {header}
       {nouvelle && <NewRequest onClose={() => setNouvelle(false)} />}
       {/* Application d'authentification toujours proposée tant qu'elle n'est pas activée (même avec la messagerie). */}
+      {mode?.enrolement_requis && toSign.length > 0 && <BanniereEnrolement />}
       {mode && !mode.mfa_active && <EnrolementTotp />}
       {rows.length === 0 && (
         <SectionCard>

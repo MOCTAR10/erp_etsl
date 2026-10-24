@@ -4,10 +4,11 @@ import type { ReactNode } from "react";
 import { motionTokens } from "../theme/tokens";
 import { pageEnter, staggerContainer, staggerItem } from "../lib/motion";
 
-/** Transition de page pilote — fondu 160 ms + translation de 4 px (preset partagé `pageEnter`). */
+/** Transition de page pilote — fondu 160 ms + translation de 4 px (preset partagé `pageEnter`).
+ *  `page-root` porte le rythme vertical de 24 px (global.css) : les pages sont des fragments rendus ici. */
 export function withPilot(node: ReactNode): ReactNode {
   return (
-    <motion.div {...pageEnter}>
+    <motion.div className="page-root" {...pageEnter}>
       {node}
     </motion.div>
   );

@@ -353,6 +353,9 @@ class IntegrityAndNotificationsTests(APITestCase):
         self.assertEqual(len(resp.data["results"]), 1)
         notif_id = resp.data["results"][0]["id"]
         self.assertFalse(resp.data["results"][0]["is_read"])
+        # Vague 3 : l'écran compose « étape · en retard depuis N j · service » sans relire la tâche.
+        self.assertIsNotNone(resp.data["results"][0]["task_due_date"])
+        self.assertTrue(resp.data["results"][0]["step_role"])
 
         resp = self.client.post(f"/api/workflow/notifications/{notif_id}/mark_read/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)

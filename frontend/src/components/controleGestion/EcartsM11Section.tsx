@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -60,6 +61,7 @@ interface Periode {
   start_date: string;
 }
 interface Pipe {
+  annee?: number;
   categories: { categorie: string; nb: number; brut: string | null; ponderation: string; pondere: string | null }[];
   total: string | null;
   provisoire: boolean;
@@ -104,8 +106,11 @@ interface MargeAffaire {
   commentaire: string;
 }
 interface CoutMo {
+  has_amount_access?: boolean;
+  pct_heures_valorisees?: string | null;
   rows: { affaire: string; ordres: number; heures: string; heures_non_valorisees: string; cout: string | null; cout_horaire_moyen: string | null }[];
 }
+type CoutMoRow = CoutMo["rows"][number] & { id: string };
 interface Plan {
   id: string;
   code: string;
@@ -302,6 +307,9 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
   const tableau = useGet<TableauBord>(["tableau", par], `${BASE}/tableau-bord/?par=${par}`);
   const marges = useGet<{ rows: MargeAffaire[] }>(["marges"], `${BASE}/marges-affaires/`);
   const coutMo = useGet<CoutMo>(["cout-mo"], `${BASE}/cout-mo-affaires/`);
+  // Taux horaire non paramétré : un seul bandeau plutôt que des lignes à 0 FCFA ; montants masqués : colonnes retirées.
+  const moNonValorise = Boolean(coutMo?.rows.length) && Number(coutMo?.pct_heures_valorisees ?? 0) === 0;
+  const moCouts = coutMo?.has_amount_access !== false && !moNonValorise;
   const plans = useList<Plan>(["plans"], `${BASE}/plans-sous-activite/`);
   const clotures = useList<Cloture>(["clotures", fiscalYear], `${BASE}/clotures/?${fy}`);
   const reportings = useList<ReportingArchive>(["reportings"], `${BASE}/reportings/`);
@@ -435,8 +443,12 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
           />
         </div>
         <p>
-          <strong>{t("ecarts_m11.pipe.total")}</strong> : <span className="amount">{money(pipe?.total)}</span>
+          <strong title={t("ecarts_m11.pipe.perimetre")}>
+            {pipe?.annee ? t("ecarts_m11.pipe.totalAnnee", { annee: pipe.annee }) : t("ecarts_m11.pipe.total")}
+          </strong>{" "}
+          : <span className="amount">{money(pipe?.total)}</span>
         </p>
+        <p className="text-muted">{t("ecarts_m11.pipe.perimetre")}</p>
       </SectionCard>
 
       <SectionCard title={t("ecarts_m11.imputation.title")}>
@@ -449,15 +461,36 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
             caption={t("ecarts_m11.imputation.title")}
             rows={withId(imputation?.rows, (r) => r.affaire)}
             columns={[
-              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (r) => <>{r.code}<span className="cell-sub">{r.titre}</span></>, sortValue: (r) => r.code },
-              { key: "profil", header: t("ecarts_m11.col.profil"), render: (r) => libelleProfil(r.profil, t) },
+              {
+                key: "affaire",
+                header: t("ecarts_m11.col.affaire"),
+                width: 240,
+                render: (r) => (
+                  <span title={r.titre}>
+                    <strong>{r.code}</strong> · {libelleProfil(r.profil, t)}
+                    <span className="cell-sub">{r.titre}</span>
+                  </span>
+                ),
+                sortValue: (r) => r.code,
+              },
               { key: "part", header: t("ecarts_m11.imputation.part"), num: true, render: (r) => pct(r.part_pct) },
               { key: "produits", header: t("ecarts_m11.col.produits"), num: true, render: (r) => money(r.produits), sortValue: (r) => Number(r.produits ?? 0) },
               { key: "margeDirecte", header: t("ecarts_m11.imputation.margeDirecte"), num: true, render: (r) => money(r.marge_directe) },
               { key: "imputee", header: t("ecarts_m11.imputation.imputee"), num: true, render: (r) => money(r.structure_imputee) },
               { key: "margeApres", header: t("ecarts_m11.imputation.margeApres"), num: true, render: (r) => money(r.marge_apres_structure), sortValue: (r) => Number(r.marge_apres_structure ?? 0) },
-              { key: "tauxReel", header: t("ecarts_m11.imputation.tauxReel"), num: true, render: (r) => pct(r.taux_structure_reel) },
-              { key: "tauxStandard", header: t("ecarts_m11.imputation.tauxStandard"), num: true, render: (r) => pct(r.taux_structure_standard) },
+              {
+                key: "taux",
+                header: t("ecarts_m11.imputation.tauxReelStandard"),
+                label: t("ecarts_m11.imputation.tauxReelStandard"),
+                num: true,
+                render: (r) => (
+                  <>
+                    {pct(r.taux_structure_reel)}
+                    <span className="cell-sub">{t("ecarts_m11.imputation.standard", { taux: pct(r.taux_structure_standard) })}</span>
+                  </>
+                ),
+                sortValue: (r) => Number(r.taux_structure_reel ?? 0),
+              },
             ]}
           />
         </div>
@@ -523,9 +556,21 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
               },
               { key: "caPrevu", header: t("ecarts_m11.tableau.caPrevu"), num: true, render: (l) => money(l.ca_prevu), sortValue: (l) => Number(l.ca_prevu ?? 0) },
               { key: "margePrevue", header: t("ecarts_m11.tableau.margePrevue"), num: true, render: (l) => money(l.marge_prevue) },
-              { key: "produits", header: t("ecarts_m11.col.produits"), num: true, render: (l) => money(l.produits) },
-              { key: "charges", header: t("ecarts_m11.tableau.charges"), num: true, render: (l) => money(l.charges) },
-              { key: "coutGr", header: t("ecarts_m11.tableau.coutGr"), num: true, render: (l) => money(l.cout_gr) },
+              {
+                key: "realise",
+                header: t("ecarts_m11.tableau.realise"),
+                label: t("ecarts_m11.tableau.realise"),
+                num: true,
+                render: (l) => (
+                  <>
+                    {money(l.produits)}
+                    <span className="cell-sub">
+                      {t("ecarts_m11.tableau.chargesCourt", { montant: money(l.charges) })} · {t("ecarts_m11.tableau.grCourt", { montant: money(l.cout_gr) })}
+                    </span>
+                  </>
+                ),
+                sortValue: (l) => Number(l.produits ?? 0),
+              },
               { key: "margeReelle", header: t("ecarts_m11.tableau.margeReelle"), num: true, render: (l) => money(l.marge_reelle), sortValue: (l) => Number(l.marge_reelle ?? 0) },
             ]}
           />
@@ -572,6 +617,14 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
       </SectionCard>
 
       <SectionCard title={t("ecarts_m11.mo.title")}>
+        {moNonValorise ? (
+          <div className="banner warn" role="note">
+            <AlertTriangle size={18} aria-hidden />
+            <div className="banner-body">
+              <span className="banner-text">{t("ecarts_m11.mo.nonParametre", { pct: pct(coutMo?.pct_heures_valorisees) })}</span>
+            </div>
+          </div>
+        ) : null}
         <div data-testid="cout-mo-affaires">
           <DataTable
             caption={t("ecarts_m11.mo.title")}
@@ -580,9 +633,16 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
               { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (r) => r.affaire, sortValue: (r) => r.affaire },
               { key: "ordres", header: t("ecarts_m11.mo.ordres"), num: true, render: (r) => formatNumber(r.ordres) },
               { key: "heures", header: t("ecarts_m11.mo.heures"), num: true, render: (r) => `${formatNumber(Number(r.heures))} h`, sortValue: (r) => Number(r.heures) },
-              { key: "nonValorisees", header: t("ecarts_m11.mo.nonValorisees"), num: true, render: (r) => `${formatNumber(Number(r.heures_non_valorisees))} h` },
-              { key: "cout", header: t("ecarts_m11.mo.cout"), num: true, render: (r) => money(r.cout), sortValue: (r) => Number(r.cout ?? 0) },
-              { key: "coutHoraire", header: t("ecarts_m11.mo.coutHoraire"), num: true, render: (r) => money(r.cout_horaire_moyen) },
+              ...(moNonValorise
+                ? []
+                : [{ key: "nonValorisees", header: t("ecarts_m11.mo.nonValorisees"), num: true, render: (r: CoutMoRow) => `${formatNumber(Number(r.heures_non_valorisees))} h` }]),
+              ...(moCouts
+                ? [
+                    { key: "cout", header: t("ecarts_m11.mo.cout"), num: true, render: (r: CoutMoRow) => money(r.cout), sortValue: (r: CoutMoRow) => Number(r.cout ?? 0) },
+                    // `null` = aucune heure valorisée sur la ligne (pas un masquage : les montants masqués retirent la colonne).
+                    { key: "coutHoraire", header: t("ecarts_m11.mo.coutHoraire"), num: true, render: (r: CoutMoRow) => (r.cout_horaire_moyen === null ? "—" : money(r.cout_horaire_moyen)) },
+                  ]
+                : []),
             ]}
           />
         </div>

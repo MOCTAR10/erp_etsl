@@ -121,6 +121,10 @@
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
+  /* « Objectif : 0 accident » ne se coupe plus sur 3 lignes (audit A07). */
+  .dir-hero-objectif {
+    white-space: nowrap;
+  }
 
   .dir-delta {
     padding: 1px 8px;

@@ -217,10 +217,9 @@ export function DirectionPage() {
           status={securiteStatut}
           foot={
             <>
-              <span>{t("direction2.securite.objectif")}</span>
-              <span className={`dir-delta tone-${securiteBadge}`}>
-                {t("premiumPilotage.direction.securite.declares", { count: accidents })}
-              </span>
+              {/* Audit A07 : un simple constat neutre (plus de pastille rouge sous « 83 jours sans accident »). */}
+              <span className="dir-hero-objectif">{t("direction2.securite.objectif")}</span>
+              <span>{t("premiumPilotage.direction.securite.declaresTotal", { count: accidents })}</span>
             </>
           }
           hint={

@@ -167,12 +167,10 @@ def _ponderations():
 
 def _opportunites_annee(fy):
     from commercial.models import Opportunity
-    from commercial.services import PIPE_CATEGORIES
+    from commercial.services import PIPE_CATEGORIES, filtre_exercice
 
     etape_cat = {e: cat for cat, etapes in PIPE_CATEGORIES.items() for e in etapes}
-    qs = Opportunity.objects.filter(is_active=True, stage__in=list(etape_cat)).filter(
-        Q(expected_close__isnull=True) | Q(expected_close__year=fy.year)
-    )
+    qs = Opportunity.objects.filter(is_active=True, stage__in=list(etape_cat)).filter(filtre_exercice(fy.year))
     return [(o, etape_cat[o.stage]) for o in qs]
 
 

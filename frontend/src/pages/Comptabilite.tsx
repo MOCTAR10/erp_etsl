@@ -151,10 +151,14 @@ export function ComptabilitePage() {
   const relevesAll = releves.rows;
   const banquesAll = banques.data ?? [];
   const valides = (paiementsTous.data ?? []).filter((p) => p.statut === "valide");
-  const tvaDue = tvaAll.reduce(
-    (acc, d) => acc + (d.has_amount_access && d.net_a_payer !== null ? Number(d.net_a_payer) : 0),
+  // B05 : une déclaration jamais calculée porte des montants à 0 par défaut — ce n'est pas une TVA nulle.
+  const tvaCalculees = tvaAll.filter((d) => Boolean(d.source_calcul));
+  const tvaDue = tvaCalculees.reduce(
+    (acc, d) => acc + (d.statut !== "deposee" && d.has_amount_access && d.net_a_payer !== null ? Number(d.net_a_payer) : 0),
     0,
   );
+  const aCalculer = <span className="muted">{t("vague3C2.compta.aCalculer")}</span>;
+  const montantTva = (d: DeclarationTva, v: string | null) => (!d.has_amount_access ? masque : d.source_calcul ? formatMoney(v) : aCalculer);
   const enCours = groups["brouillon"].length + groups["soumis"].length;
 
   const bankColumns: Column<CompteBancaire>[] = [
@@ -215,10 +219,10 @@ export function ComptabilitePage() {
     { key: "code", header: t("comptabilite.col.code"), render: (d) => d.code },
     { key: "mois", header: t("listes.compta.mois"), sortValue: (d) => d.mois, render: (d) => formatDate(d.mois) },
     { key: "taux", header: t("listes.compta.taux"), render: (d) => d.taux_tva_code },
-    { key: "base", header: t("listes.compta.base"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.base_imposable) : masque) },
-    { key: "collectee", header: t("listes.compta.collectee"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.tva_collectee) : masque) },
-    { key: "deductible", header: t("listes.compta.deductible"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.tva_deductible) : masque) },
-    { key: "net", header: t("listes.compta.net"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.net_a_payer) : masque) },
+    { key: "base", header: t("listes.compta.base"), num: true, render: (d) => montantTva(d, d.base_imposable) },
+    { key: "collectee", header: t("listes.compta.collectee"), num: true, render: (d) => montantTva(d, d.tva_collectee) },
+    { key: "deductible", header: t("listes.compta.deductible"), num: true, render: (d) => montantTva(d, d.tva_deductible) },
+    { key: "net", header: t("listes.compta.net"), num: true, render: (d) => montantTva(d, d.net_a_payer) },
     { key: "statut", header: t("listes.compta.statut"), render: (d) => <Badge tone={d.statut === "deposee" ? "ok" : "warn"}>{t(`comptabilite.tva_statut.${d.statut}`)}</Badge> },
   ];
   const controleColumns: Column<ControleInterne>[] = [
@@ -307,7 +311,11 @@ export function ComptabilitePage() {
           hint={t("revueR3.compta.soldesOuverture", { montant: formatMoney(banquesAll.reduce((n, b) => n + Number(b.solde_initial || 0), 0)) })} icon={Landmark} tone="brand" delay={0} />
         <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("revueR3.compta.engagementsEnCours", { count: enCours })} icon={ClipboardList} tone="warn" delay={0.05} />
         <Kpi label={t("comptabilite.paiements")} value={valides.length} hint={t("comptabilite.paiementsValides")} icon={CreditCard} tone="brand" delay={0.1} />
-        <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
+        {tvaCalculees.length > 0 ? (
+          <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
+        ) : (
+          <Kpi label={t("comptabilite.tva")} value={t("vague3C2.compta.aCalculer")} hint={t("vague3C2.compta.tvaACalculerHint")} icon={BadgePercent} tone="warn" delay={0.15} />
+        )}
       </div>
 
       <div id="cpt-tresorerie" className="page-section">

@@ -115,10 +115,26 @@ export function PipelinePage() {
           <Kpi label={t("pipeline.activeSegments")} value={Object.keys(s.margin_by_segment).length} icon={Layers} tone="brand" delay={0.1} />
           {s.pipe_pondere ? (
             <Kpi
-              label={t("pipeline.pipePondere")}
+              label={t("pipeline.pipePondereTous")}
               value={s.pipe_pondere.total}
               kind="money"
-              hint={t("pipeline.pipePondereHint")}
+              hint={
+                <span title={t("pipeline.pipePondereInfo")}>
+                  {s.pipe_pondere_exercice
+                    ? t("pipeline.pipePondereExercice", {
+                        annee: s.pipe_pondere_exercice.annee,
+                        montant: formatMoney(s.pipe_pondere_exercice.total),
+                      })
+                    : null}
+                  {s.pipe_pondere.ponderations
+                    ? t("pipeline.pipePonderePoids", {
+                        signe: Math.round(s.pipe_pondere.ponderations.signe * 100),
+                        enCours: Math.round(s.pipe_pondere.ponderations.en_cours * 100),
+                        prospect: Math.round(s.pipe_pondere.ponderations.prospect * 100),
+                      })
+                    : t("pipeline.pipePondereHint")}
+                </span>
+              }
               icon={Scale}
               tone="accent"
               delay={0.15}

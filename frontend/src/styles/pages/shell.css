@@ -829,10 +829,8 @@
     }
   }
 
-  /* Pages de la coquille : cartes espacées, en-têtes de carte qui passent à la ligne sans écraser les actions. */
-  .shell-page > * + .card {
-    margin-top: 16px;
-  }
+  /* Pages de la coquille : en-têtes de carte qui passent à la ligne sans écraser les actions
+     (l'espacement entre cartes vient de la règle de rythme commune, global.css). */
   .shell-page .card-header {
     flex-wrap: wrap;
     gap: 12px 16px;
@@ -1062,10 +1060,6 @@
     font-weight: var(--fw-medium);
     color: var(--text);
     overflow-wrap: anywhere;
-  }
-  /* Portée limitée à Mon espace : une règle « .card + .card » globale décalait les KPI (.kpi.card) de toutes les grilles. */
-  .main > .card:has(.me-profil) + .card {
-    margin-top: var(--space-4);
   }
 }
 

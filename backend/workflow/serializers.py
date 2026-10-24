@@ -117,6 +117,9 @@ class CommentSerializer(serializers.Serializer):
 class NotificationSerializer(serializers.ModelSerializer):
     document_title = serializers.CharField(source="task.document.title", read_only=True)
     step_name = serializers.CharField(source="task.step.name", read_only=True)
+    # Libellé de notification compact (vague 3) : échéance de la tâche et service acteur de l'étape.
+    task_due_date = serializers.DateTimeField(source="task.due_date", read_only=True)
+    step_role = serializers.CharField(source="task.step.actor_role", read_only=True)
 
     class Meta:
         model = Notification
@@ -129,6 +132,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "task",
             "document_title",
             "step_name",
+            "task_due_date",
+            "step_role",
             "created_at",
         ]
         read_only_fields = fields
