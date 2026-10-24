@@ -643,3 +643,16 @@ td .cell-nowrap,
 }
 
 } /* fin @layer pages */
+
+@layer pages {
+/* Mobile : un bouton ne dépasse jamais son conteneur ; un libellé long passe à la ligne (le « nowrap » des
+   en-têtes et des lignes vaut pour le bureau). */
+@media (max-width: 900px) {
+  .main .btn {
+    max-width: 100%;
+    white-space: normal;
+    height: auto;
+    text-align: center;
+  }
+}
+}

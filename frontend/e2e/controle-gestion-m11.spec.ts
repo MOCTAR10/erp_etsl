@@ -17,7 +17,7 @@ test.describe("M11 Contrôle de gestion : paramètres de pilotage", () => {
     await ligne.getByRole("button", { name: "Modifier" }).click();
     await ligne.getByRole("spinbutton").fill(actuelle);
     await ligne.getByRole("button", { name: "Valider" }).click();
-    await expect(ligne).toContainText(new RegExp(`(?<![\\d.])${actuelle}(\\.00)? %`));
+    await expect(ligne).toContainText(new RegExp(`(?<![\\d.,])${actuelle}([.,]00)?\\s%`));
 
     page.once("dialog", (d) => void d.accept());
     await ligne.getByRole("button", { name: "Confirmer" }).click();

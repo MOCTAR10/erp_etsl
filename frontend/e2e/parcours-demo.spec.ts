@@ -70,8 +70,10 @@ test.describe("Parcours démo : direction", () => {
     // Approuvé (double visa posé par le seed) : seule la clôture reste proposée.
     await expect(budget.getByRole("button", { name: "Clôturer" })).toBeVisible();
 
-    const ecarts = page.locator(".card:not(:has(.card))", { hasText: AFFAIRE_CHANTIER }).filter({ hasText: "analyse attendue avant le" });
+    // Carte « Écarts > 10 % à analyser » : la colonne Échéance porte la date de l'analyse attendue.
+    const ecarts = page.locator(".card:not(:has(.card))", { hasText: "Écarts > 10 % à analyser" })
+      .getByRole("row", { name: new RegExp(AFFAIRE_CHANTIER) });
     await expect(ecarts.first()).toBeVisible();
-    await expect(ecarts.first()).toContainText(/-\d+(\.\d+)? %/);
+    await expect(ecarts.first()).toContainText(/[-−]\d+([.,]\d+)?\s?%/);
   });
 });
