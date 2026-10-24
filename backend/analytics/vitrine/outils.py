@@ -92,4 +92,6 @@ def dater_documents(jour, heure=15):
 
     debut = timezone.now()
     yield
-    Document.objects.filter(created_at__gte=debut).update(created_at=instant(jour, heure))
+    # Pièces d'un même bloc espacées de quelques minutes (dépôts successifs, jamais le même horodatage).
+    for i, pk in enumerate(Document.objects.filter(created_at__gte=debut).order_by("created_at").values_list("pk", flat=True)):
+        Document.objects.filter(pk=pk).update(created_at=instant(jour, heure) + timedelta(minutes=6 * i + i % 4))

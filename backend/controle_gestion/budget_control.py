@@ -14,6 +14,8 @@ from decimal import Decimal
 
 from django.db.models import F, Sum
 
+from config.nombres import nombre_fr, pourcentage_fr
+
 SEUIL_ALERTE = Decimal("0.90")
 SEUIL_DA = Decimal("1.00")
 SEUIL_ENGAGEMENT = Decimal("1.10")
@@ -82,7 +84,8 @@ def controler(analytic, jour, supplement, seuil, objet, visa_dg=False):
     if taux > seuil and not visa_dg:
         return (
             f"Budget {sit.budget.code} ({analytic.code}) : {objet} porterait la consommation à "
-            f"{taux * 100:.1f} % (seuil {seuil * 100:.0f} %, RG-M2.08). Visa exceptionnel du DG requis."
+            f"{pourcentage_fr(round(taux * 100, 1))} (seuil {pourcentage_fr(round(seuil * 100))}, RG-M2.08). "
+            f"Visa exceptionnel du DG requis."
         )
     return None
 
@@ -94,10 +97,11 @@ def alerter(sit, taux, objet):
     destinataires = User.objects.filter(
         is_active=True, role__in=[User.Role.FINANCE, User.Role.DGA, User.Role.DIRECTION, User.Role.PDG]
     )
-    sujet = f"Alerte budget {sit.budget.code} : {taux * 100:.0f} % consommé"
+    sujet = f"Alerte budget {sit.budget.code} : {pourcentage_fr(round(taux * 100))} consommé"
     message = (
-        f"{objet} porte la consommation du budget {sit.budget.code} « {sit.budget.label} » à {taux * 100:.1f} % "
-        f"({sit.consomme:.0f} engagé sur {sit.montant:.0f}). Seuils CDC : 90 % alerte, 100 % blocage DA, "
+        f"{objet} porte la consommation du budget {sit.budget.code} « {sit.budget.label} » à "
+        f"{pourcentage_fr(round(taux * 100, 1))} ({nombre_fr(round(sit.consomme))} FCFA engagés sur "
+        f"{nombre_fr(round(sit.montant))} FCFA). Seuils CDC : 90 % alerte, 100 % blocage DA, "
         f"110 % blocage des engagements."
     )
     Notification.objects.bulk_create(

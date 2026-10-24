@@ -17,7 +17,7 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
-from .services import ZERO, _net, _posted_lines_qs, get_param_gestion, parametres_gestion_provisoires
+from .services import KPI_NOMS, ZERO, _net, _posted_lines_qs, get_param_gestion, parametres_gestion_provisoires
 from config.i18n import en_francais, tr
 
 CENT = Decimal("0.01")
@@ -228,20 +228,22 @@ def proposer_budget_pipe(fiscal_year, user=None):
 # --------------------------------------------------------------------------------------------------
 # KPI KP-M11-01 à 12 (formules provisoires, cibles = paramètres KPI_CIBLES)
 # --------------------------------------------------------------------------------------------------
-KPI_DEFS = (
-    ("01", "Taux de marge brute", "%", "min", "Marge brute / produits"),
-    ("02", "Taux de marge opérationnelle", "%", "min", "Marge opérationnelle / produits"),
-    ("03", "Taux de marge nette", "%", "min", "Marge nette / produits"),
-    ("04", "Exécution du budget de charges", "%", "max", "Charges réalisées / budget des périodes écoulées"),
-    ("05", "Réalisation du budget de produits", "%", "min", "Produits réalisés / budget des périodes écoulées"),
-    ("06", "Taux moyen de sous-activité", "%", "max", "Moyenne des taux de sous-activité des budgets"),
-    ("07", "Conformité de la doctrine Mix A / B / C", "%", "min", "Classes conformes / 3"),
-    ("08", "Délai maximal de clôture de gestion", "jours", "max", "Plus long délai fin de mois → clôture"),
-    ("09", "Reportings publiés à J+4", "%", "min", "Publications à J+4 / publications"),
-    ("10", "Analyses d'écart rendues dans le délai", "%", "min", "Analyses rendues à temps / analyses dues"),
-    ("11", "Poids du coût GLOBAL RENTAL (618)", "%", "max", "Coût GR / total des charges"),
-    ("12", "Couverture du budget de produits par le pipe", "%", "min", "Pipe pondéré / budget de produits"),
+# (numéro, sens, formule) ; nom et unité viennent de `services.KPI_NOMS` (mêmes libellés que les cibles).
+_KPI_FORMULES = (
+    ("01", "min", "Marge brute / produits"),
+    ("02", "min", "Marge opérationnelle / produits"),
+    ("03", "min", "Marge nette / produits"),
+    ("04", "max", "Charges réalisées / budget des périodes écoulées"),
+    ("05", "min", "Produits réalisés / budget des périodes écoulées"),
+    ("06", "max", "Moyenne des taux de sous-activité des budgets"),
+    ("07", "min", "Classes conformes / 3"),
+    ("08", "max", "Plus long délai fin de mois → clôture"),
+    ("09", "min", "Publications à J+4 / publications"),
+    ("10", "min", "Analyses rendues à temps / analyses dues"),
+    ("11", "max", "Coût GR / total des charges"),
+    ("12", "min", "Pipe pondéré / budget de produits"),
 )
+KPI_DEFS = tuple((num, KPI_NOMS[num][0], KPI_NOMS[num][1], sens, formule) for num, sens, formule in _KPI_FORMULES)
 KPI_CIBLES_DEFAUT = {"01": 25, "02": 12, "03": 8, "04": 100, "05": 95, "06": 5, "07": 100, "08": 4, "09": 100,
                      "10": 100, "11": 15, "12": 100}
 

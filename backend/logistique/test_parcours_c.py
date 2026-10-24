@@ -60,9 +60,9 @@ class ParcoursDemoLotCTests(TestCase):
 
     def test_hse_exigences_duer_approuve_audit_cloture_et_plan_urgence(self):
         self.assertTrue(ExigenceHabilitation.objects.filter(type_permis="chaud", mot_cle="soudage").exists())
-        self.assertEqual(Duer.objects.get(perimetre__contains="demo").statut, Duer.Statut.APPROUVE)
-        self.assertEqual(set(AuditHse.objects.filter(zone__contains="demo").values_list("statut", flat=True)), {"cloture", "planifie"})
-        self.assertTrue(PlanUrgence.objects.get(intitule__contains="demo").exercices.exists())
+        self.assertEqual(Duer.objects.get(perimetre="Atelier Libreville").statut, Duer.Statut.APPROUVE)
+        self.assertEqual(set(AuditHse.objects.filter(zone__in=("Atelier Libreville", "Chantier tuyauterie")).values_list("statut", flat=True)), {"cloture", "planifie"})
+        self.assertTrue(PlanUrgence.objects.get(intitule="Évacuation incendie atelier").exercices.exists())
 
     def test_stocks_transfert_et_consommation_imputee_a_l_of(self):
         conso = MouvementStock.objects.get(document_reference="Parcours demo - consommation")

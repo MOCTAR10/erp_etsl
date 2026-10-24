@@ -16,6 +16,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
+from config.nombres import nombre_fr
+
 
 class MaintenanceSequence(models.Model):
     """Numérotation séquentielle par type (EQ, OT, INS)."""
@@ -465,7 +467,7 @@ class PlanPreventif(models.Model):
         today = today or timezone.localdate()
         if self.prochain_compteur is not None and self.actif.compteur_lecture >= self.prochain_compteur:
             return (
-                f"seuil compteur atteint ({self.actif.compteur_lecture} ≥ {self.prochain_compteur} "
+                f"seuil compteur atteint ({nombre_fr(self.actif.compteur_lecture)} ≥ {nombre_fr(self.prochain_compteur)} "
                 f"{self.actif.get_compteur_type_display().lower()})"
             )
         if self.prochaine_date is not None and today >= self.prochaine_date:
@@ -480,7 +482,7 @@ class PlanPreventif(models.Model):
         if self.prochain_compteur is not None and self.intervalle_compteur:
             reste = self.prochain_compteur - self.actif.compteur_lecture
             if reste <= self.intervalle_compteur * Decimal(pct) / 100:
-                return f"seuil compteur proche (reste {reste} {self.actif.get_compteur_type_display().lower()})"
+                return f"seuil compteur proche (reste {nombre_fr(reste)} {self.actif.get_compteur_type_display().lower()})"
         if self.prochaine_date is not None and (self.prochaine_date - today).days <= jours:
             return f"échéance calendaire le {self.prochaine_date:%d/%m/%Y}"
         return None

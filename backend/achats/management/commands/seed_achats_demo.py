@@ -36,9 +36,9 @@ class Command(BaseCommand):
             defaults={"name": "ACI Construction Equipment", "kind": Partner.Kind.FOURNISSEUR,
                       "currency": currency},
         )
-        gr_partner, _ = Partner.objects.get_or_create(
-            code="GR-1000",
-            defaults={"name": "GLOBAL RENTAL (intra-groupe)", "kind": Partner.Kind.FOURNISSEUR,
+        gr_partner, _ = Partner.objects.get_or_create(  # tiers GLOBAL RENTAL unique du référentiel
+            code="GR-0001",
+            defaults={"name": "GLOBAL RENTAL", "kind": Partner.Kind.BOTH,
                       "currency": currency, "is_global_rental": True},
         )
         for code, label in (("MAT-A106", "Tube A106 B"), ("GR-0002", "Grue 25t")):

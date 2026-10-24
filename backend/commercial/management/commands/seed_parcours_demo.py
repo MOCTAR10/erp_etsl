@@ -45,9 +45,11 @@ class Command(BaseCommand):
     def _run(self):
         # Les seeds par module posent des codes explicites sans avancer les compteurs : sans réalignement préalable,
         # le premier code généré par l'API (AFF00001, OF00001…) entre en collision (409).
+        from analytics.vitrine.nettoyage import renommer_libelles_herites
         from users.management.commands.seed_all_demo import _sync_sequences
 
         _sync_sequences()
+        renommer_libelles_herites()  # bases chargées avec les anciens libellés « (demo) » / sans accents
         self.clients = {}
         self.today = timezone.localdate()
         self._operateurs()
@@ -86,7 +88,7 @@ class Command(BaseCommand):
                 employe.user = user
                 employe.save(update_fields=["user"])
             Qualification.objects.get_or_create(
-                employe=employe, type=Qualification.Type.HABILITATION, intitule="Habilitation chantier (demo)",
+                employe=employe, type=Qualification.Type.HABILITATION, intitule="Habilitation chantier",
                 defaults={"organisme": "Organisme agréé", "date_obtention": self.today - timedelta(days=365),
                           "date_validite": self.today + timedelta(days=365)},
             )
@@ -124,7 +126,7 @@ class Command(BaseCommand):
         if affaire.status != Affaire.Status.CONFIRMEE:
             return
         doc, _ = Document.objects.get_or_create(
-            title=f"CRRL {affaire.code} (demo)", defaults={"reference": f"CRRL-{affaire.code}", "counterparty": "ETSL"},
+            title=f"CRRL {affaire.code}", defaults={"reference": f"CRRL-{affaire.code}", "counterparty": "ETSL"},
         )
         existante = Reunion.objects.filter(affaire=affaire, type=Reunion.Type.LANCEMENT).first()
         if existante is None:
@@ -188,7 +190,7 @@ class Command(BaseCommand):
         if of.status == OrdreFabrication.Status.LANCE:
             self._permis_chantier(of)
             self.call("atelier@etls.local", "post", f"/api/operations/ordres/{of.pk}/demarrer/")
-        equipe = self._equipe("Equipe tuyauterie A (demo)", "tuyauteur", ops, ops[1])
+        equipe = self._equipe("Équipe tuyauterie A", "tuyauteur", ops, ops[1])
         if not of.affectations.exists():
             aff = self.call("atelier@etls.local", "post", "/api/operations/affectations/", {
                 "equipe": equipe["id"], "ordre": str(of.pk), "date_debut": str(self.today),
