@@ -415,7 +415,7 @@ td .card-actions--choice {
 .overload-list li {
   display: grid;
   /* Heures en largeur fixe (11ch) : la barre ne se décale pas entre « 184 h / 120 h » et « 1 348 h / 120 h ». */
-  grid-template-columns: minmax(0, 1fr) 140px 11ch 64px;
+  grid-template-columns: minmax(0, 1fr) 140px 11ch minmax(72px, auto);
   align-items: center;
   gap: var(--space-3);
   padding: 10px 0;
@@ -564,9 +564,9 @@ td .cell-nowrap,
 }
 
 /* Barre de filtres : un sélecteur garde la place de son libellé (« Type de document » non tronqué). */
-.filter-bar-item--choix,
-.filter-bar-item--fk,
-.filter-bar-item--bool {
+.filter-bar .filter-bar-item--choix,
+.filter-bar .filter-bar-item--fk,
+.filter-bar .filter-bar-item--bool {
   flex: 0 1 220px;
   min-width: 200px;
 }
@@ -629,9 +629,10 @@ td .cell-nowrap,
   .card-header > :first-child {
     flex-basis: 100%;
   }
-  .filter-bar-item--choix,
-  .filter-bar-item--fk,
-  .filter-bar-item--bool {
+  .filter-bar .filter-bar-item--choix,
+  .filter-bar .filter-bar-item--fk,
+  .filter-bar .filter-bar-item--bool {
+    flex: 1 1 calc(50% - var(--space-2));
     min-width: 0;
   }
 }
