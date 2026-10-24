@@ -571,6 +571,48 @@ td .cell-nowrap,
   min-width: 200px;
 }
 
+/* Divulgation stylée (remplace le triangle natif de <details>) : chevron tokenisé, texte secondaire. */
+.kit-disclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.kit-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.kit-disclosure > summary::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.kit-disclosure[open] > summary::before {
+  transform: rotate(45deg);
+}
+.kit-disclosure > summary:hover {
+  color: var(--text);
+}
+.kit-disclosure > summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.kit-disclosure[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
 /* Kanban de 5 colonnes ou moins : colonnes fluides, toutes visibles en bureau (pas de colonne cachée au bord). */
 @media (min-width: 901px) {
   .board:not(:has(> :nth-child(6))) {

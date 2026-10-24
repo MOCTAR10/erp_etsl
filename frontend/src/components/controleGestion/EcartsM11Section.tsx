@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 
@@ -828,7 +828,7 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
       >
         <div className="field" style={{ maxWidth: "14rem" }}>
           <label htmlFor="m11-fnp-date">{t("ecarts_m11.fnp.date")}</label>
-          <input id="m11-fnp-date" type="date" value={dateFnp} onChange={(e) => setDateFnp(e.target.value)} />
+          <DatePicker id="m11-fnp-date" value={dateFnp} onChange={setDateFnp} />
         </div>
         <div data-testid="fnp-apercu">
           <DataTable

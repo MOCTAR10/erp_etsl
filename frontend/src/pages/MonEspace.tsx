@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { ApiError, api } from "../api/client";
-import { Badge, DataTable, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionCard } from "../components/ui";
+import { Badge, DataTable, DatePicker, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { MonBulletin, MonConge } from "../types";
@@ -227,14 +227,14 @@ export function MonEspacePage() {
             </select>
           </label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 90px", gap: "0.7rem" }}>
-            <label className="field">
-              <span>{t("monEspace.debut")}</span>
-              <input type="date" required value={form.date_debut} onChange={(e) => setDates({ date_debut: e.target.value })} />
-            </label>
-            <label className="field">
-              <span>{t("monEspace.fin")}</span>
-              <input type="date" required value={form.date_fin} onChange={(e) => setDates({ date_fin: e.target.value })} />
-            </label>
+            <div className="field">
+              <label htmlFor="conge-debut">{t("monEspace.debut")}</label>
+              <DatePicker id="conge-debut" required value={form.date_debut} onChange={(v) => setDates({ date_debut: v })} />
+            </div>
+            <div className="field">
+              <label htmlFor="conge-fin">{t("monEspace.fin")}</label>
+              <DatePicker id="conge-fin" required min={form.date_debut || undefined} value={form.date_fin} onChange={(v) => setDates({ date_fin: v })} />
+            </div>
             <label className="field">
               <span>{t("monEspace.jours")}</span>
               <input
