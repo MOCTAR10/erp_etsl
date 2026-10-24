@@ -23,6 +23,15 @@ from .outils import MOIS, ajouter_mois, alea, antidater, debut_mois, fin_mois, i
 
 LOG = "logistique@etls.local"
 
+# Marqueurs d'idempotence lisibles (l'ancien préfixe « [Vitrine] » apparaissait dans l'interface).
+CAUSE_PREVENTIF = "Échéance du plan de maintenance préventive"
+CAUSE_CORRECTIF = "Usure normale constatée"
+CAUSE_URGENCE = "Surchauffe : ventilation du compresseur obstruée"
+CAUSES_OT_VITRINE = (CAUSE_PREVENTIF, CAUSE_CORRECTIF, CAUSE_URGENCE)
+MARQUEUR_CONTROLE = " — joints lot "
+LIBELLES_CONTROLE = {"visuel": "visuel", "cnd": "CND", "dimensionnel": "dimensionnel"}
+ANCIEN_PREFIXE = "[Vitrine] "
+
 # Incidents HSE des 12 derniers mois : (mois avant, jour, type, gravité, conséquence, jours d'arrêt, lieu, description)
 INCIDENTS = [
     (11, 14, "quasi_accident", "mineure", "aucune", 0, "Atelier Port-Gentil", "Chute d'une élingue non verrouillée lors d'un levage de spool"),
@@ -82,6 +91,7 @@ class VitrineTerrain:
     # -- parc et maintenance -----------------------------------------------------------------------------------
     def maintenance(self):
         maint = self.user("maintenance@etls.local")
+        self._retirer_ancien_prefixe()
         actifs = []
         with transaction.atomic():
             for i, (designation, categorie, fabricant, modele, site, age, compteur) in enumerate(ACTIFS):
@@ -105,6 +115,17 @@ class VitrineTerrain:
         Actif.objects.filter(designation=ACTIFS[3][0], statut=Actif.Statut.OPERATIONNEL).update(statut=Actif.Statut.EN_PANNE)
         Actif.objects.filter(designation=ACTIFS[7][0], statut=Actif.Statut.OPERATIONNEL).update(statut=Actif.Statut.EN_MAINTENANCE)
 
+    def _retirer_ancien_prefixe(self):
+        """Bases déjà chargées avec le préfixe « [Vitrine] » : libellés nettoyés, marqueurs posés (rejouable)."""
+        n = len(ANCIEN_PREFIXE)
+        for ot in OrdreTravail.objects.filter(description__startswith=ANCIEN_PREFIXE):
+            cause = ot.cause or (CAUSE_URGENCE if ot.type_ot == "urgence" else CAUSE_PREVENTIF)
+            OrdreTravail.objects.filter(pk=ot.pk).update(description=ot.description[n:], cause=cause)
+        for ctrl in ControleQualite.objects.filter(point_controle__startswith=ANCIEN_PREFIXE):
+            type_controle, _, lot = ctrl.point_controle[n:].partition(" joints lot ")
+            libelle = LIBELLES_CONTROLE.get(type_controle.lower(), type_controle.lower())
+            ControleQualite.objects.filter(pk=ctrl.pk).update(point_controle=f"Contrôle {libelle}{MARQUEUR_CONTROLE}{lot}")
+
     def _parc(self):
         for i, (label, categorie, statut, compteur, site) in enumerate((
             ("Grue mobile 50 t (parc)", "levage", "affecte", "heures", "Chantiers clients"),
@@ -123,21 +144,22 @@ class VitrineTerrain:
                 )
 
     def _ordres_travail(self, i, actif, maint):
-        if OrdreTravail.objects.filter(actif=actif, description__startswith="[Vitrine]").exists():
+        if OrdreTravail.objects.filter(actif=actif, cause__in=CAUSES_OT_VITRINE).exists():
             return
         r = alea(f"ot-{actif.designation}")
         ots = []
         pas = 2 if actif.compteur_type != "aucun" else 4
         for k in range(MOIS - 1 - i % pas, -1, -pas):  # préventif périodique
-            ots.append((k, "preventif", "moyenne", "Maintenance préventive périodique (vidange, filtres, contrôle général)", ""))
+            ots.append((k, "preventif", "moyenne", "Maintenance préventive périodique (vidange, filtres, contrôle général)",
+                        CAUSE_PREVENTIF))
         for k in sorted(r.sample(range(0, MOIS), 1 + (i % 3 == 0)), reverse=True):  # pannes
             ots.append((k, "correctif", r.choice(("haute", "moyenne")), r.choice((
                 "Panne d'alimentation : remplacement du contacteur principal",
                 "Fuite hydraulique sur vérin : remplacement des joints",
                 "Défaut de démarrage : remplacement de la batterie et du démarreur",
-                "Usure des balais et du collecteur : remise en état")), "Usure normale constatée"))
+                "Usure des balais et du collecteur : remise en état")), CAUSE_CORRECTIF))
         if i == 3:
-            ots.append((0, "urgence", "critique", "Arrêt compresseur sur chantier : surchauffe et perte de pression", ""))
+            ots.append((0, "urgence", "critique", "Arrêt compresseur sur chantier : surchauffe et perte de pression", CAUSE_URGENCE))
         for n, (k, nature, priorite, description, cause) in enumerate(ots):
             demande = ouvre(jour_du_mois(self.today, k, 4 + (7 * n + 3 * i) % 22))
             clos = k >= 1 or (k == 0 and n % 3 == 0 and nature == "preventif")
@@ -145,7 +167,7 @@ class VitrineTerrain:
                 OrdreTravail.Statut.EN_COURS if nature != "preventif" else OrdreTravail.Statut.PLANIFIE)
             heures = Decimal(r.choice((3, 4, 6, 8, 12)) if nature != "preventif" else r.choice((2, 3, 4)))
             ot = OrdreTravail.objects.create(
-                actif=actif, type_ot=nature, priorite=priorite, description=f"[Vitrine] {description}", cause=cause,
+                actif=actif, type_ot=nature, priorite=priorite, description=description, cause=cause,
                 demandeur=maint, technicien=maint, date_demande=demande, date_planifiee=demande + timedelta(days=2),
                 date_debut=instant(demande + timedelta(days=2), 8) if statut != OrdreTravail.Statut.PLANIFIE else None,
                 date_fin=instant(demande + timedelta(days=3), 16) if clos else None,
@@ -228,7 +250,7 @@ class VitrineTerrain:
             if affaire.is_global_rental:
                 continue
             of = OrdreFabrication.objects.filter(affaire=affaire).first()
-            if ControleQualite.objects.filter(affaire=affaire, point_controle__startswith="[Vitrine]").exists():
+            if ControleQualite.objects.filter(affaire=affaire, point_controle__contains=MARQUEUR_CONTROLE).exists():
                 continue
             r = alea(f"qualite-{affaire.code}")
             with transaction.atomic():
@@ -244,7 +266,7 @@ class VitrineTerrain:
                             type_controle=type_controle, methode_cnd=methode,
                             organisme="agrege" if type_controle == "cnd" else "interne",
                             organisme_libelle="CND Afrique Centrale" if type_controle == "cnd" else "",
-                            affaire=affaire, ordre=of, point_controle=f"[Vitrine] {type_controle.upper()} joints lot {n:02d}",
+                            affaire=affaire, ordre=of, point_controle=f"Contrôle {LIBELLES_CONTROLE[type_controle]}{MARQUEUR_CONTROLE}{n:02d}",
                             date_controle=jour, **({} if recent else {"resultat": resultat}),
                             statut=ControleQualite.Statut.EN_COURS if recent else ControleQualite.Statut.VALIDE, created_by=qa,
                         )

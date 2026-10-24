@@ -60,6 +60,11 @@ class SeedDemoVitrineTests(TestCase):
     def test_seconde_execution_ne_cree_rien(self):
         self.assertEqual(self.apres, self.rejoue)
 
+    def test_aucun_prefixe_technique_dans_les_libelles(self):
+        self.assertFalse(OrdreTravail.objects.filter(description__contains="[Vitrine]").exists())
+        self.assertFalse(ControleQualite.objects.filter(point_controle__contains="[Vitrine]").exists())
+        self.assertTrue(ControleQualite.objects.filter(point_controle__startswith="Contrôle CND — joints lot ").exists())
+
     def test_complete_seed_all_demo(self):
         for modele, n in self.avant.items():
             self.assertGreaterEqual(self.apres[modele], n, modele)
