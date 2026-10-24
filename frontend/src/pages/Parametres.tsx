@@ -315,7 +315,7 @@ export function ParametresPage() {
       {
         key: "valeur",
         header: t("ecarts_tr.parametres.valeur"),
-        width: "30%",
+        width: "28%",
         render: (p) => (
           <span className={`param-value${p.type_valeur === "json" ? " is-json" : ""}`}>
             <ParamValue p={p} />
@@ -325,7 +325,7 @@ export function ParametresPage() {
       {
         key: "statut",
         header: t("ecarts_tr.parametres.statut"),
-        width: 180,
+        width: 150,
         sortValue: (p) => (p.provisoire ? 0 : 1),
         render: (p) =>
           p.provisoire ? (
