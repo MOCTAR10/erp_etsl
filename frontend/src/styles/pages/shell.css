@@ -1063,8 +1063,8 @@
     color: var(--text);
     overflow-wrap: anywhere;
   }
-  .me-profil + .card,
-  .card + .card {
+  /* Portée limitée à Mon espace : une règle « .card + .card » globale décalait les KPI (.kpi.card) de toutes les grilles. */
+  .main > .card:has(.me-profil) + .card {
     margin-top: var(--space-4);
   }
 }
