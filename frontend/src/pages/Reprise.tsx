@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, History, SlidersHorizontal, Upload } from "lucide-react";
+import { ChevronRight, History } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, DataTable, EmptyState, PageHeader, SectionCard } from "../components/ui";
+import { Badge, DataTable, EmptyState, FileField, PageHeader, SectionCard } from "../components/ui";
 import type { BadgeTone, Column } from "../components/ui";
 import { formatDateTime, formatMoney, formatNumber } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
+import { ParamsPanel } from "../components/parametres/ParamsPanel";
+import { ParamValueTable } from "../components/parametres/ParamValueTable";
 
 interface ColonneGabarit {
   nom: string;
@@ -232,16 +234,16 @@ export function ReprisePage() {
                 ))}
               </select>
             </label>
-            <label className="field">
-              <span>{t("ecarts_import.charger.fichier")}</span>
-              <span className="file-pick reprise-file">
-                <span className="btn ghost sm reprise-file-btn" aria-hidden="true">
-                  <Upload size={14} /> {t("revueR1.reprise.choisir")}
-                </span>
-                <span className={fichier ? "file-pick-name" : "file-pick-name muted"}>{fichier?.name ?? t("revueR1.reprise.aucunFichier")}</span>
-                <input type="file" className="sr-only" accept={accept} onChange={(e) => setFichier(e.target.files?.[0] ?? null)} />
-              </span>
-            </label>
+            <div className="field">
+              <label htmlFor="reprise-fichier">{t("ecarts_import.charger.fichier")}</label>
+              <FileField
+                id="reprise-fichier"
+                accept={accept}
+                buttonLabel={t("revueR1.reprise.choisir")}
+                placeholder={t("revueR1.reprise.aucunFichier")}
+                onChange={setFichier}
+              />
+            </div>
             {gabarit?.options.map((o) => (
               <label className="field" key={o}>
                 <span>{t(`ecarts_import.charger.options.${o}`)}</span>
@@ -453,7 +455,6 @@ function C2ParTiers({ tiers }: { tiers: NonNullable<Controle["tiers"]> }) {
 function ParametresRepriseSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const q = useQuery({ queryKey: ["reprise", "parametres"], queryFn: () => api.listAll<Parametre>(`${BASE}/parametres/`), retry: 0 });
   const refresh = () => {
@@ -462,10 +463,7 @@ function ParametresRepriseSection() {
   };
   const modifier = useMutation({
     mutationFn: (v: { id: string; valeur: string }) => api.patch(`${BASE}/parametres/${v.id}/`, { valeur: v.valeur }),
-    onSuccess: () => {
-      setEdit(null);
-      refresh();
-    },
+    onSuccess: refresh,
     onError: (e) => setError(describeError(e)),
   });
   const confirmer = useMutation({
@@ -475,76 +473,26 @@ function ParametresRepriseSection() {
   });
   if (q.isError || !q.data) return null;
   const provisoires = q.data.filter((p) => p.est_provisoire).length;
-  const cols: Column<Parametre>[] = [
-    { key: "label", header: t("tableaux.pages.reprise.parametre"), render: (p) => p.label },
-    {
-      key: "valeur",
-      header: t("tableaux.pages.reprise.valeur"),
-      num: true,
-      render: (p) =>
-        edit?.id === p.id ? (
-          <input
-            type="number"
-            min={0}
-            step="0.5"
-            className="control"
-            aria-label={p.label}
-            value={edit.valeur}
-            onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })}
-          />
-        ) : (
-          `${formatNumber(Number(p.valeur), { decimals: Number.isInteger(Number(p.valeur)) ? 0 : 1 })} ${p.unite}`
-        ),
-    },
-    {
-      key: "statut",
-      header: t("ecarts_import.historique.statut"),
-      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("ecarts_import.params.provisoire") : t("ecarts_import.params.confirme")}</Badge>,
-    },
-    {
-      key: "actions",
-      header: <span className="sr-only">{t("ui.actions")}</span>,
-      render: (p) =>
-        edit?.id === p.id ? (
-          <div className="action-bar-buttons">
-            <button type="button" className="btn primary sm" onClick={() => modifier.mutate(edit)}>
-              {t("ecarts_import.params.valider")}
-            </button>
-            <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
-              {t("ecarts_import.params.annuler")}
-            </button>
-          </div>
-        ) : (
-          <div className="action-bar-buttons">
-            <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
-              {t("ecarts_import.params.modifier")}
-            </button>
-            {p.est_provisoire && (
-              <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("ecarts_import.params.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                {t("ecarts_import.params.confirmer")}
-              </button>
-            )}
-          </div>
-        ),
-    },
-  ];
   return (
     <SectionCard title={t("ecarts_import.params.titre")}>
       <div data-testid="parametres-reprise">
-        {provisoires > 0 && (
-          <div className="banner warn reprise-banner" role="note">
-            <SlidersHorizontal size={18} aria-hidden="true" />
-            <div className="banner-body">
-              <span className="banner-title">{t("ecarts_import.params.bandeau", { count: provisoires })}</span>
-            </div>
-          </div>
-        )}
-        {error && (
-          <p className="action-error" role="alert">
-            {error}
-          </p>
-        )}
-        <DataTable columns={cols} rows={q.data} caption={t("ecarts_import.params.titre")} />
+        <ParamsPanel module="integrations" count={provisoires} total={q.data.length}>
+          {error && (
+            <p className="action-error" role="alert">
+              {error}
+            </p>
+          )}
+          <ParamValueTable
+            rows={q.data}
+            caption={t("ecarts_import.params.titre")}
+            valeur={(p) => `${formatNumber(Number(p.valeur), { decimals: Number.isInteger(Number(p.valeur)) ? 0 : 1 })}${p.unite ? ` ${p.unite}` : ""}`}
+            onSave={(id, valeur) => modifier.mutateAsync({ id, valeur })}
+            onConfirm={(id) => confirmer.mutate(id)}
+            confirmMessage={t("ecarts_import.params.confirmConfirmer")}
+            pending={modifier.isPending || confirmer.isPending}
+            step="0.5"
+          />
+        </ParamsPanel>
       </div>
     </SectionCard>
   );

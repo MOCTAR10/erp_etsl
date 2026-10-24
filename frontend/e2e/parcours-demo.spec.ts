@@ -12,7 +12,7 @@ test.describe("Parcours démo : finance", () => {
     await loginAs(page, DEMO_USERS.finance);
     await page.goto("/comptabilite");
 
-    await page.getByPlaceholder("Rechercher une facture (code, objet)…").fill("Situation n1 (demo)");
+    await page.getByPlaceholder("Rechercher une facture (code, objet)…").fill("Situation n°1 - installation");
     const facture = page.getByRole("row").filter({ has: page.getByText(/^FAC\d+$/) }).filter({ hasText: "Émise" });
     await expect(facture).toHaveCount(1);
     // Pièce de vente générée à l'émission (411 · 706 · 443) : c'est elle qu'on retrouve dans le lettrage.

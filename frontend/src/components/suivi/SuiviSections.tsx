@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatDateTime, formatMoney, formatNumber, formatPercent } from "../../lib/format";
-import { ActionBar, Badge, DataTable, EmptyState, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, EmptyState, FileField, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
 /* Lot de suivi inter-modules : M3 → M11 (marge à terminaison), M10 → M11 (balance âgée), M3 → M5 (réservations),
@@ -496,7 +496,7 @@ export function ImportGrandLivreSection() {
         </div>
         <div className="field">
           <label htmlFor="import-gl-fichier">{t("ecarts_suivi.import.fichier")}</label>
-          <input id="import-gl-fichier" className="control" type="file" accept=".csv,.txt,.xml" onChange={(e) => setFichier(e.target.files?.[0] ?? null)} />
+          <FileField id="import-gl-fichier" accept=".csv,.txt,.xml" onChange={setFichier} />
         </div>
         <button type="button" className="btn ghost" disabled={!fichier || envoyer.isPending} onClick={() => envoyer.mutate()}>
           {t("ecarts_suivi.import.importer")}

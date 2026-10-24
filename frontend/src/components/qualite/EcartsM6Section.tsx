@@ -8,10 +8,9 @@ import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { ActionCorrective, NonConformite } from "../../types";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, FileField, Kpi, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
-import { ParametresQualiteSection } from "./ParametresQualiteSection";
 
 /** Douze derniers mois, libellés dans la langue de l'interface (le champ « month » natif suit la langue du navigateur). */
 function derniersMois(langue: string): { value: string; label: string }[] {
@@ -204,7 +203,7 @@ export function EcartsM6Section() {
       <CapaSection />
       <PunchListSection ofOpts={ofOpts} itpOpts={itpOpts} />
       <IndicateursSection />
-      <ParametresQualiteSection />
+      {/* Les paramètres qualité (ParametresQualiteSection) sont posés en fin de page Qualité (ancre « Paramètres »). */}
     </>
   );
 }
@@ -214,10 +213,13 @@ function ImageCndForm({ cndOpts }: { cndOpts: { value: string; label: string }[]
   const qc = useQueryClient();
   const [controle, setControle] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Clé du sélecteur de fichier : changée après un envoi réussi pour le vider.
+  const [fileKey, setFileKey] = useState(0);
   const send = useMutation({
     mutationFn: (f: File) => api.upload("/api/qualite/images-controle/", f, "fichier", { controle }),
     onSuccess: () => {
       setMsg({ ok: true, text: t("m6e.image.ok") });
+      setFileKey((k) => k + 1);
       void qc.invalidateQueries();
     },
     onError: (e) => setMsg({ ok: false, text: describeError(e) }),
@@ -229,15 +231,13 @@ function ImageCndForm({ cndOpts }: { cndOpts: { value: string; label: string }[]
         <option value="">{t("m6e.image.choisir")}</option>
         {cndOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <input
-        type="file"
+      <FileField
+        key={fileKey}
         aria-label={t("m6e.image.fichier")}
         accept="image/*,.pdf,.dcm"
         disabled={!controle || send.isPending}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
+        onChange={(f) => {
           if (f) send.mutate(f);
-          e.target.value = "";
         }}
       />
       {msg && <p className={msg.ok ? "quick-form-ok" : "action-error"} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
@@ -340,6 +340,7 @@ function CapaSection() {
     {
       key: "echeance",
       header: t("m6e.capa.echeance"),
+      kind: "date",
       render: (a) => (
         <>
           {a.echeance ? formatDate(a.echeance, i18n.language) : "—"}{" "}
@@ -396,6 +397,7 @@ function PunchListSection({ ofOpts, itpOpts }: { ofOpts: { value: string; label:
     {
       key: "echeance",
       header: t("m6e.capa.echeance"),
+      kind: "date",
       render: (i) => (
         <>
           {i.echeance ? formatDate(i.echeance, i18n.language) : "—"} {i.en_retard && <Badge tone="err">{t("m6e.capa.retard")}</Badge>}

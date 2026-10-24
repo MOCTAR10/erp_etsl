@@ -1,5 +1,5 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -7,7 +7,7 @@ import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { InfoFormule, ScelleBadge, nomPersonne } from "../sections/affichage";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, DatePicker, FileField, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 
@@ -204,14 +204,15 @@ export function EcartsM4Section() {
   // Audit photo : formulaire multipart (la photo est hachée SHA-256 côté serveur).
   const [audit, setAudit] = useState({ equipement: "", date_audit: new Date().toISOString().slice(0, 10), etat: "bon", observations: "" });
   const [photo, setPhoto] = useState<File | null>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
+  // Clé du sélecteur : changée après l'enregistrement pour vider le champ.
+  const [photoKey, setPhotoKey] = useState(0);
   const [auditMsg, setAuditMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const envoyerAudit = useMutation({
     mutationFn: () => api.upload("/api/logistique/audits/", photo as File, "photo", audit),
     onSuccess: () => {
       setAuditMsg({ ok: true, text: t("quickForm.created") });
       setPhoto(null);
-      if (photoRef.current) photoRef.current.value = "";
+      setPhotoKey((k) => k + 1);
       void qc.invalidateQueries({ queryKey: ["m4e"] });
     },
     onError: (e) => setAuditMsg({ ok: false, text: describeError(e) }),
@@ -546,24 +547,14 @@ export function EcartsM4Section() {
               </div>
               <div className="field">
                 <label htmlFor="m4-audit-photo">{t("ecarts_m4.audit.photo")} *</label>
-                {/* Champ fichier natif masqué (son « Choose File » suit la langue du navigateur) : bouton + nom du fichier dans la langue de l'interface. */}
-                <input
-                  ref={photoRef}
+                <FileField
+                  key={photoKey}
                   id="m4-audit-photo"
-                  className="sr-only"
-                  type="file"
                   accept="image/*"
-                  tabIndex={-1}
-                  onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                  buttonLabel={t("revueR2.logistique.choisirPhoto")}
+                  placeholder={t("revueR2.logistique.aucunePhoto")}
+                  onChange={setPhoto}
                 />
-                <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0, minHeight: "var(--control-h)" }}>
-                  <button type="button" className="btn ghost sm" style={{ flex: "none" }} onClick={() => photoRef.current?.click()}>
-                    {t("revueR2.logistique.choisirPhoto")}
-                  </button>
-                  <span className="muted" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {photo ? photo.name : t("revueR2.logistique.aucunePhoto")}
-                  </span>
-                </span>
               </div>
               <div className="field wide">
                 <label htmlFor="m4-audit-obs">{t("ecarts_m4.audit.observations")}</label>

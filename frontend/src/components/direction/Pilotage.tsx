@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Lock, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Info, Lock, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -10,7 +10,7 @@ import { formatDate, formatMoney, formatNumber, formatPercent } from "../../lib/
 import { useThemeMode } from "../../lib/useThemeMode";
 import { paletteFor } from "../../theme/tokens";
 import type { CubeLecture } from "../../types";
-import { Badge, DataGrid, Menu, ProgressBar } from "../ui";
+import { Badge, DataGrid, Menu, Popover, ProgressBar } from "../ui";
 import type { GridColumn } from "../ui";
 import { CubesSection } from "../workflow/CubesSection";
 import { ConfirmDialog, useServerAction } from "../workflow/actions";
@@ -384,21 +384,32 @@ export function PilotageSection({ commercial }: { commercial?: IndicateursCommer
   if (tabs.length === 0) return null;
   return (
     <section className="dir-section" aria-labelledby="dir-pilotage-title" data-testid="pilotage-direction">
-      <h3 id="dir-pilotage-title" className="section-title">
-        {t("direction2.pilotage.titre")}
-      </h3>
-      {p?.parametres_provisoires ? (
-        <div className="banner warn" role="note" data-testid="alerte-provisoire-cd">
-          <SlidersHorizontal size={18} aria-hidden />
-          <div className="banner-body">
-            <strong className="banner-title">{t("direction2.pilotage.provisoiresTitre")}</strong>
-            <span className="banner-text">{t("direction2.pilotage.provisoiresTexte")}</span>
-          </div>
-          <Link className="banner-action" to="/parametres">
-            {t("direction2.ouvrirParametres")}
-          </Link>
-        </div>
-      ) : null}
+      <div className="dir-section-head">
+        <h3 id="dir-pilotage-title" className="section-title">
+          {t("direction2.pilotage.titre")}
+        </h3>
+        {p?.parametres_provisoires ? (
+          // Hypothèses par défaut (délais, seuils) : une icône d'information discrète, rien d'alarmant en tête d'écran.
+          <Popover
+            label={t("premiumVague2.direction.hypothesesTitre")}
+            align="end"
+            trigger={
+              <button type="button" className="icon-btn dir-hypotheses" aria-label={t("premiumVague2.direction.hypothesesTitre")} data-testid="alerte-provisoire-cd">
+                <Info size={16} aria-hidden />
+              </button>
+            }
+          >
+            <div className="dir-hypotheses-pop">
+              <strong>{t("premiumVague2.direction.hypothesesTitre")}</strong>
+              <p>{t("premiumVague2.direction.hypothesesTexte")}</p>
+              <Link className="btn ghost sm" to="/parametres">
+                <SlidersHorizontal size={14} aria-hidden />
+                {t("direction2.ouvrirParametres")}
+              </Link>
+            </div>
+          </Popover>
+        ) : null}
+      </div>
       <div className="card dir-tabs-card">
         <Tabs tabs={tabs} label={t("direction2.pilotage.titre")} />
       </div>

@@ -80,10 +80,10 @@ class Command(ParcoursA):
         if affaire is None:
             raise CommandError("Affaire du lot A absente : lancer seed_parcours_demo avant seed_parcours_b.")
         etapes = (
-            ("Situation n1 (demo) - installation", 30_000_000, 25, "facturee"),
-            ("Situation n2 (demo) - tuyauterie principale", 24_000_000, 50, "validee"),
-            ("Situation n3 (demo) - essais", 18_000_000, 70, "soumise"),
-            ("Situation n4 (demo) - parachevement", 12_000_000, 85, "brouillon"),
+            ("Situation n°1 - installation", 30_000_000, 25, "facturee"),
+            ("Situation n°2 - tuyauterie principale", 24_000_000, 50, "validee"),
+            ("Situation n°3 - essais", 18_000_000, 70, "soumise"),
+            ("Situation n°4 - parachèvement", 12_000_000, 85, "brouillon"),
         )
         for i, (label, montant, avancement, cible) in enumerate(reversed(etapes)):
             situation = self._situation(affaire, label, montant, avancement, i)

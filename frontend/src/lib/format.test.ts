@@ -66,7 +66,16 @@ describe("formatMoney", () => {
 
   it("reste exact, jamais abrégé (y compris les grands montants)", () => {
     expect(sp(formatMoney(1250000000))).toBe("1 250 000 000 FCFA");
-    expect(sp(formatMoney(-4500))).toBe("-4 500 FCFA");
+    expect(sp(formatMoney(-4500))).toBe("−4 500 FCFA");
+  });
+
+  it("signe moins typographique U+2212, jamais de « -0 »", () => {
+    expect(sp(formatMoney(-818000))).toBe("−818 000 FCFA");
+    expect(formatMoney(-818000)).not.toContain("-");
+    expect(sp(formatNumber(-1234.5, { decimals: 1 }))).toBe("−1 234,5");
+    expect(sp(formatPercent(-12.5, { decimals: 1 }))).toBe("−12,5 %");
+    expect(formatNumber(-0.2)).toBe("0");
+    expect(sp(formatMoney(-0.4))).toBe("0 FCFA");
   });
 
   it("laisse passer les montants masqués et absents", () => {

@@ -44,7 +44,12 @@ export function formatBytes(bytes: number): string {
  * Séparateur de milliers UNIQUE (A-14) : `fr-FR` produit une espace fine insécable (U+202F) pour les nombres,
  * les montants une espace insécable (U+00A0) — deux espacements côte à côte. Tout passe en U+00A0.
  */
-const thousands = (text: string) => text.replace(/[  ]/g, NBSP);
+const thousandsOnly = (text: string) => text.replace(/[  ]/g, NBSP);
+
+/** Signe moins typographique U+2212 (« −818 000 FCFA ») : le trait d'union ASCII est trop court et s'écarte du chiffre. */
+const MINUS = "−";
+const minus = (text: string) => (/^-0([.,]0+)?$/.test(text) ? text.slice(1) : text.replace(/^-/, MINUS));
+const thousands = (text: string) => minus(thousandsOnly(text));
 
 export type NumberOptions = {
   /** Nombre de décimales fixes (défaut : 0). */

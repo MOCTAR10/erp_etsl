@@ -6,14 +6,16 @@ précédentes, comme le faisait le nettoyage du préfixe « [Vitrine] » : suffi
 compteur bruts « 900.00 ≥ 890.00 » (B13), cibles « Cible du KPI KP-M11-01 » sans nom d'indicateur (B06), tiers GLOBAL RENTAL en double.
 
 UPDATE ciblés (pas de save()) : aucun signal, aucune règle métier rejouée, aucune pièce comptable touchée.
-Idempotent : une base déjà propre n'est pas modifiée. Exception assumée : les situations « Situation n1 (demo) … »
-du parcours B gardent leur libellé (recherche du contrat E2E `parcours-demo.spec.ts`).
+Idempotent : une base déjà propre n'est pas modifiée. Les situations du parcours B « Situation n1 (demo) - … » deviennent
+« Situation n°1 - … » (situation, objet et ligne de la facture, pièces GED) ; le contrat E2E `parcours-demo.spec.ts`
+recherche le nouveau libellé.
 """
 
 import re
 
 from django.apps import apps
-from django.db.models import Q
+from django.db.models import Q, Value
+from django.db.models.functions import Replace
 
 SUFFIXE_DEMO = " (demo)"
 # Mots sans accents des anciens seeds (sortie ASCII) → orthographe correcte.
@@ -46,17 +48,42 @@ def libelle_propre(texte):
     return texte.replace(SUFFIXE_DEMO, "")
 
 
+# Situations du parcours B (seed_parcours_b) : anciens libellés → libellés définitifs.
+SITUATIONS_PARCOURS = (
+    ("Situation n1 (demo) - installation", "Situation n°1 - installation"),
+    ("Situation n2 (demo) - tuyauterie principale", "Situation n°2 - tuyauterie principale"),
+    ("Situation n3 (demo) - essais", "Situation n°3 - essais"),
+    ("Situation n4 (demo) - parachevement", "Situation n°4 - parachèvement"),
+)
+
+
+def situations_parcours():
+    """« Situation n1 (demo) - installation » → « Situation n°1 - installation » : la situation, l'objet et la ligne de
+    sa facture client (« AFF00003 — Situation n1 (demo) … »), les pièces GED qui reprennent le libellé."""
+    from comptabilite.models import FactureClient, LigneFactureClient
+    from documents.models import Document
+    from operations.models import SituationTravaux
+
+    n = 0
+    for ancien, nouveau in SITUATIONS_PARCOURS:
+        n += SituationTravaux.objects.filter(label=ancien).update(label=nouveau)
+        n += FactureClient.objects.filter(objet__contains=ancien).update(objet=Replace("objet", Value(ancien), Value(nouveau)))
+        n += LigneFactureClient.objects.filter(designation__contains=ancien).update(
+            designation=Replace("designation", Value(ancien), Value(nouveau))
+        )
+        n += Document.objects.filter(title__contains=ancien).update(title=Replace("title", Value(ancien), Value(nouveau)))
+    return n
+
+
 def renommer_libelles_herites():
     """« Vidange et graissage (demo) » → « Vidange et graissage », « Contrat signe » → « Contrat signé »…"""
-    n = 0
+    n = situations_parcours()
     for nom_modele, champ in CHAMPS_DEMO:
         modele = apps.get_model(nom_modele)
         filtre = Q(**{f"{champ}__contains": SUFFIXE_DEMO})
         for ancien, _ in ACCENTS:
             filtre |= Q(**{f"{champ}__contains": ancien})
         for pk, valeur in modele.objects.filter(filtre).values_list("pk", champ):
-            if nom_modele == "documents.Document" and valeur.startswith("Situation n"):
-                continue
             propre = libelle_propre(valeur)
             if propre != valeur:
                 modele.objects.filter(pk=pk).update(**{champ: propre})

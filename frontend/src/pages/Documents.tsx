@@ -10,6 +10,7 @@ import {
   Badge,
   DataGrid,
   DatePicker,
+  FileField,
   FilterBar,
   filtersToQuery,
   Kpi,
@@ -136,7 +137,7 @@ function AjoutDocument({ types }: { types: DocType[] }) {
         <div className="quick-form-fields">
           <div className="field wide">
             <label htmlFor={id("file")}>{t("ecarts_tr.ged.fichier")} *</label>
-            <input id={id("file")} name="file" type="file" required className="ged-file" />
+            <FileField id={id("file")} name="file" required />
           </div>
           <div className="field wide">
             <label htmlFor={id("title")}>{t("ecarts_tr.ged.titre")} *</label>

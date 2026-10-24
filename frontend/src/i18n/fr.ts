@@ -535,7 +535,8 @@ export const fr = {
     },
     params: {
       titre: "Paramètres de reprise",
-      bandeau: "{{count}} paramètre(s) provisoire(s) — à confirmer ou modifier par ETSL.",
+      bandeau_one: "{{count}} paramètre provisoire — à confirmer ou modifier par ETSL.",
+      bandeau_other: "{{count}} paramètres provisoires — à confirmer ou modifier par ETSL.",
       provisoire: "Provisoire",
       confirme: "Confirmé",
       modifier: "Modifier",
@@ -4837,6 +4838,12 @@ export const fr = {
       PROVISION_CP_TAUX: "Provision mensuelle pour congés payés (% du brut)",
       RMM: "Revenu minimum mensuel",
       SMIG: "SMIG mensuel",
+    },
+  },
+  premiumVague2: {
+    direction: {
+      hypothesesTitre: "Hypothèses de pilotage",
+      hypothesesTexte: "Délais de trésorerie, seuils budgétaires et durées de conservation : valeurs par défaut, à valider par ETSL dans les paramètres.",
     },
   },
 } as const;

@@ -486,7 +486,7 @@ export const en = {
     interdit: "Migration restricted to accounting, HR (employees, payroll) and QA/QC (quality).",
     oui: "Yes",
     compteurs: "{{lignes}} rows: {{creees}} created, {{maj}} updated, {{doublons}} already present, {{erreurs}} in error",
-    taux: "error rate {{taux}} % (threshold {{seuil}} %)",
+    taux: "error rate {{taux}}% (threshold {{seuil}}%)",
     rapport: "Anomaly report (CSV)",
     anomalies: "Anomalies",
     ligne: "Row",
@@ -535,7 +535,8 @@ export const en = {
     },
     params: {
       titre: "Migration parameters",
-      bandeau: "{{count}} provisional parameter(s) — to be confirmed or changed by ETSL.",
+      bandeau_one: "{{count}} provisional parameter — to be confirmed or changed by ETSL.",
+      bandeau_other: "{{count}} provisional parameters — to be confirmed or changed by ETSL.",
       provisoire: "Provisional",
       confirme: "Confirmed",
       modifier: "Edit",
@@ -4837,6 +4838,12 @@ export const en = {
       PROVISION_CP_TAUX: "Monthly paid-leave provision (% of gross)",
       RMM: "Monthly minimum income",
       SMIG: "Monthly minimum wage (SMIG)",
+    },
+  },
+  premiumVague2: {
+    direction: {
+      hypothesesTitre: "Management assumptions",
+      hypothesesTexte: "Cash-flow lead times, budget thresholds and retention periods: default values, to be validated by ETSL in the settings.",
     },
   },
 } as const;

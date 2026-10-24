@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { ReleveBancaire, RapprochementAuto } from "../../types";
-import { Badge, SectionCard } from "../ui";
+import { Badge, FileField, SectionCard } from "../ui";
 
 interface Banque {
   id: string;
@@ -23,7 +23,8 @@ export function BanqueSection() {
   const [banque, setBanque] = useState("");
   const [format, setFormat] = useState("auto");
   const [contenu, setContenu] = useState("");
-  const [nom, setNom] = useState("");
+  // Clé du sélecteur de fichier : changée après un import réussi pour le vider.
+  const [fileKey, setFileKey] = useState(0);
   const [dernier, setDernier] = useState<ReleveBancaire | null>(null);
   const [rapp, setRapp] = useState<RapprochementAuto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function BanqueSection() {
       setError(null);
       setDernier(r);
       setContenu("");
-      setNom("");
+      setFileKey((k) => k + 1);
       void qc.invalidateQueries({ queryKey: ["compta-releves"] });
     },
     onError: (e) => setError(describeError(e)),
@@ -57,9 +58,11 @@ export function BanqueSection() {
 
   if (banques.isError) return null;
 
-  const choisirFichier = async (f: File | undefined) => {
-    if (!f) return;
-    setNom(f.name);
+  const choisirFichier = async (f: File | null) => {
+    if (!f) {
+      setContenu("");
+      return;
+    }
     setContenu(await f.text());
   };
 
@@ -77,7 +80,7 @@ export function BanqueSection() {
           <option value="mt940">MT940</option>
           <option value="cfonb120">CFONB 120</option>
         </select>
-        <input type="file" aria-label={t("banque.fichier")} accept=".txt,.sta,.mt940,.cfonb,.dat" onChange={(e) => void choisirFichier(e.target.files?.[0])} />
+        <FileField key={fileKey} aria-label={t("banque.fichier")} accept=".txt,.sta,.mt940,.cfonb,.dat" onChange={(f) => void choisirFichier(f)} />
         <button type="button" className="btn" disabled={!banque || !contenu || importer.isPending} onClick={() => importer.mutate()}>
           {t("banque.importer")}
         </button>
@@ -85,7 +88,6 @@ export function BanqueSection() {
           {t("banque.rapprocher")}
         </button>
       </div>
-      {nom && <p className="muted">{nom}</p>}
 
       {dernier && (
         <div role="status" data-testid="import-resultat">

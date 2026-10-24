@@ -344,6 +344,36 @@
     scroll-margin-top: var(--space-6);
   }
 
+  /* Titre de section + icône d'information (hypothèses de pilotage) alignés ; plus de bandeau « provisoire ». */
+  .dir-section-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .dir-section-head .section-title {
+    margin-bottom: 0;
+  }
+  .dir-section-head + * {
+    margin-top: var(--space-3);
+  }
+  .dir-hypotheses {
+    color: var(--text-muted);
+  }
+  .dir-hypotheses-pop {
+    display: grid;
+    gap: var(--space-2);
+    max-width: 320px;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-sm);
+  }
+  .dir-hypotheses-pop p {
+    margin: 0;
+    color: var(--text-muted);
+  }
+  .dir-hypotheses-pop .btn {
+    justify-self: start;
+  }
+
   .dir-count {
     display: inline-grid;
     place-items: center;
@@ -943,6 +973,7 @@
   .kb-card-head .title {
     display: -webkit-box;
     -webkit-line-clamp: 3; /* A-38 : titre lisible sans coupure au milieu */
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: var(--fs-sm);

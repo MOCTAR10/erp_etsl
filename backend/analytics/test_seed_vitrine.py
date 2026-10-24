@@ -195,8 +195,6 @@ class SeedDemoVitrineTests(TestCase):
 
         for nom_modele, champ in nettoyage.CHAMPS_DEMO:
             qs = apps.get_model(nom_modele).objects.filter(**{f"{champ}__contains": "(demo)"})
-            if nom_modele == "documents.Document":
-                qs = qs.exclude(title__startswith="Situation n")
             self.assertFalse(qs.exists(), nom_modele)
         self.assertFalse(Document.objects.filter(title__contains=" — archivage (").exists())
         self.assertFalse(Document.objects.filter(title__contains="Contrat signe ").exists())
@@ -235,7 +233,7 @@ class NettoyageHeritesTests(TestCase):
             "CRRL AFF00003 (demo)": "CRRL AFF00003",
             "Contrat signe CTT00002 (demo)": "Contrat signé CTT00002",
             "Avenant 1 CTT00002 (demo)": "Avenant n°1 CTT00002",
-            "Situation n1 (demo) - installation": "Situation n1 (demo) - installation",  # recherche du spec E2E
+            "Situation n1 (demo) - installation": "Situation n°1 - installation",  # recherche du spec E2E
         }
         for titre in docs:
             Document.objects.create(title=titre)

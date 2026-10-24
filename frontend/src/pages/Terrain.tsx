@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
-import { Badge, DatePicker, PageHeader, SectionCard } from "../components/ui";
+import { Badge, DatePicker, FileField, PageHeader, SectionCard } from "../components/ui";
 import { FichesSecuriteTerrain } from "../components/hse/FichesSecuriteTerrain";
 import { offlineQueue, submitOffline, submitOfflineChain, syncNow, useOnline, useQueueItems } from "../lib/offline";
 import { REF, type QueuedFile } from "../lib/offlineQueue";
@@ -407,6 +407,8 @@ function Form({
   const init = () => Object.fromEntries(fields.map((f) => [f.name, f.initial ?? ""]));
   const [values, setValues] = useState<Record<string, string>>(init);
   const [files, setFiles] = useState<Record<string, File | undefined>>({});
+  // Clé des sélecteurs de photo : changée après l'envoi pour les vider.
+  const [fileKey, setFileKey] = useState(0);
   const [formKey, setFormKey] = useState(0); // remet à zéro les champs fichier après envoi
   const [busy, setBusy] = useState(false);
 
@@ -421,6 +423,7 @@ function Form({
           await onSubmit(values, files);
           setValues(init());
           setFiles({});
+          setFileKey((k) => k + 1);
           setFormKey((k) => k + 1);
         } finally {
           setBusy(false);
@@ -438,17 +441,21 @@ function Form({
               onChange={(v) => setValues({ ...values, [f.name]: v })}
             />
           </div>
+        ) : f.kind === "file" ? (
+          <div className="field" key={f.name}>
+            <label htmlFor={`terrain-${f.name}`}>{f.label}</label>
+            <FileField
+              key={fileKey}
+              id={`terrain-${f.name}`}
+              accept="image/*"
+              capture="environment"
+              onChange={(file) => setFiles({ ...files, [f.name]: file ?? undefined })}
+            />
+          </div>
         ) : (
           <label className="field" key={f.name}>
             <span>{f.label}</span>
-            {f.kind === "file" ? (
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => setFiles({ ...files, [f.name]: e.target.files?.[0] })}
-              />
-            ) : f.kind === "select" ? (
+            {f.kind === "select" ? (
               <select required={f.required} value={values[f.name]} onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}>
                 <option value="">—</option>
                 {(f.options ?? []).map((o) => (

@@ -177,6 +177,7 @@ function DocumentsSection({ procOpts }: { procOpts: { value: string; label: stri
     {
       key: "revue",
       header: t("m6c.docs.revue"),
+      kind: "date",
       render: (d) => (
         <>
           {d.date_revue ? formatDate(d.date_revue, i18n.language) : "—"} {d.revue_echue && <Badge tone="err">{t("m6c.docs.echue")}</Badge>}
@@ -410,7 +411,7 @@ function AuditsSection({ procOpts }: { procOpts: { value: string; label: string 
         </>
       ),
     },
-    { key: "date", header: t("m6e.f.datePrevue"), render: (a) => formatDate(a.date_prevue, i18n.language), sortValue: (a) => a.date_prevue },
+    { key: "date", header: t("m6e.f.datePrevue"), kind: "date", render: (a) => formatDate(a.date_prevue, i18n.language), sortValue: (a) => a.date_prevue },
     {
       key: "constats",
       header: t("m6c.audits.constats"),
