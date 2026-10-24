@@ -11,7 +11,7 @@ describe("barrel components/ui", () => {
   });
 
   it("exporte le kit complet utilisé par les écrans", () => {
-    for (const name of ["DataGrid", "DataTable", "PagedDataGrid", "Kpi", "Menu", "CommandPalette", "DatePicker", "FilterBar", "EmptyState"] as const) {
+    for (const name of ["DataGrid", "DataTable", "PagedDataGrid", "Kpi", "Menu", "CommandPalette", "DatePicker", "MonthPicker", "FilterBar", "EmptyState"] as const) {
       expect(ui[name], name).toBeDefined();
     }
   });

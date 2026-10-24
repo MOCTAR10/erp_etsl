@@ -127,7 +127,7 @@ function ParametresAchats() {
         edit?.id === p.id ? (
           <input type="number" min={0} step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
         ) : (
-          <span style={{ whiteSpace: "nowrap" }}>
+          <span className="cell-nowrap">
             {formatNumber(Number(p.valeur))}
             {p.unite === "choix" ? "" : ` ${UNITE_CLE[p.unite] ? t(`revueR2.purchases.unites.${UNITE_CLE[p.unite]}`) : p.unite}`}
           </span>

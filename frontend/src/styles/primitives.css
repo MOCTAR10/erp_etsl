@@ -770,6 +770,55 @@
   }
 }
 
+/* Affordance de défilement horizontal (revue finale) : fondu sur le bord qui cache des colonnes. */
+.ui-grid-wrap[data-overflow-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+.ui-grid-wrap[data-overflow-start] {
+  mask-image: linear-gradient(to right, transparent, #000 40px);
+}
+.ui-grid-wrap[data-overflow-start][data-overflow-end] {
+  mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+}
+/* Tableau hors DataGrid (.table-wrap seul) : ombres de bord en CSS pur (attachement local / scroll). */
+.table-wrap:not(.ui-grid-wrap) {
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent) left center / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--surface) 30%, transparent) right center / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) right center / 12px 100% no-repeat scroll;
+}
+@media (max-width: 900px) {
+  /* Le tableau défile dans son cadre au lieu de se comprimer (intitulés mot par mot, montants tronqués). */
+  .ui-grid:has(thead th:nth-child(3)),
+  .table-wrap > .table:has(thead th:nth-child(3)) {
+    min-width: 560px;
+  }
+  .ui-grid:has(thead th:nth-child(5)),
+  .table-wrap > .table:has(thead th:nth-child(5)) {
+    min-width: 720px;
+  }
+  .table-wrap > .table td.num {
+    white-space: nowrap;
+  }
+  .ui-grid-wrap[data-overflow-end] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  .ui-grid-wrap[data-overflow-start] {
+    mask-image: linear-gradient(to right, transparent, #000 24px);
+  }
+  .ui-grid-wrap[data-overflow-start][data-overflow-end] {
+    mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  }
+}
+@media print {
+  .ui-grid-wrap,
+  .table-wrap {
+    mask-image: none !important;
+    background: none !important;
+  }
+}
+
 /* ── Palette de commandes (cmdk) ── */
 .ui-cmd-overlay {
   z-index: 95;

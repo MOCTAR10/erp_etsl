@@ -36,6 +36,8 @@ export { AppToaster, notify } from "./Toaster";
 export type { NotifyOptions } from "./Toaster";
 export { DatePicker, DateRangePicker, dateToIso, formatIsoDate, isoToDate, parseDateInput } from "./DatePicker";
 export type { DatePickerProps, DateRangePickerProps, DateRangeValue } from "./DatePicker";
+export { currentMonth, formatMonth, MonthPicker, normalizeMonth, shiftMonth } from "./MonthPicker";
+export type { MonthPickerProps } from "./MonthPicker";
 export { DataGrid, PagedDataGrid, toOrdering } from "./DataGrid";
 export type { DataGridProps, GridColumn, GridPagination, GridSort, SortValue } from "./DataGrid";
 export { CommandPalette, normalizeSearch } from "./CommandPalette";

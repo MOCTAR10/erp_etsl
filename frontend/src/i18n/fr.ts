@@ -4465,6 +4465,36 @@ export const fr = {
       risquesCritiques_other: "{{count}} risques critiques",
     },
   },
+  revueKit: {
+    oui: "Oui",
+    non: "Non",
+    unites: {
+      jours_one: "jour",
+      jours_other: "jours",
+      heures_one: "heure",
+      heures_other: "heures",
+      mois_one: "mois",
+      mois_other: "mois",
+      ans_one: "an",
+      ans_other: "ans",
+      cyclesAn_one: "cycle/an",
+      cyclesAn_other: "cycles/an",
+      semaines_one: "semaine",
+      semaines_other: "semaines",
+      minutes_one: "minute",
+      minutes_other: "minutes",
+      km_one: "km",
+      km_other: "km",
+    },
+    kit: {
+      mois: "Mois",
+      tousLesMois: "Tous les mois",
+    },
+    ops: {
+    },
+    fin: {
+    },
+  },
 } as const;
 
 export default fr;

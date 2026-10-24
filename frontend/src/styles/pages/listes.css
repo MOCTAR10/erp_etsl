@@ -386,19 +386,22 @@ td .card-actions--choice {
 .cell-nowrap {
   white-space: nowrap;
 }
-/* Sous-titres et bandeaux à l'intérieur d'une carte de section : rythme régulier */
-.listes-page .card-body > h4 {
+/* Sous-titres et bandeaux à l'intérieur d'une carte de section : rythme régulier (tous les écrans) */
+.card-body > h4 {
   margin: var(--space-5) 0 var(--space-2);
   font-size: var(--fs-sm);
   line-height: var(--lh-sm);
   font-weight: var(--fw-semibold);
   color: var(--text);
 }
-.listes-page .card-body > h4:first-child {
+.card-body > h4:first-child {
   margin-top: 0;
 }
-.listes-page .card-body > .banner {
+.card-body > .banner {
   margin-bottom: var(--space-3);
+}
+.card-body > .banner:last-child {
+  margin-bottom: 0;
 }
 
 /* ── Surcharge de capacité (Opérations, P2-10) ── */
@@ -411,7 +414,8 @@ td .card-actions--choice {
 }
 .overload-list li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px minmax(16ch, auto) 72px;
+  /* Heures en largeur fixe (11ch) : la barre ne se décale pas entre « 184 h / 120 h » et « 1 348 h / 120 h ». */
+  grid-template-columns: minmax(0, 1fr) 140px 11ch 64px;
   align-items: center;
   gap: var(--space-3);
   padding: 10px 0;
@@ -446,10 +450,12 @@ td .card-actions--choice {
   border-radius: 0;
   background: var(--text-muted);
 }
-.overload-list li > .badge {
+.overload-list li > .badge,
+.overload-list li > :last-child {
   justify-self: end;
 }
 .overload-hours {
+  min-width: 11ch;
   text-align: right;
   color: var(--text-muted);
   white-space: nowrap;
@@ -483,12 +489,108 @@ td .card-actions--choice {
   .overload-list li {
     grid-template-columns: minmax(0, 1fr) auto;
   }
-  .overload-list li > .badge {
+  .overload-list li > .badge,
+  .overload-list li > :last-child {
     justify-self: start;
   }
   .overload-list .overload-bar {
     grid-column: 1 / -1;
     order: 3;
+  }
+}
+
+
+/* ═══ Kit partagé — revue finale (tous les écrans) ═══ */
+
+/* Un seul primaire par écran : tout déclencheur QuickForm / ActionBar posé dans une carte, une barre d'actions
+   de section ou une barre d'outils est secondaire (le primaire reste l'action de l'en-tête de page). */
+.card .quick-form-anchor > .btn.primary,
+.section-actions .quick-form-anchor > .btn.primary,
+.list-toolbar .quick-form-anchor > .btn.primary,
+.card-header .action-bar .btn.primary,
+.section-actions .action-bar .btn.primary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+.card .quick-form-anchor > .btn.primary:hover:not(:disabled),
+.section-actions .quick-form-anchor > .btn.primary:hover:not(:disabled),
+.list-toolbar .quick-form-anchor > .btn.primary:hover:not(:disabled),
+.card-header .action-bar .btn.primary:hover:not(:disabled),
+.section-actions .action-bar .btn.primary:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+/* ActionBar dans un en-tête de section : même taille que les boutons voisins (.btn standard). */
+.card-header .action-bar .btn,
+.section-actions .action-bar .btn {
+  min-height: var(--control-h);
+  padding: 0 14px;
+  font-size: var(--fs-body);
+}
+.card-header .action-bar,
+.section-actions .action-bar {
+  margin-top: 0;
+}
+
+/* En-têtes de carte : le titre passe à la ligne, jamais les boutons (ils ne rétrécissent pas). */
+.card-header {
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-4);
+}
+.card-header > :first-child {
+  flex: 1 1 320px;
+}
+.card-header > :last-child:not(:first-child) {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+.card-header .btn,
+.section-actions .btn,
+.card-actions .btn,
+.list-toolbar-end .btn {
+  white-space: nowrap;
+}
+/* Colonne d'actions de ligne (actionsColumn) : au plus juste, sans retour à la ligne des boutons. */
+.ui-grid td:has(> .card-actions) {
+  width: 1%;
+  white-space: nowrap;
+}
+/* Badges et dates d'une cellule : jamais coupés. */
+.ui-grid td .badge,
+td .cell-nowrap,
+.table td.nowrap {
+  white-space: nowrap;
+}
+
+/* Barre de filtres : un sélecteur garde la place de son libellé (« Type de document » non tronqué). */
+.filter-bar-item--choix,
+.filter-bar-item--fk,
+.filter-bar-item--bool {
+  flex: 0 1 220px;
+  min-width: 200px;
+}
+
+/* Kanban de 5 colonnes ou moins : colonnes fluides, toutes visibles en bureau (pas de colonne cachée au bord). */
+@media (min-width: 901px) {
+  .board:not(:has(> :nth-child(6))) {
+    grid-auto-columns: minmax(196px, 1fr);
+  }
+}
+
+/* Sélecteur de mois du kit (MonthPicker) : largeur d'un champ de filtre. */
+.month-picker {
+  min-width: 180px;
+}
+
+@media (max-width: 900px) {
+  .card-header > :first-child {
+    flex-basis: 100%;
+  }
+  .filter-bar-item--choix,
+  .filter-bar-item--fk,
+  .filter-bar-item--bool {
+    min-width: 0;
   }
 }
 
