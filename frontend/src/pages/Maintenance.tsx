@@ -179,7 +179,11 @@ export function MaintenancePage() {
       render: (a) => (
         <>
           {a.designation} {a.is_global_rental && <Badge tone="brand">{t("maintenance.GR")}</Badge>}
-          {a.signe_618 && <Badge tone="neutral">{t("maintenance.cpt618")}</Badge>}
+          {a.signe_618 && (
+            <span className="cell-sub" title={t("tableaux.logistique.compte618")}>
+              {t("premiumModules.compte618")}
+            </span>
+          )}
         </>
       ),
     },
