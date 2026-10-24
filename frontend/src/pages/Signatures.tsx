@@ -20,12 +20,12 @@ interface ModeSignature {
   enrolement_requis: boolean;
   message: string;
 }
-const MODE_KEY = ["signatures", "mode"];
-const useModeSignature = () =>
+export const MODE_KEY = ["signatures", "mode"];
+export const useModeSignature = () =>
   useQuery({ queryKey: MODE_KEY, queryFn: () => api.get<ModeSignature>("/api/documents/signatures/mode/"), retry: 0 });
 
 /** Enrôlement de la double authentification depuis l'écran Signatures (sans messagerie, seul second facteur). */
-function EnrolementTotp() {
+export function EnrolementTotp() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [cle, setCle] = useState<{ secret: string; otpauth_uri: string; qr_svg?: string } | null>(null);
@@ -437,7 +437,7 @@ export function SignaturesPage() {
   const header = (
     <PageHeader
       title={t("signatures.title")}
-      subtitle={t("signatures.subtitle")}
+      subtitle={t("premiumPilotage.signatures.sub")}
       actions={
         <button type="button" className="btn primary" onClick={() => setNouvelle(true)} disabled={nouvelle}>
           <Plus size={16} aria-hidden="true" /> {t("signatures.new")}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, SlidersHorizontal, Upload } from "lucide-react";
+import { ChevronRight, History, SlidersHorizontal, Upload } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -234,8 +234,8 @@ export function ReprisePage() {
             </label>
             <label className="field">
               <span>{t("ecarts_import.charger.fichier")}</span>
-              <span className="file-pick">
-                <span className="btn ghost sm" aria-hidden="true">
+              <span className="file-pick reprise-file">
+                <span className="btn ghost sm reprise-file-btn" aria-hidden="true">
                   <Upload size={14} /> {t("revueR1.reprise.choisir")}
                 </span>
                 <span className={fichier ? "file-pick-name" : "file-pick-name muted"}>{fichier?.name ?? t("revueR1.reprise.aucunFichier")}</span>
@@ -252,15 +252,18 @@ export function ReprisePage() {
                 />
               </label>
             ))}
-            <label className="field">
-              <span>
+            {/* Case alignée sur la ligne des champs (A-35). */}
+            <label className="field reprise-check">
+              <span className="reprise-check-row">
                 <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> {t("ecarts_import.charger.force")}
               </span>
             </label>
           </div>
           {gabarit && (
             <p className="muted">
-              {t("ecarts_import.charger.cle")} : <strong>{gabarit.cle}</strong> · {t("ecarts_import.charger.formats")} : {gabarit.formats.join(", ").toUpperCase()}
+              {t("premiumPilotage.reprise.libelle", { label: t("ecarts_import.charger.cle") })}
+              <strong>{gabarit.cle}</strong> · {t("premiumPilotage.reprise.libelle", { label: t("ecarts_import.charger.formats") })}
+              {gabarit.formats.join(", ").toUpperCase()}
               {gabarit.note ? ` · ${sansChemin(gabarit.note)}` : ""}
             </p>
           )}
@@ -313,8 +316,11 @@ export function ReprisePage() {
             </div>
           )}
           {gabarit && (
-            <details>
-              <summary>{t("ecarts_import.charger.colonnes", { n: gabarit.colonnes.length })}</summary>
+            <details className="reprise-details">
+              <summary>
+                <ChevronRight size={16} aria-hidden="true" className="reprise-chevron" />
+                {t("ecarts_import.charger.colonnes", { n: gabarit.colonnes.length })}
+              </summary>
               <DataTable columns={colsGabarit} rows={gabarit.colonnes.map((c) => ({ ...c, id: c.nom }))} caption={t("ecarts_import.charger.colonnes", { n: gabarit.colonnes.length })} />
             </details>
           )}

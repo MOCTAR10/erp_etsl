@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { KeyRound } from "lucide-react";
+import { Check, Circle, Eye, EyeOff, KeyRound } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -13,11 +13,46 @@ import type { Me } from "../types";
 type MeMdp = Me & { doit_changer_mdp?: boolean };
 
 function Champ({ id, label, value, onChange, autoComplete }: { id: string; label: string; value: string; onChange: (v: string) => void; autoComplete: string }) {
+  const { t } = useTranslation();
+  const [visible, setVisible] = useState(false);
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      <input id={id} type="password" required value={value} autoComplete={autoComplete} onChange={(e) => onChange(e.target.value)} />
+      <div className="mdp-input">
+        <input id={id} type={visible ? "text" : "password"} required value={value} autoComplete={autoComplete} onChange={(e) => onChange(e.target.value)} />
+        <button
+          type="button"
+          className="mdp-eye"
+          aria-label={visible ? t("premiumPilotage.mdp.masquer", { champ: label }) : t("premiumPilotage.mdp.afficher", { champ: label })}
+          aria-pressed={visible}
+          aria-controls={id}
+          onClick={() => setVisible((v) => !v)}
+        >
+          {visible ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+        </button>
+      </div>
     </div>
+  );
+}
+
+/** Règles vérifiées en direct (le serveur reste juge : nom / e-mail / mots de passe courants, A-34). */
+function Regles({ nouveau, confirmation }: { nouveau: string; confirmation: string }) {
+  const { t } = useTranslation();
+  const regles = [
+    { key: "longueur", ok: nouveau.length >= 8 },
+    { key: "chiffres", ok: nouveau.length > 0 && !/^\d+$/.test(nouveau) },
+    { key: "identiques", ok: nouveau.length > 0 && nouveau === confirmation },
+  ];
+  return (
+    <ul className="mdp-regles" aria-label={t("premiumPilotage.mdp.regles")}>
+      {regles.map((r) => (
+        <li key={r.key} className={r.ok ? "is-ok" : undefined}>
+          {r.ok ? <Check size={14} aria-hidden="true" /> : <Circle size={14} aria-hidden="true" />}
+          <span>{t(`premiumPilotage.mdp.regle.${r.key}`)}</span>
+          <span className="sr-only">{r.ok ? t("premiumPilotage.mdp.respectee") : t("premiumPilotage.mdp.aRespecter")}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -69,16 +104,14 @@ export function MonMotDePassePage() {
           {t("ecarts_tr.mdp.obligatoire")}
         </p>
       ) : null}
-      <SectionCard title={t("ecarts_tr.mdp.title")}>
-        <form className="quick-form" onSubmit={submit} aria-label={t("ecarts_tr.mdp.title")}>
-          <div className="quick-form-grid">
-            <Champ id="mdp-ancien" label={t("ecarts_tr.mdp.ancien")} value={ancien} onChange={setAncien} autoComplete="current-password" />
-            <Champ id="mdp-nouveau" label={t("ecarts_tr.mdp.nouveau")} value={nouveau} onChange={setNouveau} autoComplete="new-password" />
-            <Champ id="mdp-confirmation" label={t("ecarts_tr.mdp.confirmation")} value={confirmation} onChange={setConfirmation} autoComplete="new-password" />
-          </div>
-          <p className="muted" style={{ fontSize: 13 }}>
-            {t("ecarts_tr.mdp.regles")}
-          </p>
+      {/* Une colonne étroite, sans titre de carte qui répète le titre de page (A-34). */}
+      <SectionCard className="mdp-card">
+        <form className="quick-form mdp-form" onSubmit={submit} aria-label={t("ecarts_tr.mdp.title")}>
+          <Champ id="mdp-ancien" label={t("ecarts_tr.mdp.ancien")} value={ancien} onChange={setAncien} autoComplete="current-password" />
+          <Champ id="mdp-nouveau" label={t("ecarts_tr.mdp.nouveau")} value={nouveau} onChange={setNouveau} autoComplete="new-password" />
+          <Champ id="mdp-confirmation" label={t("ecarts_tr.mdp.confirmation")} value={confirmation} onChange={setConfirmation} autoComplete="new-password" />
+          <Regles nouveau={nouveau} confirmation={confirmation} />
+          <p className="muted mdp-note">{t("premiumPilotage.mdp.note")}</p>
           <div className="quick-form-actions">
             <button type="submit" className="btn primary" disabled={envoi.isPending}>
               <KeyRound size={15} aria-hidden="true" /> {envoi.isPending ? t("common.loading") : t("ecarts_tr.mdp.valider")}
