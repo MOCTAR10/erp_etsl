@@ -25,7 +25,7 @@ test.describe("Parcours démo : finance", () => {
     await compte.selectOption(valeur!);
     const lettrage = page.getByRole("row").filter({ has: page.getByText(/^LET\d+$/) }).filter({ hasText: piece });
     await expect(lettrage).toHaveCount(1);
-    await expect(lettrage).toContainText("Manuel · 2 ligne(s)");
+    await expect(lettrage).toContainText("Manuel · 2 lignes");
     await expect(lettrage).toContainText("Actif");
   });
 });
