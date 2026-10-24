@@ -206,9 +206,10 @@ class SeedDemoVitrineTests(TestCase):
             codes = modele.objects.values_list("code", flat=True)
             self.assertFalse([c for c in codes if re.fullmatch(r"[A-Z]+-\d+", c)], modele.__name__)
         self.assertFalse(OrdreTravail.objects.filter(description__regex=r"\d\.\d\d ≥").exists())
-        kpi = ParametreGestion.objects.filter(table="KPI_CIBLES")
-        self.assertTrue(kpi.exists())
-        self.assertFalse(kpi.filter(label__startswith="Cible du KPI").exists())
+        from controle_gestion.services import PARAMETRES_DEFAUT
+
+        self.assertEqual(PARAMETRES_DEFAUT["KPI_01"][0], "Cible — Taux de marge brute (KP-M11-01)")
+        self.assertFalse(ParametreGestion.objects.filter(label__startswith="Cible du KPI").exists())
         self.assertEqual(CircuitStep.objects.get(circuit__code="circuit_comptabilite", order=3).actor_role, "finance")
         self.assertFalse(CircuitStep.objects.filter(actor_role="admin").exists())
         self.assertEqual(Partner.objects.filter(is_global_rental=True, is_active=True).count(), 1)

@@ -13,6 +13,7 @@
 import hashlib
 import io
 from datetime import date, timedelta
+from datetime import timezone as dt_timezone
 
 from django.core.management import call_command
 from django.db import transaction
@@ -188,7 +189,8 @@ class VitrineFinitions:
                 continue
             version = doc.current_version
             demande = instant(doc.document_date, 9) + _heure(f"sig-{doc.pk}", 0, 2)
-            signe = demande + timedelta(days=1) + _heure(f"sig2-{doc.pk}", 0, 6)
+            # En UTC, comme `timezone.now()` à la signature réelle : la preuve scellée est relue telle quelle en base.
+            signe = (demande + timedelta(days=1) + _heure(f"sig2-{doc.pk}", 0, 6)).astimezone(dt_timezone.utc)
             if signe >= timezone.now():
                 continue
             req = SignatureRequest.objects.create(
@@ -261,11 +263,15 @@ class VitrineFinitions:
             Version.objects.filter(document_id=doc.pk, created_at__gte=timezone.now() - timedelta(days=10)).update(
                 created_at=quand
             )
-        # Pièces d'un même lot posées au même instant (anciens chargements) : espacées de quelques minutes.
+        # Pièces posées au même instant (lots d'un même jour, anciens chargements) : espacées de quelques minutes,
+        # jusqu'à ce qu'aucun horodatage ne soit partagé.
         from django.db.models import Count
 
-        for groupe in Document.objects.values("created_at").annotate(n=Count("id")).filter(n__gt=1):
-            pks = Document.objects.filter(created_at=groupe["created_at"]).order_by("title").values_list("pk", flat=True)
-            for i, pk in enumerate(pks):
-                if i:
-                    Document.objects.filter(pk=pk).update(created_at=groupe["created_at"] + timedelta(minutes=6 * i + i % 4))
+        for _ in range(30):
+            groupes = list(Document.objects.values("created_at").annotate(n=Count("id")).filter(n__gt=1))
+            if not groupes:
+                break
+            for groupe in groupes:
+                pks = Document.objects.filter(created_at=groupe["created_at"]).order_by("title").values_list("pk", flat=True)
+                for i, pk in enumerate(list(pks)[1:], start=1):
+                    Document.objects.filter(pk=pk).update(created_at=groupe["created_at"] + timedelta(minutes=5 * i + 1))
