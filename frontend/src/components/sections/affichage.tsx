@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import "../../styles/pages/sections.css";
 import { formatNumber } from "../../lib/format";
+import { displayName } from "../../lib/people";
 import { Badge, Popover } from "../ui";
 
 /**
@@ -71,4 +72,14 @@ export function InfoFormule({ children, label }: { children: ReactNode; label?: 
       <p className="info-formule-texte">{children}</p>
     </Popover>
   );
+}
+
+/**
+ * Nom d'une personne servi par l'API sous forme de chaîne (`*_name`, `*_nom`) : `displayName` de `lib/people`
+ * (jamais d'e-mail) ; « — » si absent.
+ */
+export function nomPersonne(t: Tr, nom: string | null | undefined): string {
+  if (!nom || !nom.trim()) return "—";
+  const tr: Tr = (key, opts) => t(key, key === "premiumPilotage.people.unknown" ? { defaultValue: "Utilisateur", ...opts } : opts);
+  return displayName(tr, { name: nom });
 }

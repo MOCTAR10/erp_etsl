@@ -4,9 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { displayName } from "../../lib/people";
+import { ScelleBadge, nomPersonne } from "../sections/affichage";
 import { SectionActions } from "../sections/SectionActions";
-import { ScelleBadge } from "../sections/affichage";
 import { ActionBar, Badge, DataTable, Kpi, Menu, QuickForm, SectionCard } from "../ui";
 import type { ActionDef, Column } from "../ui";
 import { CardActions } from "../ui/Board";
@@ -318,7 +317,7 @@ export function EcartsM3Section() {
       sortValue: (f) => f.statut_label,
       render: (f) => (
         <>
-          <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{statutLabel("fiche", f.statut, f.statut_label)}</Badge> {f.valide_par_nom ? displayName(f.valide_par_nom) : ""}
+          <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{statutLabel("fiche", f.statut, f.statut_label)}</Badge> {f.valide_par_nom ? nomPersonne(t, f.valide_par_nom) : ""}
         </>
       ),
     },

@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { nombre } from "../sections/affichage";
-import { displayName } from "../../lib/people";
+import { nomPersonne, nombre } from "../sections/affichage";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
@@ -391,7 +390,7 @@ export function EcartsM12Section() {
               { key: "dossier", header: t("ecarts_m12.contentieux.dossier"), render: (a) => a.contentieux_code },
               { key: "type", header: t("ecarts_m12.contentieux.type"), render: (a) => a.type_label },
               { key: "description", header: t("ecarts_m12.contentieux.description"), render: (a) => a.description },
-              { key: "auteur", header: t("tableaux.juridique.auteur"), render: (a) => <span className="muted">{displayName(a.auteur_name)}</span> },
+              { key: "auteur", header: t("tableaux.juridique.auteur"), render: (a) => <span className="muted">{nomPersonne(t, a.auteur_name)}</span> },
             ]}
           />
         </div>

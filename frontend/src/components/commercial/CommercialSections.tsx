@@ -4,8 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { displayName } from "../../lib/people";
-import { sansPrefixeType } from "../sections/affichage";
+import { nomPersonne, sansPrefixeType } from "../sections/affichage";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { Badge, DataTable, PagedDataTable, SectionCard } from "../ui";
@@ -155,7 +154,7 @@ export function CommercialSections() {
     { key: "code", header: t("commercial.col.code"), render: (a) => <span className="cell-nowrap">{a.code}</span>, sortValue: (a) => a.code },
     { key: "titre", header: t("commercial.col.titre"), render: (a) => a.title },
     { key: "client", header: t("commercial.col.client"), render: (a) => a.client_name ?? "—" },
-    { key: "resp", header: t("commercial.col.responsable"), render: (a) => displayName(a.responsable_email) },
+    { key: "resp", header: t("commercial.col.responsable"), render: (a) => nomPersonne(t, a.responsable_email) },
     { key: "statut", header: t("commercial.col.statut"), render: (a) => statut("statutsAffaire", a.status, a.status_label) },
     actionsColumn<Affaire>(t("ui.actions"), (a) => actionsAffaire(a, t)),
   ];

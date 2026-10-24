@@ -4,10 +4,9 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { displayName } from "../../lib/people";
+import { InfoFormule, ScelleBadge, nomPersonne } from "../sections/affichage";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { InfoFormule, ScelleBadge } from "../sections/affichage";
 import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
@@ -271,7 +270,7 @@ export function EcartsM4Section() {
     { key: "source", header: t("ecarts_m4.parc.source"), render: (r) => (
         <>
           {r.source ? lbl(`revueR2.logistique.sourceReleve.${r.source}`, r.source_label) : r.source_label}
-          {r.saisi_par_name ? <span className="cell-sub">{displayName(r.saisi_par_name)}</span> : null}
+          {r.saisi_par_name ? <span className="cell-sub">{nomPersonne(t, r.saisi_par_name)}</span> : null}
         </>
       ),
     },
@@ -303,7 +302,7 @@ export function EcartsM4Section() {
     { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (h) => h.equipement_code, render: (h) => h.equipement_code },
     { key: "champ", header: t("ecarts_m4.audit.champ"), render: (h) => h.champ },
     { key: "avantApres", header: t("ecarts_m4.audit.avantApres"), render: (h) => `${h.ancienne_valeur || "—"} → ${h.nouvelle_valeur || "—"}` },
-    { key: "par", header: t("ecarts_m4.audit.par"), sortValue: (h) => h.modifie_le, render: (h) => `${displayName(h.modifie_par_name)} · ${formatDate(h.modifie_le)}` },
+    { key: "par", header: t("ecarts_m4.audit.par"), sortValue: (h) => h.modifie_le, render: (h) => `${nomPersonne(t, h.modifie_par_name)} · ${formatDate(h.modifie_le)}` },
   ];
   const colsLocations: Column<Location>[] = [
     {

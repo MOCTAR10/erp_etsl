@@ -1,52 +1,79 @@
 /**
- * Nom d'une personne affiché dans l'interface : jamais une adresse e-mail technique.
- * - objet utilisateur : « Prénom Nom » (`full_name`, `nom_complet`, `name` ou `first_name` + `last_name`) ;
- * - chaîne : renvoyée telle quelle, sauf si c'est une adresse e-mail (le serveur se rabat sur l'e-mail
- *   quand le compte n'a ni prénom ni nom) → partie locale lisible : « demo.logistique@etls.local » → « Logistique »,
- *   « jean-paul.mba@etsl.ga » → « Jean-Paul Mba », « demo.rh@etls.local » → « RH » ;
- * - absent → `fallback` (« — » par défaut).
+ * Nom affichable d'une personne — **jamais l'e-mail** (constats A-03 / A-24 / B17).
+ *
+ * API (à copier telle quelle par les autres écrans) :
+ *
+ *   import { displayName, personInitials } from "../lib/people";
+ *   const { t } = useTranslation();
+ *   displayName(t, user)        // « Awa Ndong » | « Secrétaire général » | « Utilisateur »
+ *   personInitials(t, user)     // « AN » | « SG »
+ *   personTitle(t, user)        // « Awa Ndong — awa@etls.local » (infobulle : seul endroit où l'e-mail apparaît)
+ *   avatarStyle(nom)            // style={…} : teinte d'avatar stable dérivée du nom
+ *
+ * `user` est n'importe quel objet « personne » (`PersonLike`) : champs facultatifs, plusieurs
+ * conventions de nommage du backend acceptées.
+ *
+ * Ordre de repli :
+ *   1. nom complet déjà composé par le backend (`full_name`, `name`, `*_name` passé en `name`) ;
+ *   2. prénom + nom (`first_name` + `last_name`) ;
+ *   3. libellé du rôle via i18n `shell.roles.*` (`roleLabel`) ;
+ *   4. libellé générique i18n `premiumPilotage.people.unknown` (« Utilisateur »).
+ *
+ * Un « nom » qui ressemble à un e-mail (contient « @ ») est ignoré : l'e-mail n'est donc jamais
+ * affiché comme nom. Pour le garder accessible, le mettre en `title` (cf. `personTitle`).
  */
+import type { CSSProperties } from "react";
+
+import { initiales, roleLabel } from "./roles";
+
+/** Fonction de traduction (forme minimale de `t`, cf. `useTranslation`). */
+type T = (key: string, opts?: Record<string, unknown>) => string;
+
 export interface PersonLike {
   full_name?: string | null;
-  nom_complet?: string | null;
   name?: string | null;
   first_name?: string | null;
   last_name?: string | null;
+  role?: string | null;
   email?: string | null;
 }
 
-/** Segments techniques des comptes de démonstration ou de test, jamais montrés comme nom. */
-const TECHNIQUES = new Set(["demo", "test", "e2e", "noreply", "no-reply"]);
+const clean = (v: string | null | undefined): string => {
+  const s = (v ?? "").trim();
+  return s && !s.includes("@") ? s : "";
+};
 
-const majuscule = (s: string) => s.charAt(0).toLocaleUpperCase("fr") + s.slice(1).toLocaleLowerCase("fr");
-
-/** « jean-paul.mba » → « Jean-Paul Mba » (segments techniques retirés). */
-function nomDepuisEmail(email: string): string {
-  const local = email.split("@")[0] ?? "";
-  const segments = local
-    .split(/[._+]+/)
-    .map((s) => s.trim())
-    .filter((s) => s && !TECHNIQUES.has(s.toLowerCase()) && !/^\d+$/.test(s));
-  if (segments.length === 0) return local;
-  // Compte de service à segment unique court (« rh », « dsi ») : sigle en capitales.
-  if (segments.length === 1 && segments[0].length <= 3) return segments[0].toLocaleUpperCase("fr");
-  return segments.map((s) => s.split("-").map(majuscule).join("-")).join(" ");
+/** Nom complet (ou libellé de rôle) d'une personne, jamais son e-mail. */
+export function displayName(t: T, person: PersonLike | null | undefined): string {
+  if (!person) return t("premiumPilotage.people.unknown");
+  const direct = clean(person.full_name) || clean(person.name);
+  if (direct) return direct;
+  const composed = [clean(person.first_name), clean(person.last_name)].filter(Boolean).join(" ");
+  if (composed) return composed;
+  if (person.role) return roleLabel(t, person.role);
+  return t("premiumPilotage.people.unknown");
 }
 
-export const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+/** Initiales d'avatar dérivées du nom affichable (jamais de l'e-mail). */
+export function personInitials(t: T, person: PersonLike | null | undefined): string {
+  return initiales(displayName(t, person));
+}
 
-export function displayName(person: PersonLike | string | null | undefined, fallback = "—"): string {
-  if (person === null || person === undefined) return fallback;
-  if (typeof person === "string") {
-    const s = person.trim();
-    if (!s) return fallback;
-    return isEmail(s) ? nomDepuisEmail(s) : s;
-  }
-  const complet =
-    person.full_name?.trim() ||
-    person.nom_complet?.trim() ||
-    person.name?.trim() ||
-    [person.first_name, person.last_name].filter((x) => x && x.trim()).join(" ").trim();
-  if (complet) return isEmail(complet) ? nomDepuisEmail(complet) : complet;
-  return person.email ? nomDepuisEmail(person.email) : fallback;
+/** Infobulle : nom affichable + e-mail (l'e-mail n'apparaît qu'ici). */
+export function personTitle(t: T, person: PersonLike | null | undefined): string {
+  const nom = displayName(t, person);
+  const mail = (person?.email ?? "").trim();
+  return mail ? `${nom} — ${mail}` : nom;
+}
+
+/** Teinte d'avatar stable (0-359) dérivée du nom, pour distinguer deux « CA ». */
+export function avatarHue(nom: string): number {
+  let h = 0;
+  for (let i = 0; i < nom.length; i += 1) h = (h * 31 + nom.charCodeAt(i)) % 360;
+  return h;
+}
+
+/** Style d'avatar : variable CSS `--avatar-h` (teinte), consommée par `.compte-avatar` / `.kb-avatar`. */
+export function avatarStyle(nom: string): CSSProperties {
+  return { "--avatar-h": avatarHue(nom) } as CSSProperties;
 }

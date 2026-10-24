@@ -8,7 +8,7 @@ import { api } from "../api/client";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, Menu, notify, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
-import { displayName } from "../lib/people";
+import { nomPersonne, nombre } from "../components/sections/affichage";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   IndicateursHse,
@@ -36,7 +36,6 @@ import {
 import { EnvironnementSection, IndicateursHseSection, RevueDirectionSection } from "../components/hse/HseEnvironnementSection";
 import { EcartsM7Sections } from "../components/hse/EcartsM7Section";
 import { useListeHse } from "../components/hse/listesHse";
-import { nombre } from "../components/sections/affichage";
 import { describeError } from "../lib/offlineQueue";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
@@ -223,7 +222,7 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
       </div>
       {inc.enqueteur_name || inc.actions_count > 0 ? (
         <div className="meta muted">
-          {inc.enqueteur_name ? `${t("hse.enqueteur")} : ${displayName(inc.enqueteur_name)}` : ""}
+          {inc.enqueteur_name ? `${t("hse.enqueteur")} : ${nomPersonne(t, inc.enqueteur_name)}` : ""}
           {inc.enqueteur_name && inc.actions_count > 0 ? " · " : ""}
           {inc.actions_count > 0 ? t("revueR3.hse.actions", { count: inc.actions_count }) : ""}
         </div>
