@@ -32,7 +32,7 @@ export function valeurScalaire(t: T, i18nExists: (k: string) => boolean, p: Pick
   if (!v) return "—";
   const u = uniteCle(p.unite);
   if (u === "rôles" || u === "roles") return v.split(/\s*,\s*/).filter(Boolean).map((r) => roleLabel(t, r)).join(", ");
-  if (p.type_valeur === "texte") return v;
+  if (p.type_valeur === "texte") return texteLisible(t, i18nExists, v);
   if (UNITES_BOOLEENNES.has(u)) {
     return optionPourValeur(p.label, v) ?? (Number(v) ? t("premiumParams.valeur.oui") : t("premiumParams.valeur.non"));
   }
