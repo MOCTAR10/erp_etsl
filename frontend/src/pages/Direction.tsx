@@ -130,6 +130,13 @@ export function DirectionPage() {
   // Héros 3 — sécurité.
   const jsa = p.hse.jours_sans_accident;
   const securiteTone = jsa === null ? "ok" : jsa < 30 ? "err" : jsa < 90 ? "warn" : "ok";
+  // Pastille Sécurité explicite (A-09) : « Objectif non atteint (3 accidents) » plutôt qu'un
+  // « Sous l'objectif » ambigu à côté de « 83 jours sans accident ».
+  const accidents = p.hse.accidents;
+  const securiteStatut = accidents
+    ? t("premiumPilotage.direction.securite.nonAtteint", { count: accidents })
+    : t("premiumPilotage.direction.securite.atteint");
+  const securiteBadge = accidents ? (securiteTone === "err" ? "err" : "warn") : "ok";
   // Héros 4 — clôtures mensuelles dans les délais.
   const j4 = d.controle_gestion.conformite_j4;
   const clotureTaux = j4.taux * 100;
@@ -185,7 +192,7 @@ export function DirectionPage() {
           gauge={{ value: dispo, target: OBJECTIF_DISPO.ok, ok: OBJECTIF_DISPO.ok, warn: OBJECTIF_DISPO.warn, label: t("direction.heroDispo") }}
           foot={
             <>
-              <span>{t("direction2.objectif", { n: OBJECTIF_DISPO.ok })}</span>
+              <span>{t("premiumPilotage.direction.objectif", { valeur: formatPercent(OBJECTIF_DISPO.ok) })}</span>
               <span className={`dir-delta tone-${dispoTone}`}>{ecart(dispoEcart)}</span>
             </>
           }
@@ -196,12 +203,14 @@ export function DirectionPage() {
           label={t("direction.heroSecurite")}
           value={jsa === null ? formatNumber(p.hse.accidents) : formatNumber(jsa)}
           unit={jsa === null ? t("direction2.securite.accidents", { count: p.hse.accidents }) : t("direction2.securite.jours", { count: jsa })}
-          tone={securiteTone}
-          status={statut(securiteTone)}
+          tone={securiteBadge}
+          status={securiteStatut}
           foot={
             <>
               <span>{t("direction2.securite.objectif")}</span>
-              <span className={`dir-delta tone-${securiteTone}`}>{statut(securiteTone)}</span>
+              <span className={`dir-delta tone-${securiteBadge}`}>
+                {t("premiumPilotage.direction.securite.declares", { count: accidents })}
+              </span>
             </>
           }
           hint={
@@ -219,7 +228,7 @@ export function DirectionPage() {
           gauge={{ value: clotureTaux, target: OBJECTIF_CLOTURE.ok, ok: OBJECTIF_CLOTURE.ok, warn: OBJECTIF_CLOTURE.warn, label: t("direction2.cloture.label") }}
           foot={
             <>
-              <span>{t("direction2.objectif", { n: OBJECTIF_CLOTURE.ok })}</span>
+              <span>{t("premiumPilotage.direction.objectif", { valeur: formatPercent(OBJECTIF_CLOTURE.ok) })}</span>
               <span className={`dir-delta tone-${clotureTone}`}>{ecart(Math.round(clotureTaux - OBJECTIF_CLOTURE.ok))}</span>
             </>
           }

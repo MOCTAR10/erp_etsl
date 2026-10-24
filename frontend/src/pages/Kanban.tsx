@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
-import { CalendarClock, Check, FileText, Inbox, UserRound, XCircle } from "lucide-react";
+import { CalendarClock, Check, FileText, Inbox, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
+import { avatarStyle, displayName, personInitials, personTitle } from "../lib/people";
 import { cleanLabel } from "../components/workflow/libelle";
 import { ConfirmDialog, useServerAction } from "../components/workflow/actions";
 import { Badge, Board, BoardCard, BoardColumn, EmptyState, ErrorState, Menu, PageHeader, BoardSkeleton } from "../components/ui";
@@ -26,8 +27,14 @@ function groupByStatus(tasks: WorkflowTask[]): Record<TaskStatus, WorkflowTask[]
   return groups;
 }
 
-/** Carte de tâche sobre : document, circuit / étape, échéance ; une action principale et le menu ⋯. */
-function TaskCard({ task, locale, index }: { task: WorkflowTask; locale: string; index: number }) {
+/** Champs facultatifs servis par l'API (nom de l'assigné, étape) au-delà du type de base. */
+type TaskRow = WorkflowTask & { step?: number | null; assigned_to_name?: string | null };
+
+/**
+ * Carte de tâche sobre : document, circuit / étape, échéance ; une action principale et le menu ⋯.
+ * L'assigné est un nom (ou le rôle de l'étape), jamais un e-mail (A-03) : l'e-mail reste dans l'infobulle.
+ */
+function TaskCard({ task, locale, index, stepRoles }: { task: TaskRow; locale: string; index: number; stepRoles: Map<number, string> }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [rejet, setRejet] = useState(false);
@@ -57,12 +64,24 @@ function TaskCard({ task, locale, index }: { task: WorkflowTask; locale: string;
           {formatDate(task.due_date, locale)}
         </span>
         {overdue ? <Badge tone="err">{t("kanban.overdue")}</Badge> : null}
-        {task.assigned_to_email ? (
-          <span className="kb-assignee" title={task.assigned_to_email}>
-            <UserRound size={13} aria-hidden />
-            <span className="sr-only">{t("kanban.assigned")} : </span>
-            <span className="kb-assignee-mail">{task.assigned_to_email}</span>
-          </span>
+        {task.assigned_to ? (
+          (() => {
+            const person = {
+              name: task.assigned_to_name,
+              role: task.step != null ? stepRoles.get(task.step) : undefined,
+              email: task.assigned_to_email,
+            };
+            const nom = displayName(t, person);
+            return (
+              <span className="kb-assignee" title={personTitle(t, person)}>
+                <span className="kb-avatar" aria-hidden style={avatarStyle(nom)}>
+                  {personInitials(t, person)}
+                </span>
+                <span className="sr-only">{t("kanban.assigned")} : </span>
+                <span className="kb-assignee-mail">{nom}</span>
+              </span>
+            );
+          })()
         ) : null}
       </div>
       {ouverte ? (
@@ -98,6 +117,15 @@ export function KanbanPage() {
     queryKey: ["tasks"],
     queryFn: api.tasks,
   });
+  // Rôle d'acteur de chaque étape : libellé de repli de l'assigné quand son nom n'est pas servi.
+  const circuits = useQuery({ queryKey: ["kanban-circuits"], queryFn: api.circuits, staleTime: 5 * 60_000 });
+  const stepRoles = new Map<number, string>();
+  for (const c of circuits.data ?? []) {
+    for (const st of c.steps) {
+      const role = (st as { actor_role?: string }).actor_role;
+      if (role) stepRoles.set(st.id, role);
+    }
+  }
 
   const header = (n?: number) => (
     <PageHeader title={t("kanban.title")} subtitle={n === undefined ? t("kanban2.sub") : n === 0 ? t("kanban2.aucune") : t("kanban2.total", { count: n })} />
@@ -130,7 +158,7 @@ export function KanbanPage() {
             ) : (
               <AnimatePresence initial={false}>
                 {groups[col.status].map((task, i) => (
-                  <TaskCard key={task.id} task={task} locale={i18n.language} index={i} />
+                  <TaskCard key={task.id} task={task} locale={i18n.language} index={i} stepRoles={stepRoles} />
                 ))}
               </AnimatePresence>
             )}

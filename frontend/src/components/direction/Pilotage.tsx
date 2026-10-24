@@ -3,7 +3,7 @@ import { Lock, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber, formatPercent } from "../../lib/format";
@@ -28,8 +28,19 @@ function Tresorerie({ p }: { p: Pilotage }) {
   const { t } = useTranslation();
   const c = paletteFor(useThemeMode());
   const cf = p.cashflow;
-  const data = cf.semaines.map((s) => ({ ...s, id: s.semaine, label: `S${s.semaine}`, solde: num(s.solde_fin) ?? 0 }));
+  const data = cf.semaines.map((s) => ({
+    ...s,
+    id: s.semaine,
+    label: `S${s.semaine}`,
+    solde: num(s.solde_fin) ?? 0,
+    // Semaine sans aucun mouvement : « — » en gris plutôt que trois « 0 FCFA » (A-08).
+    vide: !num(s.encaissements) && !num(s.decaissements),
+  }));
   const tension = data.filter((s) => s.solde < 0).length;
+  const flux = (s: (typeof data)[number], v: string | number) => (s.vide ? <span className="muted">—</span> : formatMoney(v));
+  // Largeur de l'axe Y : graduations exactes groupées (« 900 000 000 »), unité en titre d'axe.
+  const maxAbs = Math.max(1, ...data.map((s) => Math.abs(s.solde)));
+  const axisWidth = Math.min(110, 14 + formatNumber(maxAbs).length * 6.4);
   const columns: GridColumn<(typeof data)[number]>[] = [
     {
       key: "semaine",
@@ -40,9 +51,9 @@ function Tresorerie({ p }: { p: Pilotage }) {
         </>
       ),
     },
-    { key: "enc", header: t("ecarts_cd.cashflow.encaissements"), num: true, render: (s) => formatMoney(s.encaissements) },
-    { key: "dec", header: t("ecarts_cd.cashflow.decaissements"), num: true, render: (s) => formatMoney(s.decaissements) },
-    { key: "flux", header: t("ecarts_cd.cashflow.flux"), num: true, render: (s) => formatMoney(s.flux_net) },
+    { key: "enc", header: t("ecarts_cd.cashflow.encaissements"), num: true, render: (s) => flux(s, s.encaissements) },
+    { key: "dec", header: t("ecarts_cd.cashflow.decaissements"), num: true, render: (s) => flux(s, s.decaissements) },
+    { key: "flux", header: t("ecarts_cd.cashflow.flux"), num: true, render: (s) => flux(s, s.flux_net) },
     {
       key: "solde",
       header: t("ecarts_cd.cashflow.solde"),
@@ -50,7 +61,7 @@ function Tresorerie({ p }: { p: Pilotage }) {
       render: (s) => (
         <span className="dir-solde">
           {s.solde < 0 ? <Badge tone="err">{t("ecarts_cd.cashflow.tension")}</Badge> : null}
-          {formatMoney(s.solde_fin)}
+          <span className={s.vide ? "muted" : undefined}>{formatMoney(s.solde_fin)}</span>
         </span>
       ),
     },
@@ -64,9 +75,12 @@ function Tresorerie({ p }: { p: Pilotage }) {
       </dl>
       <p className="dir-note">{t("direction2.tresorerie.note")}</p>
       {data.length ? (
-        <div className="dir-chart" role="img" aria-label={t("direction2.tresorerie.graphe")}>
+        <div className="dir-chart dir-chart-axis" role="img" aria-label={t("direction2.tresorerie.graphe")}>
+          <span className="dir-chart-unit" aria-hidden>
+            {t("premiumPilotage.direction.axeFcfa")}
+          </span>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="dir-cf" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={c.brand} stopOpacity={0.16} />
@@ -75,7 +89,17 @@ function Tresorerie({ p }: { p: Pilotage }) {
               </defs>
               <CartesianGrid stroke={c.border} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="label" stroke={c.textMuted} fontSize={11} tickLine={false} axisLine={false} interval={0} />
-              <ReferenceLine y={0} stroke={c.err} strokeDasharray="4 4" />
+              <YAxis
+                stroke={c.textMuted}
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                width={axisWidth}
+                tickCount={5}
+                domain={["auto", "auto"]}
+                tickFormatter={(v: number) => formatNumber(v)}
+              />
+              {tension ? <ReferenceLine y={0} stroke={c.err} strokeDasharray="4 4" /> : null}
               <Tooltip
                 contentStyle={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 8, color: c.text, fontSize: 12 }}
                 formatter={(v) => [formatMoney(Number(v)), t("ecarts_cd.cashflow.solde")]}

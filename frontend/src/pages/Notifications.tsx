@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BellOff, CheckCheck } from "lucide-react";
+import { ArrowRight, BellOff, CheckCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import { Badge, DataGrid, ErrorState, PageHeader, notify } from "../components/ui";
+import { Badge, DataGrid, EmptyState, ErrorState, PageHeader, notify } from "../components/ui";
 import type { BadgeTone, GridColumn } from "../components/ui";
 import { formatDateTime } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
@@ -27,6 +28,11 @@ export function NotificationsPage() {
     queryKey: ["notifications"],
     queryFn: api.notifications,
   });
+  // Boîte vide : on oriente vers les validations en retard plutôt qu'un écran « non branché » (A-05).
+  const taches = useQuery({ queryKey: ["tasks"], queryFn: api.tasks, staleTime: 60_000 });
+  const enRetard = (taches.data ?? []).filter(
+    (tk) => (tk.status === "pending" || tk.status === "delegated") && new Date(tk.due_date) < new Date(),
+  ).length;
 
   const lire = useMutation({
     mutationFn: (id: string) => api.post<NotificationItem>(`/api/workflow/notifications/${id}/mark_read/`),
@@ -117,17 +123,33 @@ export function NotificationsPage() {
             ))}
           </div>
         </div>
-        <DataGrid
-          columns={columns}
-          rows={rows}
-          loading={isLoading}
-          caption={t("notifications.title")}
-          initialSort={{ id: "recue", desc: true }}
-          emptyIcon={BellOff}
-          emptyLabel={filtre === "non_lues" ? t("shell.notif.videNonLues") : t("shell.notif.vide")}
-          emptyHint={filtre === "non_lues" ? undefined : t("shell.notif.videAide")}
-          rowActions={(n) => (n.is_read ? [] : [{ label: t("shell.notif.marquerLu"), icon: CheckCheck, onSelect: () => lire.mutate(n.id) }])}
-        />
+        {!isLoading && all.length === 0 ? (
+          <EmptyState
+            icon={BellOff}
+            label={t("shell.notif.vide")}
+            hint={t("shell.notif.videAide")}
+            action={
+              enRetard ? (
+                <Link className="btn" to="/kanban">
+                  {t("premiumPilotage.notifications.voirRetards", { count: enRetard })}
+                  <ArrowRight size={15} aria-hidden />
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <DataGrid
+            columns={columns}
+            rows={rows}
+            loading={isLoading}
+            caption={t("notifications.title")}
+            initialSort={{ id: "recue", desc: true }}
+            emptyIcon={BellOff}
+            emptyLabel={filtre === "non_lues" ? t("shell.notif.videNonLues") : t("shell.notif.vide")}
+            emptyHint={filtre === "non_lues" ? undefined : t("shell.notif.videAide")}
+            rowActions={(n) => (n.is_read ? [] : [{ label: t("shell.notif.marquerLu"), icon: CheckCheck, onSelect: () => lire.mutate(n.id) }])}
+          />
+        )}
       </div>
     </div>
   );

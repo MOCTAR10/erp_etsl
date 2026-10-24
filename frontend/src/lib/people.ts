@@ -7,6 +7,8 @@
  *   const { t } = useTranslation();
  *   displayName(t, user)        // « Awa Ndong » | « Secrétaire général » | « Utilisateur »
  *   personInitials(t, user)     // « AN » | « SG »
+ *   personTitle(t, user)        // « Awa Ndong — awa@etls.local » (infobulle : seul endroit où l'e-mail apparaît)
+ *   avatarStyle(nom)            // style={…} : teinte d'avatar stable dérivée du nom
  *
  * `user` est n'importe quel objet « personne » (`PersonLike`) : champs facultatifs, plusieurs
  * conventions de nommage du backend acceptées.
@@ -20,6 +22,8 @@
  * Un « nom » qui ressemble à un e-mail (contient « @ ») est ignoré : l'e-mail n'est donc jamais
  * affiché comme nom. Pour le garder accessible, le mettre en `title` (cf. `personTitle`).
  */
+import type { CSSProperties } from "react";
+
 import { initiales, roleLabel } from "./roles";
 
 /** Fonction de traduction (forme minimale de `t`, cf. `useTranslation`). */
@@ -67,4 +71,9 @@ export function avatarHue(nom: string): number {
   let h = 0;
   for (let i = 0; i < nom.length; i += 1) h = (h * 31 + nom.charCodeAt(i)) % 360;
   return h;
+}
+
+/** Style d'avatar : variable CSS `--avatar-h` (teinte), consommée par `.compte-avatar` / `.kb-avatar`. */
+export function avatarStyle(nom: string): CSSProperties {
+  return { "--avatar-h": avatarHue(nom) } as CSSProperties;
 }

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Archive, FileText, ListChecks, SlidersHorizontal, Timer } from "lucide-react";
+import { AlertTriangle, Archive, ArrowRight, FileText, ListChecks, SlidersHorizontal, Timer } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
@@ -16,10 +16,16 @@ import { useAuth } from "../store/auth";
 /** Rôles qui voient le bandeau « paramètres provisoires à confirmer par ETSL » (écarts transverses). */
 const ROLES_PARAMETRES = ["admin", "pdg", "dga", "direction"];
 /** Longueur maximale d'un libellé d'axe (le libellé complet reste dans l'infobulle). */
-const MAX_LABEL = 30;
+const MAX_LABEL = 32;
+/** Rôles à qui l'accueil propose l'accès direct à la vue Direction / BI (A-01). */
+const ROLES_VUE_DIRECTION = ["admin", "pdg", "dga", "direction"];
 const BAR_ROW = 34;
 
-const court = (s: string) => (s.length > MAX_LABEL ? `${s.slice(0, MAX_LABEL - 1).trimEnd()}…` : s);
+/** Libellé d'axe court : sans la précision entre parenthèses (« Pièces d'achat (BC, réception…) » → « Pièces d'achat »). */
+const court = (s: string) => {
+  const base = s.replace(/\s*\([^)]*\)?\s*$/, "").trim() || s;
+  return base.length > MAX_LABEL ? `${base.slice(0, MAX_LABEL - 1).trimEnd()}…` : base;
+};
 
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
@@ -37,7 +43,20 @@ export function DashboardPage() {
     retry: 0,
   }).data;
 
-  const header = <PageHeader title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} />;
+  const header = (
+    <PageHeader
+      title={t("dashboard.title")}
+      subtitle={t("dashboard.subtitle")}
+      actions={
+        ROLES_VUE_DIRECTION.includes(role) ? (
+          <Link className="btn" to="/direction">
+            {t("premiumPilotage.dashboard.vueDirection")}
+            <ArrowRight size={15} aria-hidden />
+          </Link>
+        ) : undefined
+      }
+    />
+  );
   if (isLoading)
     return (
       <>
@@ -139,7 +158,7 @@ export function DashboardPage() {
                   <YAxis
                     type="category"
                     dataKey="name"
-                    width={210}
+                    width={220}
                     tickLine={false}
                     axisLine={false}
                     stroke={c.textMuted}
