@@ -1064,6 +1064,12 @@
     flex-direction: column;
     gap: var(--space-4);
   }
+  .card.mdp-card {
+    max-width: 560px;
+  }
+  .mdp-form .field {
+    margin-bottom: 0;
+  }
   .mdp-form .field input {
     width: 100%;
     padding-right: 44px;
