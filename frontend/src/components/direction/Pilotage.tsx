@@ -80,7 +80,7 @@ function Tresorerie({ p }: { p: Pilotage }) {
             {t("premiumPilotage.direction.axeFcfa")}
           </span>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 28, right: 12, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="dir-cf" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={c.brand} stopOpacity={0.16} />
