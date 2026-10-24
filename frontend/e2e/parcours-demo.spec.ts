@@ -71,8 +71,12 @@ test.describe("Parcours démo : direction", () => {
     await expect(budget.getByRole("button", { name: "Clôturer" })).toBeVisible();
 
     // Carte « Écarts > 10 % à analyser » : la colonne Échéance porte la date de l'analyse attendue.
-    const ecarts = page.locator(".card:not(:has(.card))", { hasText: "Écarts > 10 % à analyser" })
-      .getByRole("row", { name: new RegExp(AFFAIRE_CHANTIER) });
+    const carteEcarts = page.locator(".card:not(:has(.card))", { hasText: "Écarts > 10 % à analyser" });
+    // Liste bornée aux écarts les plus forts : « Voir les N écarts » déplie le reste (revue design #81).
+    const toutVoir = carteEcarts.getByRole("button", { name: /^Voir les \d+ écarts$/ });
+    await expect(carteEcarts.getByRole("table")).toBeVisible();
+    if (await toutVoir.isVisible()) await toutVoir.click();
+    const ecarts = carteEcarts.getByRole("row", { name: new RegExp(AFFAIRE_CHANTIER) });
     await expect(ecarts.first()).toBeVisible();
     await expect(ecarts.first()).toContainText(/[-−]\d+([.,]\d+)?\s?%/);
   });
