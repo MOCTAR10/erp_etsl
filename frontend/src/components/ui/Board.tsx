@@ -141,6 +141,8 @@ export function BoardColumn({
   const visible = shown === undefined ? cards : cards.slice(0, shown);
   const hidden = cards.length - visible.length;
   const empty = cards.length === 0;
+  // Colonne à 0 (même si la page y pose son propre état vide) : largeur réduite.
+  const zero = empty || count === 0;
   const titleId = useId();
   const bodyRef = useRef<HTMLDivElement>(null);
   const overflow = useOverflowY(bodyRef, visible.length);
@@ -150,7 +152,7 @@ export function BoardColumn({
       initial={{ opacity: 0, y: motionTokens.distance.xs }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: motionTokens.duration.fast, ease: motionTokens.ease.out, delay }}
-      className={`board-col${empty ? " is-empty" : ""}`}
+      className={`board-col${zero ? " is-empty" : ""}`}
     >
       <div className="board-col-head">
         <span className="title">

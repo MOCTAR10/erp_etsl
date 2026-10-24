@@ -694,17 +694,10 @@ h3 {
    (largeur estimée --kpi-em posée par Kpi.tsx, 46 px réservés à « FCFA » en 14 px). Seule la coupure
    entre le nombre et l'unité reste permise. */
 .kpi-value.kpi-value-fit {
-  font-size: clamp(15px, calc((100cqi - 46px) / var(--kpi-em, 9)), var(--kpi-fit-max, 28px));
+  font-size: clamp(15px, calc((100cqi - 48px) / var(--kpi-em, 9)), var(--kpi-fit-max, 28px));
   white-space: normal;
 }
-.kpi-value.kpi-value-fit .ui-kpi-unit {
-  font-size: 14px;
-}
-
-/* B16 : carte sans indication → la valeur se cale en bas (hauteurs homogènes, plus de vide sous le chiffre). */
-.kpi:not(:has(.kpi-hint)) > .kpi-value {
-  margin-top: auto;
-}
+/* (taille de l'unité : primitives.css, `.kpi-value-fit .ui-kpi-unit`) */
 
 .kpi-hint {
   margin-top: auto;

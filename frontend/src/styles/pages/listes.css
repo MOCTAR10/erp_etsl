@@ -195,7 +195,8 @@
     padding-block: var(--space-1);
   }
   .board-col.is-empty .board-empty,
-  .board-col.is-empty .board-col-summary {
+  .board-col.is-empty .board-col-summary,
+  .board-col.is-empty .board-col-body:has(> .empty-state:only-child) {
     display: none;
   }
   .board-col-body {
