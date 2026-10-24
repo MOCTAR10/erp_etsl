@@ -815,6 +815,19 @@
   .matrice-non {
     color: var(--border-strong);
   }
+  /* Mobile : le libellé de rôle passe à la ligne (colonne collante étroite) pour laisser voir les modules ;
+     la matrice défile dans son cadre, aucune valeur n'est coupée. */
+  @media (max-width: 640px) {
+    .table.matrice tbody th {
+      white-space: normal;
+      min-width: 8.5rem;
+      max-width: 9.5rem;
+      line-height: 1.3;
+    }
+    .table.matrice th.matrice-mod {
+      min-width: 4.5rem;
+    }
+  }
 
   /* Pages de la coquille : cartes espacées, en-têtes de carte qui passent à la ligne sans écraser les actions. */
   .shell-page > * + .card {
