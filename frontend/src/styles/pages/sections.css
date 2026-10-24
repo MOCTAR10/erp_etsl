@@ -445,4 +445,18 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
+
+/* Carte d'incident HSE : actions de workflow à gauche, menu « ⋯ » (NCR, PDF) aligné en bas à droite, sur la même rangée. */
+.r3-card-actions:has(> .action-bar) {
+  flex-wrap: nowrap;
+  align-items: flex-end;
+}
+.r3-card-actions > .action-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+}
+.r3-card-actions > .action-bar ~ * {
+  flex: none;
+}
 }
