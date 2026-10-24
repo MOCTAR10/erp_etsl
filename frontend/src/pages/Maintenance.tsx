@@ -113,6 +113,13 @@ export function MaintenancePage() {
   const lang = i18n.language;
 
   const stats = useQuery({ queryKey: ["maintenance-stats"], queryFn: api.maintenanceStats });
+  // Coût annuel (même requête et même cache que « Coûts par centre analytique ») : le KPI des OT ouverts ne le contredit plus.
+  const annee = String(new Date().getFullYear());
+  const coutsAnnuels = useQuery({
+    queryKey: ["m5m8", "couts-maint", annee],
+    queryFn: () => api.get<{ total: string }>(`/api/maintenance/ordres/couts-annuels/?annee=${annee}`),
+    retry: 0,
+  });
 
   // Tableau des actifs paginé ; liste complète (toutes les pages) pour le formulaire et le décompte des arrêts.
   const [actifSite, setActifSite] = useState("");
@@ -162,9 +169,6 @@ export function MaintenancePage() {
   const groups = ordres.data;
   const inspectionsAll = inspections.rows;
   const arrete = actifsChoix.filter((a) => a.en_arret).length;
-  const ouvertNonClos = Object.entries(groups)
-    .filter(([k]) => !["cloture", "archive", "annule"].includes(k))
-    .reduce((sum, [, arr]) => sum + arr.length, 0);
 
   const actifColumns: Column<Actif>[] = [
     { key: "code", header: t("maintenance.col.code"), sortValue: (a) => a.code, render: (a) => <span className="cell-nowrap">{a.code}</span> },
@@ -175,7 +179,11 @@ export function MaintenancePage() {
       render: (a) => (
         <>
           {a.designation} {a.is_global_rental && <Badge tone="brand">{t("maintenance.GR")}</Badge>}
-          {a.signe_618 && <Badge tone="neutral">{t("maintenance.cpt618")}</Badge>}
+          {a.signe_618 && (
+            <span className="cell-sub" title={t("tableaux.logistique.compte618")}>
+              {t("premiumModules.compte618")}
+            </span>
+          )}
         </>
       ),
     },
@@ -252,7 +260,19 @@ export function MaintenancePage() {
         <Kpi label={t("maintenance.otOuverts")} value={s.ot_ouverts} hint={t("revueR2.maintenance.hintOuverts", { enCours: formatNumber(s.ot_en_cours), count: s.ot_critiques })} icon={Wrench} tone="brand" delay={0} />
         <Kpi label={t("maintenance.actifsArret")} value={arrete || s.actifs_arret} hint={t("revueR2.maintenance.hintArret", { n: formatNumber(s.actifs_operationnels) })} icon={Hammer} tone="warn" delay={0.05} />
         <Kpi label={t("maintenance.inspectionsPrevues")} value={s.inspections_prevues} hint={t("revueR2.maintenance.hintInspections", { h: formatNumber(s.heures_total) })} icon={ClipboardCheck} tone="accent" delay={0.1} />
-        <Kpi label={t("maintenance.coutTotal")} value={s.cout_total} kind="money" hint={t("revueR2.maintenance.hintCout", { n: formatNumber(actifs.count) })} icon={Coins} tone="brand" delay={0.15} />
+        <Kpi
+          label={t("premiumModules.maintenance.coutOuverts")}
+          value={s.cout_total}
+          kind="money"
+          hint={
+            coutsAnnuels.data
+              ? t("premiumModules.maintenance.hintCoutAnnuel", { montant: formatMoney(coutsAnnuels.data.total), annee })
+              : t("revueR2.maintenance.hintCout", { n: formatNumber(actifs.count) })
+          }
+          icon={Coins}
+          tone="brand"
+          delay={0.15}
+        />
       </div>
 
       <section className="listes-block">
@@ -268,7 +288,6 @@ export function MaintenancePage() {
             </BoardColumn>
           ))}
         </Board>
-        {ouvertNonClos > 0 ? <p className="listes-note">{t("maintenance.pendingNote")}</p> : null}
       </section>
 
       <SectionCard

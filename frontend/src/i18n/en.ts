@@ -4685,6 +4685,87 @@ export const en = {
       libelle: "{{label}}: ",
     },
   },
+  // Premium elevation — business modules ("modules" workstream): strings added by this workstream only.
+  premiumModules: {
+    scelle: { label: "Sealed", title: "SHA-256 fingerprint: {{sha}}" },
+    compte618: "Account 618",
+    methode: "Calculation method",
+    unites: {
+      kg_one: "kg", kg_other: "kg", t_one: "tonne", t_other: "tonnes", l_one: "litre", l_other: "litres",
+      unite_one: "unit", unite_other: "units",
+    },
+    maintenance: { coutOuverts: "Cost of open work orders", hintCoutAnnuel: "{{montant}} over {{annee}}" },
+    charge: {
+      sousTitre: "Weeks from {{debut}} to {{fin}}",
+      voirDetail: "Show details ({{count}})",
+      semaines_one: "{{count}} overloaded week",
+      semaines_other: "{{count}} overloaded weeks",
+      prochaine: "next: week of {{date}}",
+      carteAria_one: "{{ressource}}: {{count}} overloaded week, peak {{pic}}",
+      carteAria_other: "{{ressource}}: {{count}} overloaded weeks, peak {{pic}}",
+      sansSurcharge: "Week of {{date}}: no overload",
+      pic: "Peak +{{pct}}",
+      legende0: "No overload",
+      legende1: "Under +50%",
+      legende2: "+50% to +200%",
+      legende3: "Above +200%",
+      legendeNow: "Current week",
+    },
+    hse: { plusActions: "More actions — {{code}}" },
+    facture: {
+      apercu: "Invoice template preview",
+      titre: "INVOICE",
+      numero: "No. FC-0000 · issue date",
+      designation: "Description",
+      quantite: "Qty",
+      montant: "Amount",
+    },
+    champsErp: {
+      date: "Date", debit: "Debit", credit: "Credit", piece: "Document no.", tiers: "Third-party account", compte: "General account",
+      journal: "Journal code", libelle: "Description", analytique: "Analytical section", montant: "Amount", reference: "Reference",
+      devise: "Currency", echeance: "Due date",
+    },
+    reporting: {
+      voirInactifs_one: "+ {{count}} idle asset",
+      voirInactifs_other: "+ {{count}} idle assets",
+      masquerInactifs: "Hide idle assets",
+    },
+    rh: { declarations: "Filings", deposees: "{{n}} / {{total}} filed" },
+    terrain: {
+      appareil: "On this device",
+      enAttente: "Pending entries",
+      ordres: "Work orders",
+      permis: "Permits",
+      receptions: "Receipts",
+      jamaisSync: "Not synchronised on this device yet.",
+    },
+    // Reference-data labels translated by code (the server label stays as fallback).
+    ref: {
+      procede: { smaw: "SMAW (stick electrode)", gtaw: "GTAW (TIG)", gmaw: "GMAW (MIG/MAG)", fcaw: "FCAW (flux-cored wire)" },
+      contrat: {
+        marche_travaux: "Works contract", maintenance: "Maintenance contract", prestation: "Service agreement",
+        bail: "Lease", partenariat: "Partnership / cooperation", avenant: "Amendment", autre: "Other",
+      },
+      caution: {
+        bon_soumission: "Bid bond", bonne_execution: "Performance bond", avance: "Advance payment bond",
+        retenue: "Retention bond",
+      },
+      assurance: {
+        rc_pro: "Professional liability", tous_risques: "Contractors' all risks", flotte: "Vehicle fleet",
+        engins: "Plant & equipment", bris_machine: "Machinery breakdown", vie_groupe: "Group life / welfare",
+        multirisque: "Building multi-risk", autre: "Other",
+      },
+      phase: {
+        pre_contentieux: "Pre-litigation / formal notice", tribunal: "Court proceedings", arbitrage: "Arbitration", appel: "Appeal",
+      },
+      sens: { entrant: "Incoming", sortant: "Outgoing" },
+      reunion: {
+        comite_direction: "Management committee", revue_chantier: "Site meeting", revue_atelier: "Workshop meeting",
+        revue_qualite: "Quality review", securite: "Safety meeting (HSE)", retroplanning: "Schedule review",
+        lancement: "Project kick-off meeting (CRRL)", autre: "Other",
+      },
+    },
+  },
 } as const;
 
 export default en;

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { useSiteOptions } from "../components/sites/SiteFilter";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
+import { nomPersonne } from "../components/sections/affichage";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
@@ -240,7 +241,7 @@ export function StocksPage() {
           {c.date_validation ? (
             <>
               {formatDate(c.date_validation)}
-              {c.valide_par_name ? <span className="cell-sub">{c.valide_par_name}</span> : null}
+              {c.valide_par_name ? <span className="cell-sub">{nomPersonne(t, c.valide_par_name)}</span> : null}
             </>
           ) : (
             <Badge tone="warn">{t("m5e.cert.aValider")}</Badge>

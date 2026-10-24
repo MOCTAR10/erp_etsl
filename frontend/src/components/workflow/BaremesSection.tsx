@@ -138,7 +138,7 @@ export function BaremesSection() {
                   </div>
                 </td>
                 <td>
-                  <Badge tone={b.nature === "salariale" ? "brand" : "warn"}>{b.nature_label}</Badge>
+                  <Badge tone={b.nature === "salariale" ? "brand" : "warn"}>{t(`baremes.${b.nature}`, { defaultValue: b.nature_label })}</Badge>
                 </td>
                 {edit?.url === `/api/rh-paie/baremes/${b.id}/` ? (
                   <>

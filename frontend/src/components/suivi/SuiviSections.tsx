@@ -376,7 +376,7 @@ function GabaritForm({ g }: { g: Gabarit }) {
   return (
     <div data-testid={`gabarit-${g.code}`}>
       <p>
-        <strong>{g.code}</strong> · {g.label}{" "}
+        <strong>{g.label}</strong> <span className="muted">{g.code}</span>{" "}
         <Badge tone={g.est_provisoire ? "warn" : "ok"}>{g.est_provisoire ? t("revueKit.ops.suivi.provisoireCourt") : t("ecarts_suivi.confirme")}</Badge>
       </p>
       <div className="list-toolbar">
@@ -401,7 +401,10 @@ function GabaritForm({ g }: { g: Gabarit }) {
               {champsErp.map((k) => (
                 <tr key={k}>
                   <td className="cell-nowrap">
-                    <label htmlFor={`${uid}-col-${k}`}>{k}</label>
+                    {/* Champ ERP en clair (« Débit », « N° de pièce ») : jamais la clé technique (« debit », « piece »). */}
+                    <label htmlFor={`${uid}-col-${k}`} title={k}>
+                      {t(`premiumModules.champsErp.${k}`, { defaultValue: k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, " ") })}
+                    </label>
                   </td>
                   <td>
                     <input
@@ -503,10 +506,17 @@ export function ImportGrandLivreSection() {
       <div data-testid="lots-import">
         <DataTable columns={lotCols} rows={lots} caption={t("ecarts_suivi.import.title")} />
       </div>
-      <h4>{t("ecarts_suivi.import.gabarit")}</h4>
-      {gabarits.map((g) => (
-        <GabaritForm key={`${g.id}-${g.est_provisoire}`} g={g} />
-      ))}
+      {/* Gabarits d'import / export (paramétrage) repliés : l'écran métier montre d'abord l'import et ses lots. */}
+      {gabarits.length > 0 && (
+        <details className="kit-disclosure r3-repli">
+          <summary>
+            {t("ecarts_suivi.import.gabarit")} · {gabarits.length}
+          </summary>
+          {gabarits.map((g) => (
+            <GabaritForm key={`${g.id}-${g.est_provisoire}`} g={g} />
+          ))}
+        </details>
+      )}
     </SectionCard>
   );
 }

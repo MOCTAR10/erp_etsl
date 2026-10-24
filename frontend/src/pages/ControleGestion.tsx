@@ -17,6 +17,7 @@ import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGri
 import type { Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
+import { nomPersonne } from "../components/sections/affichage";
 import { pagedQuery } from "../lib/usePagedList";
 import type {
   AnalyseEcart,
@@ -233,7 +234,7 @@ export function revisionColumns(t: T): Column<BudgetRevision>[] {
     { key: "code", header: t("controleGestion.col.code"), render: (r) => r.code },
     { key: "budget", header: t("controleGestion.col.budget"), render: (r) => `${r.budget_code} · R${r.numero}` },
     { key: "montant", header: t("controleGestion.col.nouveauMontant"), num: true, render: (r) => money(r.has_amount_access, r.nouveau_montant) },
-    { key: "auteur", header: t("controleGestion.col.auteur"), render: (r) => r.created_by_name ?? "—" },
+    { key: "auteur", header: t("controleGestion.col.auteur"), render: (r) => nomPersonne(t, r.created_by_name) },
     { key: "comment", header: t("controleGestion.col.commentaire"), render: (r) => r.commentaire || "—" },
     {
       key: "statut",
@@ -431,7 +432,6 @@ export function ControleGestionPage() {
         </SectionCard>
       )}
 
-      <p className="muted">{t("controleGestion.pendingNote")}</p>
     </>
   );
 }

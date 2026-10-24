@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { ScelleBadge, nomPersonne } from "../sections/affichage";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, Kpi, Menu, QuickForm, SectionCard } from "../ui";
 import type { ActionDef, Column } from "../ui";
@@ -316,7 +317,7 @@ export function EcartsM3Section() {
       sortValue: (f) => f.statut_label,
       render: (f) => (
         <>
-          <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{statutLabel("fiche", f.statut, f.statut_label)}</Badge> {f.valide_par_nom ?? ""}
+          <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{statutLabel("fiche", f.statut, f.statut_label)}</Badge> {f.valide_par_nom ? nomPersonne(t, f.valide_par_nom) : ""}
         </>
       ),
     },
@@ -646,7 +647,7 @@ export function EcartsM3Section() {
   ];
   const colsDossiers: Column<Dossier>[] = [
     { key: "dossier", header: k("registre.dossier"), sortValue: (d) => d.ordre_code, render: (d) => d.ordre_code },
-    { key: "empreinte", header: k("registre.empreinte"), render: (d) => <code title={d.sha256}>{d.sha256.slice(0, 16)}…</code> },
+    { key: "empreinte", header: k("registre.empreinte"), render: (d) => <ScelleBadge sha={d.sha256} /> },
     { key: "conservation", header: k("registre.conservation"), num: true, render: (d) => t("ecarts_m3.registre.ans", { n: d.retention_years }) },
     { key: "date", header: k("date"), sortValue: (d) => d.created_at, render: (d) => formatDate(d.created_at) },
   ];

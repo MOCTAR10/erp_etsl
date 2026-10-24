@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { InfoFormule, ScelleBadge, nomPersonne } from "../sections/affichage";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
@@ -191,6 +192,7 @@ export function EcartsM4Section() {
   });
 
   const [periode, setPeriode] = useState(moisCourant());
+  const [toutReporting, setToutReporting] = useState(false);
   const reporting = useQuery({
     queryKey: ["m4e", "reporting", periode],
     queryFn: () => api.get<Reporting>(`/api/logistique/equipements/reporting/?periode=${periode}`),
@@ -268,7 +270,7 @@ export function EcartsM4Section() {
     { key: "source", header: t("ecarts_m4.parc.source"), render: (r) => (
         <>
           {r.source ? lbl(`revueR2.logistique.sourceReleve.${r.source}`, r.source_label) : r.source_label}
-          {r.saisi_par_name ? <span className="cell-sub">{r.saisi_par_name}</span> : null}
+          {r.saisi_par_name ? <span className="cell-sub">{nomPersonne(t, r.saisi_par_name)}</span> : null}
         </>
       ),
     },
@@ -293,14 +295,14 @@ export function EcartsM4Section() {
     },
     { key: "date", header: t("ecarts_m4.date"), sortValue: (a) => a.date_audit, render: (a) => formatDate(a.date_audit) },
     { key: "etat", header: t("ecarts_m4.audit.etat"), render: (a) => (a.etat ? lbl(`revueR2.logistique.etatAudit.${a.etat}`, a.etat_label) : a.etat_label) },
-    { key: "empreinte", header: t("ecarts_m4.audit.empreinte"), render: (a) => <code title={a.photo_sha256}>{a.photo_sha256.slice(0, 12)}…</code> },
+    { key: "empreinte", header: t("ecarts_m4.audit.empreinte"), render: (a) => <ScelleBadge sha={a.photo_sha256} /> },
     { key: "conservation", header: t("ecarts_m4.audit.conservation"), sortValue: (a) => a.conserver_jusqu_au, render: (a) => formatDate(a.conserver_jusqu_au) },
   ];
   const colsHistorique: Column<Historique>[] = [
     { key: "equipement", header: t("ecarts_m4.equipement"), sortValue: (h) => h.equipement_code, render: (h) => h.equipement_code },
     { key: "champ", header: t("ecarts_m4.audit.champ"), render: (h) => h.champ },
     { key: "avantApres", header: t("ecarts_m4.audit.avantApres"), render: (h) => `${h.ancienne_valeur || "—"} → ${h.nouvelle_valeur || "—"}` },
-    { key: "par", header: t("ecarts_m4.audit.par"), sortValue: (h) => h.modifie_le, render: (h) => `${h.modifie_par_name ?? "—"} · ${formatDate(h.modifie_le)}` },
+    { key: "par", header: t("ecarts_m4.audit.par"), sortValue: (h) => h.modifie_le, render: (h) => `${nomPersonne(t, h.modifie_par_name)} · ${formatDate(h.modifie_le)}` },
   ];
   const colsLocations: Column<Location>[] = [
     {
@@ -335,10 +337,10 @@ export function EcartsM4Section() {
           {l.bon_commande_code ?? "—"} / {l.facture_code ?? "—"}{" "}
           {l.facture_conforme !== null && (
             <Badge tone={l.facture_conforme ? "ok" : "err"}>{l.facture_conforme ? t("ecarts_m4.commandes.conforme") : t("ecarts_m4.commandes.ecart")}</Badge>
-          )}{" "}
-          <Badge tone="neutral" title={t("tableaux.logistique.compte618")}>
-            618
-          </Badge>
+          )}
+          <span className="cell-sub" title={t("tableaux.logistique.compte618")}>
+            {t("premiumModules.compte618")}
+          </span>
         </span>
       ),
     },
@@ -433,10 +435,11 @@ export function EcartsM4Section() {
       key: "empreinte",
       header: t("ecarts_m4.audit.empreinte"),
       render: (a) => (
-        <>
-          <code title={a.sha256}>{a.sha256.slice(0, 12)}…</code>{" "}
-          <Badge tone={a.integre ? "ok" : "err"}>{a.integre ? t("ecarts_m4.compteurs.integre") : t("ecarts_m4.compteurs.altere")}</Badge>
-        </>
+        a.integre ? (
+          <ScelleBadge sha={a.sha256} />
+        ) : (
+          <Badge tone="err" title={t("premiumModules.scelle.title", { sha: a.sha256 })}>{t("ecarts_m4.compteurs.altere")}</Badge>
+        )
       ),
     },
     { key: "conservation", header: t("ecarts_m4.audit.conservation"), sortValue: (a) => a.conserver_jusqu_au, render: (a) => formatDate(a.conserver_jusqu_au) },
@@ -621,7 +624,12 @@ export function EcartsM4Section() {
       </SectionCard>
 
       <SectionCard
-        title={t("ecarts_m4.compteurs.title")}
+        title={
+          <span className="r3-badges">
+            {t("ecarts_m4.compteurs.title")}
+            <InfoFormule>{t("ecarts_m4.compteurs.formule")}</InfoFormule>
+          </span>
+        }
         actions={
           <SectionActions>
             <QuickForm
@@ -647,13 +655,19 @@ export function EcartsM4Section() {
         <div data-testid="m4-compteurs">
           <p className="muted">{t("ecarts_m4.compteurs.hint")}</p>
           <DataTable columns={colsSuivis} rows={suivis} caption={t("ecarts_m4.compteurs.title")} emptyLabel={t("tableaux.logistique.aucuneLocationActive")} />
-          <p className="muted">{t("ecarts_m4.compteurs.formule")}</p>
           <h4>{t("ecarts_m4.compteurs.archives")}</h4>
           <DataTable columns={colsArchives} rows={archives} caption={t("ecarts_m4.compteurs.archives")} emptyLabel={t("tableaux.logistique.aucuneArchive")} />
         </div>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m4.reporting.title")}>
+      <SectionCard
+        title={
+          <span className="r3-badges">
+            {t("ecarts_m4.reporting.title")}
+            <InfoFormule>{t("ecarts_m4.reporting.formules")}</InfoFormule>
+          </span>
+        }
+      >
         <div data-testid="m4-reporting">
           <div className="field" style={{ maxWidth: 220 }}>
             <label htmlFor="m4-reporting-mois">{t("ecarts_m4.reporting.mois")}</label>
@@ -679,13 +693,20 @@ export function EcartsM4Section() {
                 <span className="muted"> · {t("ecarts_m4.reporting.rentabilite")}</span>{" "}
                 <strong className="num">{reporting.rentabilite_pct === null ? "—" : `${formatNumber(Number(reporting.rentabilite_pct))} %`}</strong>
               </p>
-              <p className="muted">{t("ecarts_m4.reporting.formules")}</p>
               <DataTable
                 columns={colsReporting}
-                rows={reporting.rows.map((r) => ({ ...r, id: r.equipement }))}
+                rows={reporting.rows.filter((r) => toutReporting || r.jours_mobilises > 0).map((r) => ({ ...r, id: r.equipement }))}
                 caption={t("ecarts_m4.reporting.title")}
                 emptyLabel={t("tableaux.logistique.aucunReporting")}
               />
+              {/* Équipements à 0 jour mobilisé (0 % / 0 FCFA) repliés : seule l'activité réelle est listée. */}
+              {reporting.rows.some((r) => r.jours_mobilises <= 0) && (
+                <button type="button" className="btn ghost sm" aria-expanded={toutReporting} onClick={() => setToutReporting((v) => !v)}>
+                  {toutReporting
+                    ? t("premiumModules.reporting.masquerInactifs")
+                    : t("premiumModules.reporting.voirInactifs", { count: reporting.rows.filter((r) => r.jours_mobilises <= 0).length })}
+                </button>
+              )}
             </>
           )}
         </div>

@@ -123,14 +123,14 @@ export function ListesHseSection() {
   const [categorie, setCategorie] = useState<(typeof CATEGORIES)[number]>("type_permis");
   const valeurs = useListe<ValeurListeHse>(`listes-${categorie}`, `/api/hse/listes/?categorie=${categorie}`);
   const columns: Column<ValeurListeHse>[] = [
-    { key: "code", header: t(`${M}.listes.code`), render: (v) => <code>{v.code}</code>, sortValue: (v) => v.code },
     {
+      // Libellé humain seul : le code technique (« hauteur », « confine ») ne sert qu'à l'infobulle.
       key: "libelle",
       header: t(`${M}.listes.libelle`),
       sortValue: (v) => v.libelle,
       render: (v) => (
         <>
-          {v.libelle} {v.gaz_obligatoire && <Badge tone="warn">{t(`${M}.listes.gaz`)}</Badge>}
+          <span title={v.code}>{v.libelle}</span> {v.gaz_obligatoire && <Badge tone="warn">{t(`${M}.listes.gaz`)}</Badge>}
           {v.dangereux && <Badge tone="err">{t(`${M}.listes.dangereux`)}</Badge>}
         </>
       ),

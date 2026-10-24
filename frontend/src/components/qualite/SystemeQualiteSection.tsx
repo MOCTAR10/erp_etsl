@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
+import { nomPersonne } from "../sections/affichage";
 import { describeError } from "../../lib/offlineQueue";
 import { roleLabel } from "../../lib/roles";
 import { SectionActions } from "../sections/SectionActions";
@@ -274,7 +275,7 @@ function ProcessusSection({
       ),
       sortValue: (p) => p.code,
     },
-    { key: "pilote", header: t("m6c.proc.pilote"), render: (p) => p.pilote_nom ?? "—", sortValue: (p) => p.pilote_nom },
+    { key: "pilote", header: t("m6c.proc.pilote"), render: (p) => nomPersonne(t, p.pilote_nom), sortValue: (p) => p.pilote_nom },
     { key: "indicateur", header: t("m6c.proc.indicateur"), render: (p) => p.indicateur || "—" },
     {
       key: "cible",

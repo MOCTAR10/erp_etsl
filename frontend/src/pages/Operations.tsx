@@ -3,11 +3,13 @@ import { CoutMainOeuvreSection } from "../components/rhpaie/EcartsM9bSection";
 import { EcartsM3Section } from "../components/operations/EcartsM3Section";
 import { ConsommationOfSection } from "../components/operations/ConsommationOfSection";
 import { statutLabel } from "../components/operations/outils";
+import { ChargeSurcharge } from "../components/operations/ChargeSurcharge";
 import { FluxM4Section } from "../components/suivi/SuiviSections";
 import { useState } from "react";
 import { Clock3, Construction, Factory, HardHat } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
 import { formatDate, formatMoney, formatNumber, formatPercent } from "../lib/format";
@@ -17,8 +19,6 @@ import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { ActionDef } from "../components/ui";
 import type {
-  ChargeAlerte,
-  ChargeStats,
   EquipeAffectation,
   OfStatus,
   OrdreFabrication,
@@ -81,68 +81,6 @@ function OfCard({ of, index }: { of: OrdreFabrication; index: number }) {
       </div>
       <CardActions actions={ofActions(of, t)} />
     </BoardCard>
-  );
-}
-
-/** Alertes affichées avant « Afficher les N alertes » : la liste complète couvre souvent plus d'un an de semaines. */
-const ALERTES_VISIBLES = 6;
-/** Dépassement (en %) à partir duquel l'alerte passe au rouge : charge au moins triple de la capacité. */
-const SURCHARGE_FORTE = 200;
-
-function Charge({ stats }: { stats: ChargeStats }) {
-  const { t } = useTranslation();
-  const [toutes, setToutes] = useState(false);
-  const alertes = stats.alertes ?? [];
-  if (alertes.length === 0) return null;
-  // Semaines à venir d'abord (la semaine en cours comprise), puis les semaines passées ; chronologique dans chaque groupe.
-  const lundi = new Date();
-  lundi.setDate(lundi.getDate() - 7);
-  const seuil = lundi.toISOString().slice(0, 10);
-  const triees = [...alertes].sort((a, b) => {
-    const pa = a.week >= seuil ? 0 : 1;
-    const pb = b.week >= seuil ? 0 : 1;
-    return pa - pb || a.week.localeCompare(b.week) || a.scope.localeCompare(b.scope);
-  });
-  const visibles = toutes ? triees : triees.slice(0, ALERTES_VISIBLES);
-  // Échelle commune : charge / capacité rapportée à la plus forte charge de la liste ; le repère marque la capacité.
-  const charge = (a: ChargeAlerte) => (a.capacity > 0 ? a.planned_hours / a.capacity : 1);
-  const maxCharge = Math.max(1, ...alertes.map(charge));
-  const repere = Math.round((1 / maxCharge) * 100);
-  return (
-    <SectionCard
-      title={`${t("operations.surcharge")} · ${alertes.length}`}
-      actions={
-        alertes.length > ALERTES_VISIBLES ? (
-          <button type="button" className="btn ghost sm" aria-expanded={toutes} onClick={() => setToutes((v) => !v)}>
-            {toutes ? t("revueR2.operations.alertesReduire") : t("revueR2.operations.alertesVoir", { count: alertes.length })}
-          </button>
-        ) : undefined
-      }
-    >
-      <ul className="overload-list" data-testid="alertes-surcharge">
-        {visibles.map((a) => {
-          const largeur = Math.max(4, Math.round((charge(a) / maxCharge) * 100));
-          // Rouge réservé aux dépassements les plus forts (charge au moins triple de la capacité), orange sinon.
-          const fort = a.overload_pct >= SURCHARGE_FORTE;
-          return (
-            <li key={`${a.scope}-${a.week}`}>
-              <span>
-                <strong>{t(`operations.${a.scope}`)}</strong>
-                <span className="cell-sub">{t("listes.operations.surchargeHint", { date: formatDate(a.week) })}</span>
-              </span>
-              <span className={`overload-bar${fort ? " err" : ""}`} aria-hidden>
-                <span style={{ width: `${largeur}%` }} />
-                <span className="overload-cap" style={{ left: `${repere}%` }} />
-              </span>
-              <span className="overload-hours">
-                {formatNumber(a.planned_hours)} h / {formatNumber(a.capacity)} h
-              </span>
-              <Badge tone={fort ? "err" : "warn"}>+{formatPercent(a.overload_pct)}</Badge>
-            </li>
-          );
-        })}
-      </ul>
-    </SectionCard>
   );
 }
 
@@ -262,7 +200,7 @@ export function OperationsPage() {
             ))
           : null}
       </div>
-      {charge.data ? <Charge stats={charge.data} /> : null}
+      {charge.data ? <ChargeSurcharge stats={charge.data} /> : null}
 
       <section className="listes-block">
         <div className="list-toolbar">

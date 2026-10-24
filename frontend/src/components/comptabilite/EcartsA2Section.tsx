@@ -6,6 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatDateShort, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
+import { ScelleBadge } from "../sections/affichage";
 import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
@@ -321,7 +322,7 @@ export function EcartsA2Section() {
       header: t("ecarts_a2.sage.empreinte"),
       render: (x) => (
         <>
-          <code>{x.sha256.slice(0, 12)}</code> {x.gabarit_provisoire && provisoire}
+          <span className="cell-nowrap"><ScelleBadge sha={x.sha256} /> {x.gabarit_provisoire && provisoire}</span>
         </>
       ),
     },

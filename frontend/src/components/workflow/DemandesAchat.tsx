@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate } from "../../lib/format";
+import { nomPersonne } from "../sections/affichage";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { DaLigneForm } from "../achats/AchatsSaisie";
@@ -45,7 +46,7 @@ export function DemandesAchat() {
         </>
       ),
     },
-    { key: "req", header: t("purchases.da.demandeur"), render: (d) => d.requester_name ?? "—" },
+    { key: "req", header: t("purchases.da.demandeur"), render: (d) => nomPersonne(t, d.requester_name) },
     {
       key: "date",
       header: t("purchases.da.echeance"),

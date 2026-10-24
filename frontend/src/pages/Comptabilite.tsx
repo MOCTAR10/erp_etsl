@@ -17,6 +17,7 @@ import { EcartsM10Section } from "../components/comptabilite/EcartsM10Section";
 import { EcartsA2Section } from "../components/comptabilite/EcartsA2Section";
 import { ImportGrandLivreSection, RetenuesGarantieSection } from "../components/suivi/SuiviSections";
 import { formatDate, formatMoney } from "../lib/format";
+import { nomPersonne } from "../components/sections/affichage";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { useFiltresListe } from "../lib/useFiltresListe";
 import type {
@@ -224,7 +225,7 @@ export function ComptabilitePage() {
     { key: "code", header: t("comptabilite.col.code"), render: (c) => c.code },
     { key: "libelle", header: t("listes.compta.controle"), render: (c) => c.libelle },
     { key: "ref", header: t("listes.compta.reference"), render: (c) => referenceProcedure(c.reference_procedure, t) },
-    { key: "resp", header: t("listes.compta.responsable"), render: (c) => c.responsable_name ?? "—" },
+    { key: "resp", header: t("listes.compta.responsable"), render: (c) => nomPersonne(t, c.responsable_name) },
     { key: "date", header: t("listes.compta.datePrevue"), sortValue: (c) => c.date_prevue, render: (c) => formatDate(c.date_prevue) },
     {
       key: "statut",
@@ -319,7 +320,6 @@ export function ComptabilitePage() {
             </BoardColumn>
           ))}
         </Board>
-        <p className="listes-note">{t("comptabilite.pendingNote")}</p>
       </section>
 
       {banquesAll.length > 0 ? (

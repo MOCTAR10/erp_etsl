@@ -1,13 +1,14 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Activity, Flame, Gauge, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, Menu, notify, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
+import { nomPersonne, nombre } from "../components/sections/affichage";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
   IndicateursHse,
@@ -35,6 +36,7 @@ import {
 import { EnvironnementSection, IndicateursHseSection, RevueDirectionSection } from "../components/hse/HseEnvironnementSection";
 import { EcartsM7Sections } from "../components/hse/EcartsM7Section";
 import { useListeHse } from "../components/hse/listesHse";
+import { describeError } from "../lib/offlineQueue";
 
 type IncidentGroups = Record<StatutIncident, Incident[]>;
 
@@ -94,7 +96,7 @@ function PermisCard({ permis }: { permis: PermisTravail }) {
   );
 }
 
-type T = (key: string) => string;
+type T = (key: string, opts?: Record<string, unknown>) => string;
 
 function risqueColumns(t: T): Column<EvaluationRisque>[] {
   return [
@@ -178,7 +180,7 @@ function bsdColumns(t: T): Column<BordereauDechet>[] {
     { key: "code", header: t("hse.col.code"), render: (b) => b.code },
     { key: "numero", header: t("hse.col.numeroBsd"), render: (b) => b.numero_bsd || "—" },
     { key: "type", header: t("hse.col.type"), render: (b) => (t(`hse.dechet_types.${b.type_dechet}`) === `hse.dechet_types.${b.type_dechet}` ? b.type_label : t(`hse.dechet_types.${b.type_dechet}`)) },
-    { key: "qty", header: t("hse.col.quantite"), num: true, render: (b) => `${b.quantite} ${b.unite_label}` },
+    { key: "qty", header: t("hse.col.quantite"), num: true, render: (b) => `${nombre(b.quantite, 3)} ${t(`premiumModules.unites.${b.unite}`, { count: Number(b.quantite), defaultValue: b.unite_label })}` },
     { key: "transp", header: t("hse.col.transporteur"), render: (b) => b.transporteur_name ?? "—" },
     {
       key: "statut",
@@ -194,6 +196,18 @@ function bsdColumns(t: T): Column<BordereauDechet>[] {
 
 function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
   const { t } = useTranslation();
+  const qc = useQueryClient();
+  const ouvrirNcr = () => {
+    const description = window.prompt(t("m7e.inc.ncrPrompt"));
+    if (description === null) return;
+    api
+      .post(`/api/hse/incidents/${inc.id}/ncr-hse/`, { description })
+      .then(() => {
+        notify.success(t("listes.actions.done", { action: t("m7e.inc.ncr") }));
+        void qc.invalidateQueries();
+      })
+      .catch((e) => notify.error(t("listes.actions.failed", { action: t("m7e.inc.ncr") }), { description: describeError(e) }));
+  };
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="card-top">
@@ -208,7 +222,7 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
       </div>
       {inc.enqueteur_name || inc.actions_count > 0 ? (
         <div className="meta muted">
-          {inc.enqueteur_name ? `${t("hse.enqueteur")} : ${inc.enqueteur_name}` : ""}
+          {inc.enqueteur_name ? `${t("hse.enqueteur")} : ${nomPersonne(t, inc.enqueteur_name)}` : ""}
           {inc.enqueteur_name && inc.actions_count > 0 ? " · " : ""}
           {inc.actions_count > 0 ? t("revueR3.hse.actions", { count: inc.actions_count }) : ""}
         </div>
@@ -222,38 +236,41 @@ function IncidentCard({ inc, index }: { inc: Incident; index: number }) {
         </span>
       </div>
       <div className="r3-card-actions">
-      <ActionBar
-        actions={[
-          ...(inc.statut === "declare"
-            ? [{ label: t("hse.act.enquete"), path: `/api/hse/incidents/${inc.id}/ouvrir-enquete/`, tone: "ghost" as const }]
-            : []),
-          ...(inc.statut !== "cloture"
-            ? [{
-                label: t("m7e.inc.ajouterAction"), path: "/api/hse/actions/", tone: "ghost" as const,
-                body: { incident: inc.id, type: "corrective" }, prompt: { name: "description", label: t("m7e.inc.actionPrompt") },
-              }]
-            : []),
-          ...(inc.statut === "en_enquete"
-            ? [{ label: t("m7e.inc.planAction"), path: `/api/hse/incidents/${inc.id}/plan-action/`, prompt: { name: "cause_profonde", label: t("m7e.inc.causeProfonde") } }]
-            : []),
-          ...(inc.statut !== "cloture"
-            ? [{
-                label: t("actions.cloturer"), path: `/api/hse/incidents/${inc.id}/cloturer/`,
-                // Une seule action pleine par carte : pendant l'enquête, c'est l'arrêt du plan d'action.
-                ...(inc.statut === "en_enquete" ? { tone: "ghost" as const } : {}),
-                prompt: ["quasi_accident", "situation_dangereuse"].includes(inc.type_incident)
-                  ? { name: "retour_experience", label: t("m7e.inc.rex") }
-                  : { name: "rapport", label: t("hse.act.rapport") },
-              }]
-            : []),
-          ...(inc.statut !== "declare"
-            ? [{ label: t("m7e.inc.ncr"), path: `/api/hse/incidents/${inc.id}/ncr-hse/`, tone: "ghost" as const, prompt: { name: "description", label: t("m7e.inc.ncrPrompt") } }]
-            : []),
-        ]}
-      />
-      <button type="button" className="btn ghost sm" onClick={() => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`)}>
-        {t("m7e.inc.pdf")}
-      </button>
+        <ActionBar
+          actions={[
+            ...(inc.statut === "declare"
+              ? [{ label: t("hse.act.enquete"), path: `/api/hse/incidents/${inc.id}/ouvrir-enquete/`, tone: "ghost" as const }]
+              : []),
+            ...(inc.statut !== "cloture"
+              ? [{
+                  label: t("m7e.inc.ajouterAction"), path: "/api/hse/actions/", tone: "ghost" as const,
+                  body: { incident: inc.id, type: "corrective" }, prompt: { name: "description", label: t("m7e.inc.actionPrompt") },
+                }]
+              : []),
+            ...(inc.statut === "en_enquete"
+              ? [{ label: t("m7e.inc.planAction"), path: `/api/hse/incidents/${inc.id}/plan-action/`, prompt: { name: "cause_profonde", label: t("m7e.inc.causeProfonde") } }]
+              : []),
+            ...(inc.statut !== "cloture"
+              ? [{
+                  label: t("actions.cloturer"), path: `/api/hse/incidents/${inc.id}/cloturer/`,
+                  // Une seule action pleine par carte : pendant l'enquête, c'est l'arrêt du plan d'action.
+                  ...(inc.statut === "en_enquete" ? { tone: "ghost" as const } : {}),
+                  prompt: ["quasi_accident", "situation_dangereuse"].includes(inc.type_incident)
+                    ? { name: "retour_experience", label: t("m7e.inc.rex") }
+                    : { name: "rapport", label: t("hse.act.rapport") },
+                }]
+              : []),
+          ]}
+        />
+        {/* Actions secondaires (NCR-HSE, rapport PDF) dans le menu « ⋯ » : au plus 3 boutons visibles par carte. */}
+        <Menu
+          size="sm"
+          label={t("premiumModules.hse.plusActions", { code: inc.code })}
+          items={[
+            inc.statut !== "declare" && { id: "ncr", label: t("m7e.inc.ncr"), onSelect: ouvrirNcr },
+            { id: "pdf", label: t("m7e.inc.pdf"), onSelect: () => void api.download(`/api/hse/incidents/${inc.id}/rapport-pdf/`, `${inc.code}.pdf`) },
+          ]}
+        />
       </div>
     </BoardCard>
   );
@@ -323,9 +340,6 @@ export function HsePage() {
   const s = stats.data;
   const permisAll = permis.rows;
   const groups = incidents.data;
-  const ouvertNonClos = Object.entries(groups)
-    .filter(([k]) => k !== "cloture")
-    .reduce((sum, [, arr]) => sum + arr.length, 0);
 
   return (
     <>
@@ -393,8 +407,6 @@ export function HsePage() {
           </BoardColumn>
         ))}
       </Board>
-
-      {ouvertNonClos > 0 ? <p className="muted">{t("hse.pendingNote")}</p> : null}
 
       <div className="r3-heading-row">
         <h3 className="section-heading">{t("hse.permis")}</h3>
