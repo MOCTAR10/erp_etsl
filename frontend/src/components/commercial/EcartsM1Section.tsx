@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +8,7 @@ import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 
 /** Écarts M1 : paramètres provisoires, scoring 360°, alertes et échéances, pipe par profil, chiffrage et dérive,
  *  profils contractuels, habilitations, RAO / RC archivés, indicateurs commerciaux. */
@@ -253,7 +253,7 @@ function ParametresM1() {
     {
       key: "statut",
       header: t("ecarts_m1.params.statut"),
-      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`ecarts_m1.params.${p.statut_valeur}`)}</Badge>,
+      render: (p) => <ParamStatusBadge provisoire={p.est_provisoire} />,
     },
     {
       key: "actions",
@@ -285,15 +285,15 @@ function ParametresM1() {
     },
   ];
   return (
-    <SectionCard title={t("ecarts_m1.params.title")}>
-      {provisoires > 0 && (
-        <div className="banner warn" role="note" data-testid="alerte-provisoire-m1">
-          <SlidersHorizontal size={18} aria-hidden />
-          <div className="banner-body">
-            <span className="banner-title">{t("ecarts_m1.params.warn", { count: provisoires })}</span>
-          </div>
-        </div>
-      )}
+    // Panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05).
+    <ParamsPanel
+      variant="card"
+      module="commercial"
+      title={t("ecarts_m1.params.title")}
+      count={params.data ? provisoires : undefined}
+      total={params.data ? lignes.length : undefined}
+      alertTestId="alerte-provisoire-m1"
+    >
       {erreur && (
         <p className="action-error" role="alert">
           {erreur}
@@ -302,7 +302,7 @@ function ParametresM1() {
       <div data-testid="parametres-m1">
         <DataTable rows={lignes} columns={cols} caption={t("ecarts_m1.params.title")} density="compact" />
       </div>
-    </SectionCard>
+    </ParamsPanel>
   );
 }
 

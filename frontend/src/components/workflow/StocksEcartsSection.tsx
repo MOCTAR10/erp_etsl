@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +7,8 @@ import { formatDate, formatMoney, formatParametre } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { AlertesStock, ArticleStockConfig, AuditValorisation, CertificatMatiere, LotMatiere, ParametreStock, TraceabiliteEntry } from "../../types";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+import { ParamsPanel } from "../parametres/ParamsPanel";
+import { ParamValueTable } from "../parametres/ParamValueTable";
 
 /** Valeur lisible d'un paramètre (« 30 jours », « 500 000 FCFA », « Oui ») ; espace simple avant l'unité finale. */
 const valeurParametre = (valeur: string, unite: string) => formatParametre(valeur, unite).replace(/\u00a0(?=[^\d\u00a0]+$)/, " ");
@@ -55,7 +56,6 @@ export function AlertesStockSection() {
 export function ParametresStockSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const q = useQuery({ queryKey: ["stocks-parametres"], queryFn: () => api.listAll<ParametreStock>("/api/stocks/parametres/"), retry: 0 });
   const refresh = () => {
@@ -66,7 +66,6 @@ export function ParametresStockSection() {
   const modifier = useMutation({
     mutationFn: (v: { id: string; valeur: string }) => api.patch(`/api/stocks/parametres/${v.id}/`, { valeur: v.valeur }),
     onSuccess: () => {
-      setEdit(null);
       refresh();
     },
     onError: (e) => setError(describeError(e)),
@@ -79,64 +78,28 @@ export function ParametresStockSection() {
   if (q.isError || !q.data) return null;
   const provisoires = q.data.filter((p) => p.est_provisoire).length;
   return (
-    <SectionCard title={t("m5e.params.title")}>
-      <div data-testid="parametres-stocks">
-        {provisoires > 0 && (
-          <div className="banner warn" role="note" data-testid="alerte-provisoire-stocks">
-            <SlidersHorizontal size={18} aria-hidden />
-            <div className="banner-body">
-              <p className="banner-text">{t("m5e.params.warn", { count: provisoires })}</p>
-            </div>
-          </div>
-        )}
-        {error && <p className="action-error" role="alert">{error}</p>}
-        <table className="table">
-          <caption className="sr-only">{t("m5e.params.title")}</caption>
-          <thead>
-            <tr>
-              <th>{t("revueKit.ops.param.parametre")}</th>
-              <th className="num">{t("revueKit.ops.param.valeur")}</th>
-              <th>{t("revueKit.ops.param.statut")}</th>
-              <th><span className="sr-only">{t("revueKit.ops.param.actions")}</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data.map((p) => (
-              <tr key={p.id}>
-                <td>{t(`revueKit.ops.param.libelles.${p.code}`, { defaultValue: p.label })}</td>
-                <td className="num cell-nowrap">
-                  {edit?.id === p.id ? (
-                    <input type="number" className="control" min={0} step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-                  ) : (
-                    valeurParametre(p.valeur, p.unite)
-                  )}
-                </td>
-                <td><Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("m5e.params.provisoire") : t("m5e.params.confirme")}</Badge></td>
-                <td>
-                  <div className="card-actions card-actions--end">
-                    {edit?.id === p.id ? (
-                      <>
-                        <button type="button" className="btn primary sm" disabled={modifier.isPending} onClick={() => modifier.mutate(edit)}>{t("m5e.params.valider")}</button>
-                        <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>{t("m5e.params.annuler")}</button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("m5e.params.modifier")}</button>
-                        {p.est_provisoire && (
-                          <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("m5e.params.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                            {t("m5e.params.confirmer")}
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </SectionCard>
+    <ParamsPanel
+      variant="card"
+      module="stocks"
+      title={t("m5e.params.title")}
+      count={q.data ? provisoires : undefined}
+      total={q.data?.length}
+      testId="parametres-stocks"
+      alertTestId="alerte-provisoire-stocks"
+    >
+      {error && <p className="action-error" role="alert">{error}</p>}
+      <ParamValueTable
+        rows={q.data ?? []}
+        caption={t("m5e.params.title")}
+        libelle={(p) => t(`revueKit.ops.param.libelles.${p.code}`, { defaultValue: p.label })}
+        valeur={(p) => valeurParametre(p.valeur, p.unite)}
+        min="0"
+        pending={modifier.isPending || confirmer.isPending}
+        confirmMessage={t("m5e.params.confirmConfirmer")}
+        onSave={(id, valeur) => modifier.mutateAsync({ id, valeur })}
+        onConfirm={(id) => confirmer.mutate(id)}
+      />
+    </ParamsPanel>
   );
 }
 

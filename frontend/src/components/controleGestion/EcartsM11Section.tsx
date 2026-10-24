@@ -9,6 +9,7 @@ import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
+import { ParametresRgmM11 } from "./ParametresRgmM11";
 
 interface Ligne {
   id: string;
@@ -41,14 +42,6 @@ interface RevisionLigne {
   period_label: string;
   ancien_montant: string | null;
   nouveau_montant: string | null;
-}
-interface Param {
-  id: string;
-  code: string;
-  label: string;
-  valeur: string;
-  unite: string;
-  est_provisoire: boolean;
 }
 interface Axe {
   id: number;
@@ -188,71 +181,6 @@ function useGet<T>(key: unknown[], path: string, enabled = true) {
 function Provisoire({ show }: { show: boolean | undefined }) {
   const { t } = useTranslation();
   return show ? <Badge tone="warn">{t("ecarts_m11.provisoire")}</Badge> : null;
-}
-
-/** Table de paramétrage (structure, taux, pondérations, cibles des KPI) : valeurs ETSL modifiables et confirmables, provisoires par défaut. */
-function ParamTable({ table, title }: { table: string; title: string }) {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const rows = useList<Param>(["params", table], `${BASE}/parametres/?table=${table}`);
-  const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const done = { onSuccess: () => { setEdit(null); setError(null); void qc.invalidateQueries(); }, onError: (e: unknown) => setError(describeError(e)) };
-  const save = useMutation({ mutationFn: (v: { id: string; valeur: string }) => api.patch(`${BASE}/parametres/${v.id}/`, { valeur: v.valeur }), ...done });
-  const confirm = useMutation({ mutationFn: (id: string) => api.post(`${BASE}/parametres/${id}/confirmer/`), ...done });
-  const columns: Column<Param>[] = [
-    { key: "label", header: t("tableaux.controleGestion.parametre"), render: (p) => p.label },
-    {
-      key: "valeur",
-      header: t("tableaux.controleGestion.valeur"),
-      num: true,
-      render: (p) =>
-        edit?.id === p.id ? (
-          <input aria-label={p.label} className="control" type="number" step="0.01" value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-        ) : (
-          `${formatNumber(Number(p.valeur))} ${p.unite}`
-        ),
-    },
-    {
-      key: "statut",
-      header: t("tableaux.controleGestion.statut"),
-      render: (p) => (p.est_provisoire ? <Badge tone="warn">{t("ecarts_m11.provisoire")}</Badge> : <Badge tone="ok">{t("ecarts_m11.confirme")}</Badge>),
-    },
-    {
-      key: "actions",
-      header: <span className="sr-only">{t("ui.actions")}</span>,
-      render: (p) =>
-        edit?.id === p.id ? (
-          <button type="button" className="btn primary sm" onClick={() => save.mutate(edit)}>
-            {t("ecarts_m11.enregistrer")}
-          </button>
-        ) : (
-          <div className="action-bar-buttons">
-            <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
-              {t("ecarts_m11.modifier")}
-            </button>
-            {p.est_provisoire && (
-              <button type="button" className="btn ghost sm" onClick={() => confirm.mutate(p.id)}>
-                {t("ecarts_m11.confirmer")}
-              </button>
-            )}
-          </div>
-        ),
-    },
-  ];
-  return (
-    <>
-      <h3>{title}</h3>
-      <div data-testid={`table-${table}`}>
-        <DataTable columns={columns} rows={rows} caption={title} density="compact" />
-      </div>
-      {error && (
-        <p className="action-error" role="alert">
-          {error}
-        </p>
-      )}
-    </>
-  );
 }
 
 /** Édition d'un budget brouillon (libellé, montant, classe de Mix) et de ses lignes mensuelles. */
@@ -436,15 +364,7 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
         <p className="muted">{t("ecarts_m11.budget.note")}</p>
       </SectionCard>
 
-      <SectionCard title={t("ecarts_m11.tables.title")}>
-        <p className="action-error" role="note">
-          {t("ecarts_m11.bandeau")}
-        </p>
-        <ParamTable table="RGM_PARAM_STRUCTURE" title={t("ecarts_m11.tables.param")} />
-        <ParamTable table="RGM_TAUX_STRUCTURE" title={t("ecarts_m11.tables.taux")} />
-        <ParamTable table="RGM_POND_PROSPECT" title={t("ecarts_m11.tables.pond")} />
-        <ParamTable table="KPI_CIBLES" title={t("ecarts_m11.tables.kpi")} />
-      </SectionCard>
+      <ParametresRgmM11 />
 
       <SectionCard
         title={t("ecarts_m11.axes.title")}

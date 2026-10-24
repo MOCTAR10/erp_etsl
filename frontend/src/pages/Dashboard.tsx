@@ -13,8 +13,11 @@ import { DataGrid, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, Sec
 import type { GridColumn } from "../components/ui";
 import { useAuth } from "../store/auth";
 
-/** Rôles qui voient le bandeau « paramètres provisoires à confirmer par ETSL » (écarts transverses). */
-const ROLES_PARAMETRES = ["admin", "pdg", "dga", "direction"];
+/**
+ * Rôles qui voient le bandeau « paramètres provisoires à confirmer par ETSL » (écarts transverses) : l'administration
+ * technique seulement (A-02) — rien en tête d'écran pour la Direction, qui confirme depuis « Paramètres ETSL ».
+ */
+const ROLES_PARAMETRES = ["admin"];
 /** Longueur maximale d'un libellé d'axe (le libellé complet reste dans l'infobulle). */
 const MAX_LABEL = 32;
 /** Rôles à qui l'accueil propose l'accès direct à la vue Direction / BI (A-01). */

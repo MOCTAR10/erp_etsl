@@ -84,3 +84,51 @@ export function parModule(rows: ParametreEtsl[]): { module: string; label: strin
   }
   return out;
 }
+
+/** Unités qui codent un choix (1 / 2 / 3) : la valeur affichée est le libellé de l'option, pas le chiffre. */
+export const UNITES_CODEES = new Set(["choix", "code", "niveau", "1/2", "clé", "cle"]);
+/** Unités booléennes (0 / 1) : « Oui » / « Non », ou le libellé de l'option décrit dans le libellé du paramètre. */
+export const UNITES_BOOLEENNES = new Set(["0/1", "booléen", "booleen", "oui/non"]);
+/** Unités qui décrivent le type de saisie (et non une grandeur) : jamais affichées après la valeur. */
+export const UNITES_TECHNIQUES = new Set(["texte", "json", "score", "rôles", "roles"]);
+
+/** Unité normalisée (« 0 / 1 » → « 0/1 », casse ignorée). */
+export const uniteCle = (unite: string | null | undefined) => (unite ?? "").replace(/\s/g, "").toLowerCase();
+
+const OPTION = /(?:^|[\s(,;:])(\d+)\s*=\s*([^,;()]+(?:\([^)]*\))?[^,;()]*)/g;
+
+/**
+ * Options d'un paramètre codé, décrites dans son libellé :
+ * « Méthode (1 = coûts engagés / budget, 2 = situations de travaux) » → { "1": "coûts engagés / budget", "2": "situations de travaux" }.
+ */
+export function optionsCodees(label: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of label.matchAll(OPTION)) {
+    const texte = m[2].trim();
+    if (texte) out[m[1]] = texte;
+  }
+  return out;
+}
+
+/** Libellé de l'option correspondant à la valeur (« 2.00 » → « situations de travaux »), majuscule initiale ; null sinon. */
+export function optionPourValeur(label: string, valeur: string): string | null {
+  const n = Number(valeur);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
+  const texte = optionsCodees(label)[String(n)];
+  return texte ? texte.charAt(0).toUpperCase() + texte.slice(1) : null;
+}
+
+/**
+ * Libellé court : la liste des options codées (« (1 = …, 2 = …) » ou « : 1 = …, 0 = … ») sort du libellé, puisque la
+ * valeur affiche déjà l'option retenue. Le libellé complet reste disponible (infobulle, panneau d'édition).
+ */
+export function libelleCourt(label: string): string {
+  const paren = label.search(/\s*\((?=[^()]*\d+\s*=)/);
+  if (paren > 0) {
+    const court = label.slice(0, paren).trim();
+    if (court) return court;
+  }
+  const deuxPoints = label.search(/\s*:\s*\d+\s*=/);
+  if (deuxPoints > 0) return label.slice(0, deuxPoints).trim();
+  return label;
+}
