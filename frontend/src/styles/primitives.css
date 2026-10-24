@@ -824,18 +824,19 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: var(--surface);
   background-clip: padding-box;
+}
+/* Fond opaque : cellule de corps = surface (survol compris) ; en-tête de grille = sa teinte d'en-tête. */
+.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid:has(thead th:nth-child(3)) tbody td:first-child,
+.table-wrap:not(.ui-grid-wrap) > .table:has(thead th:nth-child(3)) :is(th, td):first-child {
+  background: var(--surface);
+}
+.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid:has(thead th:nth-child(3)) tbody tr:hover > td:first-child {
+  background: var(--ui-hover);
 }
 .ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid:has(thead th:nth-child(3)) thead th:first-child,
 .table-wrap:not(.ui-grid-wrap) > .table:has(thead th:nth-child(3)) thead th:first-child {
   z-index: 3;
-}
-.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid thead th:first-child {
-  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
-}
-.ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid tbody tr:hover > td:first-child {
-  background: var(--ui-hover);
 }
 .ui-grid-wrap[data-overflow-start] > .ui-grid:has(thead th:nth-child(3)) :is(th, td):first-child {
   box-shadow: 6px 0 8px -6px color-mix(in srgb, var(--text) 22%, transparent);
@@ -926,6 +927,7 @@
     text-align: left;
     font-size: var(--fs-xs);
     line-height: 20px;
+    font-weight: var(--fw-regular);
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;

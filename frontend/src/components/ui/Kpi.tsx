@@ -48,15 +48,15 @@ function sizeClass(text: string): string {
 }
 
 /**
- * Largeur estimée d'un montant, en cadratins (Inter gras, chiffres tabulaires) : chiffre ≈ 0,57 em,
- * espace insécable ≈ 0,26 em, signe ≈ 0,45 em. Sert au calcul CSS de la taille qui tient dans la carte (B15).
+ * Largeur estimée d'un montant, en cadratins (Inter gras, chiffres tabulaires) : chiffre ≈ 0,62 em,
+ * espace insécable ≈ 0,28 em, signe ≈ 0,45 em. Sert au calcul CSS de la taille qui tient dans la carte (B15).
  */
 function moneyEm(body: string): number {
   let em = 0;
   for (const ch of body) {
-    if (ch >= "0" && ch <= "9") em += 0.57;
+    if (ch >= "0" && ch <= "9") em += 0.62;
     else if (ch === "-" || ch === "−" || ch === "+") em += 0.45;
-    else if (ch.trim() === "") em += 0.26;
+    else if (ch.trim() === "") em += 0.28;
     else em += 0.6;
   }
   return Math.round(em * 100) / 100;
