@@ -10,7 +10,7 @@ import { TarifsGrSection } from "../components/workflow/TarifsGrSection";
 import { EcartsM4Section } from "../components/logistique/EcartsM4Section";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, ModuleSettings, PageHeader, PagedDataTable, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { Column } from "../components/ui";
 import type {
@@ -277,7 +277,6 @@ export function LogistiquePage() {
         </SectionCard>
       )}
       <GrAffairesSection />
-      <TarifsGrSection />
       </div>
       <div id="log-suivi" className="page-section">
         <EcartsM4Section />
@@ -287,9 +286,10 @@ export function LogistiquePage() {
           <PagedDataTable list={demandes} columns={demandeColumns(t, lbl)} caption={t("logistique.demandes")} searchPlaceholder={t("logistique.searchDemandes")} />
         </SectionCard>
       )}
-      <div id="log-parametres" className="page-section">
+      <ModuleSettings id="log-parametres">
+        <TarifsGrSection />
         <ParametresLogistiqueSection />
-      </div>
+      </ModuleSettings>
     </div>
   );
 }

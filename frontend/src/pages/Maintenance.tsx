@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { SiteFilter, siteQuery, useSiteOptions } from "../components/sites/SiteFilter";
-import { type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, ModuleSettings, PageHeader, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { Column } from "../components/ui";
@@ -387,9 +387,9 @@ export function MaintenancePage() {
         />
       </SectionCard>
 
-      <div id="mnt-parametres" className="page-section">
+      <ModuleSettings id="mnt-parametres">
         <ParametresMaintenanceSection />
-      </div>
+      </ModuleSettings>
     </div>
   );
 }

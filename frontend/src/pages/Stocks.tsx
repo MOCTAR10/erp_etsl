@@ -8,7 +8,7 @@ import { useSiteOptions } from "../components/sites/SiteFilter";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { nomPersonne } from "../components/sections/affichage";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, ModuleSettings, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { Column } from "../components/ui";
@@ -462,7 +462,6 @@ export function StocksPage() {
       >
         <PagedDataGrid list={certificats} columns={certColumns} caption={t("stocks.certificats")} />
       </SectionCard>
-      <ConfigArticlesSection articles={articles.data ?? []} />
       <ReservationsStockSection />
       </div>
 
@@ -493,9 +492,10 @@ export function StocksPage() {
       )}
       </div>
 
-      <div id="stk-parametres" className="page-section">
+      <ModuleSettings id="stk-parametres">
+        <ConfigArticlesSection articles={articles.data ?? []} />
         <ParametresStockSection />
-      </div>
+      </ModuleSettings>
     </div>
   );
 }

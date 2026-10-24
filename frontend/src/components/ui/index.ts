@@ -47,3 +47,6 @@ export { SectionNav } from "./SectionNav";
 export type { SectionNavItem, SectionNavProps } from "./SectionNav";
 export { FileField } from "./FileField";
 export type { FileFieldProps } from "./FileField";
+// Vague 3 (B11) : paramétrage du module replié en bas de page.
+export { ModuleSettings } from "./ModuleSettings";
+export type { ModuleSettingsProps } from "./ModuleSettings";

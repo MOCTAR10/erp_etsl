@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { DEMO_USERS, loginAs } from "./helpers";
+import { DEMO_USERS, loginAs, ouvrirParametresModule } from "./helpers";
 
 /** POST API avec le jeton de la session courante (prépare les données sans passer par l'UI). */
 async function api(page: Page, path: string, body: unknown): Promise<{ id: string; [k: string]: unknown }> {
@@ -72,6 +72,8 @@ test.describe("Régression : écrans de workflow (ITP, permis, paie)", () => {
   test("paie : saisie d'un barème de cotisation (taux = donnée)", async ({ page }) => {
     const code = `E2E-${Date.now() % 100000}`;
     await page.goto("/rh-paie");
+    // Barèmes : paramétrage replié en bas de page (B11).
+    await ouvrirParametresModule(page);
     await expect(page.getByText("Barèmes de cotisation").first()).toBeVisible();
     await page.getByPlaceholder("Code").fill(code);
     await page.getByPlaceholder("Libellé").fill("Barème e2e");

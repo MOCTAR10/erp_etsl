@@ -553,7 +553,6 @@ export function EcartsM7Sections() {
       <PlansPreventionSection />
       <BsdPrestatairesSection />
       <FichesSecuriteSection />
-      <ListesHseSection />
     </>
   );
 }

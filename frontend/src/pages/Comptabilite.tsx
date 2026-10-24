@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, PageHeader, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, ModuleSettings, PageHeader, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { ActionDef, Column } from "../components/ui";
@@ -13,7 +13,7 @@ import { ClotureSection } from "../components/workflow/ClotureSection";
 import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
 import { LettrageSection } from "../components/workflow/LettrageSection";
-import { EcartsM10Section } from "../components/comptabilite/EcartsM10Section";
+import { EcartsM10Section, GabaritsEtatsSection } from "../components/comptabilite/EcartsM10Section";
 import { EcartsA2Section } from "../components/comptabilite/EcartsA2Section";
 import { ImportGrandLivreSection, RetenuesGarantieSection } from "../components/suivi/SuiviSections";
 import { formatDate, formatMoney } from "../lib/format";
@@ -301,6 +301,7 @@ export function ComptabilitePage() {
           { id: "cpt-etats", label: t("premiumVague2.sections.comptabilite.etats") },
           { id: "cpt-devises", label: t("premiumVague2.sections.comptabilite.devises") },
           { id: "cpt-cloture", label: t("premiumVague2.sections.comptabilite.cloture") },
+          { id: "cpt-parametres", label: t("premiumKit.moduleSettings.nav") },
         ]}
       />
 
@@ -408,12 +409,16 @@ export function ComptabilitePage() {
 
       <div id="cpt-devises" className="page-section">
       <EcartsA2Section />
-      <ImportGrandLivreSection />
       </div>
 
       <div id="cpt-cloture" className="page-section">
       <ClotureSection />
       </div>
+
+      <ModuleSettings id="cpt-parametres">
+        <GabaritsEtatsSection />
+        <ImportGrandLivreSection />
+      </ModuleSettings>
     </div>
   );
 }

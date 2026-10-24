@@ -12,8 +12,9 @@ import { CoutsHseSection } from "../components/hse/HsePermisSection";
 import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaireSection";
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { EcartsM11Section } from "../components/controleGestion/EcartsM11Section";
+import { ParametresRgmM11 } from "../components/controleGestion/ParametresRgmM11";
 import { BalanceAgeeGestionSection, MargesTerminaisonSection } from "../components/suivi/SuiviSections";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, PageHeader, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, ModuleSettings, PageHeader, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
@@ -356,6 +357,7 @@ export function ControleGestionPage() {
           { id: "cg-affaires", label: t("premiumVague2.sections.controleGestion.affaires") },
           { id: "cg-couts", label: t("premiumVague2.sections.controleGestion.couts") },
           ...(closed.length > 0 || revs.length > 0 ? [{ id: "cg-historique", label: t("premiumVague2.sections.controleGestion.historique") }] : []),
+          { id: "cg-parametres", label: t("premiumKit.moduleSettings.nav") },
         ]}
       />
 
@@ -455,6 +457,9 @@ export function ControleGestionPage() {
       )}
       </div>
 
+      <ModuleSettings id="cg-parametres">
+        <ParametresRgmM11 />
+      </ModuleSettings>
     </>
   );
 }

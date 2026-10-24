@@ -108,7 +108,6 @@ export function EcartsM6bSection() {
           )}
         </SectionCard>
       </div>
-      <CriteresSection criteres={crit} />
     </>
   );
 }
@@ -195,6 +194,12 @@ function ControleRow({ controle: c, criteres }: { controle: ControleQualite; cri
       </td>
     </tr>
   );
+}
+
+/** Critères d'acceptation (paramétrage, B11) : rendus dans « Paramètres du module » ; même cache que les contrôles. */
+export function CriteresAcceptationSection() {
+  const criteres = useQuery({ queryKey: ["m6b", "criteres"], queryFn: () => api.listAll<Critere>("/api/qualite/criteres/"), retry: 0 });
+  return <CriteresSection criteres={criteres.data ?? []} />;
 }
 
 /** Seuils d'acceptation : provisoires jusqu'à confirmation ETSL ; une modification remet le critère en provisoire. */

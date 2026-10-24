@@ -13,6 +13,17 @@ export const DEMO_USERS = {
   salarie: "salarie@etls.local",
 } as const;
 
+/**
+ * Déplie la section « Paramètres du module » (B11), repliée par défaut en bas des écrans métier : son contenu
+ * (référentiels, barèmes, paramètres provisoires…) n'est monté qu'une fois dépliée. Sans effet si elle l'est déjà.
+ */
+export async function ouvrirParametresModule(page: Page) {
+  const toggle = page.getByTestId("module-settings").locator(".ui-modsettings-toggle");
+  await toggle.waitFor({ timeout: 20_000 });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
+
 /** Connecte un utilisateur démo via l'UI (SPA : écran pilote). */
 export async function loginAs(page: Page, email: string, password = DEMO_PASSWORD) {
   // Purge la session persistée (zustand `etls.auth`) AVANT le login : on passe

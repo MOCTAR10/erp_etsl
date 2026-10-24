@@ -10,7 +10,6 @@ import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
-import { ParametresRgmM11 } from "./ParametresRgmM11";
 
 interface Ligne {
   id: string;
@@ -371,8 +370,6 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
         </div>
         <p className="muted">{t("ecarts_m11.budget.note")}</p>
       </SectionCard>
-
-      <ParametresRgmM11 />
 
       <SectionCard
         title={t("ecarts_m11.axes.title")}

@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { ScelleBadge, nomPersonne } from "../sections/affichage";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, Kpi, Menu, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, Kpi, Menu, ModuleSettings, QuickForm, SectionCard } from "../ui";
 import type { ActionDef, Column } from "../ui";
 import { CardActions } from "../ui/Board";
 import { actionsColumn } from "../ui/DataTable";
@@ -964,14 +964,14 @@ export function EcartsM3Section() {
       </SectionCard>
       </div>
 
-      <div id="ops-parametres" className="page-section">
+      <ModuleSettings id="ops-parametres">
       {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
       <ParamsPanel variant="card" module="operations" title={k("parametres.title")} count={provisoires} total={parametres.length} alertTestId="m3-provisoire">
         <div data-testid="m3-parametres">
           <DataTable columns={colsParametres} rows={parametres} caption={k("parametres.title")} emptyLabel={t("tableaux.operations.aucunParametre")} />
         </div>
       </ParamsPanel>
-      </div>
+      </ModuleSettings>
     </>
   );
 }

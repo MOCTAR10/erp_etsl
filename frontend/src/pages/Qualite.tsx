@@ -8,7 +8,7 @@ import { refLabel } from "../components/sections/affichage";
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, ModuleSettings, PagedDataGrid, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import type {
@@ -22,7 +22,7 @@ import type {
 } from "../types";
 import { ClotureM6Section } from "../components/qualite/ClotureM6Section";
 import { EcartsM6Section } from "../components/qualite/EcartsM6Section";
-import { EcartsM6bSection } from "../components/qualite/EcartsM6bSection";
+import { CriteresAcceptationSection, EcartsM6bSection } from "../components/qualite/EcartsM6bSection";
 import { EcartsM6m7Section } from "../components/qualite/EcartsM6m7Section";
 import { EcartsA3Section } from "../components/qualite/EcartsA3Section";
 import { SystemeQualiteSection } from "../components/qualite/SystemeQualiteSection";
@@ -371,9 +371,10 @@ export function QualitePage() {
       <div id="qa-systeme" className="page-section">
         <SystemeQualiteSection />
       </div>
-      <div id="qa-parametres" className="page-section">
+      <ModuleSettings id="qa-parametres">
         <ParametresQualiteSection />
-      </div>
+        <CriteresAcceptationSection />
+      </ModuleSettings>
     </>
   );
 }

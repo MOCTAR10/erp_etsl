@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, Menu, notify, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, Menu, ModuleSettings, notify, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import { nomPersonne, nombre } from "../components/sections/affichage";
@@ -34,7 +34,7 @@ import {
   PersonnelHseSection,
 } from "../components/hse/HsePersonnelSection";
 import { EnvironnementSection, IndicateursHseSection, RevueDirectionSection } from "../components/hse/HseEnvironnementSection";
-import { EcartsM7Sections } from "../components/hse/EcartsM7Section";
+import { EcartsM7Sections, ListesHseSection } from "../components/hse/EcartsM7Section";
 import { useListeHse } from "../components/hse/listesHse";
 import { describeError } from "../lib/offlineQueue";
 
@@ -489,9 +489,10 @@ export function HsePage() {
         <EcartsM7Sections />
       </div>
 
-      <div id="hse-parametres" className="page-section">
+      <ModuleSettings id="hse-parametres">
+        <ListesHseSection />
         <ParametresHseSection />
-      </div>
+      </ModuleSettings>
     </>
   );
 }

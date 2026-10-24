@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, SearchField, SectionCard, SectionNav } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, ModuleSettings, PageHeader, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { ActionDef, Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
@@ -249,6 +249,7 @@ export function RhPaiePage() {
           { id: "rh-paie", label: t("premiumVague2.sections.rhPaie.paie") },
           { id: "rh-formation", label: t("premiumVague2.sections.rhPaie.formation") },
           { id: "rh-declarations", label: t("premiumVague2.sections.rhPaie.declarations") },
+          { id: "rh-parametres", label: t("premiumKit.moduleSettings.nav") },
         ]}
       />
 
@@ -322,7 +323,6 @@ export function RhPaiePage() {
       ) : null}
       <EcartsM9bSection />
       <VirementsSection />
-      <BaremesSection />
       </div>
 
       <div id="rh-formation" className="page-section">
@@ -332,6 +332,10 @@ export function RhPaiePage() {
       <div id="rh-declarations" className="page-section">
         <DeclarationsSection />
       </div>
+
+      <ModuleSettings id="rh-parametres">
+        <BaremesSection />
+      </ModuleSettings>
     </>
   );
 }

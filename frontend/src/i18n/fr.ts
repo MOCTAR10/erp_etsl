@@ -4568,6 +4568,13 @@ export const fr = {
   },
   // Chantier « kit » (élévation premium) : composants partagés.
   premiumKit: {
+    moduleSettings: {
+      title: "Paramètres du module",
+      hint: "Référentiels, barèmes, gabarits et valeurs provisoires à confirmer par ETSL.",
+      afficher: "Afficher les paramètres",
+      masquer: "Masquer les paramètres",
+      nav: "Paramètres",
+    },
     sectionNav: {
       label: "Sections de la page",
     },

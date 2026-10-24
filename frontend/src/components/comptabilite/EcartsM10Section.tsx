@@ -155,7 +155,6 @@ export function EcartsM10Section() {
   const treso = useQuery({ queryKey: ["m10", "tresorerie"], queryFn: () => api.get<PlanTresorerie>("/api/comptabilite/etats/tresorerie/"), retry: 0 });
   const autof = useQuery({ queryKey: ["m10", "autofactures"], queryFn: () => api.listAll<AutoFacture>("/api/comptabilite/autofactures/"), retry: 0 });
   const gr = useQuery({ queryKey: ["m10", "locations-gr"], queryFn: () => api.get<LocationsGr>("/api/comptabilite/locations-gr/"), retry: 0 });
-  const gabarits = useQuery({ queryKey: ["m10", "gabarits"], queryFn: () => api.listAll<Gabarit>("/api/comptabilite/gabarits/"), retry: 0 });
   const fournisseurs = useQuery({ queryKey: ["m10", "partners"], queryFn: () => api.listAll<Ref>("/api/referentiels/partners/"), retry: 0 }).data ?? [];
   const comptes = useQuery({ queryKey: ["m10", "accounts"], queryFn: () => api.listAll<Ref>("/api/referentiels/accounts/"), retry: 0 }).data ?? [];
   const taux = useQuery({ queryKey: ["m10", "taux"], queryFn: () => api.listAll<Ref & { taux: string }>("/api/comptabilite/taux-tva/"), retry: 0 }).data ?? [];
@@ -243,24 +242,6 @@ export function EcartsM10Section() {
     ),
   ];
 
-  const colsGabarits: Column<Gabarit>[] = [
-    {
-      key: "gabarit",
-      header: t("ecarts_m10.gabarits.gabarit"),
-      render: (g) => g.label,
-      width: 260,
-    },
-    { key: "parametres", header: t("ecarts_m10.gabarits.parametres"), render: (g) => parametresLisibles(g.parametres, t) },
-    {
-      key: "statut",
-      header: t("revueR3.statut"),
-      render: (g) => (g.est_provisoire ? provisoire : <Badge tone="ok">{t("ecarts_m10.confirme")}</Badge>),
-    },
-    actionsColumn<Gabarit>(t("ui.actions"), (g) => [
-      ...(g.est_provisoire ? [{ label: t("ecarts_m10.gabarits.confirmer"), path: `/api/comptabilite/gabarits/${g.id}/confirmer/`, tone: "ghost" as const }] : []),
-      { label: t("ecarts_m10.gabarits.modifier"), path: `/api/comptabilite/gabarits/${g.id}/modifier/`, tone: "ghost", prompt: { name: "parametres", label: t("ecarts_m10.gabarits.prompt") } },
-    ]),
-  ];
 
   return (
     <>
@@ -421,13 +402,44 @@ export function EcartsM10Section() {
           <DataTable caption={t("ecarts_m10.gr.title")} columns={colsGr} rows={lignesGr} emptyLabel={t("tableaux.comptabilite.aucuneLocation")} />
         </div>
       </SectionCard>
-
-      <SectionCard title={t("ecarts_m10.gabarits.title")} subtitle={t("ecarts_m10.gabarits.subtitle")}>
-        <div data-testid="gabarits-etats">
-          <DataTable caption={t("ecarts_m10.gabarits.title")} columns={colsGabarits} rows={gabarits.data ?? []} />
-        </div>
-        <p className="muted">{t("ecarts_m10.gabarits.note")}</p>
-      </SectionCard>
     </>
+  );
+}
+
+/** Gabarits d'états fiscaux (paramétrage, B11) : rendus dans « Paramètres du module » de la Comptabilité. */
+export function GabaritsEtatsSection() {
+  const { t } = useTranslation();
+  const gabarits = useQuery({ queryKey: ["m10", "gabarits"], queryFn: () => api.listAll<Gabarit>("/api/comptabilite/gabarits/"), retry: 0 });
+  const provisoire = (
+    <Badge tone="warn" title={t("ecarts_m10.provisoire")}>
+      {t("revueR3.provisoire")}
+    </Badge>
+  );
+  const colsGabarits: Column<Gabarit>[] = [
+    {
+      key: "gabarit",
+      header: t("ecarts_m10.gabarits.gabarit"),
+      render: (g) => g.label,
+      width: 260,
+    },
+    { key: "parametres", header: t("ecarts_m10.gabarits.parametres"), render: (g) => parametresLisibles(g.parametres, t) },
+    {
+      key: "statut",
+      header: t("revueR3.statut"),
+      render: (g) => (g.est_provisoire ? provisoire : <Badge tone="ok">{t("ecarts_m10.confirme")}</Badge>),
+    },
+    actionsColumn<Gabarit>(t("ui.actions"), (g) => [
+      ...(g.est_provisoire ? [{ label: t("ecarts_m10.gabarits.confirmer"), path: `/api/comptabilite/gabarits/${g.id}/confirmer/`, tone: "ghost" as const }] : []),
+      { label: t("ecarts_m10.gabarits.modifier"), path: `/api/comptabilite/gabarits/${g.id}/modifier/`, tone: "ghost", prompt: { name: "parametres", label: t("ecarts_m10.gabarits.prompt") } },
+    ]),
+  ];
+
+  return (
+    <SectionCard title={t("ecarts_m10.gabarits.title")} subtitle={t("ecarts_m10.gabarits.subtitle")}>
+      <div data-testid="gabarits-etats">
+        <DataTable caption={t("ecarts_m10.gabarits.title")} columns={colsGabarits} rows={gabarits.data ?? []} />
+      </div>
+      <p className="muted">{t("ecarts_m10.gabarits.note")}</p>
+    </SectionCard>
   );
 }

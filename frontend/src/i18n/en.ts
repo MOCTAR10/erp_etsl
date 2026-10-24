@@ -4568,6 +4568,13 @@ export const en = {
   },
   // "kit" workstream (premium elevation): shared components.
   premiumKit: {
+    moduleSettings: {
+      title: "Module settings",
+      hint: "Reference data, scales, templates and provisional values to be confirmed by ETSL.",
+      afficher: "Show settings",
+      masquer: "Hide settings",
+      nav: "Settings",
+    },
     sectionNav: {
       label: "Page sections",
     },

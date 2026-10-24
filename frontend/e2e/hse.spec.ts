@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { DEMO_PASSWORD, DEMO_USERS, loginAs } from "./helpers";
+import { DEMO_PASSWORD, DEMO_USERS, loginAs, ouvrirParametresModule } from "./helpers";
 
 // Clôture M7 (2026-10-18) : audits & inspections, DUER, plans d'urgence et exercices.
 test.describe("M7 HSE : parcours de clôture", () => {
@@ -124,6 +124,8 @@ test.describe("M7 HSE : écarts check-lists, prévention, BSD et fiches sécurit
     await expect(page.getByTestId("fiches-securite")).toContainText("Travaux à chaud");
     await expect(page.getByTestId("checklists-hse")).toBeVisible();
     await expect(page.getByTestId("plans-prevention")).toBeVisible();
+    // Listes paramétrables : paramétrage replié en bas de page (B11).
+    await ouvrirParametresModule(page);
     await expect(page.getByTestId("listes-hse")).toContainText("Provisoire");
     const bloc = page.getByTestId("bsd-prestataires");
     const nom = `Collecte e2e ${Date.now()}`;

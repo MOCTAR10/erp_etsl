@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber, formatPercent } from "../../lib/format";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, Kpi, ModuleSettings, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
@@ -808,9 +808,9 @@ export function EcartsM1Section() {
         <ProfilsContrats />
         <RaoRc />
       </div>
-      <div id="com-parametres" className="page-section">
+      <ModuleSettings id="com-parametres">
         <ParametresM1 />
-      </div>
+      </ModuleSettings>
     </>
   );
 }

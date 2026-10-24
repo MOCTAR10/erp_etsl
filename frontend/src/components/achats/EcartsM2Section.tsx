@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, ModuleSettings, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 
@@ -464,9 +464,9 @@ export function EcartsM2Section() {
       </SectionCard>
       </div>
 
-      <div id="ach-parametres" className="page-section">
+      <ModuleSettings id="ach-parametres">
         <ParametresAchats />
-      </div>
+      </ModuleSettings>
     </>
   );
 }

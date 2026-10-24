@@ -1334,3 +1334,67 @@
 .link-inline:hover {
   text-decoration-thickness: 2px;
 }
+
+/* ── Paramètres du module (ModuleSettings, B11) ── */
+/* Bandeau replié en bas d'écran : icône, titre, aide, bouton de dépli ; le contenu reprend le rythme des cartes. */
+.ui-modsettings {
+  border-top: 1px dashed var(--border);
+  padding-top: var(--space-5);
+}
+.ui-modsettings-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.ui-modsettings-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-muted);
+}
+.ui-modsettings-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ui-modsettings-title {
+  margin: 0;
+  font-size: var(--fs-md, 1rem);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+.ui-modsettings-hint {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.ui-modsettings-toggle {
+  flex: none;
+}
+.ui-modsettings-chevron {
+  transition: transform var(--ui-dur-fast) var(--ease-out);
+}
+.ui-modsettings.is-open .ui-modsettings-chevron {
+  transform: rotate(180deg);
+}
+.ui-modsettings-body > * + * {
+  margin-top: var(--space-6);
+}
+.ui-modsettings-body:not([hidden]) {
+  margin-top: var(--space-6);
+}
+.ui-modsettings:focus {
+  outline: none;
+}
+@media (max-width: 600px) {
+  .ui-modsettings-bar {
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+  }
+  .ui-modsettings-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+}
