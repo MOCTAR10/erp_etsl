@@ -1,9 +1,11 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { CalendarCheck, Coins, Inbox, PieChart, Target } from "lucide-react";
+import { CalendarCheck, Coins, PieChart, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
+import i18n from "../i18n";
 import { GrAffairesSection } from "../components/workflow/GrAffairesSection";
 import { MaintenanceCoutsSection } from "../components/workflow/MaintenanceM8Section";
 import { CoutsHseSection } from "../components/hse/HsePermisSection";
@@ -11,7 +13,7 @@ import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaire
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { EcartsM11Section } from "../components/controleGestion/EcartsM11Section";
 import { BalanceAgeeGestionSection, MargesTerminaisonSection } from "../components/suivi/SuiviSections";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, EmptyState, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
@@ -30,13 +32,14 @@ import type {
 
 type BudgetGroups = Record<StatutBudget, Budget[]>;
 
-const BUD_BADGE: Record<StatutBudget, "ok" | "warn" | "err" | "brand"> = {
+const BUD_BADGE: Record<StatutBudget, "ok" | "warn" | "neutral"> = {
   brouillon: "warn",
   approuve: "ok",
-  cloture: "err",
+  cloture: "neutral",
 };
 const BUD_ORDER: StatutBudget[] = ["brouillon", "approuve", "cloture"];
 const BUD_VALID = new Set<StatutBudget>(BUD_ORDER);
+const ECARTS_VISIBLES = 8;
 
 type Visas = { visa_daf_par: string | null; visa_cg_par: string | null };
 
@@ -63,16 +66,18 @@ export function BudgetCard({ b, index }: { b: Budget; index: number }) {
   const { t } = useTranslation();
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        {b.code} <span className="muted">· {t(`controleGestion.budgetType${b.type_budget === "charge" ? "Charge" : "Produit"}`)}</span>
+      <div className="card-top">
+        <span className="card-code">
+          {b.code} · {t(`controleGestion.budgetType${b.type_budget === "charge" ? "Charge" : "Produit"}`)}
+        </span>
       </div>
-      <div className="meta">{b.label}</div>
-      <div className="meta">
-        {b.has_amount_access && b.montant !== null
-          ? formatMoney(b.montant)
-          : "••••••"}
-        {b.analytic_code ? ` · ${b.axis_code ?? "axe"}:${b.analytic_code}` : ""}
-        {b.nb_revisions > 0 ? ` · R${b.nb_revisions}` : ""}
+      <div className="title">{b.label}</div>
+      <div className="card-foot">
+        <span>
+          {b.analytic_code ?? ""}
+          {b.nb_revisions > 0 ? `${b.analytic_code ? " · " : ""}${t("revueR3.cg.revisions", { count: b.nb_revisions })}` : ""}
+        </span>
+        <span className="amount">{b.has_amount_access && b.montant !== null ? formatMoney(b.montant) : "••••••"}</span>
       </div>
       {b.statut === "brouillon" && <VisaStatus v={b} />}
       <ActionBar
@@ -90,6 +95,12 @@ export function BudgetCard({ b, index }: { b: Budget; index: number }) {
 }
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
+
+/** « 2026-07 » → « juil. 2026 » ; tout autre libellé de période est rendu tel quel. */
+function periodeLisible(p: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(p);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleDateString(i18n.language, { month: "short", year: "numeric" }) : p;
+}
 type MargeLigne = MargeRow & { id: string };
 
 const money = (access: boolean, v: string | number | null) => (access && v !== null ? formatMoney(v) : "••••••");
@@ -99,11 +110,7 @@ function margeColumns(t: T): Column<MargeLigne>[] {
     {
       key: "axe",
       header: t("controleGestion.col.axe"),
-      render: (r) => (
-        <>
-          {r.libelle || "—"} <span className="muted">({r.code_axe})</span>
-        </>
-      ),
+      render: (r) => r.libelle || <span className="muted">{t("revueR3.cg.nonAffecte")}</span>,
     },
     { key: "produits", header: t("controleGestion.produits"), num: true, render: (r) => formatMoney(r.produits) },
     { key: "charges", header: t("controleGestion.charges"), num: true, render: (r) => formatMoney(r.charges) },
@@ -112,7 +119,8 @@ function margeColumns(t: T): Column<MargeLigne>[] {
       key: "taux",
       header: t("controleGestion.col.taux"),
       num: true,
-      render: (r) => (r.taux_marge !== null ? `${formatNumber(r.taux_marge)} %` : "—"),
+      // Le serveur renvoie un ratio (0,13) : affiché en pourcentage à une décimale (« 13,5 % »).
+      render: (r) => (r.taux_marge !== null ? `${formatNumber(Number(r.taux_marge) * 100, { decimals: 1 })} %` : "—"),
     },
   ];
 }
@@ -176,9 +184,8 @@ function analyseColumns(t: T): Column<AnalyseEcart>[] {
       render: (a) => (
         <>
           {a.budget_label}
-          <br />
-          <span className="muted">
-            {a.code} · {a.budget_code} — {a.period_label}
+          <span className="cell-sub">
+            {periodeLisible(a.period_label)} · {a.budget_code}
           </span>
         </>
       ),
@@ -191,7 +198,7 @@ function analyseColumns(t: T): Column<AnalyseEcart>[] {
       render: (a) => (
         <Badge tone={a.en_retard ? "err" : "warn"}>
           {Number(a.ecart_pct) > 0 ? "+" : ""}
-          {a.ecart_pct} %
+          {formatNumber(a.ecart_pct, { decimals: 1 })} %
         </Badge>
       ),
     },
@@ -201,7 +208,7 @@ function analyseColumns(t: T): Column<AnalyseEcart>[] {
       sortValue: (a) => a.echeance,
       render: (a) => (
         <>
-          {t("controleGestion.echeanceAnalyse")} {formatDate(a.echeance)}
+          <span className="r3-nowrap">{formatDate(a.echeance)}</span>
           {a.en_retard ? (
             <>
               {" "}
@@ -263,6 +270,7 @@ export function ControleGestionPage() {
   const yearParam = fy.data ? `?fiscal_year=${fy.data.id}` : "";
 
   const [budSearch, setBudSearch] = useState("");
+  const [tousEcarts, setTousEcarts] = useState(false);
   const budgets = useQuery({
     queryKey: ["cg-budgets", fy.data?.id, budSearch],
     queryFn: () => api.cgBudgets(pagedQuery(1, 500, budSearch)),
@@ -331,6 +339,10 @@ export function ControleGestionPage() {
   const m = marges.data as MargesResult | undefined;
   const enCours = groups["brouillon"].length + groups["approuve"].length;
   const appliquees = revs.filter((r) => r.statut === "appliquee").length;
+  // Les écarts les plus forts d'abord (en retard en tête) : la liste complète reste à un clic.
+  const ecartsTries = [...(analyses.data ?? [])].sort(
+    (x, y) => Number(y.en_retard) - Number(x.en_retard) || Math.abs(Number(y.ecart_pct)) - Math.abs(Number(x.ecart_pct)),
+  );
 
   return (
     <>
@@ -343,29 +355,30 @@ export function ControleGestionPage() {
         <Kpi label={t("tableaux.entetes.margeHorsGr")} value={m && m.totals.marge_hors_gr !== null ? m.totals.marge_hors_gr : "••••••"} kind="money" hint={t("tableaux.entetes.coutGr", { montant: m ? formatMoney(m.totals.cout_gr) : "—" })} icon={Coins} tone="accent" delay={0.15} />
       </div>
 
+      <h3 className="section-heading">{t("controleGestion.budgets")}</h3>
       <SearchField value={budSearch} onChange={setBudSearch} placeholder={t("controleGestion.searchBudgets")} />
 
-      <div style={{ overflowX: "auto" }}>
-        <Board>
-          {BUD_ORDER.map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={t(`controleGestion.statut_budget.${st}`)}
-              count={groups[st].length}
-              tone={BUD_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={280}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <EmptyState icon={Inbox} label={t("common.empty")} />
-              ) : (
-                groups[st].map((b, i) => <BudgetCard key={b.id} b={b} index={i} />)
-              )}
-            </BoardColumn>
-          ))}
-        </Board>
-      </div>
+      <Board label={t("controleGestion.budgets")}>
+        {BUD_ORDER.map((st, ci) => (
+          <BoardColumn
+            key={st}
+            title={t(`controleGestion.statut_budget.${st}`)}
+            count={groups[st].length}
+            tone={BUD_BADGE[st]}
+            delay={ci * 0.05}
+            limit={6}
+            summary={
+              groups[st].some((b) => b.has_amount_access && b.montant !== null)
+                ? formatMoney(groups[st].reduce((n, b) => n + (b.has_amount_access && b.montant !== null ? Number(b.montant) : 0), 0))
+                : undefined
+            }
+          >
+            {groups[st].map((b, i) => (
+              <BudgetCard key={b.id} b={b} index={i} />
+            ))}
+          </BoardColumn>
+        ))}
+      </Board>
 
       {m && m.rows.length > 0 && (
         <SectionCard title={`${t("controleGestion.marges")} · ${m.rows.length}`}>
@@ -378,9 +391,19 @@ export function ControleGestionPage() {
       )}
 
       {(analyses.data?.length ?? 0) > 0 && (
-        <SectionCard title={`${t("controleGestion.analysesEcart")} · ${analyses.data?.length}`}>
+        <SectionCard
+          title={`${t("controleGestion.analysesEcart")} · ${analyses.data?.length}`}
+          subtitle={t("revueR3.cg.analysesSub")}
+          actions={
+            (analyses.data?.length ?? 0) > ECARTS_VISIBLES ? (
+              <button type="button" className="btn ghost sm" onClick={() => setTousEcarts((v) => !v)} aria-expanded={tousEcarts}>
+                {tousEcarts ? t("revueR3.cg.reduire") : t("revueR3.cg.toutVoir", { count: analyses.data?.length ?? 0 })}
+              </button>
+            ) : null
+          }
+        >
           <DataTable
-            rows={analyses.data ?? []}
+            rows={ecartsTries.slice(0, tousEcarts ? undefined : ECARTS_VISIBLES)}
             columns={analyseColumns(t)}
             caption={t("controleGestion.analysesEcart")}
           />
@@ -408,9 +431,7 @@ export function ControleGestionPage() {
         </SectionCard>
       )}
 
-      <p className="muted" style={{ marginTop: "0.5rem" }}>
-        {t("controleGestion.pendingNote")}
-      </p>
+      <p className="muted">{t("controleGestion.pendingNote")}</p>
     </>
   );
 }

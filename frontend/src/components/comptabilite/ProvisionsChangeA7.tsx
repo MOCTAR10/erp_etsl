@@ -57,7 +57,13 @@ export function ProvisionsChangeA7() {
     <div className="a7-provisions">
       <h4>
         {t("ecarts_a7.provision.title")}{" "}
-        {q.data?.provisoire && <Badge tone="warn">{t("ecarts_a7.provisoire")}</Badge>}
+        {q.data?.provisoire && (
+          <>
+            <Badge tone="warn" title={t("ecarts_a7.provisoire")}>
+              {t("revueR3.provisoire")}
+            </Badge>
+          </>
+        )}
       </h4>
       <p className="muted">{t("ecarts_a7.provision.subtitle")}</p>
       {rows.length === 0 ? (

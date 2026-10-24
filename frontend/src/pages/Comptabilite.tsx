@@ -3,6 +3,7 @@ import { useState } from "react";
 import { BadgePercent, ClipboardList, CreditCard, Landmark } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, PageHeader, QuickForm, SearchField, SectionCard } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
@@ -31,11 +32,11 @@ import type {
 
 type EngagementGroups = Record<StatutEngagement, Engagement[]>;
 
-const ENG_BADGE: Record<StatutEngagement, "ok" | "warn" | "err" | "brand"> = {
+const ENG_BADGE: Record<StatutEngagement, "ok" | "warn" | "neutral" | "brand"> = {
   brouillon: "warn",
   soumis: "brand",
   approuve: "ok",
-  annule: "err",
+  annule: "neutral",
 };
 const ENG_ORDER: StatutEngagement[] = ["brouillon", "soumis", "approuve", "annule"];
 const ENG_VALID = new Set<StatutEngagement>(ENG_ORDER);
@@ -54,6 +55,8 @@ function engagementActions(e: Engagement, t: (k: string) => string): ActionDef[]
 function EngagementCard({ e, index }: { e: Engagement; index: number }) {
   const { t } = useTranslation();
   const paye = Number(e.total_paye);
+  // Engagement entièrement réglé : « Soldé » plutôt que de répéter le même montant deux fois.
+  const solde = paye > 0 && paye >= Number(e.montant);
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="card-top">
@@ -65,7 +68,7 @@ function EngagementCard({ e, index }: { e: Engagement; index: number }) {
       <div className="title">{e.objet}</div>
       {e.fournisseur_name ? <div className="meta">{e.fournisseur_name}</div> : null}
       <div className="card-foot">
-        <span>{paye > 0 ? t("listes.compta.paye", { montant: formatMoney(paye) }) : null}</span>
+        <span>{solde ? t("revueR3.compta.solde") : paye > 0 ? t("listes.compta.paye", { montant: formatMoney(paye) }) : null}</span>
         <span className="amount">{formatMoney(e.montant)}</span>
       </div>
       <CardActions actions={engagementActions(e, t)} />
@@ -74,6 +77,13 @@ function EngagementCard({ e, index }: { e: Engagement; index: number }) {
 }
 
 const masque = "••••••";
+
+/** « proc. 4.7 » (abréviation saisie) → « Procédure 4.7 » : aucun code abrégé à l'écran. */
+function referenceProcedure(ref: string | null | undefined, t: (k: string, o?: Record<string, unknown>) => string) {
+  if (!ref) return "—";
+  const m = /^proc\.?\s*(.+)$/i.exec(ref.trim());
+  return m ? t("revueR3.compta.procedure", { ref: m[1] }) : ref;
+}
 
 export function ComptabilitePage() {
   const { t, i18n } = useTranslation();
@@ -163,7 +173,7 @@ export function ComptabilitePage() {
   ];
   const paiementColumns: Column<Paiement>[] = [
     { key: "code", header: t("comptabilite.col.code"), sortValue: (p) => p.code, render: (p) => p.code },
-    { key: "date", header: t("comptabilite.col.date"), sortValue: (p) => p.date, render: (p) => formatDate(p.date, i18n.language) },
+    { key: "date", header: t("comptabilite.col.date"), sortValue: (p) => p.date, render: (p) => <span className="r3-nowrap">{formatDate(p.date, i18n.language)}</span> },
     { key: "sens", header: t("comptabilite.col.direction"), render: (p) => t(`comptabilite.sens_${p.sens}`) },
     { key: "mode", header: t("comptabilite.col.mode"), render: (p) => t(`comptabilite.mode_${p.mode}`) },
     {
@@ -213,7 +223,7 @@ export function ComptabilitePage() {
   const controleColumns: Column<ControleInterne>[] = [
     { key: "code", header: t("comptabilite.col.code"), render: (c) => c.code },
     { key: "libelle", header: t("listes.compta.controle"), render: (c) => c.libelle },
-    { key: "ref", header: t("listes.compta.reference"), render: (c) => c.reference_procedure || "—" },
+    { key: "ref", header: t("listes.compta.reference"), render: (c) => referenceProcedure(c.reference_procedure, t) },
     { key: "resp", header: t("listes.compta.responsable"), render: (c) => c.responsable_name ?? "—" },
     { key: "date", header: t("listes.compta.datePrevue"), sortValue: (c) => c.date_prevue, render: (c) => formatDate(c.date_prevue) },
     {
@@ -279,8 +289,11 @@ export function ComptabilitePage() {
       />
 
       <div className="kpi-grid">
-        <Kpi label={t("comptabilite.banques")} value={banquesAll.length} hint={`512 · ${t("comptabilite.compte")}`} icon={Landmark} tone="brand" delay={0} />
-        <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("comptabilite.engagementsEnCours")} icon={ClipboardList} tone="warn" delay={0.05} />
+        <Kpi
+          label={t("comptabilite.banques")}
+          value={banquesAll.length}
+          hint={t("revueR3.compta.soldesOuverture", { montant: formatMoney(banquesAll.reduce((n, b) => n + Number(b.solde_initial || 0), 0)) })} icon={Landmark} tone="brand" delay={0} />
+        <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("revueR3.compta.engagementsEnCours", { count: enCours })} icon={ClipboardList} tone="warn" delay={0.05} />
         <Kpi label={t("comptabilite.paiements")} value={valides.length} hint={t("comptabilite.paiementsValides")} icon={CreditCard} tone="brand" delay={0.1} />
         <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
       </div>
@@ -297,7 +310,7 @@ export function ComptabilitePage() {
               count={groups[st].length}
               tone={ENG_BADGE[st]}
               delay={ci * 0.04}
-              limit={20}
+              limit={6}
               summary={groups[st].length ? formatMoney(groups[st].reduce((n, e) => n + Number(e.montant), 0)) : undefined}
             >
               {groups[st].map((e, i) => (
