@@ -4,6 +4,7 @@ import { Award, ClipboardCheck, FileCheck2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
+import { refLabel } from "../components/sections/affichage";
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
@@ -54,7 +55,7 @@ function qualifColumns(t: T): Column<QualificationSoudeur>[] {
       ),
     },
     { key: "norme", header: t("qualite.col.norme"), render: (q) => t(`qualite.norms.${q.norme}`) },
-    { key: "procede", header: t("qualite.col.procede"), render: (q) => `${q.procede_label} · ${q.position || "—"}` },
+    { key: "procede", header: t("qualite.col.procede"), render: (q) => `${refLabel(t, "procede", q.procede, q.procede_label)} · ${q.position || "—"}` },
     { key: "validite", header: t("qualite.col.validite"), render: (q) => <span className="r3-nowrap">{formatDate(q.date_validite)}</span> },
     {
       key: "statut",
@@ -70,7 +71,7 @@ function wpsColumns(t: T): Column<WpsWpqr>[] {
     { key: "code", header: t("qualite.col.code"), render: (w) => w.code },
     { key: "type", header: t("qualite.col.type"), render: (w) => t(`qualite.wps_type.${w.type}`) },
     { key: "ref", header: t("qualite.col.reference"), render: (w) => w.reference || "—" },
-    { key: "procede", header: t("qualite.col.procede"), render: (w) => w.procede_label },
+    { key: "procede", header: t("qualite.col.procede"), render: (w) => refLabel(t, "procede", w.procede, w.procede_label) },
     { key: "materiau", header: t("qualite.col.materiau"), render: (w) => w.materiau || "—" },
     {
       key: "statut",

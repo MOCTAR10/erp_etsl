@@ -4,6 +4,7 @@ import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
+import { refLabel, sansPrefixeType } from "../components/sections/affichage";
 import { api } from "../api/client";
 import { EcartsM12Section } from "../components/juridique/EcartsM12Section";
 import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
@@ -92,10 +93,12 @@ function ConventionCard({ c, index }: { c: Convention; index: number }) {
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
       <div className="card-top">
         <span className="card-code">
-          {c.code} · {c.type_label}
+          {c.code} · {refLabel(t, "contrat", c.type, c.type_label)}
         </span>
       </div>
-      <div className="title">{c.titre}</div>
+      <div className="title" title={c.titre}>
+        {sansPrefixeType(c.titre)}
+      </div>
       {c.partenaire_name ? <div className="meta">{c.partenaire_name}</div> : null}
       <div className="card-foot">
         <span>
@@ -137,7 +140,7 @@ const daysLeft = (t: T, d: number | null) => (d === null ? "—" : `${d} ${t("ju
 function cautionColumns(t: T): Column<Caution>[] {
   return [
     { key: "code", header: t("juridique.col.code"), render: (c) => c.code },
-    { key: "type", header: t("juridique.col.type"), render: (c) => c.type_label },
+    { key: "type", header: t("juridique.col.type"), render: (c) => refLabel(t, "caution", c.type, c.type_label) },
     { key: "benef", header: t("juridique.col.beneficiaire"), render: (c) => c.beneficiaire || "—" },
     { key: "montant", header: t("juridique.col.montant"), num: true, render: (c) => amount(c.has_amount_access, c.montant) },
     { key: "ech", header: t("juridique.col.echeance"), render: (c) => dateOr(c.date_echeance) },
@@ -153,7 +156,7 @@ function cautionColumns(t: T): Column<Caution>[] {
 function assuranceColumns(t: T): Column<Assurance>[] {
   return [
     { key: "code", header: t("juridique.col.code"), render: (a) => a.code },
-    { key: "type", header: t("juridique.col.type"), render: (a) => a.type_label },
+    { key: "type", header: t("juridique.col.type"), render: (a) => refLabel(t, "assurance", a.type, a.type_label) },
     { key: "police", header: t("juridique.col.police"), render: (a) => a.numero_police || "—" },
     { key: "assureur", header: t("juridique.col.assureur"), render: (a) => a.assureur_name ?? "—" },
     { key: "prime", header: t("juridique.col.prime"), num: true, render: (a) => amount(a.has_amount_access, a.prime_annuelle) },
@@ -172,7 +175,7 @@ function contentieuxColumns(t: T): Column<Contentieux>[] {
     { key: "code", header: t("juridique.col.code"), render: (l) => l.code },
     { key: "objet", header: t("juridique.col.objet"), render: (l) => l.objet },
     { key: "partie", header: t("juridique.col.partieAdverse"), render: (l) => l.partie_adverse ?? "—" },
-    { key: "phase", header: t("juridique.col.phase"), render: (l) => l.phase_label },
+    { key: "phase", header: t("juridique.col.phase"), render: (l) => refLabel(t, "phase", l.phase, l.phase_label) },
     { key: "enjeu", header: t("juridique.col.enjeu"), num: true, render: (l) => amount(l.has_amount_access, l.montant_en_jeu) },
     {
       key: "statut",
@@ -187,16 +190,26 @@ function grColumns(t: T): Column<DossierGlobalRental>[] {
     { key: "code", header: t("juridique.col.code"), render: (g) => g.code },
     { key: "objet", header: t("juridique.col.objet"), render: (g) => g.objet },
     { key: "partner", header: t("juridique.col.partenaire"), render: (g) => g.partenaire_gr_name },
-    { key: "montant", header: t("juridique.col.montant"), num: true, render: (g) => amount(g.has_amount_access, g.montant_estime) },
+    {
+      key: "montant",
+      header: t("juridique.col.montant"),
+      num: true,
+      // Le compte 618 est une imputation, pas un statut : en ligne secondaire sous le montant.
+      render: (g) => (
+        <>
+          {amount(g.has_amount_access, g.montant_estime)}
+          {g.signe_618 && (
+            <span className="cell-sub" title={t("tableaux.logistique.compte618")}>
+              {t("premiumModules.compte618")}
+            </span>
+          )}
+        </>
+      ),
+    },
     {
       key: "statut",
       header: t("juridique.col.statut"),
-      render: (g) => (
-        <>
-          <Badge tone={GR_TONE[g.statut]}>{t(`juridique.statut_gr.${g.statut}`)}</Badge>{" "}
-          {g.signe_618 && <Badge tone="warn">618</Badge>}
-        </>
-      ),
+      render: (g) => <Badge tone={GR_TONE[g.statut]}>{t(`juridique.statut_gr.${g.statut}`)}</Badge>,
     },
   ];
 }
@@ -204,7 +217,7 @@ function grColumns(t: T): Column<DossierGlobalRental>[] {
 function courrierColumns(t: T): Column<Courrier>[] {
   return [
     { key: "code", header: t("juridique.col.code"), render: (c) => c.code },
-    { key: "sens", header: t("juridique.col.sens"), render: (c) => c.sens_label },
+    { key: "sens", header: t("juridique.col.sens"), render: (c) => refLabel(t, "sens", c.sens, c.sens_label) },
     { key: "objet", header: t("juridique.col.objet"), render: (c) => c.objet },
     { key: "tiers", header: t("juridique.col.tiers"), render: (c) => c.tiers_name ?? "—" },
     { key: "date", header: t("juridique.col.date"), render: (c) => <span className="r3-nowrap">{dateOr(c.date_reception ?? c.date_courrier)}</span> },
@@ -234,7 +247,7 @@ function courrierColumns(t: T): Column<Courrier>[] {
 function reunionColumns(t: T): Column<Reunion>[] {
   return [
     { key: "code", header: t("juridique.col.code"), render: (r) => r.code },
-    { key: "type", header: t("juridique.col.type"), render: (r) => r.type_label },
+    { key: "type", header: t("juridique.col.type"), render: (r) => refLabel(t, "reunion", r.type, r.type_label) },
     { key: "objet", header: t("juridique.col.objet"), render: (r) => r.objet },
     { key: "date", header: t("juridique.col.date"), render: (r) => dateOr(r.date_reunion) },
     { key: "decisions", header: t("juridique.col.decisions"), num: true, render: (r) => r.nb_decisions },

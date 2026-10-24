@@ -268,8 +268,6 @@ export function RhPaiePage() {
         ))}
       </Board>
 
-      <p className="muted">{t("rhPaie.pendingNote")}</p>
-
       {(employes.count > 0 || employes.search || employeSite) && (
         <SectionCard title={`${t("rhPaie.employes")} · ${employes.count}`}>
           <div className="r3-toolbar">

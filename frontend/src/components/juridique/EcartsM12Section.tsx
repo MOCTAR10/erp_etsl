@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { nombre } from "../sections/affichage";
+import { displayName } from "../../lib/people";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
@@ -389,7 +391,7 @@ export function EcartsM12Section() {
               { key: "dossier", header: t("ecarts_m12.contentieux.dossier"), render: (a) => a.contentieux_code },
               { key: "type", header: t("ecarts_m12.contentieux.type"), render: (a) => a.type_label },
               { key: "description", header: t("ecarts_m12.contentieux.description"), render: (a) => a.description },
-              { key: "auteur", header: t("tableaux.juridique.auteur"), render: (a) => <span className="muted">{a.auteur_name ?? "—"}</span> },
+              { key: "auteur", header: t("tableaux.juridique.auteur"), render: (a) => <span className="muted">{displayName(a.auteur_name)}</span> },
             ]}
           />
         </div>
@@ -413,7 +415,7 @@ export function EcartsM12Section() {
                   key: "probabilite",
                   header: t("ecarts_m12.contentieux.probabilite"),
                   sortValue: (r) => r.probabilite_pct,
-                  render: (r) => (r.probabilite ? `${t(`ecarts_m12.probas.${r.probabilite}`)} (${r.probabilite_pct} %)` : "—"),
+                  render: (r) => (r.probabilite ? `${t(`ecarts_m12.probas.${r.probabilite}`)} (${nombre(r.probabilite_pct, 1)} %)` : "—"),
                 },
                 { key: "enjeu", header: t("ecarts_m12.risk.enjeu"), num: true, render: (r) => fcfa(r.montant_en_jeu), sortValue: (r) => Number(r.montant_en_jeu ?? 0) },
                 { key: "exposition", header: t("ecarts_m12.risk.exposition"), num: true, render: (r) => fcfa(r.exposition), sortValue: (r) => Number(r.exposition ?? 0) },

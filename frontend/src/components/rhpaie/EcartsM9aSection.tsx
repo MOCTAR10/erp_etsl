@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney } from "../../lib/format";
+import { nombre } from "../sections/affichage";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
@@ -73,6 +74,13 @@ function useOptions<T>(key: string, path: string) {
 }
 
 type LigneEcheance = Echeance & { id: string };
+interface GroupeEcheances {
+  id: string;
+  date_limite: string;
+  items: LigneEcheance[];
+  jours: number;
+  deposees: number;
+}
 
 /** Écarts M9-A : saisies RH / paie, bulletin préparé depuis le contrat, absences, carrière, grille, échéances. */
 /** Période de déclaration lisible : « 2026-07-01 » → « Juillet 2026 ». */
@@ -114,7 +122,7 @@ export function EcartsM9aSection() {
       key: "periode",
       header: t("m9a.f.periode"),
       sortValue: (a) => a.date_debut,
-      render: (a) => `${formatDate(a.date_debut)} → ${formatDate(a.date_fin)} · ${a.nb_jours} j`,
+      render: (a) => `${formatDate(a.date_debut)} → ${formatDate(a.date_fin)} · ${nombre(a.nb_jours, 1)} j`,
     },
     { key: "remuneree", header: t("m9a.f.remuneree"), render: (a) => (a.remuneree ? t("m9a.oui_non.true") : <Badge tone="warn">{t("m9a.oui_non.false")}</Badge>) },
     {
@@ -135,31 +143,57 @@ export function EcartsM9aSection() {
       ),
     },
   ];
-  const colEcheances: Column<LigneEcheance>[] = [
-    { key: "limite", header: t("m9a.echeances.limite"), sortValue: (e) => e.date_limite, render: (e) => <span className="r3-nowrap">{formatDate(e.date_limite)}</span> },
-    { key: "libelle", header: t("m9a.f.libelle"), render: (e) => e.libelle },
+  // Calendrier de dépôt groupé par date limite : une ligne par échéance (CNSS, FNH, IRPP, CFP… du même mois),
+  // un seul badge de retard, au lieu de la même date répétée quatre fois.
+  const groupes = new Map<string, LigneEcheance[]>();
+  for (const e of echeances) groupes.set(e.date_limite, [...(groupes.get(e.date_limite) ?? []), e]);
+  const echeancesGroupees: GroupeEcheances[] = [...groupes.entries()]
+    .sort(([x], [y]) => x.localeCompare(y))
+    .map(([date, items]) => ({
+      id: date,
+      date_limite: date,
+      items,
+      jours: Math.min(...items.map((e) => e.jours)),
+      deposees: items.filter((e) => e.deposee).length,
+    }));
+  const periodeTexte = (e: Echeance) =>
+    `${moisLisible(e.periode_debut, i18n.language)}${e.periode_fin !== e.periode_debut ? ` → ${moisLisible(e.periode_fin, i18n.language)}` : ""}`;
+  const colEcheances: Column<GroupeEcheances>[] = [
+    { key: "limite", header: t("m9a.echeances.limite"), sortValue: (g) => g.date_limite, render: (g) => <span className="r3-nowrap">{formatDate(g.date_limite)}</span> },
     {
-      key: "periode",
-      header: t("m9a.f.periode"),
-      render: (e) => (
-        <span className="r3-nowrap">
-          {moisLisible(e.periode_debut, i18n.language)}
-          {e.periode_fin !== e.periode_debut ? ` → ${moisLisible(e.periode_fin, i18n.language)}` : ""}
+      key: "declarations",
+      header: t("premiumModules.rh.declarations"),
+      render: (g) => (
+        <span className="r3-badges">
+          {g.items.map((e) => (
+            <Badge key={e.id} tone={e.deposee ? "ok" : "neutral"} title={`${e.libelle} · ${periodeTexte(e)}`}>
+              {e.code.replace(/^ECH-/, "")}
+            </Badge>
+          ))}
         </span>
       ),
     },
     {
+      key: "periode",
+      header: t("m9a.f.periode"),
+      render: (g) => <span className="r3-nowrap">{[...new Set(g.items.map(periodeTexte))].join(" · ")}</span>,
+    },
+    {
       key: "statut",
       header: t("rhPaie.col.statut"),
-      sortValue: (e) => (e.deposee ? null : e.jours),
-      render: (e) =>
-        e.deposee ? (
-          <Badge tone="ok">{t("m9a.echeances.deposee")}</Badge>
-        ) : e.jours < 0 ? (
-          <Badge tone="err">{t("m9a.echeances.retard", { n: -e.jours })}</Badge>
-        ) : (
-          <Badge tone="warn">{t("m9a.echeances.restant", { n: e.jours })}</Badge>
-        ),
+      sortValue: (g) => (g.deposees === g.items.length ? null : g.jours),
+      render: (g) => (
+        <>
+          {g.deposees === g.items.length ? (
+            <Badge tone="ok">{t("m9a.echeances.deposee")}</Badge>
+          ) : g.jours < 0 ? (
+            <Badge tone="err">{t("m9a.echeances.retard", { n: -g.jours })}</Badge>
+          ) : (
+            <Badge tone="warn">{t("m9a.echeances.restant", { n: g.jours })}</Badge>
+          )}
+          <span className="cell-sub">{t("premiumModules.rh.deposees", { n: g.deposees, total: g.items.length })}</span>
+        </>
+      ),
     },
   ];
   const colGrilles: Column<Grille>[] = [
@@ -322,7 +356,7 @@ export function EcartsM9aSection() {
         }
       >
         <div data-testid="echeances-m9">
-          <DataTable columns={colEcheances} rows={echeances} caption={t("m9a.echeances.title")} />
+          <DataTable columns={colEcheances} rows={echeancesGroupees} caption={t("m9a.echeances.title")} />
         </div>
       </SectionCard>
 

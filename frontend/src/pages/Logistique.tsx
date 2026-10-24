@@ -109,22 +109,24 @@ function locationColumns(t: T, lbl: Lbl): Column<LocationGR>[] {
       header: t("logistique.col.montant"),
       num: true,
       sortValue: (l) => (l.montant_estime === null ? null : Number(l.montant_estime)),
-      render: (l) => (l.montant_estime === null ? t("logistique.masked") : formatMoney(l.montant_estime)),
+      render: (l) => (
+        <>
+          {l.montant_estime === null ? t("logistique.masked") : formatMoney(l.montant_estime)}
+          {l.imputation_618 && (
+            <span className="cell-sub" title={t("tableaux.logistique.compte618")}>
+              {t("premiumModules.compte618")}
+            </span>
+          )}
+        </>
+      ),
     },
     {
       key: "statut",
       header: t("logistique.col.statut"),
       render: (l) => (
-        <span className="cell-nowrap">
-          <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
-            {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
-          </Badge>
-          {l.imputation_618 && (
-            <Badge tone="neutral" title={t("tableaux.logistique.compte618")}>
-              618
-            </Badge>
-          )}
-        </span>
+        <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
+          {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
+        </Badge>
       ),
     },
     actionsColumn<LocationGR>(t("listes.col.actions"), (l) => [

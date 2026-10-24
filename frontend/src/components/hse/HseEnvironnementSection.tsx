@@ -7,6 +7,7 @@ import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { IndicateursHse, PlanReductionImpact, RapportEnvironnemental, RevueDirectionHse } from "../../types";
 import { SectionActions } from "../sections/SectionActions";
+import { nombre } from "../sections/affichage";
 import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
@@ -25,7 +26,7 @@ export function IndicateursHseSection() {
         <Kpi label={t("m7e.ind.formation")} value={pct(d.taux_formation)} hint={t("m7e.ind.formationHint", { n: d.salaries_formes, total: d.salaries_actifs })} />
         <Kpi label={t("m7e.ind.recyclage")} value={pct(d.taux_recyclage)} hint={t("m7e.ind.recyclageHint", { n: d.habilitations_a_jour, total: d.habilitations_suivies })} />
         <Kpi label={t("m7e.ind.iso")} value={pct(d.conformite_iso)} hint={t("m7e.ind.isoHint", { n: d.audits_realises })} />
-        <Kpi label={t("m7e.ind.env")} value={d.taux_incidents_environnement ?? "—"} hint={t("m7e.ind.envHint", { n: d.incidents_environnement })} />
+        <Kpi label={t("m7e.ind.env")} value={nombre(d.taux_incidents_environnement)} hint={t("m7e.ind.envHint", { n: d.incidents_environnement })} />
       </div>
     </SectionCard>
   );

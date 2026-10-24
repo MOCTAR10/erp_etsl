@@ -25,7 +25,7 @@ test.describe("Régression : modules du menu (RF-59)", () => {
   test("admin (12 modules) voit tous les liens métier", async ({ page }) => {
     await loginAs(page, DEMO_USERS.admin, DEMO_PASSWORD);
     const sidebar = page.locator(".sidebar");
-    for (const label of [/Pipeline/, /Commandes/, /Opérations/, /Comptabilité/, /Juridique/]) {
+    for (const label of [/Pipeline/, /Achats/, /Opérations/, /Comptabilité/, /Juridique/]) {
       await expect(sidebar.getByRole("link", { name: label })).toBeVisible();
     }
   });
@@ -36,7 +36,7 @@ test.describe("Régression : modules du menu (RF-59)", () => {
     await expect(sidebar.getByRole("link", { name: /RH & Paie/ })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: /HSE/ })).toBeVisible();
     // Modules hors `ROLE_MODULES[rh]` : liens absents, donc pas de 403 au clic.
-    for (const label of [/Comptabilité/, /Juridique/, /Stocks/, /Commandes/]) {
+    for (const label of [/Comptabilité/, /Juridique/, /Stocks/, /Achats/]) {
       await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
     }
   });

@@ -10,6 +10,7 @@ import { usePagedList } from "../../lib/usePagedList";
 import type { AFacturer, FactureClient, ModeleFacture, Paginated } from "../../types";
 import { Badge, FilterBar, Menu, Pagination, SearchField, SectionCard } from "../ui";
 import { useFiltresListe } from "../../lib/useFiltresListe";
+import "../../styles/pages/sections.css";
 
 const CHAMPS: (keyof ModeleFacture)[] = ["entete", "mentions_legales", "conditions_paiement", "coordonnees_bancaires", "pied_page"];
 
@@ -222,7 +223,7 @@ export function FacturationSection() {
             </div>
           ) : (
             <>
-              <pre className="muted" style={{ whiteSpace: "pre-wrap" }}>{m.entete}</pre>
+              <ApercuFacture m={m} />
               <button type="button" className="btn ghost" onClick={() => setEdition({ entete: m.entete, mentions_legales: m.mentions_legales, conditions_paiement: m.conditions_paiement, coordonnees_bancaires: m.coordonnees_bancaires, pied_page: m.pied_page })}>
                 {t("facturation.modifier")}
               </button>{" "}
@@ -236,5 +237,45 @@ export function FacturationSection() {
         </>
       )}
     </SectionCard>
+  );
+}
+
+/** Aperçu imprimable du modèle de facture (logo, en-tête, blocs de conditions, mentions, pied de page) : jamais de texte brut monospace. */
+function ApercuFacture({ m }: { m: ModeleFacture }) {
+  const { t } = useTranslation();
+  const bloc = (c: keyof ModeleFacture) => {
+    const v = String(m[c] ?? "").trim();
+    return v ? (
+      <div className="facture-apercu-bloc">
+        <span className="facture-apercu-label">{t(`facturation.champ.${c}`)}</span>
+        <p>{v}</p>
+      </div>
+    ) : null;
+  };
+  return (
+    <figure className="facture-apercu" aria-label={t("premiumModules.facture.apercu")}>
+      <header className="facture-apercu-tete">
+        <img src={`${import.meta.env.BASE_URL}etsl-logo.jpg`} alt="" />
+        <p className="facture-apercu-entete">{String(m.entete ?? "").trim() || "—"}</p>
+        <div className="facture-apercu-titre">
+          <strong>{t("premiumModules.facture.titre")}</strong>
+          <span>{t("premiumModules.facture.numero")}</span>
+        </div>
+      </header>
+      <div className="facture-apercu-lignes" aria-hidden>
+        <span>{t("premiumModules.facture.designation")}</span>
+        <span>{t("premiumModules.facture.quantite")}</span>
+        <span>{t("premiumModules.facture.montant")}</span>
+        <i />
+        <i />
+        <i />
+      </div>
+      <div className="facture-apercu-blocs">
+        {bloc("conditions_paiement")}
+        {bloc("coordonnees_bancaires")}
+      </div>
+      {bloc("mentions_legales")}
+      {String(m.pied_page ?? "").trim() ? <footer className="facture-apercu-pied">{m.pied_page}</footer> : null}
+    </figure>
   );
 }
