@@ -627,7 +627,7 @@
   .param-group .ui-grid-actions [aria-expanded="true"] {
     opacity: 1;
   }
-  @media (hover: none) {
+  @media (hover: none), (max-width: 640px) {
     .param-group .param-confirm,
     .param-group .ui-grid-actions > * { opacity: 1; }
   }

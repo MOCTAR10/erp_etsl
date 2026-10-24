@@ -186,7 +186,7 @@ export const fr = {
     resultat: "{{n}} lettrage(s) créé(s) · {{reste}} ligne(s) restent à lettrer.",
     anomalies: "{{count}} ligne(s) en anomalie (sans tiers ou non lettrées depuis plus de {{jours}} jours)",
     motif: { sans_tiers: "Sans tiers", ancienne: "Ancienne" },
-    recents: "Lettrages récents", auto: "Automatique", manuel: "Manuel", lignes: "ligne(s)",
+    recents: "Lettrages récents", auto: "Automatique", manuel: "Manuel", lignes_one: "{{count}} ligne", lignes_other: "{{count}} lignes",
     statut: { actif: "Actif", annule: "Annulé" }, delettrer: "Dé-lettrer", motifPrompt: "Motif du dé-lettrage ?",
     params: "Paramètres modifiables par ETSL", modifier: "Modifier", valider: "Valider", annuler: "Annuler",
     provisoire: "Provisoire", confirme: "Confirmé", confirmer: "Confirmer", confirmConfirmer: "Confirmer cette valeur (validée par ETSL) ?",

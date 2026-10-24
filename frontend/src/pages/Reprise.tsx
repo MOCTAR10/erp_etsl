@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { Badge, DataTable, EmptyState, FileField, PageHeader, SectionCard } from "../components/ui";
+import { Badge, DataTable, DatePicker, EmptyState, FileField, PageHeader, SectionCard } from "../components/ui";
 import type { BadgeTone, Column } from "../components/ui";
 import { formatDateTime, formatMoney, formatNumber } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
@@ -244,16 +244,19 @@ export function ReprisePage() {
                 onChange={setFichier}
               />
             </div>
-            {gabarit?.options.map((o) => (
-              <label className="field" key={o}>
-                <span>{t(`ecarts_import.charger.options.${o}`)}</span>
-                <input
-                  type={o === "date" ? "date" : "number"}
-                  value={options[o] ?? ""}
-                  onChange={(e) => setOptions({ ...options, [o]: e.target.value })}
-                />
-              </label>
-            ))}
+            {gabarit?.options.map((o) =>
+              o === "date" ? (
+                <div className="field" key={o}>
+                  <label htmlFor={`reprise-opt-${o}`}>{t(`ecarts_import.charger.options.${o}`)}</label>
+                  <DatePicker id={`reprise-opt-${o}`} value={options[o] ?? ""} onChange={(v) => setOptions({ ...options, [o]: v })} />
+                </div>
+              ) : (
+                <label className="field" key={o}>
+                  <span>{t(`ecarts_import.charger.options.${o}`)}</span>
+                  <input type="number" value={options[o] ?? ""} onChange={(e) => setOptions({ ...options, [o]: e.target.value })} />
+                </label>
+              ),
+            )}
             {/* Case alignée sur la ligne des champs (A-35). */}
             <label className="field reprise-check">
               <span className="reprise-check-row">

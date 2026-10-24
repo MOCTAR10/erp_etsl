@@ -186,7 +186,7 @@ export const en = {
     resultat: "{{n}} match(es) created · {{reste}} line(s) left to match.",
     anomalies: "{{count}} line(s) flagged (no third party or unmatched for over {{jours}} days)",
     motif: { sans_tiers: "No third party", ancienne: "Old" },
-    recents: "Recent matches", auto: "Automatic", manuel: "Manual", lignes: "line(s)",
+    recents: "Recent matches", auto: "Automatic", manuel: "Manual", lignes_one: "{{count}} line", lignes_other: "{{count}} lines",
     statut: { actif: "Active", annule: "Cancelled" }, delettrer: "Unmatch", motifPrompt: "Reason for unmatching?",
     params: "Settings editable by ETSL", modifier: "Edit", valider: "Apply", annuler: "Cancel",
     provisoire: "Provisional", confirme: "Confirmed", confirmer: "Confirm", confirmConfirmer: "Confirm this value (validated by ETSL)?",
