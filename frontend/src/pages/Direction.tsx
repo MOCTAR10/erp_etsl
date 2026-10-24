@@ -28,7 +28,7 @@ import { PilotageSection } from "../components/direction/Pilotage";
 import { ReportingSection } from "../components/direction/Reporting";
 import { TrendPanel } from "../components/direction/TrendPanel";
 import type { IndicateursCommerciaux, Pilotage } from "../components/direction/types";
-import { ErrorState, Kpi, KpiGridSkeleton, PageHeader, Skeleton } from "../components/ui";
+import { ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionNav, Skeleton } from "../components/ui";
 import { formatMoney, formatNumber, formatPercent } from "../lib/format";
 import type { AlertesAgregees, DashboardDirection, ReportingPetrolier, Tendances } from "../types";
 
@@ -168,9 +168,19 @@ export function DirectionPage() {
   return (
     <>
       {header}
+      <SectionNav
+        items={[
+          { id: "dir-synthese", label: t("premiumVague2.sections.direction.synthese") },
+          { id: "dir-tendances", label: t("premiumVague2.sections.direction.tendances") },
+          { id: "dir-modules", label: t("premiumVague2.sections.direction.modules") },
+          { id: "dir-reporting", label: t("premiumVague2.sections.direction.reporting") },
+          { id: "echeances", label: t("premiumVague2.sections.direction.echeances") },
+          { id: "dir-pilotage", label: t("premiumVague2.sections.direction.pilotage") },
+        ]}
+      />
 
       {/* 1. Chiffres héros : cible, écart, état */}
-      <section className="dir-heroes" aria-label={t("direction2.heros")}>
+      <section id="dir-synthese" className="dir-heroes" aria-label={t("direction2.heros")}>
         <HeroStat
           label={t("direction2.ca.label")}
           value={ca.value}
@@ -238,13 +248,13 @@ export function DirectionPage() {
       </section>
 
       {/* 2. Tendances + « À traiter maintenant » (colonne latérale) */}
-      <div className="dir-split">
+      <div id="dir-tendances" className="dir-split">
         <TrendPanel data={tr} loading={tendances.isPending} />
         <AttentionList items={urgents} />
       </div>
 
       {/* 3. Indicateurs par module : 2 rangées de 4 */}
-      <section className="dir-section" aria-labelledby="dir-modules-title">
+      <section id="dir-modules" className="dir-section" aria-labelledby="dir-modules-title">
         <h3 id="dir-modules-title" className="section-title">
           {t("direction.directionKPIs")}
         </h3>
@@ -277,13 +287,17 @@ export function DirectionPage() {
       </section>
 
       {/* 4. Reporting client pétrolier */}
-      <ReportingSection p={p} />
+      <div id="dir-reporting" className="page-section">
+        <ReportingSection p={p} />
+      </div>
 
       {/* 5. Échéances */}
       <EcheancesSection a={a} />
 
       {/* 6. Pilotage financier et cubes (onglets) */}
-      <PilotageSection commercial={d.commercial.indicateurs} />
+      <div id="dir-pilotage" className="page-section">
+        <PilotageSection commercial={d.commercial.indicateurs} />
+      </div>
     </>
   );
 }

@@ -22,7 +22,7 @@ export function ConformiteHse() {
   const auditCols: Column<AuditHse>[] = [
     { key: "code", header: t("hse.m7.code"), render: (a) => a.code },
     { key: "zone", header: t("hse.m7.zone"), render: (a) => a.zone },
-    { key: "date", header: t("hse.m7.datePrevue"), render: (a) => formatDate(a.date_prevue) },
+    { key: "date", header: t("hse.m7.datePrevue"), kind: "date", render: (a) => formatDate(a.date_prevue) },
     { key: "score", header: t("hse.m7.score"), num: true, render: (a) => (a.score == null ? "—" : `${a.score} %`) },
     { key: "ecarts", header: t("hse.m7.ecarts"), num: true, render: (a) => a.nb_ecarts_ouverts },
     {
@@ -76,8 +76,8 @@ export function ConformiteHse() {
   const planCols: Column<PlanUrgence>[] = [
     { key: "code", header: t("hse.m7.code"), render: (p) => p.code },
     { key: "intitule", header: t("hse.m7.intitule"), render: (p) => `${p.intitule} · ${p.type_label}` },
-    { key: "dernier", header: t("hse.m7.dernier"), render: (p) => (p.dernier_exercice ? formatDate(p.dernier_exercice) : t("hse.m7.jamais")) },
-    { key: "prochain", header: t("hse.m7.prochain"), render: (p) => (p.prochain_exercice ? formatDate(p.prochain_exercice) : "—") },
+    { key: "dernier", header: t("hse.m7.dernier"), kind: "date", render: (p) => (p.dernier_exercice ? formatDate(p.dernier_exercice) : t("hse.m7.jamais")) },
+    { key: "prochain", header: t("hse.m7.prochain"), kind: "date", render: (p) => (p.prochain_exercice ? formatDate(p.prochain_exercice) : "—") },
     {
       key: "statut",
       header: t("hse.m7.statut"),

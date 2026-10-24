@@ -8,7 +8,7 @@ import { refLabel, sansPrefixeType } from "../components/sections/affichage";
 import { api } from "../api/client";
 import { EcartsM12Section } from "../components/juridique/EcartsM12Section";
 import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney } from "../lib/format";
@@ -359,6 +359,17 @@ export function JuridiquePage() {
           />
         }
       />
+      <SectionNav
+        items={[
+          ...(a.total > 0 ? [{ id: "jur-alertes", label: t("premiumVague2.sections.juridique.alertes") }] : []),
+          ...(convs.length > 0 || convSearch ? [{ id: "jur-conventions", label: t("premiumVague2.sections.juridique.conventions") }] : []),
+          { id: "jur-garanties", label: t("premiumVague2.sections.juridique.garanties") },
+          { id: "jur-contentieux", label: t("premiumVague2.sections.juridique.contentieux") },
+          { id: "jur-documents", label: t("premiumVague2.sections.juridique.documents") },
+          { id: "jur-suivi", label: t("premiumVague2.sections.juridique.suivi") },
+          { id: "jur-parametres", label: t("premiumVague2.sections.juridique.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi
@@ -378,7 +389,7 @@ export function JuridiquePage() {
       </div>
 
       {a.total > 0 ? (
-        <>
+        <div id="jur-alertes" className="page-section">
           <SectionCard
             title={`${t("juridique.alertes")} · ${a.total}`}
             subtitle={t("revueR3.juridique.alertesSub")}
@@ -401,11 +412,11 @@ export function JuridiquePage() {
               density="compact"
             />
           </SectionCard>
-        </>
+        </div>
       ) : null}
 
       {convs.length > 0 || convSearch ? (
-        <>
+        <div id="jur-conventions" className="page-section">
           <h3 className="section-heading">
             {t("revueR3.juridique.conventions")} · {convs.length}
           </h3>
@@ -432,9 +443,10 @@ export function JuridiquePage() {
               })}
             </Board>
           </div>
-        </>
+        </div>
       ) : null}
 
+      <div id="jur-garanties" className="page-section">
       {(cautions.count > 0 || cautions.search) && (
         <SectionCard title={`${t("juridique.cautions")} · ${cautions.count}`}>
           <PagedDataGrid list={cautions} columns={cautionColumns(t)} caption={t("juridique.cautions")} searchPlaceholder={t("juridique.searchCautions")} />
@@ -445,6 +457,8 @@ export function JuridiquePage() {
           <PagedDataGrid list={assurances} columns={assuranceColumns(t)} caption={t("juridique.assurances")} searchPlaceholder={t("juridique.searchAssurances")} />
         </SectionCard>
       )}
+      </div>
+      <div id="jur-contentieux" className="page-section">
       {(contentieux.count > 0 || contentieux.search) && (
         <SectionCard title={`${t("juridique.contentieux")} · ${contentieux.count}`}>
           <PagedDataGrid list={contentieux} columns={contentieuxColumns(t)} caption={t("juridique.contentieux")} searchPlaceholder={t("juridique.searchContentieux")} />
@@ -455,10 +469,10 @@ export function JuridiquePage() {
           <PagedDataGrid list={dossiersGr} columns={grColumns(t)} caption="GLOBAL RENTAL" searchPlaceholder={t("juridique.searchGr")} />
         </SectionCard>
       )}
+      </div>
+      <div id="jur-documents" className="page-section">
       <RechercheJuridiqueSection />
       <DocumentsOfficielsSection />
-      <EcartsM12Section />
-
       {(courriers.count > 0 || courriers.search) && (
         <SectionCard title={`${t("juridique.courriers")} · ${courriers.count}`}>
           <PagedDataGrid list={courriers} columns={courrierColumns(t)} caption={t("juridique.courriers")} searchPlaceholder={t("juridique.searchCourriers")} />
@@ -469,6 +483,9 @@ export function JuridiquePage() {
           <PagedDataGrid list={reunions} columns={reunionColumns(t)} caption={t("juridique.reunions")} searchPlaceholder={t("juridique.searchReunions")} />
         </SectionCard>
       )}
+      </div>
+
+      <EcartsM12Section />
     </>
   );
 }

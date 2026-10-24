@@ -14,7 +14,7 @@ import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
 import { formatDate, formatMoney, formatNumber, formatPercent } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { ActionDef } from "../components/ui";
@@ -182,6 +182,16 @@ export function OperationsPage() {
   return (
     <div className="listes-page">
       <PageHeader title={t("operations.title")} subtitle={t("listes.sub.operations")} />
+      <SectionNav
+        items={[
+          { id: "ops-ordres", label: t("premiumVague2.sections.operations.ordres") },
+          ...(situations.count > 0 || situations.search ? [{ id: "ops-situations", label: t("premiumVague2.sections.operations.situations") }] : []),
+          { id: "ops-equipes", label: t("premiumVague2.sections.operations.equipes") },
+          { id: "ops-consommations", label: t("premiumVague2.sections.operations.consommations") },
+          { id: "ops-suivi", label: t("premiumVague2.sections.operations.suivi") },
+          { id: "ops-parametres", label: t("premiumVague2.sections.operations.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("operations.of")} value={active} icon={HardHat} tone="brand" delay={0} />
@@ -200,6 +210,7 @@ export function OperationsPage() {
             ))
           : null}
       </div>
+      <div id="ops-ordres" className="page-section">
       {charge.data ? <ChargeSurcharge stats={charge.data} /> : null}
 
       <section className="listes-block">
@@ -217,9 +228,10 @@ export function OperationsPage() {
           ))}
         </Board>
       </section>
+      </div>
 
       {(situations.count > 0 || situations.search) && (
-        <SectionCard title={`${t("operations.situations")} · ${situations.count}`}>
+        <SectionCard id="ops-situations" title={`${t("operations.situations")} · ${situations.count}`}>
           <PagedDataTable
             list={situations}
             searchPlaceholder={t("operations.searchSituations")}
@@ -244,6 +256,7 @@ export function OperationsPage() {
         </SectionCard>
       )}
 
+      <div id="ops-equipes" className="page-section">
       <SectionCard
         title={`${t("operations.equipes")} · ${(affectations.data ?? []).length}`}
         actions={
@@ -340,9 +353,14 @@ export function OperationsPage() {
           />
         </SectionCard>
       <CoutMainOeuvreSection />
+      </div>
+
+      <div id="ops-consommations" className="page-section">
+        <ConsommationOfSection />
+        <FluxM4Section />
+      </div>
+
       <EcartsM3Section />
-      <ConsommationOfSection />
-      <FluxM4Section />
     </div>
   );
 }

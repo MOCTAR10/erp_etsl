@@ -51,7 +51,7 @@ export function PersonnelHseSection() {
     : [];
   const colPasseport: Column<LignePasseport>[] = [
     { key: "element", header: t("tableaux.hse.element"), render: (l) => l.element },
-    { key: "debut", header: t("tableaux.hse.obtention"), sortValue: (l) => l.debut, render: (l) => (l.debut ? formatDate(l.debut) : "—") },
+    { key: "debut", header: t("tableaux.hse.obtention"), kind: "date", sortValue: (l) => l.debut, render: (l) => (l.debut ? formatDate(l.debut) : "—") },
     { key: "fin", header: t("tableaux.hse.validite"), render: (l) => l.fin },
   ];
   return (
@@ -247,13 +247,13 @@ export function AptitudesSection() {
   if (q.isError || !q.data || q.data.length === 0) return null;
   const columns: Column<AptitudeMedicale>[] = [
     { key: "salarie", header: t("m7e.perso.salarie"), sortValue: (a) => a.employe_nom, render: (a) => a.employe_nom },
-    { key: "visite", header: t("m7e.perso.visite"), sortValue: (a) => a.date_visite, render: (a) => formatDate(a.date_visite) },
+    { key: "visite", header: t("m7e.perso.visite"), kind: "date", sortValue: (a) => a.date_visite, render: (a) => formatDate(a.date_visite) },
     {
       key: "resultat",
       header: t("m7e.perso.resultat"),
       render: (a) => <Badge tone={a.resultat === "inapte" ? "err" : a.resultat === "apte" ? "ok" : "warn"}>{a.resultat_label}</Badge>,
     },
-    { key: "validite", header: t("m7e.perso.validite"), sortValue: (a) => a.date_validite, render: (a) => (a.date_validite ? formatDate(a.date_validite) : "—") },
+    { key: "validite", header: t("m7e.perso.validite"), kind: "date", sortValue: (a) => a.date_validite, render: (a) => (a.date_validite ? formatDate(a.date_validite) : "—") },
   ];
   return (
     <SectionCard title={`${t("m7e.perso.aptitudes")} · ${q.data.length}`}>

@@ -242,34 +242,9 @@ export function EcartsM12Section() {
   ];
 
   return (
-    <div data-testid="ecarts-m12">
-      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
-      <ParamsPanel variant="card" module="juridique" title={t("ecarts_m12.parametres.title")} count={provisoires} total={params.length} alertTestId="m12-provisoire">
-        <p className="muted">{t("revueR3.juridique.parametresSub")}</p>
-        <div data-testid="m12-parametres">
-          <DataTable
-            caption={t("ecarts_m12.parametres.title")}
-            rows={params}
-            density="compact"
-            columns={[
-              { key: "libelle", header: t("tableaux.juridique.parametre"), render: (p) => p.libelle, sortValue: (p) => p.libelle },
-              { key: "valeur", header: t("tableaux.juridique.valeur"), render: (p) => <span className="muted">{valeurLisible(p.valeur, t)}</span> },
-              {
-                key: "statut",
-                header: t("tableaux.juridique.statut"),
-                render: (p) => <ParamStatusBadge provisoire={p.provisoire} />,
-              },
-              actionsColumn<Parametre>(t("ui.actions"), (p) => [
-                { label: t("ecarts_m12.parametres.modifier"), path: `/api/juridique/parametres/${p.id}/modifier/`, tone: "ghost" as const, prompt: { name: "valeur", label: t("ecarts_m12.parametres.json") } },
-                ...(p.provisoire
-                  ? [{ label: t("ecarts_m12.parametres.confirmer"), path: `/api/juridique/parametres/${p.id}/confirmer/`, confirm: t("ecarts_m12.parametres.confirmerQ") }]
-                  : []),
-              ]),
-            ]}
-          />
-        </div>
-      </ParamsPanel>
-
+    <div data-testid="ecarts-m12" className="page-section">
+      {/* Groupes ciblés par la navigation de sections de la page Juridique ; paramètres en dernier. */}
+      <div id="jur-suivi" className="page-section">
       <SectionCard
         title={t("ecarts_m12.contentieux.title")}
         actions={
@@ -590,6 +565,36 @@ export function EcartsM12Section() {
           />
         </div>
       </SectionCard>
+      </div>
+
+      <div id="jur-parametres" className="page-section">
+      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
+      <ParamsPanel variant="card" module="juridique" title={t("ecarts_m12.parametres.title")} count={provisoires} total={params.length} alertTestId="m12-provisoire">
+        <p className="muted">{t("revueR3.juridique.parametresSub")}</p>
+        <div data-testid="m12-parametres">
+          <DataTable
+            caption={t("ecarts_m12.parametres.title")}
+            rows={params}
+            density="compact"
+            columns={[
+              { key: "libelle", header: t("tableaux.juridique.parametre"), render: (p) => p.libelle, sortValue: (p) => p.libelle },
+              { key: "valeur", header: t("tableaux.juridique.valeur"), render: (p) => <span className="muted">{valeurLisible(p.valeur, t)}</span> },
+              {
+                key: "statut",
+                header: t("tableaux.juridique.statut"),
+                render: (p) => <ParamStatusBadge provisoire={p.provisoire} />,
+              },
+              actionsColumn<Parametre>(t("ui.actions"), (p) => [
+                { label: t("ecarts_m12.parametres.modifier"), path: `/api/juridique/parametres/${p.id}/modifier/`, tone: "ghost" as const, prompt: { name: "valeur", label: t("ecarts_m12.parametres.json") } },
+                ...(p.provisoire
+                  ? [{ label: t("ecarts_m12.parametres.confirmer"), path: `/api/juridique/parametres/${p.id}/confirmer/`, confirm: t("ecarts_m12.parametres.confirmerQ") }]
+                  : []),
+              ]),
+            ]}
+          />
+        </div>
+      </ParamsPanel>
+      </div>
     </div>
   );
 }

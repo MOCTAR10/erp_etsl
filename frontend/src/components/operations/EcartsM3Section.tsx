@@ -655,13 +655,8 @@ export function EcartsM3Section() {
 
   return (
     <>
-      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
-      <ParamsPanel variant="card" module="operations" title={k("parametres.title")} count={provisoires} total={parametres.length} alertTestId="m3-provisoire">
-        <div data-testid="m3-parametres">
-          <DataTable columns={colsParametres} rows={parametres} caption={k("parametres.title")} emptyLabel={t("tableaux.operations.aucunParametre")} />
-        </div>
-      </ParamsPanel>
-
+      {/* Groupes ciblés par la navigation de sections de la page Opérations ; paramètres en dernier. */}
+      <div id="ops-suivi" className="page-section">
       <SectionCard
         title={k("preparation.title")}
         actions={
@@ -951,6 +946,16 @@ export function EcartsM3Section() {
           <DataTable columns={colsDossiers} rows={dossiers} caption={t("tableaux.operations.dossiers")} emptyLabel={t("tableaux.operations.aucunDossier")} />
         </div>
       </SectionCard>
+      </div>
+
+      <div id="ops-parametres" className="page-section">
+      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
+      <ParamsPanel variant="card" module="operations" title={k("parametres.title")} count={provisoires} total={parametres.length} alertTestId="m3-provisoire">
+        <div data-testid="m3-parametres">
+          <DataTable columns={colsParametres} rows={parametres} caption={k("parametres.title")} emptyLabel={t("tableaux.operations.aucunParametre")} />
+        </div>
+      </ParamsPanel>
+      </div>
     </>
   );
 }

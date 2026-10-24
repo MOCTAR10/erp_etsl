@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { SiteFilter, siteQuery, useSiteOptions } from "../components/sites/SiteFilter";
-import { type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { type ActionDef, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { Column } from "../components/ui";
@@ -255,6 +255,16 @@ export function MaintenancePage() {
           />
         }
       />
+      <SectionNav
+        items={[
+          { id: "mnt-ot", label: t("premiumVague2.sections.maintenance.ot") },
+          { id: "mnt-actifs", label: t("premiumVague2.sections.maintenance.actifs") },
+          { id: "mnt-fiabilite", label: t("premiumVague2.sections.maintenance.fiabilite") },
+          { id: "mnt-couts", label: t("premiumVague2.sections.maintenance.couts") },
+          { id: "mnt-inspections", label: t("premiumVague2.sections.maintenance.inspections") },
+          { id: "mnt-parametres", label: t("premiumVague2.sections.maintenance.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("maintenance.otOuverts")} value={s.ot_ouverts} hint={t("revueR2.maintenance.hintOuverts", { enCours: formatNumber(s.ot_en_cours), count: s.ot_critiques })} icon={Wrench} tone="brand" delay={0} />
@@ -275,7 +285,7 @@ export function MaintenancePage() {
         />
       </div>
 
-      <section className="listes-block">
+      <section id="mnt-ot" className="listes-block">
         <div className="list-toolbar">
           <SearchField value={otSearch} onChange={setOtSearch} placeholder={t("maintenance.searchOt")} />
         </div>
@@ -290,6 +300,7 @@ export function MaintenancePage() {
         </Board>
       </section>
 
+      <div id="mnt-actifs" className="page-section">
       <SectionCard
         title={`${t("maintenance.actifs")} · ${actifs.count}`}
         actions={
@@ -329,14 +340,19 @@ export function MaintenancePage() {
       </SectionCard>
 
       <PlansPreventifsSection actifs={actifsChoix} />
-      <FiabiliteSection />
-      <PiecesRechangeSection />
-      <ExigencesHabilitationSection />
-      <CoutsMaintenanceSection />
-      <LiaisonBcGrSection />
-      <ParametresMaintenanceSection />
+      </div>
+      <div id="mnt-fiabilite" className="page-section">
+        <FiabiliteSection />
+        <PiecesRechangeSection />
+        <ExigencesHabilitationSection />
+      </div>
+      <div id="mnt-couts" className="page-section">
+        <CoutsMaintenanceSection />
+        <LiaisonBcGrSection />
+      </div>
 
       <SectionCard
+        id="mnt-inspections"
         title={`${t("maintenance.inspections")} · ${inspections.count}`}
         actions={
           <QuickForm
@@ -369,6 +385,10 @@ export function MaintenancePage() {
           pagination={{ page: inspections.page, pageSize: inspections.pageSize, count: inspections.count, onPageChange: inspections.setPage, onPageSizeChange: inspections.setPageSize }}
         />
       </SectionCard>
+
+      <div id="mnt-parametres" className="page-section">
+        <ParametresMaintenanceSection />
+      </div>
     </div>
   );
 }

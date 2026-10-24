@@ -323,6 +323,7 @@ export function PlansPreventionSection() {
     {
       key: "inspection",
       header: t(`${M}.pdp.inspection`),
+      kind: "date",
       sortValue: (p) => p.date_inspection_commune,
       render: (p) => (p.date_inspection_commune ? formatDate(p.date_inspection_commune) : "—"),
     },

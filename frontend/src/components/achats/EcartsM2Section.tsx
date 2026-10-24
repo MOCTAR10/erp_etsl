@@ -307,6 +307,8 @@ export function EcartsM2Section() {
 
   return (
     <>
+      {/* Groupes ciblés par la navigation de sections de la page Achats. */}
+      <div id="ach-fournisseurs" className="page-section">
       <SectionCard
         title={t("ecarts_m2.catalogue.title")}
         actions={
@@ -460,8 +462,11 @@ export function EcartsM2Section() {
         </div>
         <p className="muted">{t("ecarts_m2.ged.note", { n: pieces?.conservation_ans ?? 10 })}</p>
       </SectionCard>
+      </div>
 
-      <ParametresAchats />
+      <div id="ach-parametres" className="page-section">
+        <ParametresAchats />
+      </div>
     </>
   );
 }

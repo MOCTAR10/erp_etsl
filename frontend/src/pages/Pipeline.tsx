@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { formatDate, formatMoney, formatPercent } from "../lib/format";
 import { CommercialSections } from "../components/commercial/CommercialSections";
 import { EcartsM1Section } from "../components/commercial/EcartsM1Section";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import type { Opportunity, OpportunityStage, Paginated } from "../types";
 
@@ -97,6 +97,16 @@ export function PipelinePage() {
   return (
     <div className="listes-page">
       <PageHeader title={t("pipeline.title")} subtitle={t("listes.sub.pipeline")} />
+      <SectionNav
+        items={[
+          { id: "com-opportunites", label: t("premiumVague2.sections.pipeline.opportunites") },
+          { id: "com-offres", label: t("premiumVague2.sections.pipeline.offres") },
+          { id: "com-relances", label: t("premiumVague2.sections.pipeline.relances") },
+          { id: "com-chiffrage", label: t("premiumVague2.sections.pipeline.chiffrage") },
+          { id: "com-profils", label: t("premiumVague2.sections.pipeline.profils") },
+          { id: "com-parametres", label: t("premiumVague2.sections.pipeline.parametres") },
+        ]}
+      />
 
       {s ? (
         <div className="kpi-grid">
@@ -117,6 +127,7 @@ export function PipelinePage() {
         </div>
       ) : null}
 
+      <div id="com-opportunites" className="page-section">
       <Board label={t("listes.boardLabel.pipeline")}>
         {COLUMNS.map((col, ci) => {
           const sum = stageTotal(groups[col.stage]);
@@ -137,8 +148,11 @@ export function PipelinePage() {
           );
         })}
       </Board>
+      </div>
 
-      <CommercialSections />
+      <div id="com-offres" className="page-section">
+        <CommercialSections />
+      </div>
       <EcartsM1Section />
     </div>
   );

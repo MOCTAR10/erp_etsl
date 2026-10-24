@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { ActionDef, Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
@@ -242,6 +242,15 @@ export function RhPaiePage() {
   return (
     <>
       <PageHeader title={t("rhPaie.title")} subtitle={t("tableaux.entetes.rhPaie")} />
+      <SectionNav
+        items={[
+          { id: "rh-conges", label: t("premiumVague2.sections.rhPaie.conges") },
+          { id: "rh-employes", label: t("premiumVague2.sections.rhPaie.employes") },
+          { id: "rh-paie", label: t("premiumVague2.sections.rhPaie.paie") },
+          { id: "rh-formation", label: t("premiumVague2.sections.rhPaie.formation") },
+          { id: "rh-declarations", label: t("premiumVague2.sections.rhPaie.declarations") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("rhPaie.effectif")} value={s.effectif} hint={`${s.en_conge} ${t("rhPaie.enConge")} · ${s.contrats_expirants_30} ${t("rhPaie.contratsExpirants")}`} icon={Users} tone="brand" delay={0} />
@@ -250,6 +259,7 @@ export function RhPaiePage() {
         <Kpi label={t("rhPaie.masseNette")} value={m.net_total} kind="money" hint={`${t("rhPaie.bulletins")} · ${formatNumber(m.bulletins)}`} icon={Banknote} tone="accent" delay={0.15} />
       </div>
 
+      <div id="rh-conges" className="page-section">
       <h3 className="section-heading">{t("revueR3.rh.conges")}</h3>
       <Board label={t("revueR3.rh.conges")}>
         {CONGE_ORDER.map((st, ci) => (
@@ -267,7 +277,9 @@ export function RhPaiePage() {
           </BoardColumn>
         ))}
       </Board>
+      </div>
 
+      <div id="rh-employes" className="page-section">
       {(employes.count > 0 || employes.search || employeSite) && (
         <SectionCard title={`${t("rhPaie.employes")} · ${employes.count}`}>
           <div className="r3-toolbar">
@@ -284,7 +296,10 @@ export function RhPaiePage() {
           />
         </SectionCard>
       )}
+      <EcartsM9aSection />
+      </div>
 
+      <div id="rh-paie" className="page-section">
       {bulletins.count > 0 || bulletins.search ? (
         <SectionCard title={`${t("rhPaie.bulletins")} · ${bulletins.count}`}>
           {avertissement ? (
@@ -305,12 +320,18 @@ export function RhPaiePage() {
           />
         </SectionCard>
       ) : null}
-      <EcartsM9aSection />
       <EcartsM9bSection />
-      <EcartsM9cSection />
-      <DeclarationsSection />
       <VirementsSection />
       <BaremesSection />
+      </div>
+
+      <div id="rh-formation" className="page-section">
+        <EcartsM9cSection />
+      </div>
+
+      <div id="rh-declarations" className="page-section">
+        <DeclarationsSection />
+      </div>
     </>
   );
 }

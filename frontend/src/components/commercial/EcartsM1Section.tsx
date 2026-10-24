@@ -795,13 +795,22 @@ function RaoRc() {
 export function EcartsM1Section() {
   return (
     <>
-      <AlertesEcheances />
-      <Clients360 />
-      <PipeProfilIndicateurs />
-      <Chiffrage />
-      <ProfilsContrats />
-      <RaoRc />
-      <ParametresM1 />
+      {/* Groupes ciblés par la navigation de sections de la page Pipeline. */}
+      <div id="com-relances" className="page-section">
+        <AlertesEcheances />
+        <Clients360 />
+        <PipeProfilIndicateurs />
+      </div>
+      <div id="com-chiffrage" className="page-section">
+        <Chiffrage />
+      </div>
+      <div id="com-profils" className="page-section">
+        <ProfilsContrats />
+        <RaoRc />
+      </div>
+      <div id="com-parametres" className="page-section">
+        <ParametresM1 />
+      </div>
     </>
   );
 }

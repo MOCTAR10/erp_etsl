@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, PageHeader, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, PageHeader, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { ActionDef, Column } from "../components/ui";
@@ -289,6 +289,17 @@ export function ComptabilitePage() {
         }
       />
 
+      <SectionNav
+        items={[
+          { id: "cpt-tresorerie", label: t("premiumVague2.sections.comptabilite.tresorerie") },
+          { id: "cpt-facturation", label: t("premiumVague2.sections.comptabilite.facturation") },
+          { id: "cpt-lettrage", label: t("premiumVague2.sections.comptabilite.lettrage") },
+          { id: "cpt-etats", label: t("premiumVague2.sections.comptabilite.etats") },
+          { id: "cpt-devises", label: t("premiumVague2.sections.comptabilite.devises") },
+          { id: "cpt-cloture", label: t("premiumVague2.sections.comptabilite.cloture") },
+        ]}
+      />
+
       <div className="kpi-grid">
         <Kpi
           label={t("comptabilite.banques")}
@@ -299,6 +310,7 @@ export function ComptabilitePage() {
         <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
       </div>
 
+      <div id="cpt-tresorerie" className="page-section">
       <section className="listes-block">
         <div className="list-toolbar">
           <SearchField value={engSearch} onChange={setEngSearch} placeholder={t("comptabilite.searchEngagements")} />
@@ -359,19 +371,20 @@ export function ComptabilitePage() {
         </SectionCard>
       )}
 
-      <ClotureSection />
-
-      <FacturationSection />
-
       <BanqueSection />
+      </div>
 
-      <LettrageSection />
-
-      <EcartsM10Section />
-      <EcartsA2Section />
+      <div id="cpt-facturation" className="page-section">
+      <FacturationSection />
       <RetenuesGarantieSection />
-      <ImportGrandLivreSection />
+      </div>
 
+      <div id="cpt-lettrage" className="page-section">
+      <LettrageSection />
+      </div>
+
+      <div id="cpt-etats" className="page-section">
+      <EcartsM10Section />
       {tvaAll.length > 0 ? (
         <SectionCard title={`${t("listes.compta.tva")} · ${tvaAll.length}`}>
           <DataTable rows={tvaAll} columns={tvaColumns} caption={t("listes.compta.tva")} />
@@ -383,6 +396,16 @@ export function ComptabilitePage() {
           <DataTable rows={controlesAll} columns={controleColumns} caption={t("listes.compta.controles")} />
         </SectionCard>
       ) : null}
+      </div>
+
+      <div id="cpt-devises" className="page-section">
+      <EcartsA2Section />
+      <ImportGrandLivreSection />
+      </div>
+
+      <div id="cpt-cloture" className="page-section">
+      <ClotureSection />
+      </div>
     </div>
   );
 }

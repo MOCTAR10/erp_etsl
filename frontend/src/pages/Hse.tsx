@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, Menu, notify, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, EmptyState, ErrorState, Kpi, Menu, notify, PageHeader, PagedDataGrid, Pagination, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatNumber } from "../lib/format";
 import { nomPersonne, nombre } from "../components/sections/affichage";
@@ -142,7 +142,7 @@ function formationColumns(t: T): Column<FormationSecurite>[] {
     { key: "code", header: t("hse.col.code"), render: (f) => f.code },
     { key: "theme", header: t("hse.col.theme"), render: (f) => f.theme },
     { key: "type", header: t("hse.col.type"), render: (f) => t(`hse.formation_types.${f.type_session}`) },
-    { key: "date", header: t("hse.col.date"), render: (f) => formatDate(f.date_session) },
+    { key: "date", header: t("hse.col.date"), kind: "date", render: (f) => formatDate(f.date_session) },
     { key: "nb", header: t("hse.col.participants"), num: true, render: (f) => f.nb_participants },
     {
       key: "statut",
@@ -379,6 +379,17 @@ export function HsePage() {
           />
         }
       />
+      <SectionNav
+        items={[
+          { id: "hse-incidents", label: t("premiumVague2.sections.hse.incidents") },
+          { id: "hse-permis", label: t("premiumVague2.sections.hse.permis") },
+          { id: "hse-risques", label: t("premiumVague2.sections.hse.risques") },
+          { id: "hse-personnel", label: t("premiumVague2.sections.hse.personnel") },
+          { id: "hse-environnement", label: t("premiumVague2.sections.hse.environnement") },
+          { id: "hse-prevention", label: t("premiumVague2.sections.hse.prevention") },
+          { id: "hse-parametres", label: t("premiumVague2.sections.hse.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid r3-kpi-5">
         <Kpi label={t("hse.joursSansAccident")} value={s.jours_sans_accident ?? t("tableaux.entetes.aucunAccident")} hint={`${s.incidents_ouverts} ${t("hse.incidentsOuverts")}`} icon={ShieldAlert} tone="ok" delay={0} />
@@ -395,6 +406,7 @@ export function HsePage() {
         />
       </div>
 
+      <div id="hse-incidents" className="page-section">
       <h3 className="section-heading">{t("revueR3.hse.incidents")}</h3>
       <SearchField value={incSearch} onChange={setIncSearch} placeholder={t("hse.searchIncidents")} />
 
@@ -407,7 +419,9 @@ export function HsePage() {
           </BoardColumn>
         ))}
       </Board>
+      </div>
 
+      <div id="hse-permis" className="page-section">
       <div className="r3-heading-row">
         <h3 className="section-heading">{t("hse.permis")}</h3>
         <DemandePermisForm />
@@ -425,7 +439,9 @@ export function HsePage() {
           <Pagination page={permis.page} pageSize={permis.pageSize} count={permis.count} onPageChange={permis.setPage} onPageSizeChange={permis.setPageSize} />
         </>
       ) : null}
+      </div>
 
+      <div id="hse-risques" className="page-section">
       {(risques.count > 0 || risques.search) && (
         <SectionCard title={`${t("hse.risques")} · ${risques.count}`}>
           <PagedDataGrid list={risques} columns={risqueColumns(t)} caption={t("hse.risques")} searchPlaceholder={t("hse.searchRisques")} />
@@ -436,6 +452,12 @@ export function HsePage() {
           <PagedDataGrid list={atex} columns={atexColumns(t)} caption={t("hse.atex")} searchPlaceholder={t("hse.searchAtex")} />
         </SectionCard>
       )}
+      <ConformiteHse />
+      <ActionsHseSection />
+      <RegistreOshaSection />
+      </div>
+
+      <div id="hse-personnel" className="page-section">
       {(formations.count > 0 || formations.search) && (
         <SectionCard title={`${t("hse.formations")} · ${formations.count}`}>
           <PagedDataGrid list={formations} columns={formationColumns(t)} caption={t("hse.formations")} searchPlaceholder={t("hse.searchFormations")} />
@@ -446,23 +468,30 @@ export function HsePage() {
           <PagedDataGrid list={epis} columns={epiColumns(t)} caption={t("hse.epi")} searchPlaceholder={t("hse.searchEpis")} />
         </SectionCard>
       )}
-      <ConformiteHse />
-      <ActionsHseSection />
-      <RegistreOshaSection />
       <PersonnelHseSection />
       <FormationsNominativesSection />
       <AptitudesSection />
       <ExigencesPermisSection />
+      </div>
+
+      <div id="hse-environnement" className="page-section">
       <IndicateursHseSection />
       <EnvironnementSection />
-      <RevueDirectionSection />
-      <ParametresHseSection />
-      <EcartsM7Sections />
       {(bsd.count > 0 || bsd.search) && (
         <SectionCard title={`${t("hse.bsd")} · ${bsd.count}`}>
           <PagedDataGrid list={bsd} columns={bsdColumns(t)} caption={t("hse.bsd")} searchPlaceholder={t("hse.searchBsd")} />
         </SectionCard>
       )}
+      <RevueDirectionSection />
+      </div>
+
+      <div id="hse-prevention" className="page-section">
+        <EcartsM7Sections />
+      </div>
+
+      <div id="hse-parametres" className="page-section">
+        <ParametresHseSection />
+      </div>
     </>
   );
 }

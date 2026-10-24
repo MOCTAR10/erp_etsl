@@ -18,7 +18,7 @@ export function ActionsHseSection() {
   const columns: Column<ActionHse>[] = [
     { key: "code", header: t("tableaux.hse.reference"), render: (a) => <strong>{a.code}</strong>, sortValue: (a) => a.code },
     { key: "description", header: t("tableaux.hse.action"), render: (a) => a.description },
-    { key: "echeance", header: t("tableaux.hse.echeance"), render: (a) => (a.echeance ? formatDate(a.echeance) : "—"), sortValue: (a) => a.echeance },
+    { key: "echeance", header: t("tableaux.hse.echeance"), kind: "date", render: (a) => (a.echeance ? formatDate(a.echeance) : "—"), sortValue: (a) => a.echeance },
     {
       key: "actions",
       header: <span className="sr-only">{t("ui.actions")}</span>,
@@ -54,7 +54,7 @@ export function RegistreOshaSection() {
   const rows: CasOsha[] = (q.data?.rows ?? []).map((r) => ({ ...r, id: r.cas }));
   const columns: Column<CasOsha>[] = [
     { key: "cas", header: t("tableaux.hse.cas"), render: (r) => r.cas, sortValue: (r) => r.cas },
-    { key: "date", header: t("tableaux.hse.date"), render: (r) => formatDate(r.date), sortValue: (r) => r.date },
+    { key: "date", header: t("tableaux.hse.date"), kind: "date", render: (r) => formatDate(r.date), sortValue: (r) => r.date },
     { key: "lieu", header: t("tableaux.hse.lieu"), render: (r) => `${r.lieu}${r.zone ? ` · ${t(`m7e.zones.${r.zone}`, { defaultValue: r.zone })}` : ""}` },
     {
       key: "classification",

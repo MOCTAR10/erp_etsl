@@ -13,7 +13,7 @@ import { SaisieBudgetaireSection } from "../components/workflow/SaisieBudgetaire
 import { PilotageGestionSection } from "../components/workflow/PilotageGestionSection";
 import { EcartsM11Section } from "../components/controleGestion/EcartsM11Section";
 import { BalanceAgeeGestionSection, MargesTerminaisonSection } from "../components/suivi/SuiviSections";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, PageHeader, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
@@ -348,6 +348,16 @@ export function ControleGestionPage() {
   return (
     <>
       <PageHeader title={t("controleGestion.title")} subtitle={t("tableaux.entetes.controleGestion")} />
+      <SectionNav
+        items={[
+          { id: "cg-budgets", label: t("premiumVague2.sections.controleGestion.budgets") },
+          ...((m && m.rows.length > 0) || (analyses.data?.length ?? 0) > 0 ? [{ id: "cg-marges", label: t("premiumVague2.sections.controleGestion.marges") }] : []),
+          { id: "cg-pilotage", label: t("premiumVague2.sections.controleGestion.pilotage") },
+          { id: "cg-affaires", label: t("premiumVague2.sections.controleGestion.affaires") },
+          { id: "cg-couts", label: t("premiumVague2.sections.controleGestion.couts") },
+          ...(closed.length > 0 || revs.length > 0 ? [{ id: "cg-historique", label: t("premiumVague2.sections.controleGestion.historique") }] : []),
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("controleGestion.budgets")} value={enCours} hint={t("tableaux.entetes.budgetsHint")} icon={PieChart} tone="brand" delay={0} />
@@ -356,6 +366,7 @@ export function ControleGestionPage() {
         <Kpi label={t("tableaux.entetes.margeHorsGr")} value={m && m.totals.marge_hors_gr !== null ? m.totals.marge_hors_gr : "••••••"} kind="money" hint={t("tableaux.entetes.coutGr", { montant: m ? formatMoney(m.totals.cout_gr) : "—" })} icon={Coins} tone="accent" delay={0.15} />
       </div>
 
+      <div id="cg-budgets" className="page-section">
       <h3 className="section-heading">{t("controleGestion.budgets")}</h3>
       <SearchField value={budSearch} onChange={setBudSearch} placeholder={t("controleGestion.searchBudgets")} />
 
@@ -380,7 +391,9 @@ export function ControleGestionPage() {
           </BoardColumn>
         ))}
       </Board>
+      </div>
 
+      <div id="cg-marges" className="page-section">
       {m && m.rows.length > 0 && (
         <SectionCard title={`${t("controleGestion.marges")} · ${m.rows.length}`}>
           <DataGrid
@@ -411,15 +424,24 @@ export function ControleGestionPage() {
         </SectionCard>
       )}
 
-      <SaisieBudgetaireSection fiscalYear={fy.data.id} budgets={[...groups.brouillon, ...groups.approuve, ...groups.cloture]} />
-      <PilotageGestionSection fiscalYear={fy.data?.id} />
-      <EcartsM11Section fiscalYear={fy.data.id} />
-      <MargesTerminaisonSection />
-      <BalanceAgeeGestionSection />
-      <GrAffairesSection fiscalYear={fy.data?.id} />
-      <MaintenanceCoutsSection />
-      <CoutsHseSection />
+      </div>
 
+      <div id="cg-pilotage" className="page-section">
+        <SaisieBudgetaireSection fiscalYear={fy.data.id} budgets={[...groups.brouillon, ...groups.approuve, ...groups.cloture]} />
+        <PilotageGestionSection fiscalYear={fy.data?.id} />
+        <EcartsM11Section fiscalYear={fy.data.id} />
+      </div>
+      <div id="cg-affaires" className="page-section">
+        <MargesTerminaisonSection />
+        <BalanceAgeeGestionSection />
+        <GrAffairesSection fiscalYear={fy.data?.id} />
+      </div>
+      <div id="cg-couts" className="page-section">
+        <MaintenanceCoutsSection />
+        <CoutsHseSection />
+      </div>
+
+      <div id="cg-historique" className="page-section">
       {closed.length > 0 && (
         <SectionCard title={`${t("controleGestion.clotures")} · ${closed.length}`}>
           <DataGrid rows={closed} columns={clotureColumns(t)} caption={t("controleGestion.clotures")} />
@@ -431,6 +453,7 @@ export function ControleGestionPage() {
           <DataGrid rows={revs} columns={revisionColumns(t)} caption={t("controleGestion.revisions")} />
         </SectionCard>
       )}
+      </div>
 
     </>
   );

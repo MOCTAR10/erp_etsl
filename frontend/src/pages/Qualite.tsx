@@ -8,7 +8,7 @@ import { refLabel } from "../components/sections/affichage";
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import type { Column } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import type {
@@ -26,6 +26,7 @@ import { EcartsM6bSection } from "../components/qualite/EcartsM6bSection";
 import { EcartsM6m7Section } from "../components/qualite/EcartsM6m7Section";
 import { EcartsA3Section } from "../components/qualite/EcartsA3Section";
 import { SystemeQualiteSection } from "../components/qualite/SystemeQualiteSection";
+import { ParametresQualiteSection } from "../components/qualite/ParametresQualiteSection";
 import { ItpSection } from "../components/workflow/ItpSection";
 
 type NcGroups = Record<StatutNC, NonConformite[]>;
@@ -56,7 +57,7 @@ function qualifColumns(t: T): Column<QualificationSoudeur>[] {
     },
     { key: "norme", header: t("qualite.col.norme"), render: (q) => t(`qualite.norms.${q.norme}`) },
     { key: "procede", header: t("qualite.col.procede"), render: (q) => `${refLabel(t, "procede", q.procede, q.procede_label)} · ${q.position || "—"}` },
-    { key: "validite", header: t("qualite.col.validite"), render: (q) => <span className="r3-nowrap">{formatDate(q.date_validite)}</span> },
+    { key: "validite", header: t("qualite.col.validite"), kind: "date", render: (q) => <span className="r3-nowrap">{formatDate(q.date_validite)}</span> },
     {
       key: "statut",
       header: t("qualite.col.statut"),
@@ -116,7 +117,7 @@ function pvColumns(t: T): Column<PvControle>[] {
     { key: "code", header: t("qualite.col.code"), render: (p) => p.code },
     { key: "intitule", header: t("qualite.intitule"), render: (p) => p.intitule },
     { key: "affaire", header: t("qualite.col.objet"), render: (p) => p.affaire_code ?? "—" },
-    { key: "date", header: t("qualite.col.date"), render: (p) => formatDate(p.date_pv) },
+    { key: "date", header: t("qualite.col.date"), kind: "date", render: (p) => formatDate(p.date_pv) },
     { key: "retention", header: t("qualite.col.retention"), num: true, render: (p) => `${p.retention_years} ${t("qualite.col.ans")}` },
     {
       key: "statut",
@@ -274,6 +275,16 @@ export function QualitePage() {
           />
         }
       />
+      <SectionNav
+        items={[
+          { id: "qa-nc", label: t("premiumVague2.sections.qualite.nc") },
+          { id: "qa-qualifications", label: t("premiumVague2.sections.qualite.qualifications") },
+          { id: "qa-controles", label: t("premiumVague2.sections.qualite.controles") },
+          { id: "qa-suivi", label: t("premiumVague2.sections.qualite.suivi") },
+          { id: "qa-systeme", label: t("premiumVague2.sections.qualite.systeme") },
+          { id: "qa-parametres", label: t("premiumVague2.sections.qualite.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi
@@ -310,6 +321,7 @@ export function QualitePage() {
         />
       </div>
 
+      <div id="qa-nc" className="page-section">
       <h3 className="section-heading">{t("revueR3.qualite.nc")}</h3>
       <SearchField value={ncSearch} onChange={setNcSearch} placeholder={t("qualite.searchNc")} />
 
@@ -322,7 +334,9 @@ export function QualitePage() {
           </BoardColumn>
         ))}
       </Board>
+      </div>
 
+      <div id="qa-qualifications" className="page-section">
       {(qualifs.count > 0 || qualifs.search) && (
         <SectionCard title={`${t("qualite.qualifs")} · ${qualifs.count}`}>
           <PagedDataGrid list={qualifs} columns={qualifColumns(t)} caption={t("qualite.qualifs")} searchPlaceholder={t("qualite.searchQualifs")} />
@@ -333,6 +347,8 @@ export function QualitePage() {
           <PagedDataGrid list={wps} columns={wpsColumns(t)} caption={t("qualite.wps")} searchPlaceholder={t("qualite.searchWps")} />
         </SectionCard>
       )}
+      </div>
+      <div id="qa-controles" className="page-section">
       {(controles.count > 0 || controles.search) && (
         <SectionCard title={`${t("qualite.controles")} · ${controles.count}`}>
           <PagedDataGrid list={controles} columns={ctrlColumns(t)} caption={t("qualite.controles")} searchPlaceholder={t("qualite.searchControles")} />
@@ -345,11 +361,19 @@ export function QualitePage() {
       )}
       <ItpSection />
       <ClotureM6Section />
-      <EcartsM6Section />
-      <EcartsM6bSection />
-      <EcartsM6m7Section />
-      <EcartsA3Section />
-      <SystemeQualiteSection />
+      </div>
+      <div id="qa-suivi" className="page-section">
+        <EcartsM6Section />
+        <EcartsM6bSection />
+        <EcartsM6m7Section />
+        <EcartsA3Section />
+      </div>
+      <div id="qa-systeme" className="page-section">
+        <SystemeQualiteSection />
+      </div>
+      <div id="qa-parametres" className="page-section">
+        <ParametresQualiteSection />
+      </div>
     </>
   );
 }

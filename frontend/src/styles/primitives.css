@@ -1258,6 +1258,20 @@
     transition: none;
   }
 }
+/* Groupe de blocs ciblé par une ancre de SectionNav (`<div id="…" className="page-section">`) : garde le rythme
+   vertical de 24 px de la zone principale. Couche `layout` (comme la règle `.main`) : une règle de page l'emporte. */
+@layer layout {
+  .page-section {
+    display: block;
+    min-width: 0;
+  }
+  :where(.page-section) > :where(* + *:not([hidden], .sr-only)) {
+    margin-top: var(--space-6);
+  }
+  :where(.page-section) > :first-child {
+    margin-top: 0;
+  }
+}
 
 /* ── Sélecteur de fichier (FileField) ── */
 .ui-file {

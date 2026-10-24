@@ -10,7 +10,10 @@ export function SectionCard({
   actions,
   children,
   className = "",
+  id,
 }: {
+  /** Ancre de la carte (cible d'une `SectionNav`). */
+  id?: string;
   title?: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
@@ -18,7 +21,7 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <div className={`card ${className}`.trim()}>
+    <div id={id} className={`card ${className}`.trim()}>
       {title || subtitle || actions ? (
         <div className="card-header">
           <div>
