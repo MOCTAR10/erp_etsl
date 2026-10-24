@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { ActionBar, type ActionDef, Badge, type Column, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, type ActionDef, actionsColumn, Badge, type Column, DataTable, QuickForm, SectionCard } from "../ui";
 import { describeError } from "../../lib/offlineQueue";
 import { formatNumber } from "../../lib/format";
 import { SectionActions } from "../sections/SectionActions";
@@ -111,32 +112,36 @@ export function SitesSection() {
     {
       key: "code",
       header: t("ecarts_a5.code"),
+      width: 110,
       render: (l) => (l.site ? <strong>{l.site.code}</strong> : <span className="muted">{t("ecarts_a5.nonRattache")}</span>),
     },
     {
       key: "libelle",
       header: t("ecarts_a5.libelle"),
+      width: 220,
       render: (l) =>
         l.site ? (
           <>
             {l.site.libelle}
-            {l.site.ville ? <div className="muted">{l.site.ville}</div> : null}
+            {l.site.ville ? <div className="cell-sub">{l.site.ville}</div> : null}
           </>
         ) : null,
     },
-    { key: "type", header: t("ecarts_a5.type"), render: (l) => (l.site ? t(`ecarts_a5.types.${l.site.type_site}`, { defaultValue: l.site.type_site_label }) : null) },
+    { key: "type", header: t("ecarts_a5.type"), width: 110, render: (l) => (l.site ? t(`ecarts_a5.types.${l.site.type_site}`, { defaultValue: l.site.type_site_label }) : null) },
     { key: "alias", header: t("ecarts_a5.alias"), render: (l) => (l.site ? <span className="muted">{l.site.alias || "—"}</span> : null) },
     ...RESSOURCES.map(
       (r): Column<LigneSite> => ({
         key: `res-${r}`,
         header: t(`ecarts_a5.res.${r}`),
         num: true,
+        width: 72,
         render: (l) => formatNumber(l.compte[r] ?? 0),
       }),
     ),
     {
       key: "statut",
       header: t("ecarts_a5.statut"),
+      width: 120,
       render: (l) =>
         !l.site ? null : !l.site.actif ? (
           <Badge tone="neutral">{t("ecarts_a5.inactif")}</Badge>
@@ -146,11 +151,8 @@ export function SitesSection() {
           <Badge tone="ok">{t("ecarts_a5.confirme")}</Badge>
         ),
     },
-    {
-      key: "actions",
-      header: <span className="sr-only">{t("ecarts_a5.actions")}</span>,
-      render: (l) => (l.site ? <ActionBar actions={actions(l.site)} /> : null),
-    },
+    // Une action visible (Confirmer tant que le site est provisoire), les autres dans « ⋯ ».
+    actionsColumn(t("ecarts_a5.actions"), (l) => (l.site ? actions(l.site) : [])),
   ];
 
   return (
@@ -184,9 +186,12 @@ export function SitesSection() {
       }
     >
       {liste.some((s) => s.est_provisoire) ? (
-        <p className="action-error" role="note">
-          {t("ecarts_a5.provisoire")}
-        </p>
+        <div className="banner warn" role="note">
+          <AlertTriangle size={18} aria-hidden />
+          <div className="banner-body">
+            <span className="banner-text">{t("ecarts_a5.provisoire")}</span>
+          </div>
+        </div>
       ) : null}
       {rep ? <p className="muted">{rep.restriction.active ? t("ecarts_a5.restrictionOn") : t("ecarts_a5.restrictionOff")}</p> : null}
       <div data-testid="sites-etsl">

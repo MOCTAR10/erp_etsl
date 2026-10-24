@@ -1,17 +1,36 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { TriangleAlert } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatDateTime, formatMoney, formatNumber } from "../../lib/format";
-import { ActionBar, Badge, DataTable, SectionCard } from "../ui";
+import { formatDate, formatDateTime, formatMoney, formatNumber, formatPercent } from "../../lib/format";
+import { ActionBar, Badge, DataTable, EmptyState, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
 /* Lot de suivi inter-modules : M3 → M11 (marge à terminaison), M10 → M11 (balance âgée), M3 → M5 (réservations),
    M1 → M10 (retenue de garantie), import du grand livre / gabarit SAGE, M4 → M3 (flux machines, compteurs, BL). */
 
 const fcfa = (v: string | null | undefined) => (v === null || v === undefined ? "—" : formatMoney(v));
-const pct = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${formatNumber(Number(v))} %`);
+const pct = (v: string | null | undefined) =>
+  v === null || v === undefined ? "—" : formatPercent(v, { decimals: Number.isInteger(Number(v)) ? 0 : 1 });
+/** Quantité sans décimales inutiles (« 12 », « 2,5 ») : jamais « 12.00 ». */
+const qte = (v: string | null | undefined) => {
+  const n = Number(v);
+  return v === null || v === undefined || v === "" ? "—" : formatNumber(n, { decimals: Number.isInteger(n) ? 0 : 2 });
+};
+
+/** Avertissement « valeurs provisoires » : bandeau d'attention (le rouge reste réservé aux erreurs). */
+function NoteProvisoire({ children }: { children: ReactNode }) {
+  return (
+    <div className="banner warn" role="note">
+      <TriangleAlert size={18} aria-hidden />
+      <div className="banner-body">
+        <p className="banner-text">{children}</p>
+      </div>
+    </div>
+  );
+}
 /** Valeur de tri numérique d'une décimale DRF (`null` en fin de liste). */
 const num = (v: string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
 
@@ -120,11 +139,7 @@ export function BalanceAgeeGestionSection() {
   return (
     <SectionCard title={t("ecarts_suivi.balance.title")}>
       <p className="muted">{t("ecarts_suivi.balance.note")}</p>
-      {q.data?.clients.provisoire && (
-        <p className="action-error" role="note">
-          {q.data.clients.avertissement}
-        </p>
-      )}
+      {q.data?.clients.provisoire && <NoteProvisoire>{q.data.clients.avertissement}</NoteProvisoire>}
       {q.data && <TableEtat etat={q.data.clients} />}
       {q.data && <TableEtat etat={q.data.fournisseurs} />}
     </SectionCard>
@@ -161,17 +176,18 @@ export function ReservationsStockSection() {
     queryFn: () => api.get<{ rows: Dispo[]; bloquante: boolean }>("/api/stocks/reservations/disponibilites/"),
     retry: 0,
   });
-  const resas = useQuery({
+  const resasQ = useQuery({
     queryKey: ["suivi", "reservations"],
     queryFn: () => api.listAll<Reservation>("/api/stocks/reservations/", { maxPages: 2 }),
     retry: 0,
-  }).data ?? [];
+  });
+  const resas = resasQ.data ?? [];
   const dispoRows = (dispo.data?.rows ?? []).map((d) => ({ ...d, id: d.article }));
   const dispoCols: Column<Dispo & { id: string }>[] = [
     { key: "article", header: t("ecarts_suivi.resa.article"), render: (d) => `${d.code} · ${d.label}`, sortValue: (d) => d.code },
-    { key: "physique", header: t("ecarts_suivi.resa.physique"), num: true, render: (d) => formatNumber(Number(d.physique)), sortValue: (d) => num(d.physique) },
-    { key: "reserve", header: t("ecarts_suivi.resa.reserve"), num: true, render: (d) => formatNumber(Number(d.reserve)), sortValue: (d) => num(d.reserve) },
-    { key: "disponible", header: t("ecarts_suivi.resa.disponible"), num: true, render: (d) => formatNumber(Number(d.disponible)), sortValue: (d) => num(d.disponible) },
+    { key: "physique", header: t("ecarts_suivi.resa.physique"), num: true, render: (d) => qte(d.physique), sortValue: (d) => num(d.physique) },
+    { key: "reserve", header: t("ecarts_suivi.resa.reserve"), num: true, render: (d) => qte(d.reserve), sortValue: (d) => num(d.reserve) },
+    { key: "disponible", header: t("ecarts_suivi.resa.disponible"), num: true, render: (d) => qte(d.disponible), sortValue: (d) => num(d.disponible) },
   ];
   const resaCols: Column<Reservation>[] = [
     { key: "article", header: t("ecarts_suivi.resa.article"), render: (r) => `${r.article_code} · ${r.article_label}`, sortValue: (r) => r.article_code },
@@ -183,10 +199,8 @@ export function ReservationsStockSection() {
       sortValue: (r) => num(r.quantite),
       render: (r) => (
         <>
-          {formatNumber(Number(r.quantite))}{" "}
-          <span className="muted">
-            ({t("ecarts_suivi.resa.reste")} {formatNumber(Number(r.reste))})
-          </span>
+          {qte(r.quantite)}
+          <span className="cell-sub">{t("revueKit.ops.resa.reste", { n: qte(r.reste) })}</span>
         </>
       ),
     },
@@ -196,7 +210,10 @@ export function ReservationsStockSection() {
       sortValue: (r) => r.statut_label,
       render: (r) => (
         <>
-          <Badge tone={r.statut === "active" ? "warn" : r.statut === "consommee" ? "ok" : "brand"}>{r.statut_label}</Badge> <span className="muted">{r.motif}</span>
+          <Badge tone={r.statut === "active" ? "warn" : r.statut === "consommee" ? "ok" : "neutral"}>
+            {t(`revueKit.ops.resa.statuts.${r.statut}`, { defaultValue: r.statut_label })}
+          </Badge>
+          {r.motif ? <span className="cell-sub">{r.motif}</span> : null}
         </>
       ),
     },
@@ -213,17 +230,29 @@ export function ReservationsStockSection() {
         ) : null,
     },
   ];
+  // Rien à suivre (aucune disponibilité ni réservation) : un seul état vide au lieu de deux tableaux vides.
+  const toutVide = !dispo.isLoading && !resasQ.isLoading && dispoRows.length === 0 && resas.length === 0;
   return (
-    <SectionCard title={t("ecarts_suivi.resa.title")}>
-      <p className="muted">
-        {t("ecarts_suivi.resa.note")} {dispo.data && <Badge tone="warn">{dispo.data.bloquante ? t("ecarts_suivi.resa.bloquante") : t("ecarts_suivi.resa.alerte")}</Badge>}
-      </p>
-      <div data-testid="disponibilites-stock">
-        <DataTable columns={dispoCols} rows={dispoRows} caption={t("ecarts_suivi.resa.disponible")} loading={dispo.isLoading} />
-      </div>
-      <div data-testid="reservations-stock">
-        <DataTable columns={resaCols} rows={resas} caption={t("ecarts_suivi.resa.title")} />
-      </div>
+    <SectionCard
+      title={t("ecarts_suivi.resa.title")}
+      subtitle={t("ecarts_suivi.resa.note")}
+      actions={dispo.data ? <Badge tone="info">{dispo.data.bloquante ? t("ecarts_suivi.resa.bloquante") : t("ecarts_suivi.resa.alerte")}</Badge> : undefined}
+    >
+      {toutVide ? (
+        <EmptyState compact label={t("revueKit.ops.resa.vide")} hint={t("revueKit.ops.resa.videAide")} />
+      ) : (
+        <>
+          <div data-testid="disponibilites-stock">
+            <DataTable columns={dispoCols} rows={dispoRows} caption={t("ecarts_suivi.resa.disponible")} loading={dispo.isLoading} />
+          </div>
+          {resas.length > 0 && (
+            <div data-testid="reservations-stock">
+              <h4>{t("ecarts_suivi.resa.title")}</h4>
+              <DataTable columns={resaCols} rows={resas} caption={t("ecarts_suivi.resa.title")} />
+            </div>
+          )}
+        </>
+      )}
     </SectionCard>
   );
 }
@@ -288,11 +317,7 @@ export function RetenuesGarantieSection() {
   return (
     <SectionCard title={t("ecarts_suivi.rg.title")}>
       <p className="muted">{t("ecarts_suivi.rg.note", { compte: q.data?.compte ?? "4117" })}</p>
-      {q.data?.provisoire && (
-        <p className="action-error" role="note">
-          {t("ecarts_suivi.provisoire")}
-        </p>
-      )}
+      {q.data?.provisoire && <NoteProvisoire>{t("revueKit.ops.suivi.provisoire")}</NoteProvisoire>}
       <div data-testid="retenues-garantie">
         <DataTable columns={rgCols} rows={rgRows} caption={t("ecarts_suivi.rg.title")} loading={q.isLoading} />
       </div>
@@ -328,18 +353,13 @@ interface Batch {
 function GabaritForm({ g }: { g: Gabarit }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [v, setV] = useState({ separateur: g.separateur, encodage: g.encodage, format_date: g.format_date, separateur_decimal: g.separateur_decimal, colonnes: JSON.stringify(g.colonnes, null, 1) });
+  const uid = useId();
+  const [v, setV] = useState({ separateur: g.separateur, encodage: g.encodage, format_date: g.format_date, separateur_decimal: g.separateur_decimal });
+  // Correspondance des colonnes éditée en paires « champ ERP → colonne du fichier » (plus de JSON à saisir).
+  const [colonnes, setColonnes] = useState<Record<string, string>>({ ...g.colonnes });
   const [erreur, setErreur] = useState<string | null>(null);
   const save = useMutation({
-    mutationFn: () => {
-      let colonnes: unknown;
-      try {
-        colonnes = JSON.parse(v.colonnes);
-      } catch {
-        throw new Error(t("ecarts_suivi.import.jsonInvalide"));
-      }
-      return api.patch(`/api/integrations/gabarits/${g.id}/`, { ...v, colonnes });
-    },
+    mutationFn: () => api.patch(`/api/integrations/gabarits/${g.id}/`, { ...v, colonnes }),
     onSuccess: () => {
       setErreur(null);
       void qc.invalidateQueries({ queryKey: ["suivi", "gabarits"] });
@@ -347,29 +367,59 @@ function GabaritForm({ g }: { g: Gabarit }) {
     onError: (e) => setErreur(e instanceof Error ? e.message : t("ecarts_suivi.erreur")),
   });
   const champ = (k: "separateur" | "encodage" | "format_date" | "separateur_decimal") => (
-    <label className="field" key={k}>
-      <span>{t(`ecarts_suivi.import.${k}`)}</span>
-      <input value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
-    </label>
+    <div className="field" key={k}>
+      <label htmlFor={`${uid}-${k}`}>{t(`ecarts_suivi.import.${k}`)}</label>
+      <input id={`${uid}-${k}`} className="control" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
+    </div>
   );
+  const champsErp = Object.keys(colonnes);
   return (
     <div data-testid={`gabarit-${g.code}`}>
       <p>
-        <strong>{g.code}</strong> · {g.label} <Badge tone={g.est_provisoire ? "warn" : "ok"}>{g.est_provisoire ? t("ecarts_suivi.provisoire") : t("ecarts_suivi.confirme")}</Badge>
+        <strong>{g.code}</strong> · {g.label}{" "}
+        <Badge tone={g.est_provisoire ? "warn" : "ok"}>{g.est_provisoire ? t("revueKit.ops.suivi.provisoireCourt") : t("ecarts_suivi.confirme")}</Badge>
       </p>
-      <div className="action-bar-buttons">
+      <div className="list-toolbar">
         {champ("separateur")}
         {champ("encodage")}
         {champ("format_date")}
         {champ("separateur_decimal")}
       </div>
-      <label className="field">
-        <span>{t("ecarts_suivi.import.colonnes")}</span>
-        <textarea rows={6} value={v.colonnes} onChange={(e) => setV({ ...v, colonnes: e.target.value })} />
-      </label>
-      {erreur && <p className="action-error">{erreur}</p>}
+      {champsErp.length > 0 && (
+        <>
+          <h4>{t("revueKit.ops.suivi.colonnes")}</h4>
+          <p className="muted">{t("revueKit.ops.suivi.colonnesAide")}</p>
+          <table className="table">
+            <caption className="sr-only">{t("revueKit.ops.suivi.colonnes")}</caption>
+            <thead>
+              <tr>
+                <th>{t("revueKit.ops.suivi.champErp")}</th>
+                <th>{t("revueKit.ops.suivi.colonneFichier")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {champsErp.map((k) => (
+                <tr key={k}>
+                  <td className="cell-nowrap">
+                    <label htmlFor={`${uid}-col-${k}`}>{k}</label>
+                  </td>
+                  <td>
+                    <input
+                      id={`${uid}-col-${k}`}
+                      className="control"
+                      value={colonnes[k] ?? ""}
+                      onChange={(e) => setColonnes({ ...colonnes, [k]: e.target.value })}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {erreur && <p className="action-error" role="alert">{erreur}</p>}
       <div className="action-bar-buttons">
-        <button type="button" className="btn" onClick={() => save.mutate()} disabled={save.isPending}>
+        <button type="button" className="btn ghost" onClick={() => save.mutate()} disabled={save.isPending}>
           {t("ecarts_suivi.enregistrer")}
         </button>
         {g.est_provisoire && <ActionBar actions={[{ label: t("ecarts_suivi.confirmer"), path: `/api/integrations/gabarits/${g.id}/confirmer/`, tone: "ghost" as const }]} />}
@@ -401,7 +451,8 @@ export function ImportGrandLivreSection() {
       sortValue: (b) => b.created_at,
       render: (b) => (
         <>
-          {b.filename} <span className="muted">{formatDateTime(b.created_at)}</span>
+          {b.filename}
+          <span className="cell-sub">{formatDateTime(b.created_at)}</span>
         </>
       ),
     },
@@ -411,7 +462,10 @@ export function ImportGrandLivreSection() {
       header: t("ecarts_suivi.resa.statut"),
       render: (b) => (
         <>
-          <Badge tone={b.status === "success" ? "ok" : b.status === "failed" ? "err" : "warn"}>{b.status_label}</Badge> <span className="muted">{b.error_message}</span>
+          <Badge tone={b.status === "success" ? "ok" : b.status === "failed" ? "err" : "warn"}>
+            {t(`revueKit.ops.suivi.lotStatuts.${b.status}`, { defaultValue: b.status_label })}
+          </Badge>
+          {b.error_message ? <span className="cell-sub">{b.error_message}</span> : null}
         </>
       ),
     },
@@ -429,19 +483,19 @@ export function ImportGrandLivreSection() {
   return (
     <SectionCard title={t("ecarts_suivi.import.title")}>
       <p className="muted">{t("ecarts_suivi.import.note")}</p>
-      <div className="action-bar-buttons">
-        <label className="field">
-          <span>{t("ecarts_suivi.import.connecteur")}</span>
-          <select value={connecteur} onChange={(e) => setConnecteur(e.target.value)}>
+      <div className="list-toolbar">
+        <div className="field">
+          <label htmlFor="import-gl-connecteur">{t("ecarts_suivi.import.connecteur")}</label>
+          <select id="import-gl-connecteur" className="control" value={connecteur} onChange={(e) => setConnecteur(e.target.value)}>
             <option value="gl">{t("ecarts_suivi.import.gl")}</option>
             <option value="sage">{t("ecarts_suivi.import.sage")}</option>
           </select>
-        </label>
-        <label className="field">
-          <span>{t("ecarts_suivi.import.fichier")}</span>
-          <input type="file" accept=".csv,.txt,.xml" onChange={(e) => setFichier(e.target.files?.[0] ?? null)} />
-        </label>
-        <button type="button" className="btn primary" disabled={!fichier || envoyer.isPending} onClick={() => envoyer.mutate()}>
+        </div>
+        <div className="field">
+          <label htmlFor="import-gl-fichier">{t("ecarts_suivi.import.fichier")}</label>
+          <input id="import-gl-fichier" className="control" type="file" accept=".csv,.txt,.xml" onChange={(e) => setFichier(e.target.files?.[0] ?? null)} />
+        </div>
+        <button type="button" className="btn ghost" disabled={!fichier || envoyer.isPending} onClick={() => envoyer.mutate()}>
           {t("ecarts_suivi.import.importer")}
         </button>
       </div>
@@ -491,39 +545,50 @@ export function FluxM4Section() {
     {
       key: "source",
       header: t("ecarts_suivi.flux.source"),
-      render: (m) => <Badge tone={m.source === "gr" ? "warn" : "brand"}>{m.source === "gr" ? `GR ${m.location ?? ""}` : t("ecarts_suivi.flux.parc")}</Badge>,
+      render: (m) =>
+        m.source === "gr" ? (
+          <>
+            <Badge tone="neutral">{t("revueKit.ops.flux.locationGr")}</Badge>
+            {m.location ? <span className="cell-sub">{m.location}</span> : null}
+          </>
+        ) : (
+          <Badge tone="neutral">{t("ecarts_suivi.flux.parc")}</Badge>
+        ),
     },
     { key: "of", header: t("ecarts_suivi.resa.of"), render: (m) => m.of ?? "—", sortValue: (m) => m.of },
     {
       key: "periode",
       header: t("ecarts_suivi.flux.periode"),
       sortValue: (m) => m.debut,
-      render: (m) => `${m.debut ? formatDate(m.debut) : "—"} → ${m.fin ? formatDate(m.fin) : "…"}`,
+      render: (m) => <span className="cell-nowrap">{`${m.debut ? formatDate(m.debut) : "—"} → ${m.fin ? formatDate(m.fin) : "…"}`}</span>,
     },
-    { key: "compteur", header: t("ecarts_suivi.flux.compteur"), num: true, render: (m) => formatNumber(Number(m.compteur)), sortValue: (m) => num(m.compteur) },
+    { key: "compteur", header: t("ecarts_suivi.flux.compteur"), num: true, render: (m) => qte(m.compteur), sortValue: (m) => num(m.compteur) },
   ];
   return (
     <SectionCard title={t("ecarts_suivi.flux.title")}>
       <p className="muted">{t("ecarts_suivi.flux.note")}</p>
       {rows.length === 0 && <p className="muted">{t("ecarts_suivi.flux.vide")}</p>}
-      {rows.map((b) => (
-        <div key={b.affaire ?? "aucune"} data-testid="flux-m4-affaire">
-          <h4>
-            {b.affaire ?? "—"} · {b.titre} <span className="muted">— {t("ecarts_suivi.flux.consoGr")} {formatNumber(Number(b.consommation_gr))}</span>
-          </h4>
-          <DataTable columns={machineCols} rows={b.machines.map((m, i) => ({ ...m, id: `${m.equipement}-${i}` }))} caption={`${b.affaire ?? "—"} · ${b.titre}`} />
-          {b.bl.length > 0 && (
-            <ul>
-              {b.bl.map((l) => (
-                <li key={l.code}>
-                  {t("ecarts_suivi.flux.bl")} {l.reference_bl || l.code} · {formatDate(l.date)} · {t("ecarts_suivi.flux.ecart")} {pct(l.ecart_pct)}{" "}
-                  {l.litige && <Badge tone="err">{t("ecarts_suivi.flux.litige")}</Badge>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ))}
+      {rows.map((b) => {
+        // Groupe sans affaire : titre « Sans affaire » seul (pas de tiret orphelin ni de code vide).
+        const titre = b.affaire ? `${b.affaire} · ${b.titre}` : t("revueKit.ops.flux.sansAffaire");
+        return (
+          <div key={b.affaire ?? "aucune"} data-testid="flux-m4-affaire">
+            <h4>{titre}</h4>
+            <p className="muted">{t("revueKit.ops.flux.consoGr", { n: qte(b.consommation_gr) })}</p>
+            <DataTable columns={machineCols} rows={b.machines.map((m, i) => ({ ...m, id: `${m.equipement}-${i}` }))} caption={titre} />
+            {b.bl.length > 0 && (
+              <ul>
+                {b.bl.map((l) => (
+                  <li key={l.code}>
+                    {t("ecarts_suivi.flux.bl")} {l.reference_bl || l.code} · {formatDate(l.date)} · {t("ecarts_suivi.flux.ecart")} {pct(l.ecart_pct)}{" "}
+                    {l.litige && <Badge tone="err">{t("ecarts_suivi.flux.litige")}</Badge>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
     </SectionCard>
   );
 }

@@ -57,28 +57,33 @@ export function CoutMainOeuvreSection() {
   if (lignes === null) return null;
   const rows: LigneCoutOf[] = lignes.map((l) => ({ ...l, id: l.ordre }));
   const columns: Column<LigneCoutOf>[] = [
-    { key: "of", header: t("m9b.cout.of"), sortValue: (l) => l.ordre_code, render: (l) => l.ordre_code },
-    { key: "affaire", header: t("m9b.cout.affaire"), render: (l) => l.affaire ?? "—" },
+    // Largeurs en % : l'affaire prend la place, heures et coût restent groupés à droite (plus de colonnes étirées).
+    { key: "of", header: t("m9b.cout.of"), width: "18%", sortValue: (l) => l.ordre_code, render: (l) => <span className="cell-nowrap">{l.ordre_code}</span> },
+    { key: "affaire", header: t("m9b.cout.affaire"), width: "42%", render: (l) => l.affaire ?? "—" },
     {
       key: "heures",
       header: t("m9b.cout.heures"),
+      num: true,
+      width: "22%",
       sortValue: (l) => Number(l.heures),
       render: (l) => (
         <>
-          {heures(l.heures)} h{l.heures_prevues ? ` / ${heures(l.heures_prevues)} h` : ""}{" "}
+          <span className="cell-nowrap">
+            {heures(l.heures)} h{l.heures_prevues ? ` / ${heures(l.heures_prevues)} h` : ""}
+          </span>{" "}
           {Number(l.heures_non_valorisees) > 0 && <Badge tone="warn">{t("m9b.cout.nonValorisees", { n: heures(l.heures_non_valorisees) })}</Badge>}
           {l.depassement && <Badge tone="err">{t("m9b.cout.depassement")}</Badge>}
         </>
       ),
     },
-    { key: "cout", header: t("m9b.cout.cout"), num: true, sortValue: (l) => Number(l.cout), render: (l) => formatMoney(l.cout) },
+    { key: "cout", header: t("m9b.cout.cout"), num: true, width: "18%", sortValue: (l) => Number(l.cout), render: (l) => <span className="cell-nowrap">{formatMoney(l.cout)}</span> },
   ];
   return (
     <SectionCard title={t("m9b.cout.title")}>
       <div data-testid="cout-main-oeuvre">
-        <DataTable columns={columns} rows={rows} caption={t("m9b.cout.title")} />
+        <DataTable columns={columns} rows={rows} caption={t("m9b.cout.title")} density="compact" />
       </div>
-      <p className="muted">{t("m9b.cout.note")}</p>
+      <p className="card-sub">{t("m9b.cout.note")}</p>
     </SectionCard>
   );
 }

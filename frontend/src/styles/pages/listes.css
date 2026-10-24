@@ -613,6 +613,11 @@ td .cell-nowrap,
   margin-bottom: var(--space-2);
 }
 
+/* Champ libellé dans une barre d'outils : libellé au-dessus, à 6 px du contrôle. */
+.list-toolbar .field:has(> label) {
+  gap: 6px;
+}
+
 /* Kanban de 5 colonnes ou moins : colonnes fluides, toutes visibles en bureau (pas de colonne cachée au bord). */
 @media (min-width: 901px) {
   .board:not(:has(> :nth-child(6))) {

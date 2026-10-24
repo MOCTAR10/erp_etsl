@@ -42,7 +42,7 @@ test.describe("M9 : ETSL modifie les taux lui-même", () => {
     await ligne.getByRole("button", { name: "Modifier" }).click();
     await ligne.getByLabel("Taux (%)").fill("5.5");
     await ligne.getByRole("button", { name: "Enregistrer" }).click();
-    await expect(page.getByRole("row", { name: /CNSS-VIEIL-S/ })).toContainText("5.5");
+    await expect(page.getByRole("row", { name: /CNSS-VIEIL-S/ })).toContainText(/5[,.]5/); // « 5,5 % » (format FR)
     await expect(page.getByRole("row", { name: /CNSS-VIEIL-S/ })).toContainText("Provisoire");
   });
 });

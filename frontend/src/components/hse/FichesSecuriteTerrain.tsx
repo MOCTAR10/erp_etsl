@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
@@ -52,11 +53,20 @@ export function FichesSecuriteTerrain() {
     <SectionCard title={t(`${m}.terrain`)}>
       <div data-testid="fiches-terrain">
         {q.isError && <p className="muted">{t(`${m}.copieLocale`)}</p>}
+        {/* Une seule note pour les fiches provisoires ; chaque fiche ne porte qu'un badge court. */}
+        {fiches.some((f) => f.provisoire) && (
+          <div className="banner warn" role="note">
+            <AlertTriangle size={18} aria-hidden />
+            <div className="banner-body">
+              <span className="banner-text">{t("revueKit.fin.fichesProvisoires")}</span>
+            </div>
+          </div>
+        )}
         {fiches.map((f) => (
-          <details key={f.id}>
+          <details key={f.id} className="kit-disclosure">
             <summary>
-              <strong>{f.titre}</strong> <span className="muted">v{f.version}</span>{" "}
-              {f.provisoire && <Badge tone="warn">{t("ecarts_m6m7.provisoire")}</Badge>}
+              <strong>{f.titre}</strong> <span className="muted">v{f.version}</span>
+              {f.provisoire && <Badge tone="warn">{t("revueKit.fin.provisoire")}</Badge>}
             </summary>
             {f.risques && <p><strong>{t(`${m}.risques`)}</strong> : {f.risques}</p>}
             <p style={{ whiteSpace: "pre-line" }}><strong>{t(`${m}.consignes`)}</strong> : {f.consignes}</p>

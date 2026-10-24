@@ -1,14 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { EMPTY, formatMoney, formatParametre, formatPercent } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { AtterrissageResult, DoctrineResult, NiveauxMarge, ParametreGestion, SousActiviteResult } from "../../types";
-import { Badge, SectionCard } from "../ui";
+import { Badge, DataTable, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
-const montant = (v: string | null) => (v === null ? "••••••" : formatNumber(Number(v)));
+/** Montant exact en FCFA (« 1 089 983 419 FCFA ») ; masqué si l'API ne l'expose pas. */
+const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
+/** Taux en points servi par l'API (« 47.24 ») → « 47,24 % » ; entier sans décimales (« 5 % »). */
+const pourcent = (v: string | number | null | undefined) => {
+  if (v === null || v === undefined || v === "") return EMPTY;
+  const n = Number(v);
+  return formatPercent(v, { decimals: Number.isInteger(n) ? 0 : 2 });
+};
 
 /**
  * Pilotage M11 : sous-activité par centre (90 / 91 / 99), doctrine d'imputation Mix A/B/C et paramètres.
@@ -19,6 +28,8 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
+  // Paramètres repliés par défaut, ouverts tant que des valeurs provisoires attendent ETSL ; le choix de l'utilisateur prime ensuite.
+  const [ouvert, setOuvert] = useState<boolean | null>(null);
   const enabled = fiscalYear !== undefined;
 
   const params = useQuery({
@@ -74,16 +85,73 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
 
   if (params.isError) return null; // pas de droit : la section n'apparaît pas
   const provisoires = (params.data ?? []).filter((p) => p.est_provisoire).length;
+  const colonnes: Column<ParametreGestion>[] = [
+    { key: "libelle", header: t("revueKit.fin.parametre"), render: (p) => p.label, sortValue: (p) => p.label, width: 260 },
+    {
+      key: "valeur",
+      header: t("revueKit.fin.valeur"),
+      num: true,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            className="control"
+            aria-label={p.label}
+            value={edit.valeur}
+            onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })}
+          />
+        ) : (
+          <span className="cell-nowrap">{formatParametre(p.valeur, p.unite)}</span>
+        ),
+    },
+    {
+      key: "statut",
+      header: t("revueKit.fin.statut"),
+      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`pilotageGestion.${p.statut_valeur}`)}</Badge>,
+      sortValue: (p) => p.statut_valeur,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) => (
+        <div className="action-bar-buttons r3-nowrap">
+          {edit?.id === p.id ? (
+            <>
+              <button type="button" className="btn primary sm" disabled={modifier.isPending} onClick={() => modifier.mutate(edit)}>
+                {t("pilotageGestion.valider")}
+              </button>
+              <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
+                {t("pilotageGestion.annuler")}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
+                {t("pilotageGestion.modifier")}
+              </button>
+              {p.est_provisoire && (
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  disabled={confirmer.isPending}
+                  onClick={() => window.confirm(t("pilotageGestion.confirmConfirmer")) && confirmer.mutate(p.id)}
+                >
+                  {t("pilotageGestion.confirmer")}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <SectionCard title={t("pilotageGestion.title")}>
       <div data-testid="pilotage-gestion">
         <p className="muted">{t("pilotageGestion.hint")}</p>
-        {provisoires > 0 && (
-          <p className="action-error" role="note" data-testid="alerte-provisoire-gestion">
-            {t("pilotageGestion.warnProvisoire", { count: provisoires })}
-          </p>
-        )}
         {error && <p className="action-error" role="alert">{error}</p>}
 
         <h4 className="section-heading">{t("pilotageGestion.niveaux")}</h4>
@@ -100,7 +168,7 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
                 <tr key={m}>
                   <td>{t(`pilotageGestion.${m}`)}</td>
                   <td className="num">{montant(niveaux.data[m])}</td>
-                  <td className="num">{niveaux.data[tx] === null ? "—" : `${niveaux.data[tx]} %`}</td>
+                  <td className="num">{pourcent(niveaux.data[tx])}</td>
                 </tr>
               ))}
               <tr>
@@ -161,7 +229,7 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
                   <td>{r.code} — {r.label}</td>
                   <td className="num">{montant(r.budget_ecoule)}</td>
                   <td className="num">{montant(r.realise)}</td>
-                  <td className="num">{r.taux_sous_activite} %</td>
+                  <td className="num">{pourcent(r.taux_sous_activite)}</td>
                   <td><Badge tone={r.centre === "99" ? "err" : r.centre === "91" ? "warn" : "ok"}>{t("pilotageGestion.centreN", { n: r.centre })}</Badge></td>
                 </tr>
               ))}
@@ -171,7 +239,12 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
 
         <h4 className="section-heading">{t("pilotageGestion.doctrine")}</h4>
         {doctrine.data && !doctrine.data.cible_coherente && (
-          <p className="action-error" role="note">{t("pilotageGestion.cibleIncoherente")}</p>
+          <div className="banner warn" role="note">
+            <AlertTriangle size={18} aria-hidden />
+            <div className="banner-body">
+              <span className="banner-text">{t("pilotageGestion.cibleIncoherente")}</span>
+            </div>
+          </div>
         )}
         {doctrine.data && (
           <table className="table">
@@ -189,8 +262,8 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
                 <tr key={l.classe}>
                   <td>Mix {l.classe}</td>
                   <td className="num">{montant(l.montant)}</td>
-                  <td className="num">{l.part} %</td>
-                  <td className="num">{l.classe === "C" ? "≤ " : ""}{l.cible} %</td>
+                  <td className="num">{pourcent(l.part)}</td>
+                  <td className="num cell-nowrap">{l.classe === "C" ? "≤ " : ""}{pourcent(l.cible)}</td>
                   <td>{l.conforme === null ? "—" : <Badge tone={l.conforme ? "ok" : "err"}>{l.conforme ? t("pilotageGestion.conforme") : t("pilotageGestion.ecart")}</Badge>}</td>
                 </tr>
               ))}
@@ -202,40 +275,18 @@ export function PilotageGestionSection({ fiscalYear }: { fiscalYear: number | st
         )}
 
         <h4 className="section-heading">{t("pilotageGestion.params")}</h4>
-        <table className="table">
-          <tbody>
-            {(params.data ?? []).map((p) => (
-              <tr key={p.id}>
-                <td>{p.label}</td>
-                <td>
-                  {edit?.id === p.id ? (
-                    <input type="number" min="0" step="0.01" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-                  ) : (
-                    `${p.valeur} ${p.unite}`
-                  )}
-                </td>
-                <td><Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`pilotageGestion.${p.statut_valeur}`)}</Badge></td>
-                <td>
-                  {edit?.id === p.id ? (
-                    <>
-                      <button type="button" className="btn" onClick={() => modifier.mutate(edit)}>{t("pilotageGestion.valider")}</button>{" "}
-                      <button type="button" className="btn ghost" onClick={() => setEdit(null)}>{t("pilotageGestion.annuler")}</button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("pilotageGestion.modifier")}</button>{" "}
-                      {p.est_provisoire && (
-                        <button type="button" className="btn ghost" onClick={() => window.confirm(t("pilotageGestion.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                          {t("pilotageGestion.confirmer")}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {provisoires > 0 && (
+          <div className="banner warn" role="note" data-testid="alerte-provisoire-gestion">
+            <AlertTriangle size={18} aria-hidden />
+            <div className="banner-body">
+              <span className="banner-text">{t("pilotageGestion.warnProvisoire", { count: provisoires })}</span>
+            </div>
+          </div>
+        )}
+        <details className="r3-repli" open={ouvert ?? provisoires > 0} onToggle={(e) => setOuvert(e.currentTarget.open)}>
+          <summary>{t("revueKit.fin.voirParametres", { count: (params.data ?? []).length })}</summary>
+          <DataTable columns={colonnes} rows={params.data ?? []} caption={t("pilotageGestion.params")} density="compact" />
+        </details>
       </div>
     </SectionCard>
   );

@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { CalendarClock } from "lucide-react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatParametre } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { Actif, CalendrierPreventif, ExigenceHabilitationMaintenance, HistoriqueStatutOT, OrdreTravail, PlanPreventif } from "../../types";
-import { Badge, QuickForm, SectionCard } from "../ui";
+import { Badge, currentMonth, MonthPicker, QuickForm, SectionCard } from "../ui";
 
-const moisCourant = () => new Date().toISOString().slice(0, 7);
+/** Nombre sans décimales inutiles (« 900 », « 2,5 ») : jamais « 900.00 ». */
+const nombre = (v: string | number | null | undefined) => formatParametre(v, null);
 
 /**
  * Plans préventifs M8 (CDC M8.2 / §13.4) : saisie par machine ou composant (périodicité et / ou intervalle
@@ -17,7 +19,7 @@ const moisCourant = () => new Date().toISOString().slice(0, 7);
 export function PlansPreventifsSection({ actifs }: { actifs: Actif[] }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [mois, setMois] = useState(moisCourant());
+  const [mois, setMois] = useState(currentMonth());
   const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,35 +43,53 @@ export function PlansPreventifsSection({ actifs }: { actifs: Actif[] }) {
   if (plans.isError) return null; // pas de droit de lecture M8 : la section n'apparaît pas
   const rows = plans.data ?? [];
   const cal = calendrier.data;
+  // Unité du compteur de chaque équipement (heures moteur ou kilomètres) : « toutes les 50 heures », « tous les 500 km ».
+  const uniteCompteur = new Map(actifs.map((a) => [a.id, a.compteur_type]));
+  const intervalle = (p: PlanPreventif) => {
+    const unite = uniteCompteur.get(p.actif);
+    if (unite === "heures") return t("revueKit.ops.plans.compteurHeures", { valeur: formatParametre(p.intervalle_compteur, "heures") });
+    if (unite === "km") return t("revueKit.ops.plans.compteurKm", { valeur: formatParametre(p.intervalle_compteur, "km") });
+    return t("revueKit.ops.plans.compteur", { valeur: nombre(p.intervalle_compteur) });
+  };
+  const compteur = (p: PlanPreventif) => {
+    const unite = uniteCompteur.get(p.actif);
+    const cible = unite === "heures" || unite === "km" ? formatParametre(p.prochain_compteur, unite) : nombre(p.prochain_compteur);
+    return `${nombre(p.compteur_actuel)} / ${cible}`;
+  };
+
+  const actions = (
+    <div className="section-actions">
+      <QuickForm
+        title={t("m8e.plans.nouveau")}
+        endpoint="/api/maintenance/plans/"
+        variant="secondary"
+        fields={[
+          {
+            name: "actif", label: t("m8e.plans.actif"), type: "select", required: true,
+            options: actifs.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
+          },
+          { name: "libelle", label: t("m8e.plans.libelle"), required: true },
+          { name: "composant", label: t("m8e.plans.composant") },
+          { name: "periodicite_jours", label: t("m8e.plans.periodicite"), type: "number", min: 1, step: "1" },
+          { name: "intervalle_compteur", label: t("m8e.plans.intervalle"), type: "number", min: 0, step: "0.01" },
+          { name: "derniere_date", label: t("m8e.plans.derniereDate"), type: "date" },
+          {
+            name: "priorite", label: t("m8e.plans.priorite"), type: "select", required: true, defaultValue: "moyenne",
+            options: ["basse", "moyenne", "haute", "critique"].map((v) => ({ value: v, label: t(`maintenance.ot_priorites.${v}`) })),
+          },
+        ]}
+      />
+      <button type="button" className="btn ghost" onClick={() => declencher.mutate()} disabled={declencher.isPending}>
+        {t("m8e.plans.declencher")}
+      </button>
+    </div>
+  );
 
   return (
-    <SectionCard title={`${t("m8e.plans.title")} · ${rows.length}`}>
-      <div data-testid="plans-preventifs">
+    // Le repère de test englobe la carte : les boutons de création et de déclenchement sont dans l'en-tête.
+    <div data-testid="plans-preventifs">
+      <SectionCard title={`${t("m8e.plans.title")} · ${rows.length}`} actions={actions}>
         <p className="muted">{t("m8e.plans.hint")}</p>
-        <div className="action-bar-buttons">
-          <QuickForm
-            title={t("m8e.plans.nouveau")}
-            endpoint="/api/maintenance/plans/"
-            fields={[
-              {
-                name: "actif", label: t("m8e.plans.actif"), type: "select", required: true,
-                options: actifs.map((a) => ({ value: a.id, label: `${a.code} · ${a.designation}` })),
-              },
-              { name: "libelle", label: t("m8e.plans.libelle"), required: true },
-              { name: "composant", label: t("m8e.plans.composant") },
-              { name: "periodicite_jours", label: t("m8e.plans.periodicite"), type: "number", min: 1, step: "1" },
-              { name: "intervalle_compteur", label: t("m8e.plans.intervalle"), type: "number", min: 0, step: "0.01" },
-              { name: "derniere_date", label: t("m8e.plans.derniereDate"), type: "date" },
-              {
-                name: "priorite", label: t("m8e.plans.priorite"), type: "select", required: true, defaultValue: "moyenne",
-                options: ["basse", "moyenne", "haute", "critique"].map((v) => ({ value: v, label: t(`maintenance.ot_priorites.${v}`) })),
-              },
-            ]}
-          />
-          <button type="button" className="btn" onClick={() => declencher.mutate()} disabled={declencher.isPending}>
-            {t("m8e.plans.declencher")}
-          </button>
-        </div>
         {info && <p className="muted" role="status" data-testid="plans-info">{info}</p>}
         {error && <p className="action-error" role="alert">{error}</p>}
         {rows.length === 0 ? (
@@ -90,25 +110,27 @@ export function PlansPreventifsSection({ actifs }: { actifs: Actif[] }) {
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id}>
-                  <td><strong>{p.code}</strong></td>
+                  <td className="cell-nowrap"><strong>{p.code}</strong></td>
                   <td>{p.actif_code}</td>
                   <td>{p.libelle}{p.composant ? <span className="muted"> · {p.composant}</span> : null}</td>
                   <td>
                     {[
-                      p.periodicite_jours ? t("m8e.plans.tousLes", { n: p.periodicite_jours }) : null,
-                      p.intervalle_compteur ? t("m8e.plans.toutesLes", { n: p.intervalle_compteur }) : null,
+                      p.periodicite_jours
+                        ? t("revueKit.ops.plans.periodicite", { count: p.periodicite_jours, duree: formatParametre(p.periodicite_jours, "jours") })
+                        : null,
+                      p.intervalle_compteur && Number(p.intervalle_compteur) ? intervalle(p) : null,
                     ].filter(Boolean).join(" · ")}
                   </td>
                   <td>
                     {[
                       p.prochaine_date ? formatDate(p.prochaine_date) : null,
-                      p.prochain_compteur ? `${p.compteur_actuel} / ${p.prochain_compteur}` : null,
+                      p.prochain_compteur ? compteur(p) : null,
                     ].filter(Boolean).join(" · ")}
                   </td>
                   <td>
                     {p.echeance ? <Badge tone="err">{t("m8e.plans.echu")}</Badge> : p.prealerte ? <Badge tone="warn">{t("m8e.plans.prealerte")}</Badge> : <Badge tone="ok">{t("m8e.plans.aJour")}</Badge>}
                     {p.ot_ouvert ? <span className="muted"> · {p.ot_ouvert}</span> : null}
-                    {(p.echeance || p.prealerte) && <div className="muted">{p.echeance ?? p.prealerte}</div>}
+                    {(p.echeance || p.prealerte) && <span className="cell-sub">{p.echeance ?? p.prealerte}</span>}
                   </td>
                 </tr>
               ))}
@@ -116,15 +138,20 @@ export function PlansPreventifsSection({ actifs }: { actifs: Actif[] }) {
           </table>
         )}
 
-        <h4 className="section-heading">{t("m8e.cal.title")}</h4>
-        <label>
-          {t("m8e.cal.mois")}{" "}
-          <input type="month" value={mois} onChange={(e) => setMois(e.target.value)} aria-label={t("m8e.cal.mois")} />
-        </label>
+        <h4>{t("m8e.cal.title")}</h4>
+        <div className="list-toolbar">
+          <div className="field">
+            <label htmlFor="calendrier-preventif-mois">{t("m8e.cal.mois")}</label>
+            <MonthPicker id="calendrier-preventif-mois" value={mois} onChange={setMois} />
+          </div>
+        </div>
         {cal?.provisoire && (
-          <p className="action-error" role="note" data-testid="alerte-provisoire-prealerte">
-            {t("m8e.cal.warnProvisoire", { jours: cal.prealerte_jours, pct: cal.prealerte_pct })}
-          </p>
+          <div className="banner warn" role="note" data-testid="alerte-provisoire-prealerte">
+            <CalendarClock size={18} aria-hidden />
+            <div className="banner-body">
+              <p className="banner-text">{t("m8e.cal.warnProvisoire", { jours: cal.prealerte_jours, pct: nombre(cal.prealerte_pct) })}</p>
+            </div>
+          </div>
         )}
         {cal && cal.occurrences.length === 0 && <p className="muted">{t("m8e.cal.aucune")}</p>}
         {cal && cal.occurrences.length > 0 && (
@@ -153,11 +180,11 @@ export function PlansPreventifsSection({ actifs }: { actifs: Actif[] }) {
         {cal && cal.compteurs.length > 0 && (
           <p className="muted">
             {t("m8e.cal.compteurs")}{" "}
-            {cal.compteurs.map((c) => `${c.plan} ${c.actif} ${c.compteur_actuel} / ${c.prochain_compteur}`).join(" · ")}
+            {cal.compteurs.map((c) => `${c.plan} ${c.actif} ${nombre(c.compteur_actuel)} / ${nombre(c.prochain_compteur)}`).join(" · ")}
           </p>
         )}
-      </div>
-    </SectionCard>
+      </SectionCard>
+    </div>
   );
 }
 
@@ -165,6 +192,7 @@ export function PlansPreventifsSection({ actifs }: { actifs: Actif[] }) {
 export function OtDetails({ ot }: { ot: OrdreTravail }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const uid = useId();
   const [open, setOpen] = useState(false);
   const [heures, setHeures] = useState(ot.heures_mo ?? "");
   const [tarif, setTarif] = useState(ot.tarif_horaire ?? "");
@@ -186,7 +214,7 @@ export function OtDetails({ ot }: { ot: OrdreTravail }) {
   const modifiable = ot.has_amount_access && !["cloture", "archive", "annule"].includes(ot.statut);
 
   return (
-    <details className="ot-details" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+    <details className="ot-details kit-disclosure" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
       <summary>{t("m8e.ot.details")}</summary>
       {ot.document_titre && <p className="muted">{t("m8e.ot.archiveGed", { titre: ot.document_titre })}</p>}
       {ot.qualifie_par_name && (
@@ -202,16 +230,18 @@ export function OtDetails({ ot }: { ot: OrdreTravail }) {
             enregistrer.mutate();
           }}
         >
-          <label>
-            {t("m8e.ot.heures")}{" "}
-            <input type="number" min={0} step="0.25" value={heures} onChange={(e) => setHeures(e.target.value)} />
-          </label>{" "}
-          <label>
-            {t("m8e.ot.tarif")}{" "}
-            <input type="number" min={0} step="1" value={tarif} onChange={(e) => setTarif(e.target.value)} />
-          </label>{" "}
-          <button type="submit" className="btn" disabled={enregistrer.isPending}>{t("quickForm.save")}</button>
-          {msg && <span className={msg.ok ? "quick-form-ok" : "action-error"} role={msg.ok ? "status" : "alert"}> {msg.text}</span>}
+          <div className="list-toolbar">
+            <div className="field">
+              <label htmlFor={`${uid}-heures`}>{t("m8e.ot.heures")}</label>
+              <input id={`${uid}-heures`} className="control" type="number" min={0} step="0.25" value={heures} onChange={(e) => setHeures(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor={`${uid}-tarif`}>{t("m8e.ot.tarif")}</label>
+              <input id={`${uid}-tarif`} className="control" type="number" min={0} step="1" value={tarif} onChange={(e) => setTarif(e.target.value)} />
+            </div>
+            <button type="submit" className="btn ghost sm" disabled={enregistrer.isPending}>{t("quickForm.save")}</button>
+          </div>
+          {msg && <p className={msg.ok ? "quick-form-ok" : "action-error"} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
         </form>
       )}
       {open && (
@@ -251,25 +281,29 @@ export function ExigencesHabilitationSection() {
   });
   if (q.isError) return null;
   const rows = q.data ?? [];
+  const nouvelle = (
+    <QuickForm
+      title={t("m8e.hab.nouvelle")}
+      endpoint="/api/maintenance/exigences-habilitation/"
+      variant="secondary"
+      fields={[
+        {
+          name: "categorie_actif", label: t("m8e.hab.categorie"), type: "select",
+          options: ["machine", "engin", "levage", "atelier", "chantier", "outillage"].map((v) => ({ value: v, label: t(`maintenance.categories.${v}`) })),
+        },
+        {
+          name: "type_ot", label: t("m8e.hab.type"), type: "select",
+          options: ["correctif", "preventif", "urgence", "inspection"].map((v) => ({ value: v, label: t(`maintenance.ot_types.${v}`) })),
+        },
+        { name: "mot_cle", label: t("m8e.hab.motCle"), required: true },
+      ]}
+    />
+  );
   return (
-    <SectionCard title={`${t("m8e.hab.title")} · ${rows.length}`}>
-      <div data-testid="exigences-habilitation">
+    // Le repère de test englobe la carte : le bouton de création est dans l'en-tête de la section.
+    <div data-testid="exigences-habilitation">
+      <SectionCard title={`${t("m8e.hab.title")} · ${rows.length}`} actions={<div className="section-actions">{nouvelle}</div>}>
         <p className="muted">{t("m8e.hab.hint")}</p>
-        <QuickForm
-          title={t("m8e.hab.nouvelle")}
-          endpoint="/api/maintenance/exigences-habilitation/"
-          fields={[
-            {
-              name: "categorie_actif", label: t("m8e.hab.categorie"), type: "select",
-              options: ["machine", "engin", "levage", "atelier", "chantier", "outillage"].map((v) => ({ value: v, label: t(`maintenance.categories.${v}`) })),
-            },
-            {
-              name: "type_ot", label: t("m8e.hab.type"), type: "select",
-              options: ["correctif", "preventif", "urgence", "inspection"].map((v) => ({ value: v, label: t(`maintenance.ot_types.${v}`) })),
-            },
-            { name: "mot_cle", label: t("m8e.hab.motCle"), required: true },
-          ]}
-        />
         {error && <p className="action-error" role="alert">{error}</p>}
         {rows.length === 0 ? (
           <p className="muted">{t("m8e.hab.aucune")}</p>
@@ -279,20 +313,27 @@ export function ExigencesHabilitationSection() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.categorie_label || t("m8e.hab.toutes")}</td>
-                  <td>{r.type_label || t("m8e.hab.tous")}</td>
+                  <td>{r.categorie_actif ? t(`maintenance.categories.${r.categorie_actif}`, { defaultValue: r.categorie_label }) : t("m8e.hab.toutes")}</td>
+                  <td>{r.type_ot ? t(`maintenance.ot_types.${r.type_ot}`, { defaultValue: r.type_label }) : t("m8e.hab.tous")}</td>
                   <td><strong>{r.mot_cle}</strong></td>
                   <td>
-                    <button type="button" className="btn ghost" onClick={() => window.confirm(t("m8e.hab.confirmSupprimer")) && supprimer.mutate(r.id)}>
-                      {t("m8e.hab.supprimer")}
-                    </button>
+                    <div className="card-actions card-actions--end">
+                      <button
+                        type="button"
+                        className="btn ghost sm"
+                        disabled={supprimer.isPending}
+                        onClick={() => window.confirm(t("m8e.hab.confirmSupprimer")) && supprimer.mutate(r.id)}
+                      >
+                        {t("m8e.hab.supprimer")}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
-    </SectionCard>
+      </SectionCard>
+    </div>
   );
 }

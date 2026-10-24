@@ -53,80 +53,91 @@ export function TarifsGrSection() {
   if (tarifs.isError) return null; // pas de droit de lecture M4 : la section n'apparaît pas
   const rows = tarifs.data ?? [];
 
+  const nouvelle = (
+    <QuickForm
+      title={t("tarifsGr.nouvelle")}
+      endpoint="/api/logistique/tarifs-gr/"
+      variant="secondary"
+      fields={[
+        {
+          name: "partenaire", label: t("tarifsGr.partenaire"), type: "select", required: true,
+          options: (partenaires.data ?? []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` })),
+        },
+        {
+          name: "equipement", label: t("tarifsGr.equipement"), type: "select",
+          options: (equipements.data ?? []).map((e) => ({ value: e.id, label: `${e.code} — ${e.label}` })),
+        },
+        {
+          name: "categorie", label: t("tarifsGr.categorie"), type: "select",
+          options: CATEGORIES.map((c) => ({ value: c, label: t(`tarifsGr.cat.${c}`) })),
+        },
+        {
+          name: "periodicite", label: t("tarifsGr.periodicite"), type: "select", required: true, defaultValue: "jour",
+          options: PERIODICITES.map((p) => ({ value: p, label: t(`tarifsGr.per.${p}`) })),
+        },
+        { name: "tarif", label: t("tarifsGr.tarif"), type: "number", required: true, min: 0, step: "0.01" },
+        { name: "penalite_jour", label: t("tarifsGr.penalite"), type: "number", min: 0, step: "0.01" },
+        { name: "date_effet", label: t("tarifsGr.dateEffet"), type: "date", required: true },
+      ]}
+    />
+  );
+
   return (
-    <SectionCard title={`${t("tarifsGr.title")} · ${rows.length}`}>
-      <div data-testid="tarifs-gr">
+    // Le repère de test englobe la carte : le bouton de création est dans l'en-tête de la section.
+    <div data-testid="tarifs-gr">
+      <SectionCard title={`${t("tarifsGr.title")} · ${rows.length}`} actions={<div className="section-actions">{nouvelle}</div>}>
         <p className="muted">{t("tarifsGr.hint")}</p>
-        <QuickForm
-          title={t("tarifsGr.nouvelle")}
-          endpoint="/api/logistique/tarifs-gr/"
-          fields={[
-            {
-              name: "partenaire", label: t("tarifsGr.partenaire"), type: "select", required: true,
-              options: (partenaires.data ?? []).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` })),
-            },
-            {
-              name: "equipement", label: t("tarifsGr.equipement"), type: "select",
-              options: (equipements.data ?? []).map((e) => ({ value: e.id, label: `${e.code} — ${e.label}` })),
-            },
-            {
-              name: "categorie", label: t("tarifsGr.categorie"), type: "select",
-              options: CATEGORIES.map((c) => ({ value: c, label: t(`tarifsGr.cat.${c}`) })),
-            },
-            {
-              name: "periodicite", label: t("tarifsGr.periodicite"), type: "select", required: true, defaultValue: "jour",
-              options: PERIODICITES.map((p) => ({ value: p, label: t(`tarifsGr.per.${p}`) })),
-            },
-            { name: "tarif", label: t("tarifsGr.tarif"), type: "number", required: true, min: 0, step: "0.01" },
-            { name: "penalite_jour", label: t("tarifsGr.penalite"), type: "number", min: 0, step: "0.01" },
-            { name: "date_effet", label: t("tarifsGr.dateEffet"), type: "date", required: true },
-          ]}
-        />
         {error && <p className="action-error" role="alert">{error}</p>}
         {rows.length === 0 ? (
-          <p className="muted">{t("tarifsGr.aucun")}</p>
+          <p className="muted">{t("revueKit.ops.tarifs.aucun")}</p>
         ) : (
           <table className="table">
             <caption className="sr-only">{t("tarifsGr.title")}</caption>
             <thead>
               <tr>
                 <th>{t("tarifsGr.code")}</th>
-                <th>{t("tarifsGr.partenaire")}</th>
+                <th>{t("revueKit.ops.tarifs.partenaire")}</th>
                 <th>{t("tarifsGr.cible")}</th>
                 <th>{t("tarifsGr.periodicite")}</th>
                 <th className="num">{t("tarifsGr.tarif")}</th>
                 <th className="num">{t("tarifsGr.penalite")}</th>
                 <th>{t("tarifsGr.dateEffet")}</th>
                 <th>{t("tarifsGr.version")}</th>
-                <th />
+                <th><span className="sr-only">{t("revueKit.ops.param.actions")}</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td><strong>{r.code}</strong></td>
+                  <td className="cell-nowrap"><strong>{r.code}</strong></td>
                   <td>{r.partenaire_code}</td>
-                  <td>{r.equipement_code ?? (r.categorie ? r.categorie_label : t("tarifsGr.generale"))}</td>
-                  <td>{r.periodicite_label}</td>
-                  <td className="num">{montant(r.tarif)}</td>
-                  <td className="num">{montant(r.penalite_jour)}</td>
-                  <td><time dateTime={r.date_effet}>{formatDate(r.date_effet)}</time></td>
+                  <td>
+                    {r.equipement_code ??
+                      (r.categorie ? t(`tarifsGr.cat.${r.categorie}`, { defaultValue: r.categorie_label }) : t("tarifsGr.generale"))}
+                  </td>
+                  <td>{t(`tarifsGr.per.${r.periodicite}`, { defaultValue: r.periodicite_label })}</td>
+                  <td className="num cell-nowrap">{montant(r.tarif)}</td>
+                  <td className="num cell-nowrap">{montant(r.penalite_jour)}</td>
+                  <td className="cell-nowrap"><time dateTime={r.date_effet}>{formatDate(r.date_effet)}</time></td>
                   <td>v{r.version}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={() => window.confirm(t("tarifsGr.confirmSupprimer")) && supprimer.mutate(r.id)}
-                    >
-                      {t("tarifsGr.supprimer")}
-                    </button>
+                    <div className="card-actions card-actions--end">
+                      <button
+                        type="button"
+                        className="btn ghost sm"
+                        disabled={supprimer.isPending}
+                        onClick={() => window.confirm(t("tarifsGr.confirmSupprimer")) && supprimer.mutate(r.id)}
+                      >
+                        {t("tarifsGr.supprimer")}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
-    </SectionCard>
+      </SectionCard>
+    </div>
   );
 }

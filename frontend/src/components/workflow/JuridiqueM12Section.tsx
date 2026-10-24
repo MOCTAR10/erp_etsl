@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -59,18 +60,24 @@ export function RechercheJuridiqueSection() {
       <div data-testid="recherche-juridique">
         <p className="muted">{t("rechercheJuridique.hint")}</p>
         <form
+          className="r3-toolbar"
           onSubmit={(e) => {
             e.preventDefault();
             setQ(saisie.trim());
           }}
-          style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}
         >
-          <input type="search" aria-label={t("rechercheJuridique.terme")} placeholder={t("rechercheJuridique.terme")} value={saisie} onChange={(e) => setSaisie(e.target.value)} />
-          <select aria-label={t("rechercheJuridique.module")} value={module} onChange={(e) => setModule(e.target.value)}>
-            <option value="">{t("rechercheJuridique.tousModules")}</option>
-            {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <button type="submit" className="btn" disabled={saisie.trim().length < 2}>{t("rechercheJuridique.chercher")}</button>
+          <div className="field">
+            <label htmlFor="jur-terme">{t("rechercheJuridique.terme")}</label>
+            <input id="jur-terme" type="search" value={saisie} onChange={(e) => setSaisie(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="jur-module">{t("rechercheJuridique.module")}</label>
+            <select id="jur-module" className="control" value={module} onChange={(e) => setModule(e.target.value)}>
+              <option value="">{t("rechercheJuridique.tousModules")}</option>
+              {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <button type="submit" className="btn primary" disabled={saisie.trim().length < 2}>{t("rechercheJuridique.chercher")}</button>
         </form>
         {resultat.isError && <p className="action-error" role="alert">{describeError(resultat.error)}</p>}
         {resultat.data && resultat.data.documents.length === 0 && <p className="muted">{t("rechercheJuridique.aucun")}</p>}
@@ -98,15 +105,15 @@ export function RechercheJuridiqueSection() {
         )}
 
         {resultat.data && resultat.data.documents.length > 0 && (
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.5rem" }}>
-            <select aria-label={t("rechercheJuridique.document")} value={document} onChange={(e) => setDocument(e.target.value)}>
+          <div className="r3-toolbar">
+            <select className="control" aria-label={t("rechercheJuridique.document")} value={document} onChange={(e) => setDocument(e.target.value)}>
               <option value="">{t("rechercheJuridique.document")}</option>
               {resultat.data.documents.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
             </select>
-            <select aria-label={t("rechercheJuridique.objetType")} value={objetType} onChange={(e) => setObjetType(e.target.value)}>
+            <select className="control" aria-label={t("rechercheJuridique.objetType")} value={objetType} onChange={(e) => setObjetType(e.target.value)}>
               {OBJETS_LIEABLES.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
-            <input aria-label={t("rechercheJuridique.objetId")} placeholder={t("rechercheJuridique.objetId")} value={objetId} onChange={(e) => setObjetId(e.target.value)} />
+            <input className="control" aria-label={t("rechercheJuridique.objetId")} placeholder={t("rechercheJuridique.objetId")} value={objetId} onChange={(e) => setObjetId(e.target.value)} />
             <button type="button" className="btn ghost" disabled={!document || !objetId || lier.isPending} onClick={() => lier.mutate()}>
               {t("rechercheJuridique.lier")}
             </button>
@@ -155,9 +162,12 @@ export function DocumentsOfficielsSection() {
       <div data-testid="documents-officiels">
         <p className="muted">{t("docsOfficiels.hint")}</p>
         {provisoires > 0 && (
-          <p className="action-error" role="note" data-testid="alerte-provisoire-officiels">
-            {t("docsOfficiels.warnProvisoire", { count: provisoires })}
-          </p>
+          <div className="banner warn" role="note" data-testid="alerte-provisoire-officiels">
+            <AlertTriangle size={18} aria-hidden />
+            <div className="banner-body">
+              <span className="banner-text">{t("docsOfficiels.warnProvisoire", { count: provisoires })}</span>
+            </div>
+          </div>
         )}
         {error && <p className="action-error" role="alert">{error}</p>}
         <table className="table">
@@ -166,15 +176,17 @@ export function DocumentsOfficielsSection() {
               <tr key={r.id}>
                 <td>{r.label}</td>
                 <td>{r.officiel ? <Badge tone={r.officiel_provisoire ? "warn" : "ok"}>{r.officiel_provisoire ? t("docsOfficiels.provisoire") : t("docsOfficiels.confirme")}</Badge> : "—"}</td>
-                <td>
-                  <button type="button" className="btn ghost" onClick={() => definir.mutate({ id: r.id, officiel: !r.officiel })}>
-                    {r.officiel ? t("docsOfficiels.retirer") : t("docsOfficiels.marquer")}
-                  </button>{" "}
-                  {r.officiel_provisoire && (
-                    <button type="button" className="btn ghost" onClick={() => window.confirm(t("docsOfficiels.confirmConfirmer")) && confirmer.mutate(r.id)}>
-                      {t("docsOfficiels.confirmer")}
+                <td className="num">
+                  <div className="card-actions card-actions--end">
+                    <button type="button" className="btn ghost sm" disabled={definir.isPending} onClick={() => definir.mutate({ id: r.id, officiel: !r.officiel })}>
+                      {r.officiel ? t("docsOfficiels.retirer") : t("docsOfficiels.marquer")}
                     </button>
-                  )}
+                    {r.officiel_provisoire && (
+                      <button type="button" className="btn ghost sm" disabled={confirmer.isPending} onClick={() => window.confirm(t("docsOfficiels.confirmConfirmer")) && confirmer.mutate(r.id)}>
+                        {t("docsOfficiels.confirmer")}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
