@@ -3,11 +3,13 @@ import { useState } from "react";
 import { Award, ClipboardCheck, FileCheck2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { formatDate } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
+import { actionsColumn } from "../components/ui/DataTable";
 import type {
   ControleQualite,
   NonConformite,
@@ -41,10 +43,19 @@ type T = (key: string) => string;
 function qualifColumns(t: T): Column<QualificationSoudeur>[] {
   return [
     { key: "code", header: t("qualite.col.code"), render: (q) => q.code },
-    { key: "soudeur", header: t("qualite.col.soudeur"), render: (q) => `${q.soudeur_name} (${q.soudeur_code})` },
+    {
+      key: "soudeur",
+      header: t("qualite.col.soudeur"),
+      render: (q) => (
+        <>
+          {q.soudeur_name}
+          <span className="cell-sub">{q.soudeur_code}</span>
+        </>
+      ),
+    },
     { key: "norme", header: t("qualite.col.norme"), render: (q) => t(`qualite.norms.${q.norme}`) },
     { key: "procede", header: t("qualite.col.procede"), render: (q) => `${q.procede_label} · ${q.position || "—"}` },
-    { key: "validite", header: t("qualite.col.validite"), render: (q) => formatDate(q.date_validite) },
+    { key: "validite", header: t("qualite.col.validite"), render: (q) => <span className="r3-nowrap">{formatDate(q.date_validite)}</span> },
     {
       key: "statut",
       header: t("qualite.col.statut"),
@@ -116,24 +127,22 @@ function pvColumns(t: T): Column<PvControle>[] {
       ),
     },
     {
-      key: "actions",
-      header: "",
+      key: "dossier",
+      header: <span className="sr-only">{t("m6e.pv.dossier")}</span>,
       render: (p) => (
-        <>
-          {(p.statut === "en_cours" || p.statut === "reserve") && (
-            <ActionBar
-              actions={[
-                { label: t("m6e.pv.receptionner"), path: `/api/qualite/pvs/${p.id}/levee-reserve/`, body: { reserve: false }, confirm: t("m6e.pv.confirmReception") },
-                { label: t("m6e.pv.reserve"), path: `/api/qualite/pvs/${p.id}/levee-reserve/`, body: { reserve: true }, tone: "ghost", prompt: { name: "motif", label: t("m6e.pv.motif") } },
-              ]}
-            />
-          )}
-          <button type="button" className="btn ghost" onClick={() => void api.download(`/api/qualite/pvs/${p.id}/dossier/`, `dossier-qualite-${p.code}.pdf`)}>
-            {t("m6e.pv.dossier")}
-          </button>
-        </>
+        <button type="button" className="btn ghost sm r3-nowrap" onClick={() => void api.download(`/api/qualite/pvs/${p.id}/dossier/`, `dossier-qualite-${p.code}.pdf`)}>
+          {t("m6e.pv.dossier")}
+        </button>
       ),
     },
+    actionsColumn<PvControle>(t("listes.col.actions"), (p) =>
+      p.statut === "en_cours" || p.statut === "reserve"
+        ? [
+            { label: t("m6e.pv.receptionner"), path: `/api/qualite/pvs/${p.id}/levee-reserve/`, body: { reserve: false }, confirm: t("m6e.pv.confirmReception"), tone: "ghost" },
+            { label: t("m6e.pv.reserve"), path: `/api/qualite/pvs/${p.id}/levee-reserve/`, body: { reserve: true }, tone: "ghost", prompt: { name: "motif", label: t("m6e.pv.motif") } },
+          ]
+        : [],
+    ),
   ];
 }
 
@@ -141,19 +150,19 @@ function NcCard({ nc, index }: { nc: NonConformite; index: number }) {
   const { t } = useTranslation();
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        {nc.code} <span className="muted">· {t(`qualite.nc_source.${nc.source}`)}</span>
-      </div>
-      <div className="meta">{nc.description}</div>
-      <div className="meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className={`badge ${nc.gravite === "critique" ? "err" : nc.gravite === "majeure" ? "warn" : "brand"}`}>
-          {t(`qualite.nc_gravite.${nc.gravite}`)}
+      <div className="card-top">
+        <span className="card-code">
+          {nc.code} · {t(`qualite.nc_source.${nc.source}`)}
+          {nc.controle_code ? ` · ${nc.controle_code}` : ""}
         </span>
-        <span>{t(`qualite.nc_traitement.${nc.traitement}`)}</span>
       </div>
-      <div className="meta muted">
-        {nc.controle_code ? `· ${nc.controle_code}` : ""}
-        {nc.actions_count > 0 ? ` · ${t("qualite.capa")} ×${nc.actions_count}` : ""}
+      <div className="title">{nc.description}</div>
+      <div className="card-foot">
+        <Badge tone={nc.gravite === "critique" ? "err" : nc.gravite === "majeure" ? "warn" : "neutral"}>{t(`qualite.nc_gravite.${nc.gravite}`)}</Badge>
+        <span className="meta">
+          {t(`qualite.nc_traitement.${nc.traitement}`)}
+          {nc.actions_count > 0 ? ` · ${t("revueR3.qualite.capa", { count: nc.actions_count })}` : ""}
+        </span>
       </div>
       <ActionBar
         actions={[
@@ -269,7 +278,7 @@ export function QualitePage() {
         <Kpi
           label={t("qualite.qualifsValides")}
           value={valids}
-          hint={`${t("qualite.qualifs")} · ${qualifsAll.length}`}
+          hint={t("revueR3.qualite.surQualifs", { total: qualifsAll.length })}
           icon={Award}
           tone="ok"
           delay={0}
@@ -277,7 +286,7 @@ export function QualitePage() {
         <Kpi
           label={t("qualite.ncOuvertes")}
           value={openNc}
-          hint={`${t("qualite.capa")} · ${capaAll.length} (ouvertes ${capaAll.filter((a) => a.statut !== "cloturee").length})`}
+          hint={t("revueR3.qualite.capaHint", { ouvertes: capaAll.filter((a) => a.statut !== "cloturee").length, total: capaAll.length })}
           icon={ShieldAlert}
           tone="warn"
           delay={0.05}
@@ -285,7 +294,7 @@ export function QualitePage() {
         <Kpi
           label={t("qualite.wpsValides")}
           value={wpsValid}
-          hint={`${t("qualite.wps")} · ${wpsAll.length}`}
+          hint={t("revueR3.qualite.surWps", { total: wpsAll.length })}
           icon={FileCheck2}
           tone="brand"
           delay={0.1}
@@ -293,38 +302,25 @@ export function QualitePage() {
         <Kpi
           label={t("qualite.reservations")}
           value={reservations}
-          hint={`${t("qualite.archive10")} · retention 10 ans`}
+          hint={t("revueR3.qualite.pvHint", { total: pvAll.length })}
           icon={ClipboardCheck}
           tone="accent"
           delay={0.15}
         />
       </div>
 
+      <h3 className="section-heading">{t("revueR3.qualite.nc")}</h3>
       <SearchField value={ncSearch} onChange={setNcSearch} placeholder={t("qualite.searchNc")} />
 
-      <div style={{ overflowX: "auto" }}>
-        <Board>
-          {NC_ORDER.map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={t(`qualite.nc_statut.${st}`)}
-              count={groups[st].length}
-              tone={NC_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={260}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <p className="muted" style={{ padding: "0.5rem 0.25rem" }}>
-                  {t("common.empty")}
-                </p>
-              ) : (
-                groups[st].map((nc, i) => <NcCard key={nc.id} nc={nc} index={i} />)
-              )}
-            </BoardColumn>
-          ))}
-        </Board>
-      </div>
+      <Board label={t("revueR3.qualite.nc")}>
+        {NC_ORDER.map((st, ci) => (
+          <BoardColumn key={st} title={t(`qualite.nc_statut.${st}`)} count={groups[st].length} tone={NC_BADGE[st]} delay={ci * 0.05} limit={6}>
+            {groups[st].map((nc, i) => (
+              <NcCard key={nc.id} nc={nc} index={i} />
+            ))}
+          </BoardColumn>
+        ))}
+      </Board>
 
       {(qualifs.count > 0 || qualifs.search) && (
         <SectionCard title={`${t("qualite.qualifs")} · ${qualifs.count}`}>

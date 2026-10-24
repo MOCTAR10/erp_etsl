@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
+import { cleanLabel } from "../components/workflow/libelle";
 import {
   Badge,
   DataGrid,
@@ -245,7 +246,7 @@ export function DocumentsPage() {
         );
       },
     },
-    { key: "type", header: t("ecarts_tr.ged.type"), sortValue: (d) => d.type_label, render: (d) => d.type_label ?? "—" },
+    { key: "type", header: t("ecarts_tr.ged.type"), sortValue: (d) => d.type_label, render: (d) => (d.type_label ? cleanLabel(d.type_label) : "—") },
     {
       key: "statut",
       header: t("ecarts_tr.ged.statut"),
@@ -265,30 +266,32 @@ export function DocumentsPage() {
         const v = verif[d.id];
         if (v && typeof v !== "string")
           return <Badge tone={v.ok ? "ok" : "err"}>{v.ok ? t("ecarts_tr.ged.integre") : t("ecarts_tr.ged.altere")}</Badge>;
-        return (
-          <code className="ged-sha" title={d.sha256 || undefined}>
-            {d.sha256 ? `${d.sha256.slice(0, 10)}…` : "—"}
+        return d.sha256 ? (
+          <code className="ged-sha" title={d.sha256}>
+            {`${d.sha256.slice(0, 10)}…`}
           </code>
+        ) : (
+          <span className="muted">—</span>
         );
       },
     },
   ];
 
   const typeColumns: GridColumn<DocType>[] = [
-    { key: "type", header: t("ecarts_tr.ged.type"), sortValue: (ty) => ty.label, render: (ty) => <strong>{ty.label}</strong> },
+    { key: "type", header: t("ecarts_tr.ged.type"), sortValue: (ty) => ty.label, render: (ty) => <strong>{cleanLabel(ty.label)}</strong> },
     {
       key: "retention",
       header: t("ecarts_tr.ged.retention"),
       num: true,
       sortValue: (ty) => ty.retention_years,
-      render: (ty) => (ty.retention_years ? `${ty.retention_years} ${t("ecarts_tr.ged.ans")}` : "—"),
+      render: (ty) => (ty.retention_years ? t("revueR1.ans", { count: ty.retention_years }) : "—"),
     },
     {
       key: "statut",
       header: t("ecarts_tr.parametres.statut"),
       render: (ty) =>
         ty.retention_provisoire ? (
-          <Badge tone="warn">{t("ecarts_tr.parametres.provisoire")}</Badge>
+          <Badge tone="warn">{t("formulaires.parametres.provisoire")}</Badge>
         ) : (
           <Badge tone="ok">{t("ecarts_tr.parametres.confirme")}</Badge>
         ),
@@ -315,7 +318,7 @@ export function DocumentsPage() {
       <div className="kpi-grid">
         <Kpi label={t("ecarts_tr.ged.total")} value={facets?.total ?? 0} icon={FileText} tone="brand" />
         <Kpi label={t("ecarts_tr.ged.statuts.in_validation")} value={facets?.by_status?.in_validation ?? 0} icon={FileText} tone="warn" delay={0.05} />
-        <Kpi label={t("ecarts_tr.ged.statuts.archived")} value={facets?.by_status?.archived ?? 0} icon={Archive} tone="accent" delay={0.1} />
+        <Kpi label={t("revueR1.ged.archives")} value={facets?.by_status?.archived ?? 0} icon={Archive} tone="accent" delay={0.1} />
       </div>
       <SectionCard title={t("ecarts_tr.ged.documents")} className="ged-card">
         <FilterBar
@@ -324,7 +327,7 @@ export function DocumentsPage() {
           onChange={setCriteres}
           idPrefix="ged-f"
           primary={["status", "type", "document_date"]}
-          options={{ type: types.map((ty) => ({ valeur: String(ty.id), libelle: ty.label })) }}
+          options={{ type: types.map((ty) => ({ valeur: String(ty.id), libelle: cleanLabel(ty.label) })) }}
           search={<SearchField value={list.search} onChange={list.setSearch} placeholder={t("ecarts_tr.ged.rechercher")} />}
           moreKeys={["year"]}
           more={

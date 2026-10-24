@@ -245,7 +245,7 @@ function CriteresSection({ criteres }: { criteres: Critere[] }) {
             {t("m5e.params.modifier")}
           </button>
           {c.est_provisoire && (
-            <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/qualite/criteres/${c.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer") }]} />
+            <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/qualite/criteres/${c.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer"), tone: "ghost" }]} />
           )}
         </div>
       ),

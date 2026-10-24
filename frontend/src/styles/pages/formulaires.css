@@ -386,7 +386,17 @@
   /* ── Paramètres ETSL ── */
   .param-banner { margin-bottom: var(--space-5); }
   .param-banner > svg { color: var(--warn-text); }
-  .param-banner .banner-body { flex-direction: column; align-items: flex-start; }
+  .param-banner button.banner-action {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--brand);
+  }
+  .param-banner button.banner-action:hover { text-decoration: underline; text-underline-offset: 3px; }
   .param-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -456,8 +466,7 @@
   .param-link:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
   .param-link:focus-visible { outline: var(--focus-outline); outline-offset: 2px; border-radius: 4px; }
   .param-code {
-    font-family: var(--font-mono);
-    font-size: var(--fs-2xs);
+    font-size: var(--fs-xs);
     color: var(--text-muted);
     overflow-wrap: break-word;
   }
@@ -479,11 +488,9 @@
   .param-confirm {
     white-space: nowrap;
     color: var(--brand);
-    border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
-    background: var(--brand-soft);
   }
   .param-confirm:hover:not(:disabled) {
-    background: var(--brand-tint);
+    background: var(--brand-soft);
   }
   .param-edit-meta {
     display: grid;
@@ -527,5 +534,32 @@
     .param-toolbar select.filter-control { flex: 1 1 100%; }
     .segmented { width: 100%; }
     .segmented button { flex: 1; }
+  }
+}
+
+@layer pages {
+  /* Reprise de données : sélecteur de fichier dessiné (le contrôle natif reste accessible, masqué). */
+  .file-pick {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--control-h);
+    min-width: 0;
+    cursor: pointer;
+  }
+  .file-pick-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-sm);
+  }
+  .file-pick:focus-within .btn {
+    outline: var(--focus-outline);
+    outline-offset: 2px;
+  }
+  .reprise-banner {
+    margin-bottom: var(--space-4);
   }
 }

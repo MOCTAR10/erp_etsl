@@ -1,15 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatNumber } from "../../lib/format";
+import { formatMoney, formatParametre } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { GrAffairesResult, ParametreLogistique } from "../../types";
-import { Badge, SectionCard } from "../ui";
+import { Badge, currentMonth, MonthPicker, SectionCard } from "../ui";
 
-const montant = (v: string | null) => (v === null ? "••••••" : formatNumber(Number(v)));
-const moisCourant = () => new Date().toISOString().slice(0, 7);
+const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
+
+/** Valeur lisible d'un paramètre (« 30 jours », « 50 000 000 FCFA ») ; espace simple avant l'unité finale. */
+const valeurParametre = (valeur: string, unite: string) => formatParametre(valeur, unite).replace(/\u00a0(?=[^\d\u00a0]+$)/, " ");
 
 /**
  * Flux compteurs → M11 : coût GLOBAL RENTAL du mois ventilé par affaire (compte 618 isolé), avec la marge
@@ -17,7 +20,7 @@ const moisCourant = () => new Date().toISOString().slice(0, 7);
  */
 export function GrAffairesSection({ fiscalYear }: { fiscalYear?: number | string }) {
   const { t } = useTranslation();
-  const [periode, setPeriode] = useState(moisCourant());
+  const [periode, setPeriode] = useState(currentMonth());
   const suffixe = fiscalYear !== undefined ? `&fiscal_year=${fiscalYear}` : "";
   const q = useQuery({
     queryKey: ["cg-gr-affaires", periode, fiscalYear],
@@ -26,38 +29,46 @@ export function GrAffairesSection({ fiscalYear }: { fiscalYear?: number | string
     retry: 0,
   });
   if (q.isError && !q.data) return null; // pas de droit de lecture M11 : la section n'apparaît pas
+  const champ = fiscalYear !== undefined ? "gr-affaires-mois-cg" : "gr-affaires-mois";
 
   return (
     <SectionCard title={t("grAffaires.title")}>
       <div data-testid="gr-affaires">
         <p className="muted">{t("grAffaires.hint")}</p>
-        <label>
-          {t("grAffaires.periode")}{" "}
-          <input type="month" value={periode} onChange={(e) => setPeriode(e.target.value)} aria-label={t("grAffaires.periode")} />
-        </label>
+        <div className="list-toolbar">
+          <div className="field">
+            <label htmlFor={champ}>{t("grAffaires.periode")}</label>
+            <MonthPicker id={champ} value={periode} onChange={setPeriode} />
+          </div>
+        </div>
         {q.data?.provisoire && (
-          <p className="action-error" role="note" data-testid="alerte-provisoire-gr">{t("grAffaires.warnProvisoire")}</p>
+          <div className="banner warn" role="note" data-testid="alerte-provisoire-gr">
+            <TriangleAlert size={18} aria-hidden />
+            <div className="banner-body">
+              <p className="banner-text">{t("grAffaires.warnProvisoire")}</p>
+            </div>
+          </div>
         )}
-        {q.data && q.data.rows.length === 0 && <p className="muted">{t("grAffaires.aucun")}</p>}
+        {q.data && q.data.rows.length === 0 && <p className="muted">{t("revueKit.ops.gr.aucunePrestation")}</p>}
         {q.data && q.data.rows.length > 0 && (
           <table className="table">
             <thead>
               <tr>
                 <th>{t("grAffaires.affaire")}</th>
                 <th className="num">{t("grAffaires.consommation")}</th>
-                <th className="num">{t("grAffaires.coutGr")}</th>
+                <th className="num">{t("revueKit.ops.gr.cout")}</th>
                 <th className="num">{t("grAffaires.penalites")}</th>
-                {fiscalYear !== undefined && <th className="num">{t("grAffaires.margeApresGr")}</th>}
+                {fiscalYear !== undefined && <th className="num">{t("revueKit.ops.gr.margeApres")}</th>}
               </tr>
             </thead>
             <tbody>
               {q.data.rows.map((r) => (
                 <tr key={r.affaire ?? "non-affecte"}>
                   <td>{r.affaire ? `${r.affaire} — ${r.titre}` : <Badge tone="warn">{r.titre}</Badge>}</td>
-                  <td className="num">{formatNumber(Number(r.consommation))}</td>
-                  <td className="num">{montant(r.cout_gr)}</td>
-                  <td className="num">{montant(r.penalites)}</td>
-                  {fiscalYear !== undefined && <td className="num">{r.marge_apres_gr === null ? "—" : montant(r.marge_apres_gr)}</td>}
+                  <td className="num">{formatParametre(r.consommation, null)}</td>
+                  <td className="num cell-nowrap">{montant(r.cout_gr)}</td>
+                  <td className="num cell-nowrap">{montant(r.penalites)}</td>
+                  {fiscalYear !== undefined && <td className="num cell-nowrap">{r.marge_apres_gr === null ? "—" : montant(r.marge_apres_gr)}</td>}
                 </tr>
               ))}
             </tbody>
@@ -65,7 +76,7 @@ export function GrAffairesSection({ fiscalYear }: { fiscalYear?: number | string
         )}
         {q.data && (
           <p>
-            {t("grAffaires.total")} (618) : <strong>{montant(q.data.total_gr)}</strong>
+            {t("revueKit.ops.gr.total")} (618) : <strong className="cell-nowrap">{montant(q.data.total_gr)}</strong>
           </p>
         )}
       </div>
@@ -111,40 +122,54 @@ export function ParametresLogistiqueSection() {
       <div data-testid="parametres-logistique">
         <p className="muted">{t("paramLogistique.hint")}</p>
         {provisoires > 0 && (
-          <p className="action-error" role="note" data-testid="alerte-provisoire-logistique">
-            {t("paramLogistique.warnProvisoire", { count: provisoires })}
-          </p>
+          <div className="banner warn" role="note" data-testid="alerte-provisoire-logistique">
+            <SlidersHorizontal size={18} aria-hidden />
+            <div className="banner-body">
+              <p className="banner-text">{t("paramLogistique.warnProvisoire", { count: provisoires })}</p>
+            </div>
+          </div>
         )}
         {error && <p className="action-error" role="alert">{error}</p>}
         <table className="table">
+          <caption className="sr-only">{t("paramLogistique.title")}</caption>
+          <thead>
+            <tr>
+              <th>{t("revueKit.ops.param.parametre")}</th>
+              <th className="num">{t("revueKit.ops.param.valeur")}</th>
+              <th>{t("revueKit.ops.param.statut")}</th>
+              <th><span className="sr-only">{t("revueKit.ops.param.actions")}</span></th>
+            </tr>
+          </thead>
           <tbody>
             {(params.data ?? []).map((p) => (
               <tr key={p.id}>
-                <td>{p.label}</td>
-                <td>
+                <td>{t(`revueKit.ops.param.libelles.${p.code}`, { defaultValue: p.label })}</td>
+                <td className="num cell-nowrap">
                   {edit?.id === p.id ? (
-                    <input type="number" min="1" step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+                    <input type="number" className="control" min="1" step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
                   ) : (
-                    `${p.valeur} ${p.unite}`
+                    valeurParametre(p.valeur, p.unite)
                   )}
                 </td>
                 <td><Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`pilotageGestion.${p.statut_valeur}`)}</Badge></td>
                 <td>
-                  {edit?.id === p.id ? (
-                    <>
-                      <button type="button" className="btn" onClick={() => modifier.mutate(edit)}>{t("pilotageGestion.valider")}</button>{" "}
-                      <button type="button" className="btn ghost" onClick={() => setEdit(null)}>{t("pilotageGestion.annuler")}</button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("pilotageGestion.modifier")}</button>{" "}
-                      {p.est_provisoire && (
-                        <button type="button" className="btn ghost" onClick={() => window.confirm(t("paramLogistique.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                          {t("pilotageGestion.confirmer")}
-                        </button>
-                      )}
-                    </>
-                  )}
+                  <div className="card-actions card-actions--end">
+                    {edit?.id === p.id ? (
+                      <>
+                        <button type="button" className="btn primary sm" disabled={modifier.isPending} onClick={() => modifier.mutate(edit)}>{t("pilotageGestion.valider")}</button>
+                        <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>{t("pilotageGestion.annuler")}</button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("pilotageGestion.modifier")}</button>
+                        {p.est_provisoire && (
+                          <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("paramLogistique.confirmConfirmer")) && confirmer.mutate(p.id)}>
+                            {t("pilotageGestion.confirmer")}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

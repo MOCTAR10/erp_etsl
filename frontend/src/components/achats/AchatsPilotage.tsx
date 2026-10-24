@@ -5,8 +5,10 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
-import { ActionBar, Badge, DataTable, PagedDataTable, QuickForm, SectionCard } from "../ui";
+import { Badge, DataTable, PagedDataTable, QuickForm, SectionCard } from "../ui";
 import type { ActionDef, Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
+import { useRefOptions } from "./refs";
 
 /** Clôture M2 : réceptions sous contrôle qualité, litiges fournisseurs, notation et reporting achats (CDC §5.4-§5.11). */
 
@@ -24,6 +26,7 @@ interface Litige {
   code: string;
   order_code: string;
   fournisseur_name: string | null;
+  type?: string;
   type_label: string;
   statut: string;
   statut_label: string;
@@ -68,61 +71,91 @@ export function AchatsPilotage() {
   });
   const depots = (depotsQuery.data ?? []).filter((d) => d.is_active).map((d) => ({ value: d.id, label: `${d.code} — ${d.label}` }));
   const litiges = usePagedList<Litige>("achats-litiges", (q) => api.get<Paginated<Litige>>(`/api/achats/litiges/${q}`));
+  // Choix du BC par code (et non par identifiant technique) dans le formulaire de litige.
+  const commandes = useRefOptions<{ id: string; code: string; supplier_name: string | null }>(
+    "bc-litiges", "/api/achats/orders/", (o) => `${o.code} — ${o.supplier_name ?? "—"}`,
+  );
   const reporting = useQuery({
     queryKey: ["achats-reporting"],
     queryFn: () => api.get<Reporting & { fournisseurs: Fournisseur[] }>("/api/achats/orders/reporting/"),
   });
 
   const colReceptions: Column<Reception>[] = [
-    { key: "code", header: t("achatsPilotage.col.reception"), render: (r) => `${r.code} · ${r.order_code}` },
-    { key: "date", header: t("achatsPilotage.col.date"), render: (r) => formatDate(r.received_at) },
+    { key: "code", header: t("achatsPilotage.col.reception"), render: (r) => <span className="cell-nowrap">{`${r.code} · ${r.order_code}`}</span> },
+    { key: "date", header: t("achatsPilotage.col.date"), render: (r) => <span className="cell-nowrap">{formatDate(r.received_at)}</span> },
     {
       key: "qc",
       header: t("achatsPilotage.col.controle"),
-      render: (r) =>
-        r.controle_qualite ? (
-          <Badge tone={r.controle_qualite.resultat === "non_conforme" ? "err" : r.controle_qualite.statut === "valide" ? "ok" : "warn"}>
-            {r.controle_qualite.code} · {r.controle_qualite.resultat || r.controle_qualite.statut}
+      render: (r) => {
+        const qc = r.controle_qualite;
+        if (!qc) return "—";
+        // Résultat (ou, à défaut, statut) du contrôle traduit d'après son code.
+        const etat = qc.resultat
+          ? t(`revueR2.purchases.resultats.${qc.resultat}`, { defaultValue: qc.resultat })
+          : t(`revueR2.purchases.qcStatuts.${qc.statut}`, { defaultValue: qc.statut });
+        return (
+          <Badge tone={qc.resultat === "non_conforme" ? "err" : qc.statut === "valide" ? "ok" : "warn"}>
+            <span className="cell-nowrap">{`${qc.code} · ${etat}`}</span>
           </Badge>
-        ) : (
-          "—"
-        ),
+        );
+      },
     },
-    { key: "statut", header: t("achatsPilotage.col.statut"), render: (r) => <Badge tone={r.status === "valide" ? "ok" : "warn"}>{r.status_label}</Badge> },
     {
-      key: "actions",
-      header: "",
-      render: (r) =>
-        r.status === "en_attente" ? (
-          <ActionBar
-            actions={[
-              {
-                label: t("achatsPilotage.validerReception"),
-                path: `/api/achats/receipts/${r.id}/valider/`,
-                // Plusieurs dépôts actifs : la mise en stock exige de choisir le dépôt de réception.
-                ...(depots.length > 1 ? { prompt: { name: "depot", label: t("achatsSaisie.depot"), options: depots } } : {}),
-              },
-            ]}
-          />
-        ) : null,
+      key: "statut",
+      header: t("achatsPilotage.col.statut"),
+      render: (r) => (
+        <Badge tone={r.status === "valide" ? "ok" : r.status === "annule" ? "neutral" : "warn"}>
+          {t(`revueR2.purchases.receptionStatuts.${r.status}`, { defaultValue: r.status_label })}
+        </Badge>
+      ),
     },
+    actionsColumn<Reception>(t("ui.actions"), (r) =>
+      r.status === "en_attente"
+        ? [
+            {
+              label: t("achatsPilotage.validerReception"),
+              path: `/api/achats/receipts/${r.id}/valider/`,
+              // Plusieurs dépôts actifs : la mise en stock exige de choisir le dépôt de réception.
+              ...(depots.length > 1 ? { prompt: { name: "depot", label: t("achatsSaisie.depot"), options: depots } } : {}),
+            },
+          ]
+        : [],
+    ),
   ];
   const colLitiges: Column<Litige>[] = [
-    { key: "code", header: t("achatsPilotage.col.litige"), render: (l) => `${l.code} · ${l.order_code}` },
+    {
+      key: "code",
+      header: t("achatsPilotage.col.litige"),
+      render: (l) => (
+        <>
+          <span className="cell-nowrap">{l.code}</span>
+          <span className="cell-sub cell-nowrap">
+            {l.order_code}
+          </span>
+        </>
+      ),
+    },
     { key: "fournisseur", header: t("achatsPilotage.col.fournisseur"), render: (l) => l.fournisseur_name ?? "—" },
-    { key: "type", header: t("achatsPilotage.col.type"), render: (l) => l.type_label },
+    { key: "type", header: t("achatsPilotage.col.type"), render: (l) => (l.type ? t(`achatsPilotage.types.${l.type}`, { defaultValue: l.type_label }) : l.type_label) },
     { key: "relances", header: t("achatsPilotage.col.relances"), num: true, render: (l) => l.nb_relances },
     {
       key: "statut",
       header: t("achatsPilotage.col.statut"),
       render: (l) => (
-        <Badge tone={l.statut === "resolu" ? "ok" : l.statut === "escalade" ? "err" : "warn"}>
-          {l.statut_label}
-          {l.contentieux_code ? ` · ${l.contentieux_code}` : ""}
-        </Badge>
+        <>
+          <Badge tone={l.statut === "resolu" ? "ok" : l.statut === "escalade" ? "err" : "warn"}>
+            {t(`revueR2.purchases.litigeStatuts.${l.statut}`, { defaultValue: l.statut_label })}
+          </Badge>
+          {l.contentieux_code ? (
+            <span className="cell-sub cell-nowrap">
+              {l.contentieux_code}
+            </span>
+          ) : null}
+        </>
       ),
     },
-    { key: "actions", header: "", render: (l) => <ActionBar actions={actionsLitige(l, t)} /> },
+    // Une action principale (Résoudre) + les autres dans « ⋯ » : plus de boutons empilés sur trois lignes.
+    actionsColumn<Litige>(t("ui.actions"), (l) => actionsLitige(l, t), () => t("achatsPilotage.resoudre")),
   ];
   const colFournisseurs: Column<Fournisseur & { id: string }>[] = [
     { key: "nom", header: t("achatsPilotage.col.fournisseur"), render: (f) => f.fournisseur },
@@ -139,7 +172,7 @@ export function AchatsPilotage() {
     { key: "prix", header: t("achatsPilotage.col.prixMoyen"), num: true, render: (p) => montant(p.prix_moyen) },
   ];
   const colEngagements: Column<Reporting["engagements"][number] & { id: string }>[] = [
-    { key: "axe", header: t("achatsPilotage.col.axe"), render: (e) => `${e.axe} · ${e.libelle}` },
+    { key: "axe", header: t("achatsPilotage.col.axe"), render: (e) => (e.axe && e.axe !== "—" ? `${e.axe} · ${e.libelle}` : e.libelle) },
     { key: "engage", header: t("achatsPilotage.col.engage"), num: true, render: (e) => montant(e.engage) },
   ];
 
@@ -148,14 +181,17 @@ export function AchatsPilotage() {
     <>
       <SectionCard title={`${t("achatsPilotage.receptions")} · ${receptions.count}`}>
         <p className="muted">{t("achatsPilotage.receptionsIntro")}</p>
-        <PagedDataTable list={receptions} columns={colReceptions} caption={t("achatsPilotage.receptions")} searchPlaceholder={t("achatsPilotage.searchReceptions")} />
+        <PagedDataTable list={receptions} columns={colReceptions} maxHeight="none" caption={t("achatsPilotage.receptions")} searchPlaceholder={t("achatsPilotage.searchReceptions")} />
       </SectionCard>
-      <SectionCard title={`${t("achatsPilotage.litiges")} · ${litiges.count}`}>
+      <SectionCard
+        title={`${t("achatsPilotage.litiges")} · ${litiges.count}`}
+        actions={
+          <div className="section-actions">
         <QuickForm
           title={t("achatsPilotage.nouveauLitige")}
           endpoint="/api/achats/litiges/"
           fields={[
-            { name: "purchase_order", label: t("achatsPilotage.bc"), required: true },
+            { name: "purchase_order", label: t("achatsPilotage.bc"), type: "select", required: true, options: commandes },
             {
               name: "type",
               label: t("achatsPilotage.col.type"),
@@ -167,14 +203,19 @@ export function AchatsPilotage() {
             { name: "montant_en_jeu", label: t("achatsPilotage.montant"), type: "number" },
           ]}
         />
-        <PagedDataTable list={litiges} columns={colLitiges} caption={t("achatsPilotage.litiges")} searchPlaceholder={t("achatsPilotage.searchLitiges")} />
+          </div>
+        }
+      >
+        <PagedDataTable list={litiges} columns={colLitiges} maxHeight="none" caption={t("achatsPilotage.litiges")} searchPlaceholder={t("achatsPilotage.searchLitiges")} />
       </SectionCard>
       <SectionCard title={t("achatsPilotage.fournisseurs")}>
         <DataTable rows={(r?.fournisseurs ?? []).map((f) => ({ ...f, id: f.fournisseur_id }))} columns={colFournisseurs} caption={t("achatsPilotage.fournisseurs")} />
       </SectionCard>
       <SectionCard title={t("achatsPilotage.reporting")}>
-        <DataTable rows={(r?.prix_moyens ?? []).map((p) => ({ ...p, id: p.article }))} columns={colPrix} caption={t("achatsPilotage.col.prixMoyen")} />
-        <DataTable rows={(r?.engagements ?? []).map((e) => ({ ...e, id: e.axe }))} columns={colEngagements} caption={t("achatsPilotage.col.engage")} />
+        <h4>{t("revueR2.purchases.prixMoyens")}</h4>
+        <DataTable rows={(r?.prix_moyens ?? []).map((p) => ({ ...p, id: p.article }))} columns={colPrix} caption={t("revueR2.purchases.prixMoyens")} />
+        <h4>{t("revueR2.purchases.engagements")}</h4>
+        <DataTable rows={(r?.engagements ?? []).map((e) => ({ ...e, id: e.axe }))} columns={colEngagements} caption={t("revueR2.purchases.engagements")} />
       </SectionCard>
     </>
   );

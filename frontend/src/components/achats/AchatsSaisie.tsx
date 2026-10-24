@@ -65,10 +65,10 @@ function ConsultationsSection() {
   const ouvertes = useRefOptions<{ id: string; code: string; subject: string }>("consultations-ouvertes", "/api/achats/consultations/?status=ouverte", (c) => `${c.code} — ${c.subject}`);
 
   const colC: Column<Consultation>[] = [
-    { key: "code", header: t("achatsSaisie.col.code"), render: (c) => c.code },
+    { key: "code", header: t("achatsSaisie.col.code"), render: (c) => <span className="cell-nowrap">{c.code}</span> },
     { key: "subject", header: t("achatsSaisie.col.objet"), render: (c) => c.subject },
-    { key: "da", header: t("achatsSaisie.col.da"), render: (c) => c.request_code ?? "—" },
-    { key: "due", header: t("achatsSaisie.col.echeance"), render: (c) => (c.due_date ? formatDate(c.due_date) : "—") },
+    { key: "da", header: t("achatsSaisie.col.da"), render: (c) => <span className="cell-nowrap">{c.request_code ?? "—"}</span> },
+    { key: "due", header: t("achatsSaisie.col.echeance"), render: (c) => <span className="cell-nowrap">{c.due_date ? formatDate(c.due_date) : "—"}</span> },
     { key: "offres", header: t("achatsSaisie.col.offres"), num: true, render: (c) => c.offers_total },
     {
       key: "status",
@@ -81,7 +81,7 @@ function ConsultationsSection() {
     ]),
   ];
   const colO: Column<Offre>[] = [
-    { key: "consultation", header: t("achatsSaisie.col.consultation"), render: (o) => o.consultation_code },
+    { key: "consultation", header: t("achatsSaisie.col.consultation"), render: (o) => <span className="cell-nowrap">{o.consultation_code}</span> },
     { key: "fournisseur", header: t("achatsSaisie.col.fournisseur"), render: (o) => o.supplier_name ?? "—" },
     { key: "montant", header: t("achatsSaisie.col.montant"), num: true, render: (o) => montant(o.amount) },
     { key: "delai", header: t("achatsSaisie.col.delai"), num: true, render: (o) => o.delivery_days ?? "—" },
@@ -126,10 +126,13 @@ function ConsultationsSection() {
       }
     >
       {(consultations.count > 0 || consultations.search) && (
-        <PagedDataTable list={consultations} columns={colC} caption={t("achatsSaisie.consultations")} searchPlaceholder={t("achatsSaisie.searchConsultations")} />
+        <PagedDataTable list={consultations} columns={colC} maxHeight="none" caption={t("achatsSaisie.consultations")} searchPlaceholder={t("achatsSaisie.searchConsultations")} />
       )}
       {(offres.count > 0 || offres.search) && (
-        <PagedDataTable list={offres} columns={colO} caption={t("achatsSaisie.newOffre")} searchPlaceholder={t("achatsSaisie.searchOffres")} />
+        <>
+          <h4>{t("revueR2.purchases.offresFournisseurs")}</h4>
+          <PagedDataTable list={offres} columns={colO} maxHeight="none" caption={t("revueR2.purchases.offresFournisseurs")} searchPlaceholder={t("achatsSaisie.searchOffres")} />
+        </>
       )}
     </SectionCard>
   );
@@ -161,9 +164,26 @@ function CommandesSection() {
     return [];
   };
   const cols: Column<Commande>[] = [
-    { key: "code", header: t("achatsSaisie.col.code"), sortValue: (o) => o.code, render: (o) => <>{o.code} {o.is_global_rental && <Badge tone="brand" title={t("purchases.gr")}>GR</Badge>}</> },
+    {
+      key: "code",
+      header: t("achatsSaisie.col.code"),
+      sortValue: (o) => o.code,
+      render: (o) => (
+        <span className="cell-nowrap">
+          {o.code}
+          {o.is_global_rental && (
+            <>
+              {" "}
+              <Badge tone="brand" title={t("purchases.gr")}>
+                GR
+              </Badge>
+            </>
+          )}
+        </span>
+      ),
+    },
     { key: "fournisseur", header: t("achatsSaisie.col.fournisseur"), render: (o) => o.supplier_name ?? "—" },
-    { key: "date", header: t("achatsSaisie.col.date"), render: (o) => formatDate(o.order_date) },
+    { key: "date", header: t("achatsSaisie.col.date"), render: (o) => <span className="cell-nowrap">{formatDate(o.order_date)}</span> },
     { key: "total", header: t("achatsSaisie.col.total"), num: true, render: (o) => montant(o.total) },
     { key: "status", header: t("achatsSaisie.col.statut"), render: (o) => <StatusBadge status={o.status} /> },
     actionsColumn<Commande>(t("listes.col.actions"), actions),
@@ -209,7 +229,7 @@ function CommandesSection() {
     >
       <FilterBar defs={filtresBc.defs} value={filtresBc.criteres} onChange={filtresBc.setCriteres} idPrefix="bc-f" />
       {(commandes.count > 0 || commandes.search || filtresBc.extra) && (
-        <PagedDataTable list={commandes} columns={cols} caption={t("achatsSaisie.commandes")} searchPlaceholder={t("achatsSaisie.searchCommandes")} />
+        <PagedDataTable list={commandes} columns={cols} maxHeight="none" caption={t("achatsSaisie.commandes")} searchPlaceholder={t("achatsSaisie.searchCommandes")} />
       )}
     </SectionCard>
   );
@@ -241,15 +261,55 @@ function FacturesSection() {
     return [];
   };
   const cols: Column<Facture>[] = [
-    { key: "code", header: t("achatsSaisie.col.code"), render: (f) => `${f.code} · ${f.order_code}` },
-    { key: "ref", header: t("achatsSaisie.col.reference"), render: (f) => f.invoice_ref || "—" },
-    { key: "fournisseur", header: t("achatsSaisie.col.fournisseur"), render: (f) => f.supplier_name ?? "—" },
-    { key: "date", header: t("achatsSaisie.col.date"), render: (f) => formatDate(f.invoice_date) },
+    // Code de la facture + BC d'origine en ligne secondaire ; référence fournisseur sous le fournisseur (tableau moins large).
+    {
+      key: "code",
+      header: t("achatsSaisie.col.code"),
+      sortValue: (f) => f.code,
+      render: (f) => (
+        <>
+          <span className="cell-nowrap">{f.code}</span>
+          <span className="cell-sub cell-nowrap">
+            {f.order_code}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "fournisseur",
+      header: t("achatsSaisie.col.fournisseur"),
+      width: "24%",
+      render: (f) => (
+        <>
+          {f.supplier_name ?? "—"}
+          {f.invoice_ref ? <span className="cell-sub">{t("revueR2.purchases.refFournisseur", { ref: f.invoice_ref })}</span> : null}
+        </>
+      ),
+    },
+    { key: "date", header: t("achatsSaisie.col.date"), sortValue: (f) => f.invoice_date, render: (f) => <span className="cell-nowrap">{formatDate(f.invoice_date)}</span> },
     { key: "ht", header: t("achatsSaisie.col.total"), num: true, render: (f) => montant(f.total) },
-    { key: "tva", header: t("achatsSaisie.col.tva"), num: true, render: (f) => montant(f.total_tva) },
-    { key: "ttc", header: t("achatsSaisie.col.ttc"), num: true, render: (f) => montant(f.total_ttc) },
-    { key: "ecr", header: t("achatsSaisie.col.ecriture"), render: (f) => f.move_number ?? "—" },
-    { key: "status", header: t("achatsSaisie.col.statut"), render: (f) => <StatusBadge status={f.status} /> },
+    // TVA en ligne secondaire du TTC et écriture sous le statut : 2 colonnes de moins, l'action de ligne reste visible.
+    {
+      key: "ttc",
+      header: t("achatsSaisie.col.ttc"),
+      num: true,
+      render: (f) => (
+        <>
+          {montant(f.total_ttc)}
+          <span className="cell-sub cell-nowrap">{t("revueR2.purchases.dontTva", { montant: montant(f.total_tva) })}</span>
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: t("achatsSaisie.col.statut"),
+      render: (f) => (
+        <>
+          <StatusBadge status={f.status} />
+          {f.move_number ? <span className="cell-sub cell-nowrap">{f.move_number}</span> : null}
+        </>
+      ),
+    },
     actionsColumn<Facture>(t("listes.col.actions"), actions),
   ];
 
@@ -285,7 +345,7 @@ function FacturesSection() {
     >
       <FilterBar defs={filtresFf.defs} value={filtresFf.criteres} onChange={filtresFf.setCriteres} idPrefix="ff-f" />
       {(factures.count > 0 || factures.search || filtresFf.extra) && (
-        <PagedDataTable list={factures} columns={cols} caption={t("achatsSaisie.factures")} searchPlaceholder={t("achatsSaisie.searchFactures")} />
+        <PagedDataTable list={factures} columns={cols} maxHeight="none" caption={t("achatsSaisie.factures")} searchPlaceholder={t("achatsSaisie.searchFactures")} />
       )}
     </SectionCard>
   );

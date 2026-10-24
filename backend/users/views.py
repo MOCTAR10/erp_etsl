@@ -1,6 +1,7 @@
 import csv
 import io
 
+from django.contrib.auth.models import update_last_login
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import HttpResponse
@@ -31,6 +32,8 @@ Evt = JournalAcces.Evenement
 
 
 def _jetons(user):
+    """Jetons JWT de fin d'étape MFA ; la connexion est aboutie : `last_login` est mis à jour."""
+    update_last_login(None, user)
     refresh = RefreshToken.for_user(user)
     return {"refresh": str(refresh), "access": str(refresh.access_token)}
 
@@ -64,6 +67,8 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
                 "mfa_jeton": mfa.emettre_jeton(user),
             })
         journaliser(request, Evt.CONNEXION, user=user)
+        # Jetons délivrés : connexion aboutie → « Dernière connexion » de l'administration (sinon « Jamais »).
+        update_last_login(None, user)
         return Response(serializer.validated_data)
 
 

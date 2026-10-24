@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import { formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { Budget, ConsommationsStock, PeriodeRef } from "../../types";
-import { DataTable, QuickForm, SectionCard } from "../ui";
+import { DataTable, MonthPicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
 interface AxisRef {
@@ -79,7 +79,7 @@ export function SaisieBudgetaireSection({ fiscalYear, budgets }: { fiscalYear: s
 
   return (
     <SectionCard title={t("controleGestion.saisie.title")}>
-      <div data-testid="saisie-budgetaire" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+      <div data-testid="saisie-budgetaire" className="r3-toolbar">
         <QuickForm
           title={t("controleGestion.saisie.nouveauBudget")}
           endpoint="/api/controle-gestion/budgets/"
@@ -115,6 +115,7 @@ export function SaisieBudgetaireSection({ fiscalYear, budgets }: { fiscalYear: s
         />
         {brouillons.length > 0 && (
           <QuickForm
+            variant="secondary"
             title={t("controleGestion.saisie.nouvelleLigne")}
             endpoint="/api/controle-gestion/budget-lignes/"
             fields={[
@@ -126,6 +127,7 @@ export function SaisieBudgetaireSection({ fiscalYear, budgets }: { fiscalYear: s
         )}
         {approuves.length > 0 && (
           <QuickForm
+            variant="secondary"
             title={t("controleGestion.saisie.nouvelleRevision")}
             endpoint="/api/controle-gestion/revisions/"
             fields={[
@@ -137,6 +139,7 @@ export function SaisieBudgetaireSection({ fiscalYear, budgets }: { fiscalYear: s
           />
         )}
         <QuickForm
+          variant="secondary"
           title={t("controleGestion.saisie.nouvelleCloture")}
           endpoint="/api/controle-gestion/clotures/"
           fields={[{ name: "period", label: t("controleGestion.col.periode"), type: "select", required: true, options: optPeriode }]}
@@ -151,10 +154,12 @@ export function SaisieBudgetaireSection({ fiscalYear, budgets }: { fiscalYear: s
         </p>
       )}
 
-      <h3 style={{ marginTop: "1rem" }}>{t("controleGestion.saisie.stockTitle")}</h3>
-      <div className="field" style={{ maxWidth: "14rem" }}>
-        <label htmlFor="cg-periode-stock">{t("controleGestion.saisie.periodeStock")}</label>
-        <input id="cg-periode-stock" type="month" value={periodeStock} onChange={(e) => setPeriodeStock(e.target.value)} />
+      <h4 className="section-heading">{t("controleGestion.saisie.stockTitle")}</h4>
+      <div className="r3-toolbar">
+        <div className="field">
+          <label htmlFor="cg-periode-stock">{t("controleGestion.saisie.periodeStock")}</label>
+          <MonthPicker id="cg-periode-stock" value={periodeStock} onChange={setPeriodeStock} emptyLabel={t("revueKit.kit.tousLesMois")} />
+        </div>
       </div>
       {stock.isError ? null : (stock.data?.depots.length ?? 0) === 0 ? (
         <p className="muted">{t("controleGestion.saisie.stockVide")}</p>

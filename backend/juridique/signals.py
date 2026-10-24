@@ -83,6 +83,19 @@ def _fiche_pdf(objet):
     return buf.getvalue()
 
 
+def _libelle_statut(objet, statut):
+    """Libellé lisible du statut (« Réceptionné ») d'après les choix du modèle ; le code brut à défaut."""
+    champs = sorted(
+        (f for f in objet._meta.concrete_fields if f.choices),
+        key=lambda f: f.name not in ("statut", "status"),  # le champ de statut d'abord
+    )
+    for field in champs:
+        libelles = dict(field.flatchoices)
+        if statut in libelles:
+            return str(libelles[statut])
+    return statut
+
+
 def archiver_objet(objet, objet_type, statut, type_code=None, user=None):
     """Dépose en GED une fiche PDF de l'objet pour ce statut (idempotent) ; renvoie le document ou None."""
     from django.core.files.base import ContentFile
@@ -99,7 +112,7 @@ def archiver_objet(objet, objet_type, statut, type_code=None, user=None):
     sha = hashlib.sha256(contenu).hexdigest()
     now = timezone.now()
     doc = Document.objects.create(
-        title=f"{objet} — archivage ({statut})"[:255],
+        title=f"{objet} — archivage ({_libelle_statut(objet, statut)})"[:255],
         status=Document.Status.ARCHIVED,
         archived_at=now,
         document_date=timezone.localdate(),

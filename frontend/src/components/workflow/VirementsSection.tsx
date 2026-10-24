@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { Employe } from "../../types";
-import { SectionCard } from "../ui";
+import { DatePicker, SectionCard } from "../ui";
 
 interface Compte {
   id: string;
@@ -79,17 +79,24 @@ export function VirementsSection() {
     onError,
   });
   const generer = useMutation({
-    mutationFn: () => api.post("/api/rh-paie/ordres-virement/generer/", gen),
+    mutationFn: (body: typeof gen) => api.post("/api/rh-paie/ordres-virement/generer/", body),
     onSuccess: refresh("ordres-virement"),
     onError,
   });
 
   if (comptes.isError) return null; // hors cercle paie : la section n'apparaît pas
+  // Champs libellés (label visible) ; le texte d'exemple reste en placeholder.
   const f = (k: keyof typeof compte, label: string) => (
-    <input required aria-label={label} placeholder={label} value={compte[k]} onChange={(e) => setCompte({ ...compte, [k]: e.target.value })} />
+    <div className="field">
+      <label htmlFor={`vir-compte-${k}`}>{label}</label>
+      <input id={`vir-compte-${k}`} required placeholder={label} value={compte[k]} onChange={(e) => setCompte({ ...compte, [k]: e.target.value })} />
+    </div>
   );
   const r = (k: keyof typeof rib, label: string) => (
-    <input aria-label={label} placeholder={label} value={rib[k]} onChange={(e) => setRib({ ...rib, [k]: e.target.value })} />
+    <div className="field">
+      <label htmlFor={`vir-rib-${k}`}>{label}</label>
+      <input id={`vir-rib-${k}`} placeholder={label} value={rib[k]} onChange={(e) => setRib({ ...rib, [k]: e.target.value })} />
+    </div>
   );
 
   return (
@@ -98,23 +105,32 @@ export function VirementsSection() {
 
       <h4 className="subtitle">{t("virements.generer")}</h4>
       <form
-        className="bareme-form"
+        className="r3-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
-          generer.mutate();
+          generer.mutate(gen);
         }}
       >
-        <input required type="date" aria-label={t("virements.periode")} value={gen.periode} onChange={(e) => setGen({ ...gen, periode: e.target.value })} />
-        <select required aria-label={t("virements.compte")} value={gen.compte} onChange={(e) => setGen({ ...gen, compte: e.target.value })}>
-          <option value="">{t("virements.compte")}</option>
-          {(comptes.data ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.raison_sociale} — {c.numero_compte}
-            </option>
-          ))}
-        </select>
-        <input required type="date" aria-label={t("virements.execution")} value={gen.date_execution} onChange={(e) => setGen({ ...gen, date_execution: e.target.value })} />
-        <button className="btn" type="submit" disabled={generer.isPending}>
+        <div className="field">
+          <label htmlFor="vir-periode">{t("virements.periode")}</label>
+          <DatePicker id="vir-periode" required value={gen.periode} onChange={(v) => setGen((g) => ({ ...g, periode: v }))} />
+        </div>
+        <div className="field">
+          <label htmlFor="vir-compte">{t("virements.compte")}</label>
+          <select id="vir-compte" className="control" required value={gen.compte} onChange={(e) => setGen({ ...gen, compte: e.target.value })}>
+            <option value="">{t("revueKit.fin.choisirCompte")}</option>
+            {(comptes.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.raison_sociale} — {c.numero_compte}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="vir-execution">{t("virements.execution")}</label>
+          <DatePicker id="vir-execution" required value={gen.date_execution} onChange={(v) => setGen((g) => ({ ...g, date_execution: v }))} />
+        </div>
+        <button className="btn primary" type="submit" disabled={generer.isPending}>
           {t("virements.generer")}
         </button>
       </form>
@@ -125,33 +141,44 @@ export function VirementsSection() {
       )}
 
       {(ordres.data ?? []).length > 0 && (
-        <table className="table">
-          <tbody>
-            {(ordres.data ?? []).map((o) => (
-              <tr key={o.id}>
-                <td>
-                  <strong>{o.code}</strong> · {formatDate(o.periode)}
-                  <div className="muted">
-                    {o.compte_label} · {o.par_email ?? "—"}
-                  </div>
-                </td>
-                <td>
-                  {o.nb_virements} · {formatMoney(o.total)}
-                </td>
-                <td>
-                  <button type="button" className="btn" onClick={() => void api.download(`/api/rh-paie/ordres-virement/${o.id}/fichier/`, `${o.code}.cfonb`)}>
-                    {t("virements.telecharger")}
-                  </button>
-                </td>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{t("revueKit.fin.ordre")}</th>
+                <th className="num">{t("revueKit.fin.nbVirements")}</th>
+                <th className="num">{t("revueKit.fin.total")}</th>
+                <th className="num">
+                  <span className="sr-only">{t("ui.actions")}</span>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(ordres.data ?? []).map((o) => (
+                <tr key={o.id}>
+                  <td>
+                    <strong>{o.code}</strong> · {formatDate(o.periode)}
+                    <div className="cell-sub">
+                      {o.compte_label} · {o.par_email ?? "—"}
+                    </div>
+                  </td>
+                  <td className="num">{o.nb_virements}</td>
+                  <td className="num cell-nowrap">{formatMoney(o.total)}</td>
+                  <td className="num">
+                    <button type="button" className="btn ghost sm" onClick={() => void api.download(`/api/rh-paie/ordres-virement/${o.id}/fichier/`, `${o.code}.cfonb`)}>
+                      {t("virements.telecharger")}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <h4 className="subtitle">{t("virements.compteTitle")}</h4>
       <form
-        className="bareme-form"
+        className="r3-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
           addCompte.mutate();
@@ -163,33 +190,36 @@ export function VirementsSection() {
         {f("code_guichet", t("virements.guichet"))}
         {f("numero_compte", t("virements.numCompte"))}
         {f("cle_rib", t("virements.cle"))}
-        <button className="btn" type="submit" disabled={addCompte.isPending}>
+        <button className="btn ghost" type="submit" disabled={addCompte.isPending}>
           {t("virements.ajouterCompte")}
         </button>
       </form>
 
       <h4 className="subtitle">{t("virements.ribTitle")}</h4>
       <form
-        className="bareme-form"
+        className="r3-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
           saveRib.mutate();
         }}
       >
-        <select required aria-label={t("virements.employe")} value={rib.employe} onChange={(e) => setRib({ ...rib, employe: e.target.value })}>
-          <option value="">{t("virements.employe")}</option>
-          {(employes.data ?? []).map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.code} — {e.nom_complet}
-            </option>
-          ))}
-        </select>
+        <div className="field">
+          <label htmlFor="vir-rib-employe">{t("virements.employe")}</label>
+          <select id="vir-rib-employe" className="control" required value={rib.employe} onChange={(e) => setRib({ ...rib, employe: e.target.value })}>
+            <option value="">{t("revueKit.fin.choisirSalarie")}</option>
+            {(employes.data ?? []).map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.code} — {e.nom_complet}
+              </option>
+            ))}
+          </select>
+        </div>
         {r("rib_banque", t("virements.banque"))}
         {r("rib_guichet", t("virements.guichet"))}
         {r("rib_compte", t("virements.numCompte"))}
         {r("rib_cle", t("virements.cle"))}
         {r("banque_nom", t("virements.domiciliation"))}
-        <button className="btn" type="submit" disabled={saveRib.isPending}>
+        <button className="btn ghost" type="submit" disabled={saveRib.isPending}>
           {t("virements.majRib")}
         </button>
       </form>

@@ -27,6 +27,25 @@ class AuthAPITests(APITestCase):
         self.assertIn("access", resp.data)
         self.assertIn("refresh", resp.data)
 
+    def test_login_updates_last_login(self):
+        """« Dernière connexion » de l'administration : `last_login` posé à l'émission du jeton JWT."""
+        self.assertIsNone(self.user.last_login)
+        self.client.post(
+            "/api/users/token/",
+            {"email": "alice@etls.local", "password": "mauvais"},
+            format="json",
+        )
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.last_login)
+        resp = self.client.post(
+            "/api/users/token/",
+            {"email": "alice@etls.local", "password": "MotDePasse#2026"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.last_login)
+
     def test_login_wrong_password(self):
         resp = self.client.post(
             "/api/users/token/",

@@ -65,9 +65,10 @@ Catalogue vivant de tous les états : `npm run ladle` (§5). Props exactes : lir
 | `Board`, `BoardColumn`, `BoardCard`, `CardActions` | `label` ; `title`, `count`, `tone`, `summary`, `limit`, `emptyLabel` ; `actions`, `primary` | Kanban horizontal par statut ; une action principale par carte, le reste dans `⋯`. |
 | `DataGrid` / `DataTable` / `PagedDataGrid` | `columns` (`key`, `header`, `render`, `num`, `sortValue`, `width`), `rows`, `caption`, `loading`, `density`, `rowActions`, `onRowClick`, `pagination`, `emptyLabel`, `emptyHint` | Toute liste d'entités ; `PagedDataGrid` pour une liste serveur (`usePagedList`). `actionsColumn(label, actions)` = colonne d'actions de ligne. |
 | `Pagination`, `SearchField`, `FilterBar` | `page`, `pageSize`, `count` ; `value`, `onChange` ; `defs`, `value`, `primary`, `search`, `more` | Pagination serveur DRF, recherche différée, filtres multicritères (3 en ligne, le reste dans « Plus de filtres »). |
-| `QuickForm` | `title`, `endpoint`, `fields`, `submitLabel`, `transform` | Création rapide en panneau latéral (POST direct). |
+| `QuickForm` | `title`, `endpoint`, `fields`, `submitLabel`, `transform`, `variant` | Création rapide en panneau latéral (POST direct). Dans une carte, une barre d'actions de section ou une barre d'outils, le déclencheur est rendu secondaire (un seul primaire par écran). |
 | `ActionBar` | `actions: ActionDef[]` (`label`, `path`, `tone`, `confirm`, `prompt`) | Actions de workflow d'un objet (le serveur décide des droits). |
-| `DatePicker`, `DateRangePicker` | `id`, `name`, `value` (ISO), `onChange`, `min`, `max`, `disabled` | Toute date (saisie jj/mm/aaaa + calendrier) et toute période. |
+| `DatePicker`, `DateRangePicker` | `id`, `name`, `value` (ISO), `onChange`, `min`, `max`, `disabled` | Toute date (saisie jj/mm/aaaa + calendrier) et toute période. Jamais d'`<input type="date">` natif (format de la langue du navigateur). |
+| `MonthPicker` | `id`, `name`, `value` (« AAAA-MM »), `onChange`, `min`, `max`, `emptyLabel` | Tout choix de mois : liste du kit libellée dans la langue de l'interface (« Octobre 2026 »). Jamais d'`<input type="month">` natif. |
 | `Menu` | `items` (`label`, `icon`, `onSelect`, `shortcut`, `danger`, `disabled` \| `"separator"` \| `{type:"label"}`), `label`, `trigger` | Actions secondaires `⋯` ; destructives en dernier, en rouge. |
 | `Sheet`, `Modal`, `SheetClose` | `title`, `description`, `footer`, `trigger` ou `open`/`onOpenChange`, `width` | Panneau latéral (édition, détail) ; fenêtre centrée (confirmation). |
 | `Tooltip`, `Popover` | `content` ; `trigger`, `label` | Aide courte au survol ; contenu riche au clic. |
@@ -75,7 +76,9 @@ Catalogue vivant de tous les états : `npm run ladle` (§5). Props exactes : lir
 | `CommandPalette` | `groups`, `search`, `open`, `onOpenChange`, `hotkey` | Palette Ctrl+K (pages, actions, entités serveur). |
 | `EmptyState`, `ErrorState`, `Skeleton` (`KpiSkeleton`, `KpiGridSkeleton`, `BoardSkeleton`) | `label`, `hint`, `icon`, `action`, `compact` ; `message`, `onRetry` | Chaque liste dessine ses états vide / erreur / chargement. |
 
-Formatage (`src/lib/format.ts`) : `formatMoney` (« 25 000 000 FCFA »), `formatNumber`, `formatPercent`, `formatDate` (« 23 sept. 2026 »), `formatDateShort` (« 23/09/2026 »), `formatDateTime`, `EMPTY` (« — »). Un seul point d'entrée API : l'objet `api` de `src/api/client.ts` (jamais de `fetch()` dans une page).
+Formatage (`src/lib/format.ts`) : `formatMoney` (« 25 000 000 FCFA »), `formatNumber`, `formatPercent`, `formatParametre` (valeur + unité d'un paramètre servi par l'API : « 30 jours », « 15 000 FCFA/h », « Oui », compte « 411700 » — jamais « 30.00 jours »), `formatDate` (« 23 sept. 2026 »), `formatDateShort` (« 23/09/2026 »), `formatDateTime`, `EMPTY` (« — »). Les nombres suivent la langue de l'interface : FR « 3 337 000 000 FCFA », « 81,3 % » ; EN « 3,337,000,000 FCFA », « 81.3% » (la devise reste FCFA, le montant reste exact).
+
+Utilitaires CSS partagés : `.cell-nowrap` (codes, dates d'une cellule), `.cell-sub` (ligne secondaire d'une cellule), `.kit-disclosure` (`<details>` avec chevron tokenisé), `.banner.warn` pour tout avertissement « provisoire » (le rouge est réservé aux alertes). `Column.width` impose aussi une largeur minimale ; sous 900 px, un tableau de 3 colonnes ou plus garde une largeur minimale et défile dans son cadre (fondu de bord quand il déborde). `PagedDataGrid` / `PagedDataTable` n'ont pas de hauteur maximale (la pagination la borne). Les blocs empilés directement dans la zone principale sont espacés de 24 px. Un seul point d'entrée API : l'objet `api` de `src/api/client.ts` (jamais de `fetch()` dans une page).
 
 ---
 

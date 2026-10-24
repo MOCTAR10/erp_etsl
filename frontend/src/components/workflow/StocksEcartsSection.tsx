@@ -1,12 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatParametre } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { AlertesStock, ArticleStockConfig, AuditValorisation, CertificatMatiere, LotMatiere, ParametreStock, TraceabiliteEntry } from "../../types";
 import { ActionBar, Badge, QuickForm, SectionCard } from "../ui";
+
+/** Valeur lisible d'un paramètre (« 30 jours », « 500 000 FCFA », « Oui ») ; espace simple avant l'unité finale. */
+const valeurParametre = (valeur: string, unite: string) => formatParametre(valeur, unite).replace(/\u00a0(?=[^\d\u00a0]+$)/, " ");
+
+/** Quantité sans décimales inutiles (« 12 », « 2,5 ») : jamais « 12.00 ». */
+const quantite = (v: string | number | null) => formatParametre(v, null);
 
 const OUI_NON = (t: (k: string) => string) => [
   { value: "true", label: t("m5e.oui") },
@@ -75,39 +82,54 @@ export function ParametresStockSection() {
     <SectionCard title={t("m5e.params.title")}>
       <div data-testid="parametres-stocks">
         {provisoires > 0 && (
-          <p className="action-error" role="note" data-testid="alerte-provisoire-stocks">{t("m5e.params.warn", { count: provisoires })}</p>
+          <div className="banner warn" role="note" data-testid="alerte-provisoire-stocks">
+            <SlidersHorizontal size={18} aria-hidden />
+            <div className="banner-body">
+              <p className="banner-text">{t("m5e.params.warn", { count: provisoires })}</p>
+            </div>
+          </div>
         )}
         {error && <p className="action-error" role="alert">{error}</p>}
         <table className="table">
           <caption className="sr-only">{t("m5e.params.title")}</caption>
+          <thead>
+            <tr>
+              <th>{t("revueKit.ops.param.parametre")}</th>
+              <th className="num">{t("revueKit.ops.param.valeur")}</th>
+              <th>{t("revueKit.ops.param.statut")}</th>
+              <th><span className="sr-only">{t("revueKit.ops.param.actions")}</span></th>
+            </tr>
+          </thead>
           <tbody>
             {q.data.map((p) => (
               <tr key={p.id}>
-                <td>{p.label}</td>
-                <td className="num">
+                <td>{t(`revueKit.ops.param.libelles.${p.code}`, { defaultValue: p.label })}</td>
+                <td className="num cell-nowrap">
                   {edit?.id === p.id ? (
-                    <input type="number" min={0} step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
+                    <input type="number" className="control" min={0} step="1" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
                   ) : (
-                    `${formatNumber(Number(p.valeur))} ${p.unite}`
+                    valeurParametre(p.valeur, p.unite)
                   )}
                 </td>
                 <td><Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("m5e.params.provisoire") : t("m5e.params.confirme")}</Badge></td>
                 <td>
-                  {edit?.id === p.id ? (
-                    <>
-                      <button type="button" className="btn" onClick={() => modifier.mutate(edit)}>{t("m5e.params.valider")}</button>{" "}
-                      <button type="button" className="btn ghost" onClick={() => setEdit(null)}>{t("m5e.params.annuler")}</button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("m5e.params.modifier")}</button>{" "}
-                      {p.est_provisoire && (
-                        <button type="button" className="btn ghost" onClick={() => window.confirm(t("m5e.params.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                          {t("m5e.params.confirmer")}
-                        </button>
-                      )}
-                    </>
-                  )}
+                  <div className="card-actions card-actions--end">
+                    {edit?.id === p.id ? (
+                      <>
+                        <button type="button" className="btn primary sm" disabled={modifier.isPending} onClick={() => modifier.mutate(edit)}>{t("m5e.params.valider")}</button>
+                        <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>{t("m5e.params.annuler")}</button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("m5e.params.modifier")}</button>
+                        {p.est_provisoire && (
+                          <button type="button" className="btn ghost sm" onClick={() => window.confirm(t("m5e.params.confirmConfirmer")) && confirmer.mutate(p.id)}>
+                            {t("m5e.params.confirmer")}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -136,23 +158,27 @@ export function ConfigArticlesSection({ articles }: { articles: { id: string; co
   if (q.isError) return null;
   const rows = q.data ?? [];
   const configures = new Set(rows.map((r) => r.article));
+  const nouveau = (
+    <QuickForm
+      title={t("m5e.config.nouveau")}
+      endpoint="/api/stocks/configs/"
+      variant="secondary"
+      transform={(v) => ({ ...v, lot_obligatoire: v.lot_obligatoire === "true", certificat_requis: v.certificat_requis === "true" })}
+      fields={[
+        {
+          name: "article", label: t("stocks.col.article"), type: "select", required: true,
+          options: articles.filter((a) => !configures.has(a.id)).map((a) => ({ value: a.id, label: `${a.code} · ${a.label}` })),
+        },
+        { name: "seuil_minimal", label: t("m5e.config.seuil"), type: "number", min: 0, step: "0.01" },
+        { name: "lot_obligatoire", label: t("m5e.config.lotObligatoire"), type: "select", required: true, defaultValue: "false", options: OUI_NON(t) },
+        { name: "certificat_requis", label: t("m5e.config.certificatRequis"), type: "select", required: true, defaultValue: "false", options: OUI_NON(t) },
+      ]}
+    />
+  );
   return (
-    <SectionCard title={`${t("m5e.config.title")} · ${rows.length}`}>
-      <div data-testid="config-articles">
-        <QuickForm
-          title={t("m5e.config.nouveau")}
-          endpoint="/api/stocks/configs/"
-          transform={(v) => ({ ...v, lot_obligatoire: v.lot_obligatoire === "true", certificat_requis: v.certificat_requis === "true" })}
-          fields={[
-            {
-              name: "article", label: t("stocks.col.article"), type: "select", required: true,
-              options: articles.filter((a) => !configures.has(a.id)).map((a) => ({ value: a.id, label: `${a.code} · ${a.label}` })),
-            },
-            { name: "seuil_minimal", label: t("m5e.config.seuil"), type: "number", min: 0, step: "0.01" },
-            { name: "lot_obligatoire", label: t("m5e.config.lotObligatoire"), type: "select", required: true, defaultValue: "false", options: OUI_NON(t) },
-            { name: "certificat_requis", label: t("m5e.config.certificatRequis"), type: "select", required: true, defaultValue: "false", options: OUI_NON(t) },
-          ]}
-        />
+    // Le repère de test englobe la carte : le bouton de création est dans l'en-tête de la section.
+    <div data-testid="config-articles">
+      <SectionCard title={`${t("m5e.config.title")} · ${rows.length}`} actions={<div className="section-actions">{nouveau}</div>}>
         {error && <p className="action-error" role="alert">{error}</p>}
         {rows.length > 0 && (
           <table className="table">
@@ -163,38 +189,40 @@ export function ConfigArticlesSection({ articles }: { articles: { id: string; co
                 <th className="num">{t("m5e.config.seuil")}</th>
                 <th>{t("m5e.config.lotObligatoire")}</th>
                 <th>{t("m5e.config.certificatRequis")}</th>
-                <th />
+                <th><span className="sr-only">{t("revueKit.ops.param.actions")}</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id}>
                   <td>{c.article_code} <span className="muted">· {c.article_label}</span></td>
-                  <td className="num">{formatNumber(Number(c.seuil_minimal))}</td>
+                  <td className="num">{quantite(c.seuil_minimal)}</td>
                   <td>{c.lot_obligatoire ? t("m5e.oui") : t("m5e.non")}</td>
                   <td>{c.certificat_requis ? t("m5e.oui") : t("m5e.non")}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={() => {
-                        const v = window.prompt(t("m5e.config.nouveauSeuil"), c.seuil_minimal);
-                        if (v !== null) modifier.mutate({ id: c.id, body: { seuil_minimal: v } });
-                      }}
-                    >
-                      {t("m5e.config.modifierSeuil")}
-                    </button>{" "}
-                    <button type="button" className="btn ghost" onClick={() => modifier.mutate({ id: c.id, body: { lot_obligatoire: !c.lot_obligatoire } })}>
-                      {c.lot_obligatoire ? t("m5e.config.lotFacultatif") : t("m5e.config.exigerLot")}
-                    </button>
+                    <div className="card-actions card-actions--end">
+                      <button
+                        type="button"
+                        className="btn ghost sm"
+                        onClick={() => {
+                          const v = window.prompt(t("m5e.config.nouveauSeuil"), c.seuil_minimal);
+                          if (v !== null) modifier.mutate({ id: c.id, body: { seuil_minimal: v } });
+                        }}
+                      >
+                        {t("m5e.config.modifierSeuil")}
+                      </button>
+                      <button type="button" className="btn ghost sm" onClick={() => modifier.mutate({ id: c.id, body: { lot_obligatoire: !c.lot_obligatoire } })}>
+                        {c.lot_obligatoire ? t("m5e.config.lotFacultatif") : t("m5e.config.exigerLot")}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
-    </SectionCard>
+      </SectionCard>
+    </div>
   );
 }
 
@@ -211,21 +239,23 @@ export function TracabiliteSection({ lots }: { lots: LotMatiere[] }) {
   return (
     <SectionCard title={t("m5e.trace.title")}>
       <div data-testid="tracabilite-lot">
-        <label>
-          {t("m5e.trace.lot")}{" "}
-          <select aria-label={t("m5e.trace.lot")} value={lot} onChange={(e) => setLot(e.target.value)}>
-            <option value="">{t("m5e.trace.choisir")}</option>
-            {lots.map((l) => (
-              <option key={l.id} value={l.id}>{l.code} · {l.numero_lot}{l.numero_coulee ? ` · ${l.numero_coulee}` : ""}</option>
-            ))}
-          </select>
-        </label>
+        <div className="list-toolbar">
+          <div className="field">
+            <label htmlFor="tracabilite-lot-choix">{t("m5e.trace.lot")}</label>
+            <select id="tracabilite-lot-choix" className="control" value={lot} onChange={(e) => setLot(e.target.value)}>
+              <option value="">{t("m5e.trace.choisir")}</option>
+              {lots.map((l) => (
+                <option key={l.id} value={l.id}>{l.code} · {l.numero_lot}{l.numero_coulee ? ` · ${l.numero_coulee}` : ""}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         {q.data && q.data.length === 0 && <p className="muted">{t("m5e.trace.aucun")}</p>}
         {q.data && q.data.length > 0 && (
           <ol className="trace-chaine">
             {q.data.map((m) => (
               <li key={m.code}>
-                <time dateTime={m.date}>{formatDate(m.date)}</time> · <strong>{m.code}</strong> · {m.type_label} · {formatNumber(Number(m.quantite))}
+                <time dateTime={m.date}>{formatDate(m.date)}</time> · <strong>{m.code}</strong> · {m.type_label} · {quantite(m.quantite)}
                 {" · "}{m.source ?? "—"} → {m.destination ?? "—"}
                 {m.ordre ? ` · OF ${m.ordre}` : ""}
                 {m.reference ? ` · ${m.reference}` : ""}
@@ -293,25 +323,27 @@ export function AuditValorisationSection({ depots, articles }: { depots: { id: s
     enabled: Boolean(depot && article),
     retry: 0,
   });
-  const montant = (v: string | null) => (v === null ? "••••••" : formatNumber(Number(v)));
+  const montant = (v: string | null) => (v === null ? "••••••" : formatMoney(v));
   return (
     <SectionCard title={t("m5e.audit.title")}>
       <div data-testid="audit-valorisation">
         <p className="muted">{t("m5e.audit.hint")}</p>
-        <label>
-          {t("m5e.audit.depot")}{" "}
-          <select aria-label={t("m5e.audit.depot")} value={depot} onChange={(e) => setDepot(e.target.value)}>
-            <option value="">—</option>
-            {depots.map((d) => <option key={d.id} value={d.id}>{d.code} · {d.label}</option>)}
-          </select>
-        </label>{" "}
-        <label>
-          {t("m5e.audit.article")}{" "}
-          <select aria-label={t("m5e.audit.article")} value={article} onChange={(e) => setArticle(e.target.value)}>
-            <option value="">—</option>
-            {articles.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.label}</option>)}
-          </select>
-        </label>
+        <div className="list-toolbar">
+          <div className="field">
+            <label htmlFor="audit-valorisation-depot">{t("m5e.audit.depot")}</label>
+            <select id="audit-valorisation-depot" className="control" value={depot} onChange={(e) => setDepot(e.target.value)}>
+              <option value="">—</option>
+              {depots.map((d) => <option key={d.id} value={d.id}>{d.code} · {d.label}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="audit-valorisation-article">{t("m5e.audit.article")}</label>
+            <select id="audit-valorisation-article" className="control" value={article} onChange={(e) => setArticle(e.target.value)}>
+              <option value="">—</option>
+              {articles.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.label}</option>)}
+            </select>
+          </div>
+        </div>
         {q.data && (
           <>
             <p role="status">{t("m5e.audit.resultat", { methode: t(`m5e.depot.methodes.${q.data.methode}`), n: q.data.ecarts })}</p>
@@ -331,10 +363,10 @@ export function AuditValorisationSection({ depots, articles }: { depots: { id: s
                   {q.data.lignes.map((l) => (
                     <tr key={l.mouvement}>
                       <td>{l.mouvement} <span className="muted">· {formatDate(l.date)}</span></td>
-                      <td className="num">{formatNumber(Number(l.quantite))}</td>
-                      <td className="num">{montant(l.cout_enregistre)}</td>
-                      <td className="num">{montant(l.cout_recalcule)}</td>
-                      <td className="num">{montant(l.ecart)}</td>
+                      <td className="num">{quantite(l.quantite)}</td>
+                      <td className="num cell-nowrap">{montant(l.cout_enregistre)}</td>
+                      <td className="num cell-nowrap">{montant(l.cout_recalcule)}</td>
+                      <td className="num cell-nowrap">{montant(l.ecart)}</td>
                     </tr>
                   ))}
                 </tbody>

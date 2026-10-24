@@ -2,8 +2,9 @@ import i18n from "i18next";
 
 /**
  * Formats d'affichage uniques de l'ERP (montants, nombres, pourcentages, dates).
- * - Nombres et montants : convention française (« 25 000 000 FCFA », « 0,75 »),
- *   quelle que soit la langue de l'interface (usage gabonais du FCFA).
+ * - Nombres et montants : suivent le sélecteur FR/EN — français « 25 000 000 FCFA », « 0,75 »,
+ *   « 81,3 % » ; anglais « 25,000,000 FCFA », « 0.75 », « 81.3% ». La devise reste « FCFA »
+ *   et le montant reste exact dans les deux langues.
  * - Dates : suivent le sélecteur FR/EN.
  * - Valeur absente → « — » ; valeur masquée (`has_amount_access` = false côté
  *   serveur : « — », « •••••• ») → renvoyée telle quelle.
@@ -13,7 +14,9 @@ import i18n from "i18next";
 /** Langue active de l'interface (FR par défaut) : les dates suivent le sélecteur FR/EN. */
 const currentLocale = () => i18n.language || "fr";
 
-const NUMBER_LOCALE = "fr-FR";
+/** Locale des nombres : `en-US` si l'interface est en anglais, sinon `fr-FR` (défaut). */
+const isEnglish = () => currentLocale().startsWith("en");
+const numberLocale = () => (isEnglish() ? "en-US" : "fr-FR");
 const NBSP = " ";
 export const EMPTY = "—";
 
@@ -47,7 +50,7 @@ export function formatNumber(value: Numeric, options: NumberOptions = {}): strin
   const n = toNumber(value);
   if (n === null) return EMPTY;
   const decimals = options.decimals ?? 0;
-  return n.toLocaleString(NUMBER_LOCALE, {
+  return n.toLocaleString(numberLocale(), {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
@@ -71,7 +74,7 @@ export function formatMoney(value: Numeric, options: MoneyOptions = {}): string 
     return typeof value === "string" && value.trim() !== "" ? value : EMPTY;
   }
   const currency = options.currency ?? "FCFA";
-  const body = n.toLocaleString(NUMBER_LOCALE, { maximumFractionDigits: 0 });
+  const body = n.toLocaleString(numberLocale(), { maximumFractionDigits: 0 });
   return `${body.replace(/[\u202f ]/g, NBSP)}${NBSP}${currency}`;
 }
 
@@ -82,12 +85,12 @@ export type PercentOptions = {
   ratio?: boolean;
 };
 
-/** « 75 % » ; « 7,5 % » avec `{ decimals: 1 }` ; « — » si absent. */
+/** « 75 % » ; « 7,5 % » avec `{ decimals: 1 }` (EN : « 75% », « 7.5% ») ; « — » si absent. */
 export function formatPercent(value: Numeric, options: PercentOptions = {}): string {
   const n = toNumber(value);
   if (n === null) return EMPTY;
   const pct = options.ratio ? n * 100 : n;
-  return `${formatNumber(pct, { decimals: options.decimals ?? 0 })}${NBSP}%`;
+  return `${formatNumber(pct, { decimals: options.decimals ?? 0 })}${isEnglish() ? "" : NBSP}%`;
 }
 
 function toDate(iso: string | Date | null | undefined): Date | null {
@@ -111,7 +114,7 @@ export function formatDate(iso: string | Date | null | undefined, locale: string
 export function formatDateShort(iso: string | Date | null | undefined): string {
   const d = toDate(iso);
   if (!d) return EMPTY;
-  return d.toLocaleDateString(currentLocale().startsWith("en") ? "en-GB" : "fr-FR", {
+  return d.toLocaleDateString(isEnglish() ? "en-GB" : "fr-FR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -127,4 +130,47 @@ export function formatDateTime(iso: string | Date | null | undefined, locale: st
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Unités de paramètres traduites (clé `revueKit.unites.<clé>`, pluriel i18next) ; les autres restent telles quelles. */
+const UNITES: Record<string, string> = {
+  jour: "jours",
+  jours: "jours",
+  j: "jours",
+  heure: "heures",
+  heures: "heures",
+  h: "heures",
+  mois: "mois",
+  an: "ans",
+  ans: "ans",
+  "cycles/an": "cyclesAn",
+  "cycle/an": "cyclesAn",
+  semaine: "semaines",
+  semaines: "semaines",
+  minutes: "minutes",
+  km: "km",
+};
+
+/**
+ * Valeur d'un paramètre ETSL servie par l'API (`valeur` décimale DRF + `unite`) → texte lisible :
+ * « 30 jours », « 50 000 000 FCFA », « 15 000 FCFA/h », « 90 % », « Oui » (unité 0/1),
+ * « 411700 » (compte comptable : ni décimales ni séparateur ni unité), « 2,5 heures ».
+ * Jamais « 30.00 jours », « 1.00 0/1 » ni « 411700.00 compte ».
+ */
+export function formatParametre(valeur: Numeric, unite?: string | null): string {
+  const u = (unite ?? "").trim();
+  const key = u.replace(/\s/g, "").toLowerCase();
+  const n = toNumber(valeur);
+  if (n === null) return typeof valeur === "string" && valeur.trim() !== "" ? valeur : EMPTY;
+  if (key === "0/1" || key === "booleen" || key === "bool") return i18n.t(n ? "revueKit.oui" : "revueKit.non");
+  if (key === "compte" || key === "code") return String(Math.trunc(n));
+  const decimals = Number.isInteger(n) ? 0 : Math.abs(n * 10 - Math.round(n * 10)) < 1e-9 ? 1 : 2;
+  if (key === "fcfa") return formatMoney(n);
+  if (key.startsWith("fcfa/")) return formatMoney(n, { currency: `FCFA/${u.split("/").slice(1).join("/").trim()}` });
+  if (key === "%") return formatPercent(n, { decimals });
+  const num = formatNumber(n, { decimals });
+  if (!u) return num;
+  const k = UNITES[key];
+  const label = k ? i18n.t(`revueKit.unites.${k}`, { count: n, defaultValue: u }) : u;
+  return `${num}${NBSP}${label}`;
 }

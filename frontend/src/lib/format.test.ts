@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { formatBytes, formatDate, formatDateShort, formatMoney, formatNumber, formatPercent } from "./format";
+import i18n from "../i18n";
+
+import { formatBytes, formatDate, formatDateShort, formatMoney, formatNumber, formatParametre, formatPercent } from "./format";
 
 /** Normalise les espaces insécables pour comparer. */
 const sp = (v: string) => v.replace(/\u202f|\u00a0/g, " ");
@@ -82,5 +84,42 @@ describe("formatDate (valeurs absentes)", () => {
     expect(formatDate(null)).toBe("—");
     expect(formatDate("pas une date")).toBe("—");
     expect(formatDateShort("2026-09-23T10:00:00Z")).toBe("23/09/2026");
+  });
+});
+
+describe("formats numériques en anglais", () => {
+  afterEach(async () => {
+    await i18n.changeLanguage("fr");
+  });
+
+  it("suivent la langue de l'interface (montant toujours exact, en FCFA)", async () => {
+    await i18n.changeLanguage("en");
+    expect(sp(formatMoney(3337000000))).toBe("3,337,000,000 FCFA");
+    expect(formatPercent(81.3, { decimals: 1 })).toBe("81.3%");
+    expect(formatNumber(1234.5, { decimals: 1 })).toBe("1,234.5");
+  });
+
+  it("restent à la française en français", async () => {
+    await i18n.changeLanguage("fr");
+    expect(sp(formatMoney(3337000000))).toBe("3 337 000 000 FCFA");
+    expect(sp(formatPercent(81.3, { decimals: 1 }))).toBe("81,3 %");
+  });
+});
+
+describe("formatParametre", () => {
+  it("rend lisibles les valeurs brutes de l'API", async () => {
+    await i18n.changeLanguage("fr");
+    expect(sp(formatParametre("30.00", "jours"))).toBe("30 jours");
+    expect(sp(formatParametre("1.00", "jours"))).toBe("1 jour");
+    expect(sp(formatParametre("50000000.00", "FCFA"))).toBe("50 000 000 FCFA");
+    expect(sp(formatParametre("15000.00", "FCFA/h"))).toBe("15 000 FCFA/h");
+    expect(sp(formatParametre("90.00", "%"))).toBe("90 %");
+    expect(formatParametre("411700.00", "compte")).toBe("411700");
+    expect(formatParametre("1.00", "0/1")).toBe("Oui");
+    expect(formatParametre("0.00", "0 / 1")).toBe("Non");
+    expect(sp(formatParametre("2.50", "heures"))).toBe("2,5 heures");
+    expect(sp(formatParametre("1.00", "cycles/an"))).toBe("1 cycle/an");
+    expect(sp(formatParametre("12.00", "unités"))).toBe("12 unités");
+    expect(formatParametre(null, "jours")).toBe("—");
   });
 });

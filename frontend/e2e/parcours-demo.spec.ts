@@ -43,9 +43,10 @@ test.describe("Parcours démo : direction", () => {
     await expect(gr).toHaveCount(1);
     await expect(chantier).toContainText("Actif");
     await expect(gr).toContainText("Actif");
-    // Colonne « Avenants » : l'avenant n°1 signé est compté sur le contrat chantier, aucun sur le contrat GR.
-    await expect(chantier.getByRole("cell").nth(6)).toHaveText("1");
-    await expect(gr.getByRole("cell").nth(6)).toHaveText("0");
+    // Colonne « Avenants » (5e cellule : profil sous le code, client et affaire regroupés) : l'avenant n°1 signé est
+    // compté sur le contrat chantier, aucun sur le contrat GR.
+    await expect(chantier.getByRole("cell").nth(4)).toHaveText("1");
+    await expect(gr.getByRole("cell").nth(4)).toHaveText("0");
   });
 
   test("le dossier GLOBAL RENTAL du parcours est ouvert et imputé au 618", async ({ page }) => {
@@ -69,8 +70,10 @@ test.describe("Parcours démo : direction", () => {
     // Approuvé (double visa posé par le seed) : seule la clôture reste proposée.
     await expect(budget.getByRole("button", { name: "Clôturer" })).toBeVisible();
 
-    const ecarts = page.locator(".card:not(:has(.card))", { hasText: AFFAIRE_CHANTIER }).filter({ hasText: "analyse attendue avant le" });
+    // Carte « Écarts > 10 % à analyser » : la colonne Échéance porte la date de l'analyse attendue.
+    const ecarts = page.locator(".card:not(:has(.card))", { hasText: "Écarts > 10 % à analyser" })
+      .getByRole("row", { name: new RegExp(AFFAIRE_CHANTIER) });
     await expect(ecarts.first()).toBeVisible();
-    await expect(ecarts.first()).toContainText(/-\d+(\.\d+)? %/);
+    await expect(ecarts.first()).toContainText(/[-−]\d+([.,]\d+)?\s?%/);
   });
 });

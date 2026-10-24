@@ -1,15 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatMoney } from "../../lib/format";
+import { formatDate, formatMoney, formatParametre, formatPercent } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { BaremeCotisation, HistoriqueBareme, ParametrePaie } from "../../types";
-import { Badge, SectionCard } from "../ui";
+import { Badge, DatePicker, Menu, SectionCard } from "../ui";
 import { ImpotSection } from "./ImpotSection";
 
 const EMPTY = { code: "", label: "", organisme: "", nature: "salariale", base: "brut", taux: "", plafond: "", date_effet: "" };
+type NouveauBareme = typeof EMPTY;
+
+/** Taux en points servi avec 3 décimales (« 11.000 ») → « 11 % », « 5,5 % », « 0,125 % » (décimales utiles seulement). */
+function taux(v: string): string {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return v;
+  const decimales = [0, 1, 2, 3].find((d) => Math.abs(n * 10 ** d - Math.round(n * 10 ** d)) < 1e-9) ?? 3;
+  return formatPercent(n, { decimals: decimales });
+}
 
 /**
  * Barèmes de cotisation (taux, plafonds, date d'effet). Les taux sont des DONNÉES à saisir et valider avec
@@ -34,8 +44,7 @@ export function BaremesSection() {
   const [error, setError] = useState<string | null>(null);
 
   const create = useMutation({
-    mutationFn: () =>
-      api.post("/api/rh-paie/baremes/", { ...form, plafond: form.plafond || null, ordre: 0 }),
+    mutationFn: (v: NouveauBareme) => api.post("/api/rh-paie/baremes/", { ...v, plafond: v.plafond || null, ordre: 0 }),
     onSuccess: () => {
       setForm(EMPTY);
       setError(null);
@@ -93,23 +102,29 @@ export function BaremesSection() {
     <SectionCard title={t("baremes.title")}>
       <p className="muted">{t("baremes.hint")}</p>
       {provisoires > 0 && (
-        <p className="action-error" role="note" data-testid="alerte-provisoire">
-          {t("baremes.warnProvisoire", { count: provisoires })}
-        </p>
+        <div className="banner warn" role="note" data-testid="alerte-provisoire">
+          <AlertTriangle size={18} aria-hidden />
+          <div className="banner-body">
+            <span className="banner-text">{t("baremes.warnProvisoire", { count: provisoires })}</span>
+          </div>
+        </div>
       )}
       {rows.length === 0 ? (
         <p className="muted">{t("baremes.none")}</p>
       ) : (
+        <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
               <th>{t("baremes.code")}</th>
               <th>{t("baremes.nature")}</th>
-              <th>{t("baremes.taux")}</th>
-              <th>{t("baremes.plafond")}</th>
+              <th className="num">{t("baremes.taux")}</th>
+              <th className="num">{t("baremes.plafond")}</th>
               <th>{t("baremes.effet")}</th>
               <th>{t("baremes.statut")}</th>
-              <th />
+              <th className="num">
+                <span className="sr-only">{t("ui.actions")}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -117,7 +132,7 @@ export function BaremesSection() {
               <tr key={b.id}>
                 <td>
                   <strong>{b.code}</strong>
-                  <div className="muted">
+                  <div className="cell-sub">
                     {b.label}
                     {b.organisme ? ` · ${b.organisme}` : ""}
                   </div>
@@ -127,67 +142,75 @@ export function BaremesSection() {
                 </td>
                 {edit?.url === `/api/rh-paie/baremes/${b.id}/` ? (
                   <>
-                    <td>
-                      <input type="number" step="0.001" min="0" aria-label={t("baremes.taux")} value={edit.valeur} onChange={(e) => setEdit({ ...edit, valeur: e.target.value })} />
+                    <td className="num">
+                      <input type="number" step="0.001" min="0" className="control" aria-label={t("baremes.taux")} value={edit.valeur} onChange={(e) => setEdit({ ...edit, valeur: e.target.value })} />
                     </td>
-                    <td>
-                      <input type="number" step="1" min="0" aria-label={t("baremes.plafond")} value={edit.plafond ?? ""} onChange={(e) => setEdit({ ...edit, plafond: e.target.value })} />
+                    <td className="num">
+                      <input type="number" step="1" min="0" className="control" aria-label={t("baremes.plafond")} value={edit.plafond ?? ""} onChange={(e) => setEdit({ ...edit, plafond: e.target.value })} />
                     </td>
                   </>
                 ) : (
                   <>
-                    <td>{b.taux} %</td>
-                    <td>{b.plafond ? formatMoney(b.plafond) : "—"}</td>
+                    <td className="num cell-nowrap">{taux(b.taux)}</td>
+                    <td className="num cell-nowrap">{b.plafond ? formatMoney(b.plafond) : "—"}</td>
                   </>
                 )}
-                <td>
+                <td className="cell-nowrap">
                   {formatDate(b.date_effet)}
                   {b.date_fin ? ` → ${formatDate(b.date_fin)}` : ""}
                 </td>
                 <td title={`${b.source} ${b.reference_texte}`.trim()}>
                   <Badge tone={b.statut_valeur === "confirme" ? "ok" : "warn"}>{t(`baremes.${b.statut_valeur}`)}</Badge>
                 </td>
-                <td>
-                  {b.statut_valeur !== "confirme" && (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => window.confirm(t("baremes.confirmConfirmer")) && confirmer.mutate(`/api/rh-paie/baremes/${b.id}/`)}
-                    >
-                      {t("baremes.confirmer")}
-                    </button>
-                  )}{" "}
-                  {edit?.url === `/api/rh-paie/baremes/${b.id}/` ? (
-                    <>
-                      <button type="button" className="btn" onClick={() => enregistrer.mutate(edit)}>
-                        {t("baremes.save")}
-                      </button>{" "}
-                      <button type="button" className="btn" onClick={() => setEdit(null)}>
-                        {t("baremes.annuler")}
-                      </button>{" "}
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => setEdit({ url: `/api/rh-paie/baremes/${b.id}/`, valeur: b.taux, plafond: b.plafond ?? "", source: b.source })}
-                      >
-                        {t("baremes.modifier")}
-                      </button>{" "}
-                    </>
-                  )}
-                  <button type="button" className="btn" onClick={() => proposerRevision(b)}>
-                    {t("baremes.reviser")}
-                  </button>{" "}
-                  <button type="button" className="btn" onClick={() => void voirHistorique(b)}>
-                    {t("baremes.historique")}
-                  </button>
+                <td className="num">
+                  {/* Confirmer, Modifier et Historique restent des boutons visibles (parcours testés) ; la révision passe dans « ⋯ ». */}
+                  <div className="card-actions card-actions--end">
+                    {edit?.url === `/api/rh-paie/baremes/${b.id}/` ? (
+                      <>
+                        <button type="button" className="btn primary sm" disabled={enregistrer.isPending} onClick={() => enregistrer.mutate(edit)}>
+                          {t("baremes.save")}
+                        </button>
+                        <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
+                          {t("baremes.annuler")}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {b.statut_valeur !== "confirme" && (
+                          <button
+                            type="button"
+                            className="btn ghost sm"
+                            disabled={confirmer.isPending}
+                            onClick={() => window.confirm(t("baremes.confirmConfirmer")) && confirmer.mutate(`/api/rh-paie/baremes/${b.id}/`)}
+                          >
+                            {t("baremes.confirmer")}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => setEdit({ url: `/api/rh-paie/baremes/${b.id}/`, valeur: b.taux, plafond: b.plafond ?? "", source: b.source })}
+                        >
+                          {t("baremes.modifier")}
+                        </button>
+                        <button type="button" className="btn ghost sm" onClick={() => void voirHistorique(b)}>
+                          {t("baremes.historique")}
+                        </button>
+                      </>
+                    )}
+                    <Menu
+                      size="sm"
+                      align="end"
+                      label={t("ui.rowActions")}
+                      items={[{ id: "reviser", label: t("baremes.reviser"), disabled: reviser.isPending, onSelect: () => proposerRevision(b) }]}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {histoire && (
@@ -206,59 +229,62 @@ export function BaremesSection() {
       )}
 
       <h4 className="subtitle">{t("baremes.paramsTitle")}</h4>
+      <div className="table-wrap">
       <table className="table">
         <tbody>
           {(params.data ?? []).map((p) => (
             <tr key={p.id}>
               <td>
                 <strong>{p.code}</strong>
-                <div className="muted">{p.label}</div>
+                <div className="cell-sub">{p.label}</div>
               </td>
-              <td>
+              <td className="num cell-nowrap">
                 {edit?.url === `/api/rh-paie/parametres-paie/${p.id}/` ? (
-                  <input type="number" step="0.001" aria-label={t("baremes.valeur")} value={edit.valeur} onChange={(e) => setEdit({ ...edit, valeur: e.target.value })} />
+                  <input type="number" step="0.001" className="control" aria-label={t("baremes.valeur")} value={edit.valeur} onChange={(e) => setEdit({ ...edit, valeur: e.target.value })} />
                 ) : (
-                  <>
-                    {p.valeur} {p.unite}
-                  </>
+                  formatParametre(p.valeur, p.unite)
                 )}
               </td>
               <td title={`${p.source} ${p.reference_texte}`.trim()}>
                 <Badge tone={p.statut_valeur === "confirme" ? "ok" : "warn"}>{t(`baremes.${p.statut_valeur}`)}</Badge>
               </td>
-              <td>
-                {edit?.url === `/api/rh-paie/parametres-paie/${p.id}/` ? (
-                  <>
-                    <button type="button" className="btn" onClick={() => enregistrer.mutate(edit)}>
-                      {t("baremes.save")}
-                    </button>{" "}
-                    <button type="button" className="btn" onClick={() => setEdit(null)}>
-                      {t("baremes.annuler")}
+              <td className="num">
+                <div className="card-actions card-actions--end">
+                  {edit?.url === `/api/rh-paie/parametres-paie/${p.id}/` ? (
+                    <>
+                      <button type="button" className="btn primary sm" disabled={enregistrer.isPending} onClick={() => enregistrer.mutate(edit)}>
+                        {t("baremes.save")}
+                      </button>
+                      <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
+                        {t("baremes.annuler")}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() => setEdit({ url: `/api/rh-paie/parametres-paie/${p.id}/`, valeur: p.valeur, source: p.source })}
+                    >
+                      {t("baremes.modifier")}
                     </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => setEdit({ url: `/api/rh-paie/parametres-paie/${p.id}/`, valeur: p.valeur, source: p.source })}
-                  >
-                    {t("baremes.modifier")}
-                  </button>
-                )}{" "}
-                {p.statut_valeur !== "confirme" && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => window.confirm(t("baremes.confirmConfirmer")) && confirmer.mutate(`/api/rh-paie/parametres-paie/${p.id}/`)}
-                  >
-                    {t("baremes.confirmer")}
-                  </button>
-                )}
+                  )}
+                  {p.statut_valeur !== "confirme" && (
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      disabled={confirmer.isPending}
+                      onClick={() => window.confirm(t("baremes.confirmConfirmer")) && confirmer.mutate(`/api/rh-paie/parametres-paie/${p.id}/`)}
+                    >
+                      {t("baremes.confirmer")}
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
 
       <p className="muted">{t("baremes.editHint")}</p>
       {error && (
@@ -269,35 +295,55 @@ export function BaremesSection() {
       <ImpotSection onChanged={refresh} />
 
       <h4 className="subtitle">{t("baremes.add")}</h4>
+      {/* Libellés visibles ; les placeholders « Code », « Libellé », « Taux (%) » restent (repères de saisie et parcours testés). */}
       <form
-        className="bareme-form"
+        className="r3-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
-          create.mutate();
+          create.mutate(form);
         }}
       >
-        <input required aria-label={t("baremes.code")} placeholder={t("baremes.code")} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-        <input required aria-label={t("baremes.label")} placeholder={t("baremes.label")} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-        <input aria-label={t("baremes.organisme")} placeholder={t("baremes.organisme")} value={form.organisme} onChange={(e) => setForm({ ...form, organisme: e.target.value })} />
-        <select aria-label={t("baremes.nature")} value={form.nature} onChange={(e) => setForm({ ...form, nature: e.target.value })}>
-          <option value="salariale">{t("baremes.salariale")}</option>
-          <option value="patronale">{t("baremes.patronale")}</option>
-        </select>
-        <select aria-label={t("baremes.base")} value={form.base} onChange={(e) => setForm({ ...form, base: e.target.value })}>
-          <option value="brut">{t("baremes.baseBrut")}</option>
-          <option value="salaire">{t("baremes.baseSalaire")}</option>
-        </select>
-        <input required type="number" step="0.001" min="0" aria-label={t("baremes.taux")} placeholder={t("baremes.taux")} value={form.taux} onChange={(e) => setForm({ ...form, taux: e.target.value })} />
-        <input type="number" step="1" min="0" aria-label={t("baremes.plafond")} placeholder={t("baremes.plafond")} value={form.plafond} onChange={(e) => setForm({ ...form, plafond: e.target.value })} />
-        <input required type="date" aria-label={t("baremes.effet")} value={form.date_effet} onChange={(e) => setForm({ ...form, date_effet: e.target.value })} />
-        <button className="btn" type="submit" disabled={create.isPending}>
+        <div className="field">
+          <label htmlFor="bareme-code">{t("baremes.code")}</label>
+          <input id="bareme-code" required placeholder={t("baremes.code")} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="bareme-label">{t("baremes.label")}</label>
+          <input id="bareme-label" required placeholder={t("baremes.label")} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="bareme-organisme">{t("baremes.organisme")}</label>
+          <input id="bareme-organisme" value={form.organisme} onChange={(e) => setForm({ ...form, organisme: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="bareme-nature">{t("baremes.nature")}</label>
+          <select id="bareme-nature" className="control" value={form.nature} onChange={(e) => setForm({ ...form, nature: e.target.value })}>
+            <option value="salariale">{t("baremes.salariale")}</option>
+            <option value="patronale">{t("baremes.patronale")}</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="bareme-base">{t("baremes.base")}</label>
+          <select id="bareme-base" className="control" value={form.base} onChange={(e) => setForm({ ...form, base: e.target.value })}>
+            <option value="brut">{t("baremes.baseBrut")}</option>
+            <option value="salaire">{t("baremes.baseSalaire")}</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="bareme-taux">{t("baremes.taux")}</label>
+          <input id="bareme-taux" required type="number" step="0.001" min="0" placeholder={t("baremes.taux")} value={form.taux} onChange={(e) => setForm({ ...form, taux: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="bareme-plafond">{t("baremes.plafond")}</label>
+          <input id="bareme-plafond" type="number" step="1" min="0" value={form.plafond} onChange={(e) => setForm({ ...form, plafond: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="bareme-effet">{t("baremes.effet")}</label>
+          <DatePicker id="bareme-effet" required value={form.date_effet} onChange={(v) => setForm((f) => ({ ...f, date_effet: v }))} />
+        </div>
+        <button className="btn primary" type="submit" disabled={create.isPending}>
           {t("baremes.save")}
         </button>
-        {error && (
-          <p className="action-error" role="alert">
-            {error}
-          </p>
-        )}
       </form>
     </SectionCard>
   );

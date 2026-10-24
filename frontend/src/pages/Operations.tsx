@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { CoutMainOeuvreSection } from "../components/rhpaie/EcartsM9bSection";
 import { EcartsM3Section } from "../components/operations/EcartsM3Section";
 import { ConsommationOfSection } from "../components/operations/ConsommationOfSection";
+import { statutLabel } from "../components/operations/outils";
 import { FluxM4Section } from "../components/suivi/SuiviSections";
 import { useState } from "react";
 import { Clock3, Construction, Factory, HardHat } from "lucide-react";
@@ -16,6 +17,7 @@ import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { ActionDef } from "../components/ui";
 import type {
+  ChargeAlerte,
   ChargeStats,
   EquipeAffectation,
   OfStatus,
@@ -64,7 +66,7 @@ function OfCard({ of, index }: { of: OrdreFabrication; index: number }) {
       <div className="card-top">
         <span className="card-code">{of.code}</span>
         <span className="card-tags">
-          <Badge tone="neutral">{of.scope_label}</Badge>
+          <Badge tone="neutral">{t(`operations.${of.scope}`)}</Badge>
         </span>
       </div>
       <div className="title">{of.label}</div>
@@ -82,29 +84,60 @@ function OfCard({ of, index }: { of: OrdreFabrication; index: number }) {
   );
 }
 
+/** Alertes affichées avant « Afficher les N alertes » : la liste complète couvre souvent plus d'un an de semaines. */
+const ALERTES_VISIBLES = 6;
+/** Dépassement (en %) à partir duquel l'alerte passe au rouge : charge au moins triple de la capacité. */
+const SURCHARGE_FORTE = 200;
+
 function Charge({ stats }: { stats: ChargeStats }) {
   const { t } = useTranslation();
+  const [toutes, setToutes] = useState(false);
   const alertes = stats.alertes ?? [];
   if (alertes.length === 0) return null;
+  // Semaines à venir d'abord (la semaine en cours comprise), puis les semaines passées ; chronologique dans chaque groupe.
+  const lundi = new Date();
+  lundi.setDate(lundi.getDate() - 7);
+  const seuil = lundi.toISOString().slice(0, 10);
+  const triees = [...alertes].sort((a, b) => {
+    const pa = a.week >= seuil ? 0 : 1;
+    const pb = b.week >= seuil ? 0 : 1;
+    return pa - pb || a.week.localeCompare(b.week) || a.scope.localeCompare(b.scope);
+  });
+  const visibles = toutes ? triees : triees.slice(0, ALERTES_VISIBLES);
+  // Échelle commune : charge / capacité rapportée à la plus forte charge de la liste ; le repère marque la capacité.
+  const charge = (a: ChargeAlerte) => (a.capacity > 0 ? a.planned_hours / a.capacity : 1);
+  const maxCharge = Math.max(1, ...alertes.map(charge));
+  const repere = Math.round((1 / maxCharge) * 100);
   return (
-    <SectionCard title={`${t("operations.surcharge")} · ${alertes.length}`}>
+    <SectionCard
+      title={`${t("operations.surcharge")} · ${alertes.length}`}
+      actions={
+        alertes.length > ALERTES_VISIBLES ? (
+          <button type="button" className="btn ghost sm" aria-expanded={toutes} onClick={() => setToutes((v) => !v)}>
+            {toutes ? t("revueR2.operations.alertesReduire") : t("revueR2.operations.alertesVoir", { count: alertes.length })}
+          </button>
+        ) : undefined
+      }
+    >
       <ul className="overload-list" data-testid="alertes-surcharge">
-        {alertes.map((a) => {
-          // Barre : dépassement de capacité (pleine à +100 %).
-          const ratio = Math.max(0.04, Math.min(1, a.overload_pct / 100));
+        {visibles.map((a) => {
+          const largeur = Math.max(4, Math.round((charge(a) / maxCharge) * 100));
+          // Rouge réservé aux dépassements les plus forts (charge au moins triple de la capacité), orange sinon.
+          const fort = a.overload_pct >= SURCHARGE_FORTE;
           return (
             <li key={`${a.scope}-${a.week}`}>
               <span>
                 <strong>{t(`operations.${a.scope}`)}</strong>
                 <span className="cell-sub">{t("listes.operations.surchargeHint", { date: formatDate(a.week) })}</span>
               </span>
-              <span className={`overload-bar${a.overload_pct >= 100 ? " err" : ""}`} aria-hidden>
-                <span style={{ width: `${Math.round(ratio * 100)}%` }} />
+              <span className={`overload-bar${fort ? " err" : ""}`} aria-hidden>
+                <span style={{ width: `${largeur}%` }} />
+                <span className="overload-cap" style={{ left: `${repere}%` }} />
               </span>
               <span className="overload-hours">
                 {formatNumber(a.planned_hours)} h / {formatNumber(a.capacity)} h
               </span>
-              <Badge tone={a.overload_pct >= 100 ? "err" : "warn"}>+{formatPercent(a.overload_pct)}</Badge>
+              <Badge tone={fort ? "err" : "warn"}>+{formatPercent(a.overload_pct)}</Badge>
             </li>
           );
         })}
@@ -220,8 +253,8 @@ export function OperationsPage() {
               <Kpi
                 key={key}
                 label={t(`operations.${key}`)}
-                value={`${formatNumber(chargeData.totals[key].calculated)} h ${t("operations.planned")}`}
-                hint={`${formatNumber(chargeData.totals[key].pointed)} h ${t("operations.pointed")} · ${chargeData.totals[key].count} OF`}
+                value={`${formatNumber(chargeData.totals[key].calculated)} h`}
+                hint={t("revueR2.operations.kpiHint", { pointees: formatNumber(chargeData.totals[key].pointed), count: chargeData.totals[key].count })}
                 icon={key === "atelier" ? Factory : Construction}
                 tone="brand"
                 delay={0.1 + i * 0.05}
@@ -254,15 +287,15 @@ export function OperationsPage() {
             searchPlaceholder={t("operations.searchSituations")}
             caption={t("operations.situations")}
             columns={[
-              { key: "code", header: t("operations.sit.code"), render: (s) => s.code },
-              { key: "periode", header: t("operations.sit.periode"), render: (s) => `${formatDate(s.period_start)} → ${formatDate(s.period_end)}` },
+              { key: "code", header: t("operations.sit.code"), render: (s) => <span className="cell-nowrap">{s.code}</span> },
+              { key: "periode", header: t("operations.sit.periode"), render: (s) => <span className="cell-nowrap">{`${formatDate(s.period_start)} → ${formatDate(s.period_end)}`}</span> },
               { key: "heures", header: t("operations.sit.heures"), num: true, render: (s) => `${formatNumber(Number(s.ordered_hours))} h` },
               { key: "avancement", header: t("operations.sit.avancement"), num: true, render: (s) => formatPercent(s.progress) },
               { key: "montant", header: t("operations.sit.montant"), num: true, render: (s) => (s.amount === null ? t("operations.masked") : formatMoney(s.amount)) },
               {
                 key: "statut",
                 header: t("operations.sit.statut"),
-                render: (s) => <Badge tone={s.status === "brouillon" || s.status === "soumise" ? "warn" : "ok"}>{s.status_label}</Badge>,
+                render: (s) => <Badge tone={s.status === "brouillon" || s.status === "soumise" ? "warn" : "ok"}>{statutLabel("situation", s.status, s.status_label)}</Badge>,
               },
               actionsColumn<SituationTravaux>(t("listes.col.actions"), (s) => [
                 ...(s.status === "brouillon" ? [{ label: t("operations.actions.soumettre"), path: `/api/operations/situations/${s.id}/soumettre/` }] : []),
@@ -273,9 +306,9 @@ export function OperationsPage() {
         </SectionCard>
       )}
 
-        <SectionCard
-          title={`${t("operations.equipes")} · ${(affectations.data ?? []).length}`}
-          actions={
+      <SectionCard
+        title={`${t("operations.equipes")} · ${(affectations.data ?? []).length}`}
+        actions={
           <div className="section-actions">
             <QuickForm
               title={t("operations.forms.equipe")}
@@ -315,13 +348,13 @@ export function OperationsPage() {
             columns={[
               { key: "equipe", header: t("operations.aff.equipe"), render: (a) => a.equipe_label },
               { key: "metier", header: t("operations.aff.metier"), render: (a) => (METIERS.includes(a.metier) ? t(`operations.forms.${a.metier}`) : a.metier) },
-              { key: "of", header: t("operations.aff.of"), render: (a) => a.ordre_code },
-              { key: "periode", header: t("operations.aff.periode"), render: (a) => `${formatDate(a.date_debut)} → ${formatDate(a.date_fin)}` },
+              { key: "of", header: t("operations.aff.of"), render: (a) => <span className="cell-nowrap">{a.ordre_code}</span> },
+              { key: "periode", header: t("operations.aff.periode"), render: (a) => <span className="cell-nowrap">{`${formatDate(a.date_debut)} → ${formatDate(a.date_fin)}`}</span> },
               { key: "effectif", header: t("operations.aff.effectif"), num: true, render: (a) => a.effectif },
               {
                 key: "statut",
                 header: t("operations.aff.statut"),
-                render: (a) => <Badge tone={a.statut === "planifiee" ? "warn" : "ok"}>{a.statut_label}</Badge>,
+                render: (a) => <Badge tone={a.statut === "planifiee" ? "warn" : "ok"}>{statutLabel("affectation", a.statut, a.statut_label)}</Badge>,
               },
               actionsColumn<EquipeAffectation>(t("listes.col.actions"), (a) => [
                 ...(a.statut === "planifiee"
@@ -360,10 +393,10 @@ export function OperationsPage() {
             rows={presences.data ?? []}
             caption={t("operations.presences")}
             columns={[
-              { key: "date", header: t("operations.pres.date"), render: (p) => formatDate(p.date) },
+              { key: "date", header: t("operations.pres.date"), render: (p) => <span className="cell-nowrap">{formatDate(p.date)}</span> },
               { key: "employe", header: t("operations.pres.employe"), render: (p) => p.employe_nom },
-              { key: "of", header: t("operations.pres.of"), render: (p) => p.ordre_code },
-              { key: "statut", header: t("operations.pres.statut"), render: (p) => <Badge tone={p.statut === "present" ? "ok" : "warn"}>{p.statut_label}</Badge> },
+              { key: "of", header: t("operations.pres.of"), render: (p) => <span className="cell-nowrap">{p.ordre_code}</span> },
+              { key: "statut", header: t("operations.pres.statut"), render: (p) => <Badge tone={p.statut === "present" ? "ok" : "warn"}>{statutLabel("presence", p.statut, p.statut_label)}</Badge> },
               { key: "motif", header: t("operations.pres.motif"), render: (p) => p.motif || "—" },
             ]}
           />

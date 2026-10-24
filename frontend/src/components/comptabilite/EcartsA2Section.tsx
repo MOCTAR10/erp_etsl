@@ -6,8 +6,9 @@ import { api } from "../../api/client";
 import { formatDate, formatDateShort, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
+import { actionsColumn } from "../ui/DataTable";
 import { ProvisionsChangeA7 } from "./ProvisionsChangeA7";
 
 interface SituationDevise {
@@ -100,6 +101,9 @@ interface Ref {
 }
 
 const fcfa = (v: string | null | undefined) => formatMoney(v);
+/** Cours de change lisible : « 655,957 » (décimales utiles seulement, pas de « 655.957000 »). */
+const cours = (v: string | null | undefined) =>
+  v === null || v === undefined || v === "" ? "—" : Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 6 });
 
 /** Écarts a2 : cours de change et opérations en devise, revenu à l'avancement, export des écritures vers SAGE. */
 export function EcartsA2Section() {
@@ -129,7 +133,11 @@ export function EcartsA2Section() {
   const partners = useQuery({ queryKey: ["m10", "partners"], queryFn: () => api.listAll<Ref>("/api/referentiels/partners/"), retry: 0 }).data ?? [];
   const comptes = useQuery({ queryKey: ["m10", "accounts"], queryFn: () => api.listAll<Ref>("/api/referentiels/accounts/"), retry: 0 }).data ?? [];
 
-  const provisoire = <Badge tone="warn">{t("ecarts_a2.provisoire")}</Badge>;
+  const provisoire = (
+    <Badge tone="warn" title={t("ecarts_a2.provisoire")}>
+      {t("revueR3.provisoire")}
+    </Badge>
+  );
   const etrangeres = devises.filter((d) => d.code !== "XAF");
   const promptDate = { name: "date", label: t("ecarts_a2.promptDate") };
   const telecharger = (e: ExportSage) => {
@@ -141,20 +149,16 @@ export function EcartsA2Section() {
   const colsTaux: Column<Taux>[] = [
     { key: "devise", header: t("ecarts_a2.taux.devise"), render: (x) => x.devise_code, sortValue: (x) => x.devise_code },
     { key: "date", header: t("ecarts_a2.taux.date"), render: (x) => formatDate(x.date), sortValue: (x) => x.date },
-    { key: "taux", header: t("ecarts_a2.taux.taux"), num: true, render: (x) => x.taux },
+    { key: "taux", header: t("ecarts_a2.taux.taux"), num: true, render: (x) => cours(x.taux) },
     { key: "source", header: t("ecarts_a2.taux.source"), render: (x) => x.source_label },
     {
       key: "statut",
-      header: actionsHeader,
-      render: (x) =>
-        x.est_provisoire ? (
-          <>
-            {provisoire} <ActionBar actions={[{ label: t("ecarts_a2.confirmer"), path: `/api/comptabilite/taux-change/${x.id}/confirmer/`, tone: "ghost" }]} />
-          </>
-        ) : (
-          <Badge tone="ok">{t("ecarts_a2.confirme")}</Badge>
-        ),
+      header: t("revueR3.statut"),
+      render: (x) => (x.est_provisoire ? provisoire : <Badge tone="ok">{t("ecarts_a2.confirme")}</Badge>),
     },
+    actionsColumn<Taux>(t("ui.actions"), (x) =>
+      x.est_provisoire ? [{ label: t("ecarts_a2.confirmer"), path: `/api/comptabilite/taux-change/${x.id}/confirmer/`, tone: "ghost" }] : [],
+    ),
   ];
 
   const colsOps: Column<Operation>[] = [
@@ -189,7 +193,7 @@ export function EcartsA2Section() {
       num: true,
       render: (o) => (
         <>
-          {o.taux_origine ?? "—"} {o.taux_provisoire && provisoire}
+          {cours(o.taux_origine)} {o.taux_provisoire && provisoire}
         </>
       ),
     },
@@ -237,10 +241,12 @@ export function EcartsA2Section() {
       header: t("ecarts_a2.rav.affaire"),
       render: (r) => (
         <>
-          {r.affaire_code} <span className="muted">· {r.affaire_label}</span>
+          {r.affaire_code}
+          <span className="cell-sub">{r.affaire_label}</span>
         </>
       ),
       sortValue: (r) => r.affaire_code,
+      width: 260,
     },
     {
       key: "pct",
@@ -260,27 +266,24 @@ export function EcartsA2Section() {
           ""
         ) : (
           <>
-            {fcfa(r.ecart)} {r.nature && r.nature !== "aucune" && <Badge tone={r.nature === "produits_a_recevoir" ? "brand" : "warn"}>{t(`ecarts_a2.rav.${r.nature}`)}</Badge>}
+            <span className="r3-nowrap">{fcfa(r.ecart)}</span>
+            {r.nature && r.nature !== "aucune" && <span className="cell-sub">{t(`ecarts_a2.rav.${r.nature}`)}</span>}
           </>
         ),
     },
-    {
-      key: "actions",
-      header: actionsHeader,
-      render: (r) =>
-        r.erreur ? null : (
-          <ActionBar
-            actions={[
-              {
-                label: t("ecarts_a2.rav.comptabiliser"),
-                path: "/api/comptabilite/reconnaissances-revenu/",
-                body: { affaire: r.affaire, date_arrete: arrete },
-                confirm: t("ecarts_a2.rav.confirm"),
-              },
-            ]}
-          />
-        ),
-    },
+    actionsColumn<LigneRav>(t("ui.actions"), (r) =>
+      r.erreur || !Number(r.ecart)
+        ? []
+        : [
+            {
+              label: t("ecarts_a2.rav.comptabiliser"),
+              path: "/api/comptabilite/reconnaissances-revenu/",
+              body: { affaire: r.affaire, date_arrete: arrete },
+              confirm: t("ecarts_a2.rav.confirm"),
+              tone: "ghost",
+            },
+          ],
+    ),
   ];
 
   const colsHisto: Column<Reconnaissance>[] = [
@@ -360,15 +363,15 @@ export function EcartsA2Section() {
       >
         {situation.isError && <p className="muted">{describeError(situation.error)}</p>}
         {situation.data && (
-          <p className="muted">
+          <div className="r3-toolbar">
             {situation.data.devises.map((d) => (
-              <span key={d.devise} style={{ marginRight: 12 }}>
-                <strong>{d.devise}</strong> {d.taux ?? "—"} {d.date ? `(${formatDate(d.date)})` : ""}{" "}
+              <span key={d.devise} className="r3-badges">
+                <strong>{d.devise}</strong> {cours(d.taux)} <span className="muted">{d.date ? formatDate(d.date) : ""}</span>
                 {d.a_jour ? <Badge tone="ok">{t("ecarts_a2.taux.aJour")}</Badge> : <Badge tone="err">{t("ecarts_a2.taux.manquant")}</Badge>}
               </span>
             ))}
             {situation.data.provisoire && provisoire}
-          </p>
+          </div>
         )}
         <div data-testid="taux-change">
           <DataTable caption={t("ecarts_a2.taux.title")} columns={colsTaux} rows={taux.data?.results ?? []} />
@@ -413,11 +416,11 @@ export function EcartsA2Section() {
       </SectionCard>
 
       <SectionCard title={t("ecarts_a2.rav.title")} subtitle={t("ecarts_a2.rav.subtitle")}>
-        <div className="action-bar-buttons">
-          <label className="field">
-            <span>{t("ecarts_a2.rav.arrete")}</span>
-            <input type="date" value={arrete} onChange={(e) => setArrete(e.target.value)} />
-          </label>
+        <div className="r3-toolbar">
+          <div className="field">
+            <label htmlFor="a2-arrete">{t("ecarts_a2.rav.arrete")}</label>
+            <DatePicker id="a2-arrete" value={arrete} onChange={(v) => v && setArrete(v)} />
+          </div>
           {apercu.data && (
             <p className="muted">
               {t("ecarts_a2.rav.methode")} : <strong>{t(`ecarts_a2.rav.methodes.${apercu.data.methode}`)}</strong> {apercu.data.provisoire && provisoire}

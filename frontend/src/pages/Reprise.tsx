@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { History, SlidersHorizontal, Upload } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -80,6 +81,16 @@ interface Parametre {
 const BASE = "/api/integrations/migration";
 const TON_LOT: Record<Lot["statut"], BadgeTone> = { valide: "ok", succes: "ok", partiel: "warn", rejete: "err", echec: "err" };
 const TON_CONTROLE: Record<Controle["statut"], BadgeTone> = { conforme: "ok", ecart: "err", a_saisir: "warn", a_controler: "neutral" };
+/** Retire les chemins d'API cités dans les notes de gabarit (« (/api/integrations/import/) »). */
+const sansChemin = (texte: string) => texte.replace(/\s*\(\/api\/[^)]*\)/g, "");
+/** Libellé court d'un contrôle : avant « = », « : » ou « ( » (« Balance d'ouverture = balance SAGE » → « Balance d'ouverture »). */
+const court = (libelle: string) => libelle.split(/\s[=:(]/)[0].trim();
+/** Texte serveur lisible : montants « 579411230.00 » au format français, codes « agent_maitrise » en clair. */
+const lisible = (texte: string) =>
+  texte
+    .replace(/-?\d+\.\d{2}\b/g, (n) => formatNumber(Number(n), { decimals: Number(n) % 1 ? 2 : 0 }))
+    .replace(/\b([a-z]+)_([a-z_]+)\b/g, (m) => m.replace(/_/g, " "));
+
 const SOURCES = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"];
 const tri = (v: string | null) => (v === null || v === "" ? null : Number(v));
 type ColonneLigne = ColonneGabarit & { id: string };
@@ -216,14 +227,20 @@ export function ReprisePage() {
               >
                 {gabarits.map((g) => (
                   <option key={g.code} value={g.code}>
-                    {g.objet} · {g.libelle}
+                    {g.libelle}
                   </option>
                 ))}
               </select>
             </label>
             <label className="field">
               <span>{t("ecarts_import.charger.fichier")}</span>
-              <input type="file" accept={accept} onChange={(e) => setFichier(e.target.files?.[0] ?? null)} />
+              <span className="file-pick">
+                <span className="btn ghost sm" aria-hidden="true">
+                  <Upload size={14} /> {t("revueR1.reprise.choisir")}
+                </span>
+                <span className={fichier ? "file-pick-name" : "file-pick-name muted"}>{fichier?.name ?? t("revueR1.reprise.aucunFichier")}</span>
+                <input type="file" className="sr-only" accept={accept} onChange={(e) => setFichier(e.target.files?.[0] ?? null)} />
+              </span>
             </label>
             {gabarit?.options.map((o) => (
               <label className="field" key={o}>
@@ -244,7 +261,7 @@ export function ReprisePage() {
           {gabarit && (
             <p className="muted">
               {t("ecarts_import.charger.cle")} : <strong>{gabarit.cle}</strong> · {t("ecarts_import.charger.formats")} : {gabarit.formats.join(", ").toUpperCase()}
-              {gabarit.note ? ` · ${gabarit.note}` : ""}
+              {gabarit.note ? ` · ${sansChemin(gabarit.note)}` : ""}
             </p>
           )}
           <div className="action-bar-buttons">
@@ -306,7 +323,7 @@ export function ReprisePage() {
 
       <SectionCard title={t("ecarts_import.historique.titre")}>
         {(lots.data ?? []).length === 0 ? (
-          <EmptyState label={t("ecarts_import.historique.vide")} />
+          <EmptyState icon={History} label={t("ecarts_import.historique.vide")} hint={t("revueR1.reprise.historiqueAide")} compact />
         ) : (
           <div data-testid="reprise-historique">
             <DataTable columns={colsLots} rows={lots.data!} caption={t("ecarts_import.historique.titre")} />
@@ -331,13 +348,15 @@ function RapprochementsSection() {
     retry: 0,
   });
   if (q.isError || !q.data) return null;
+  // Libellé de chaque contrôle (« C1 · Balance d'ouverture ») pour les champs de saisie de la source.
+  const libelles: Record<string, string> = Object.fromEntries(q.data.controles.map((c) => [c.code.toLowerCase(), c.libelle]));
   const cols: Column<ControleLigne>[] = [
     {
       key: "controle",
       header: t("ecarts_import.rappro.controle"),
       render: (c) => (
         <>
-          <strong>{c.code}</strong> {c.libelle}
+          <strong>{c.code}</strong> {lisible(c.libelle)}
           <div className="muted">{c.valideur}</div>
         </>
       ),
@@ -350,7 +369,7 @@ function RapprochementsSection() {
       header: t("ecarts_import.historique.statut"),
       render: (c) => <Badge tone={TON_CONTROLE[c.statut]}>{t(`ecarts_import.rappro.statuts.${c.statut}`)}</Badge>,
     },
-    { key: "detail", header: t("ecarts_import.rappro.detail"), render: (c) => c.detail },
+    { key: "detail", header: t("ecarts_import.rappro.detail"), render: (c) => lisible(c.detail) },
   ];
   return (
     <SectionCard title={t("ecarts_import.rappro.titre")}>
@@ -359,7 +378,7 @@ function RapprochementsSection() {
         <div className="quick-form-grid">
           {SOURCES.map((s) => (
             <label className="field" key={s}>
-              <span>{t("ecarts_import.rappro.source", { code: s.toUpperCase() })}</span>
+              <span title={libelles[s]}>{libelles[s] ? `${s.toUpperCase()} · ${court(libelles[s])}` : t("ecarts_import.rappro.source", { code: s.toUpperCase() })}</span>
               <input type="number" step="any" value={sources[s] ?? ""} onChange={(e) => setSources({ ...sources, [s]: e.target.value })} />
             </label>
           ))}
@@ -507,9 +526,12 @@ function ParametresRepriseSection() {
     <SectionCard title={t("ecarts_import.params.titre")}>
       <div data-testid="parametres-reprise">
         {provisoires > 0 && (
-          <p className="action-error" role="note">
-            {t("ecarts_import.params.bandeau", { count: provisoires })}
-          </p>
+          <div className="banner warn reprise-banner" role="note">
+            <SlidersHorizontal size={18} aria-hidden="true" />
+            <div className="banner-body">
+              <span className="banner-title">{t("ecarts_import.params.bandeau", { count: provisoires })}</span>
+            </div>
+          </div>
         )}
         {error && (
           <p className="action-error" role="alert">

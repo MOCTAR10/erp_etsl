@@ -2,7 +2,7 @@ import { createColumnHelper, createSortedRowModel, functionalUpdate, rowSortingF
 import type { ColumnDef, SortingState, Updater } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ChevronsUpDown, Inbox } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -65,7 +65,10 @@ export interface DataGridProps<T extends { id: string | number }> {
   emptyIcon?: LucideIcon;
   /** `comfortable` (défaut) ou `compact` (listes longues, écrans de contrôle). */
   density?: "comfortable" | "compact";
-  /** En-têtes collants dans une zone défilante de hauteur `maxHeight` (défaut `min(70vh, 760px)` ; `"none"` = pas de limite). */
+  /**
+   * En-têtes collants dans une zone défilante de hauteur `maxHeight` (défaut `min(70vh, 760px)` ; `"none"` = pas de
+   * limite). `PagedDataGrid` / `PagedDataTable` passent `"none"` par défaut : la pagination borne déjà la hauteur.
+   */
   maxHeight?: number | string;
   /** Actions d'une ligne : menu « ⋯ » en dernière colonne (entrées vides = pas de menu pour cette ligne). */
   rowActions?: (row: T) => MenuEntry[];
@@ -78,6 +81,35 @@ export interface DataGridProps<T extends { id: string | number }> {
   onSortChange?: (sort: GridSort) => void;
   /** Pagination serveur (composant `Pagination` existant) sous le tableau. */
   pagination?: GridPagination;
+}
+
+/**
+ * Débordement horizontal d'une zone défilante : `end` = du contenu reste à droite, `start` = à gauche.
+ * Sert d'affordance (fondu de bord, `data-overflow-*`) : sans elle, une colonne coupée net au bord ne dit
+ * pas qu'on peut faire défiler.
+ */
+export function useOverflowEdges(ref: { current: HTMLElement | null }) {
+  const [edges, setEdges] = useState({ start: false, end: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      const next = { start: max > 1 && el.scrollLeft > 1, end: max > 1 && el.scrollLeft < max - 1 };
+      setEdges((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    const table = el.firstElementChild;
+    if (table) ro?.observe(table);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro?.disconnect();
+    };
+  }, [ref]);
+  return edges;
 }
 
 const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel() });
@@ -97,6 +129,16 @@ const collator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" })
 function compare(a: string | number, b: string | number): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
   return collator.compare(String(a), String(b));
+}
+
+/**
+ * Largeur d'une colonne : `width` ET `min-width` (sinon le navigateur la rétrécit dès que la table manque de place,
+ * et la largeur demandée n'a aucun effet visible). Un pourcentage n'impose pas de minimum.
+ */
+function colStyle(width: number | string | undefined): CSSProperties | undefined {
+  if (width === undefined) return undefined;
+  if (typeof width === "string" && width.trim().endsWith("%")) return { width };
+  return { width, minWidth: width };
 }
 
 const isSortable = <T,>(c: GridColumn<T>) => c.sortable ?? Boolean(c.sortValue || c.sortKey);
@@ -192,6 +234,8 @@ export function DataGrid<T extends { id: string | number }>({
   const height = maxHeight ?? "min(70vh, 760px)";
   const scrollable = height !== "none";
   const wrapStyle: CSSProperties | undefined = scrollable ? { maxHeight: height } : undefined;
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const overflow = useOverflowEdges(wrapRef);
   const showSkeleton = loading && rows.length === 0;
 
   let body: ReactNode;
@@ -238,7 +282,7 @@ export function DataGrid<T extends { id: string | number }>({
           }
         >
           {columns.map((c) => (
-            <td key={c.key} className={c.num ? "num" : undefined}>
+            <td key={c.key} className={c.num ? "num" : undefined} style={colStyle(c.width)}>
               {c.render(row)}
             </td>
           ))}
@@ -254,7 +298,10 @@ export function DataGrid<T extends { id: string | number }>({
     <div className="ui-grid-root">
       {/* Zone défilante atteignable au clavier (flèches) : axe « scrollable-region-focusable » */}
       <div
+        ref={wrapRef}
         className="table-wrap ui-grid-wrap"
+        data-overflow-end={overflow.end || undefined}
+        data-overflow-start={overflow.start || undefined}
         style={wrapStyle}
         tabIndex={0} /* toujours : le débordement horizontal dépend de la largeur d'écran */
         role="group"
@@ -275,7 +322,7 @@ export function DataGrid<T extends { id: string | number }>({
                     key={h.id}
                     scope="col"
                     className={[c.num ? "num" : "", canSort ? "sortable" : "", sorted ? "is-sorted" : ""].filter(Boolean).join(" ") || undefined}
-                    style={c.width !== undefined ? { width: c.width } : undefined}
+                    style={colStyle(c.width)}
                     aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : canSort ? "none" : undefined}
                   >
                     {canSort ? (
@@ -312,6 +359,7 @@ export function DataGrid<T extends { id: string | number }>({
 export function PagedDataGrid<T extends { id: string | number }>({
   list,
   searchPlaceholder,
+  maxHeight = "none",
   ...grid
 }: Omit<DataGridProps<T>, "rows" | "pagination" | "loading"> & {
   list: ReturnType<typeof usePagedList<T>>;
@@ -322,6 +370,7 @@ export function PagedDataGrid<T extends { id: string | number }>({
       {searchPlaceholder ? <SearchField value={list.search} onChange={list.setSearch} placeholder={searchPlaceholder} /> : null}
       <DataGrid
         {...grid}
+        maxHeight={maxHeight}
         rows={list.rows}
         loading={list.query.isFetching}
         pagination={{

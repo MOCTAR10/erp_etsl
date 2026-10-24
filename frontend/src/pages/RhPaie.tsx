@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Banknote, CalendarClock, FileText, Inbox, Users } from "lucide-react";
+import { Banknote, CalendarClock, FileText, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, EmptyState, ErrorState, Kpi, PageHeader, Pagination, SearchField, SectionCard } from "../components/ui";
-import type { Column } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, ErrorState, Kpi, PageHeader, SearchField, SectionCard } from "../components/ui";
+import type { ActionDef, Column } from "../components/ui";
+import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { usePagedList } from "../lib/usePagedList";
 import type {
@@ -60,88 +62,33 @@ function CongeCard({ c, index }: { c: DemandeConge; index: number }) {
   );
 }
 
-function BulletinCard({ b }: { b: BulletinPaie }) {
-  const { t } = useTranslation();
-  const badge =
-    b.statut === "cloture" ? "ok" : b.statut === "valide" ? "brand" : b.statut === "annule" ? "err" : "warn";
-  return (
-    <div className="card kpi" key={b.id}>
-      <span className="kpi-label">
-        {b.code} · {b.matricule} · {formatDate(b.periode)}{" "}
-        <span className={`badge ${badge}`}>{t(`rhPaie.bulletins_statut.${b.statut}`)}</span>
-      </span>
-      <span className="kpi-value">{b.employe_nom}</span>
-      <span className="meta muted">
-        {b.has_amount_access && b.net !== null ? (
-          <>
-            Net {formatMoney(b.net)} · Brut {formatMoney(b.brut)}
-          </>
-        ) : (
-          "••••••"
-        )}
-        {b.disponible_le && <span className="badge ok"> {t("baremes.diffuse")}</span>}
-        {b.move_number && <span className="badge brand"> {b.move_number}</span>}
-        {b.document && <span className="badge ok"> {t("virements.archive")}</span>}
-        {b.signature_statut && (
-          <span className={`badge ${b.signature_statut === "completed" ? "ok" : b.signature_statut === "refused" ? "err" : "warn"}`}>
-            {" "}
-            {t(`m9c.signature.${b.signature_statut}`)}
-          </span>
-        )}
-        {b.statut !== "annule" && (
-          <button type="button" className="btn" onClick={() => void api.download(`/api/rh-paie/bulletins/${b.id}/pdf/`, `${b.code}.pdf`)}>
-            {t("virements.pdf")}
-          </button>
-        )}
-      </span>
-      {b.avertissement && (
-        <p className="action-error" role="note" data-testid="avertissement-provisoire">
-          {b.avertissement}
-        </p>
-      )}
-      <ActionBar
-        actions={[
-          ...(b.statut === "brouillon"
-            ? [
-                { label: t("m9a.preparer"), path: `/api/rh-paie/bulletins/${b.id}/preparer/` },
-                { label: t("actions.calculer"), path: `/api/rh-paie/bulletins/${b.id}/calculer/`, tone: "ghost" as const },
-                { label: t("declarations.integrer"), path: `/api/rh-paie/bulletins/${b.id}/integrer-temps/`, tone: "ghost" as const },
-                { label: t("actions.valider"), path: `/api/rh-paie/bulletins/${b.id}/valider/` },
-              ]
-            : []),
-          ...((b.statut === "valide" || b.statut === "cloture") && !b.document
-            ? [{ label: t("virements.archiver"), path: `/api/rh-paie/bulletins/${b.id}/archiver/`, tone: "ghost" as const }]
-            : []),
-          ...((b.statut === "valide" || b.statut === "cloture") && (!b.signature_statut || b.signature_statut === "refused")
-            ? [{ label: t("m9c.signature.demander"), path: `/api/rh-paie/bulletins/${b.id}/signer/`, tone: "ghost" as const }]
-            : []),
-          ...((b.statut === "valide" || b.statut === "cloture") && !b.disponible_le
-            ? [{ label: t("actions.diffuser"), path: `/api/rh-paie/bulletins/${b.id}/diffuser/`, tone: "ghost" as const }]
-            : []),
-          ...((b.statut === "valide" || b.statut === "cloture") && !b.move_number
-            ? [
-                {
-                  label: t("actions.comptabiliser"),
-                  path: `/api/rh-paie/bulletins/${b.id}/comptabiliser/`,
-                  confirm: t("actions.confirmComptabiliser"),
-                },
-              ]
-            : []),
-          ...(b.statut === "valide"
-            ? [
-                {
-                  label: t("actions.cloturer"),
-                  path: `/api/rh-paie/bulletins/${b.id}/cloturer/`,
-                  tone: "ghost" as const,
-                  confirm: t("actions.confirmCloturer"),
-                },
-              ]
-            : []),
-        ]}
-      />
-    </div>
-  );
+/** Actions de workflow d'un bulletin : l'action attendue d'abord (bouton), le reste dans « ⋯ ». */
+function bulletinActions(b: BulletinPaie, t: (k: string) => string): ActionDef[] {
+  const emis = b.statut === "valide" || b.statut === "cloture";
+  return [
+    ...(b.statut === "brouillon"
+      ? [
+          { label: t("actions.valider"), path: `/api/rh-paie/bulletins/${b.id}/valider/` },
+          { label: t("m9a.preparer"), path: `/api/rh-paie/bulletins/${b.id}/preparer/` },
+          { label: t("actions.calculer"), path: `/api/rh-paie/bulletins/${b.id}/calculer/`, tone: "ghost" as const },
+          { label: t("declarations.integrer"), path: `/api/rh-paie/bulletins/${b.id}/integrer-temps/`, tone: "ghost" as const },
+        ]
+      : []),
+    ...(emis && !b.move_number
+      ? [{ label: t("actions.comptabiliser"), path: `/api/rh-paie/bulletins/${b.id}/comptabiliser/`, confirm: t("actions.confirmComptabiliser") }]
+      : []),
+    ...(emis && !b.disponible_le ? [{ label: t("actions.diffuser"), path: `/api/rh-paie/bulletins/${b.id}/diffuser/`, tone: "ghost" as const }] : []),
+    ...(emis && (!b.signature_statut || b.signature_statut === "refused")
+      ? [{ label: t("m9c.signature.demander"), path: `/api/rh-paie/bulletins/${b.id}/signer/`, tone: "ghost" as const }]
+      : []),
+    ...(emis && !b.document ? [{ label: t("virements.archiver"), path: `/api/rh-paie/bulletins/${b.id}/archiver/`, tone: "ghost" as const }] : []),
+    ...(b.statut === "valide"
+      ? [{ label: t("actions.cloturer"), path: `/api/rh-paie/bulletins/${b.id}/cloturer/`, tone: "ghost" as const, confirm: t("actions.confirmCloturer") }]
+      : []),
+  ];
 }
+
+const BULLETIN_TONE: Record<string, "ok" | "brand" | "err" | "warn"> = { cloture: "ok", valide: "brand", annule: "err" };
 
 /** « 2026-10 » → « Octobre 2026 » (langue de l'interface) ; valeur inattendue renvoyée telle quelle. */
 function moisLong(mois: string, langue: string): string {
@@ -168,7 +115,10 @@ export function RhPaiePage() {
       render: (e) =>
         e.contrat_actif ? (
           <>
-            {t(`rhPaie.contrats_types.${e.contrat_actif.type}`)} · {formatDate(e.contrat_actif.date_debut, i18n.language)}{" "}
+            {t(`rhPaie.contrats_types.${e.contrat_actif.type}`)}
+            <span className="cell-sub">
+              {t("revueR3.rh.depuis", { date: formatDate(e.contrat_actif.date_debut, i18n.language) })}
+            </span>{" "}
             {e.contrat_actif.a_renouveler && <Badge tone="warn">≤ 90 j</Badge>}
           </>
         ) : (
@@ -177,6 +127,66 @@ export function RhPaiePage() {
     },
     { key: "solde", header: t("rhPaie.soldeConges"), num: true, render: (e) => `${formatNumber(e.solde_conges)} j` },
     { key: "statut", header: t("rhPaie.col.statut"), render: (e) => <Badge tone={employeTone(e)}>{t(`rhPaie.statut_employe.${e.statut}`)}</Badge> },
+  ];
+
+  const bulletinColumns: Column<BulletinPaie>[] = [
+    {
+      key: "salarie",
+      header: t("revueR3.rh.salarie"),
+      sortValue: (b) => b.employe_nom,
+      render: (b) => (
+        <>
+          {b.employe_nom}
+          <span className="cell-sub">
+            {b.code} · {b.matricule}
+          </span>
+        </>
+      ),
+    },
+    { key: "periode", header: t("revueR3.rh.periode"), sortValue: (b) => b.periode, render: (b) => <span className="r3-nowrap">{moisLong(b.periode.slice(0, 7), i18n.language)}</span> },
+    {
+      key: "brut",
+      header: t("revueR3.rh.brut"),
+      num: true,
+      sortValue: (b) => Number(b.brut ?? 0),
+      render: (b) => (b.has_amount_access && b.brut !== null ? formatMoney(b.brut) : "••••••"),
+    },
+    {
+      key: "net",
+      header: t("revueR3.rh.net"),
+      num: true,
+      sortValue: (b) => Number(b.net ?? 0),
+      render: (b) => (b.has_amount_access && b.net !== null ? <strong>{formatMoney(b.net)}</strong> : "••••••"),
+    },
+    {
+      key: "statut",
+      header: t("rhPaie.col.statut"),
+      render: (b) => {
+        const suivi = [
+          b.move_number ? t("revueR3.rh.comptabilise") : null,
+          b.disponible_le ? t("baremes.diffuse") : null,
+          b.signature_statut ? t(`m9c.signature.${b.signature_statut}`) : null,
+          b.document ? t("virements.archive") : null,
+        ].filter(Boolean);
+        return (
+          <>
+            <Badge tone={BULLETIN_TONE[b.statut] ?? "warn"}>{t(`rhPaie.bulletins_statut.${b.statut}`)}</Badge>
+            {suivi.length > 0 ? <span className="cell-sub">{suivi.join(" · ")}</span> : null}
+          </>
+        );
+      },
+    },
+    {
+      key: "pdf",
+      header: <span className="sr-only">{t("virements.pdf")}</span>,
+      render: (b) =>
+        b.statut !== "annule" ? (
+          <button type="button" className="btn ghost sm" onClick={() => void api.download(`/api/rh-paie/bulletins/${b.id}/pdf/`, `${b.code}.pdf`)}>
+            {t("virements.pdf")}
+          </button>
+        ) : null,
+    },
+    actionsColumn<BulletinPaie>(t("listes.col.actions"), (b) => bulletinActions(b, t)),
   ];
 
   const stats = useQuery({ queryKey: ["rhpaie-stats"], queryFn: api.rhPaieStats });
@@ -226,6 +236,8 @@ export function RhPaiePage() {
   const bulletinsAll = bulletins.rows;
   const m = masse.data;
   const enAttente = groups["demande"].length + groups["approuve"].length;
+  // Un seul avertissement de taux provisoires pour la page de bulletins, pas un pavé par bulletin.
+  const avertissement = bulletinsAll.find((b) => b.avertissement)?.avertissement;
 
   return (
     <>
@@ -233,77 +245,67 @@ export function RhPaiePage() {
 
       <div className="kpi-grid">
         <Kpi label={t("rhPaie.effectif")} value={s.effectif} hint={`${s.en_conge} ${t("rhPaie.enConge")} · ${s.contrats_expirants_30} ${t("rhPaie.contratsExpirants")}`} icon={Users} tone="brand" delay={0} />
-        <Kpi label={t("rhPaie.congesEnAttente")} value={enAttente || s.conges_en_attente} hint={`${s.qualifications_expirees} ${t("rhPaie.qualsExpirees")}`} icon={CalendarClock} tone="warn" delay={0.05} />
+        <Kpi label={t("rhPaie.congesEnAttente")} value={enAttente || s.conges_en_attente} hint={t("revueR3.rh.qualsExpirees", { count: s.qualifications_expirees })} icon={CalendarClock} tone="warn" delay={0.05} />
         <Kpi label={t("rhPaie.bulletinsMois")} value={s.bulletins_mois} hint={`${moisLong(m.mois, i18n.language)} · ${t("rhPaie.masseBrute")} ${formatMoney(m.brut_total)}`} icon={FileText} tone="brand" delay={0.1} />
         <Kpi label={t("rhPaie.masseNette")} value={m.net_total} kind="money" hint={`${t("rhPaie.bulletins")} · ${formatNumber(m.bulletins)}`} icon={Banknote} tone="accent" delay={0.15} />
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <Board>
-          {CONGE_ORDER.map((st, ci) => (
-            <BoardColumn
-              key={st}
-              title={t(`rhPaie.conges_statut.${st}`)}
-              count={groups[st].length}
-              tone={CONGE_BADGE[st]}
-              delay={ci * 0.05}
-              minWidth={240}
-              limit={20}
-            >
-              {groups[st].length === 0 ? (
-                <EmptyState icon={Inbox} label={t("common.empty")} />
-              ) : (
-                groups[st].map((c, i) => <CongeCard key={c.id} c={c} index={i} />)
-              )}
-            </BoardColumn>
-          ))}
-        </Board>
-      </div>
+      <h3 className="section-heading">{t("revueR3.rh.conges")}</h3>
+      <Board label={t("revueR3.rh.conges")}>
+        {CONGE_ORDER.map((st, ci) => (
+          <BoardColumn
+            key={st}
+            title={t(`rhPaie.conges_statut.${st}`)}
+            count={groups[st].length}
+            tone={CONGE_BADGE[st]}
+            delay={ci * 0.05}
+            limit={6}
+          >
+            {groups[st].map((c, i) => (
+              <CongeCard key={c.id} c={c} index={i} />
+            ))}
+          </BoardColumn>
+        ))}
+      </Board>
 
-      <p className="muted" style={{ marginTop: "0.5rem" }}>
-        {t("rhPaie.pendingNote")}
-      </p>
+      <p className="muted">{t("rhPaie.pendingNote")}</p>
 
       {(employes.count > 0 || employes.search || employeSite) && (
         <SectionCard title={`${t("rhPaie.employes")} · ${employes.count}`}>
-          <SearchField value={employes.search} onChange={employes.setSearch} placeholder={t("rhPaie.searchEmployes")} />
-          <SiteFilter value={employeSite} onChange={setEmployeSite} />
-          {employesAll.length === 0 ? (
-            <EmptyState icon={Inbox} label={t("common.empty")} />
-          ) : (
-            <DataGrid rows={employesAll} columns={employeColumns} caption={t("rhPaie.employes")} />
-          )}
-          <Pagination
-            page={employes.page}
-            pageSize={employes.pageSize}
-            count={employes.count}
-            onPageChange={employes.setPage}
-            onPageSizeChange={employes.setPageSize}
+          <div className="r3-toolbar">
+            <SearchField value={employes.search} onChange={employes.setSearch} placeholder={t("rhPaie.searchEmployes")} />
+            <SiteFilter value={employeSite} onChange={setEmployeSite} />
+          </div>
+          <DataGrid
+            rows={employesAll}
+            columns={employeColumns}
+            caption={t("rhPaie.employes")}
+            loading={employes.query.isFetching}
+            emptyLabel={t("common.empty")}
+            pagination={{ page: employes.page, pageSize: employes.pageSize, count: employes.count, onPageChange: employes.setPage, onPageSizeChange: employes.setPageSize }}
           />
         </SectionCard>
       )}
 
       {bulletins.count > 0 || bulletins.search ? (
-        <>
-          <h3 className="section-heading">
-            {t("rhPaie.bulletins")}
-          </h3>
-          <SearchField value={bulletins.search} onChange={bulletins.setSearch} placeholder={t("rhPaie.searchBulletins")} />
-          {bulletinsAll.length === 0 ? (
-            <EmptyState icon={Inbox} label={t("common.empty")} />
-          ) : (
-            <div className="card-list">
-              {bulletinsAll.map((b) => <BulletinCard key={b.id} b={b} />)}
-            </div>
-          )}
-          <Pagination
-            page={bulletins.page}
-            pageSize={bulletins.pageSize}
-            count={bulletins.count}
-            onPageChange={bulletins.setPage}
-            onPageSizeChange={bulletins.setPageSize}
+        <SectionCard title={`${t("rhPaie.bulletins")} · ${bulletins.count}`}>
+          {avertissement ? (
+            <p className="r3-note" role="note" data-testid="avertissement-provisoire" title={avertissement}>
+              {t("revueR3.rh.avertissement")}
+            </p>
+          ) : null}
+          <div className="list-toolbar">
+            <SearchField value={bulletins.search} onChange={bulletins.setSearch} placeholder={t("rhPaie.searchBulletins")} />
+          </div>
+          <DataGrid
+            rows={bulletinsAll}
+            columns={bulletinColumns}
+            caption={t("rhPaie.bulletins")}
+            loading={bulletins.query.isFetching}
+            emptyLabel={t("common.empty")}
+            pagination={{ page: bulletins.page, pageSize: bulletins.pageSize, count: bulletins.count, onPageChange: bulletins.setPage, onPageSizeChange: bulletins.setPageSize }}
           />
-        </>
+        </SectionCard>
       ) : null}
       <EcartsM9aSection />
       <EcartsM9bSection />

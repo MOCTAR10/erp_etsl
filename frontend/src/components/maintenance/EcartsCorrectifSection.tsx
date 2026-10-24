@@ -50,7 +50,7 @@ export function LiaisonBcGrSection() {
   const columns: Column<OtGr>[] = [
     { key: "ot", header: t("ecarts_correctif.maint.ot"), render: (o) => o.code, sortValue: (o) => o.code },
     { key: "actif", header: t("ecarts_correctif.maint.actif"), render: (o) => o.actif_code, sortValue: (o) => o.actif_code },
-    { key: "statut", header: t("ecarts_correctif.maint.statut"), render: (o) => o.statut_label },
+    { key: "statut", header: t("ecarts_correctif.maint.statut"), render: (o) => String(t(`maintenance.ot_statut.${o.statut}`, { defaultValue: o.statut_label })) },
     {
       key: "ecriture",
       header: t("ecarts_correctif.maint.ecriture"),

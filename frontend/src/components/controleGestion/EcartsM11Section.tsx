@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 
@@ -347,6 +347,13 @@ function EditionBrouillon({ budgets }: { budgets: BudgetM11[] }) {
 
 /** Écarts M11 : révision par ligne, tables de paramétrage, axes, pipe → budget, imputation de structure, KPI, tableaux de bord,
  *  marge d'affaire, coût MO, plans d'action, reporting archivé, revue de performance, provision 408. */
+/** Profil contractuel lisible (« marche_travaux » → « Marché de travaux »), jamais le code brut. */
+function libelleProfil(p: string | null | undefined, t: (k: string, o?: Record<string, unknown>) => string): string {
+  if (!p) return "—";
+  const brut = p.replace(/_/g, " ");
+  return t(`revueR3.profils.${p}`, { defaultValue: brut.charAt(0).toUpperCase() + brut.slice(1) });
+}
+
 export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }) {
   const { t } = useTranslation();
   const fy = `fiscal_year=${fiscalYear}`;
@@ -522,8 +529,8 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
             caption={t("ecarts_m11.imputation.title")}
             rows={withId(imputation?.rows, (r) => r.affaire)}
             columns={[
-              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (r) => `${r.code} · ${r.titre}`, sortValue: (r) => r.code },
-              { key: "profil", header: t("ecarts_m11.col.profil"), render: (r) => r.profil },
+              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (r) => <>{r.code}<span className="cell-sub">{r.titre}</span></>, sortValue: (r) => r.code },
+              { key: "profil", header: t("ecarts_m11.col.profil"), render: (r) => libelleProfil(r.profil, t) },
               { key: "part", header: t("ecarts_m11.imputation.part"), num: true, render: (r) => pct(r.part_pct) },
               { key: "produits", header: t("ecarts_m11.col.produits"), num: true, render: (r) => money(r.produits), sortValue: (r) => Number(r.produits ?? 0) },
               { key: "margeDirecte", header: t("ecarts_m11.imputation.margeDirecte"), num: true, render: (r) => money(r.marge_directe) },
@@ -583,8 +590,17 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
             caption={t("ecarts_m11.tableau.title")}
             rows={withId(tableau?.lignes, (l) => l.cle)}
             columns={[
-              { key: "cle", header: t(`ecarts_m11.tableau.axes.${par}`), render: (l) => l.cle, sortValue: (l) => l.cle },
-              { key: "affaires", header: t("ecarts_m11.tableau.affaires"), num: true, render: (l) => formatNumber(l.affaires), sortValue: (l) => l.affaires },
+              {
+                key: "cle",
+                header: t(`ecarts_m11.tableau.axes.${par}`),
+                render: (l) => (
+                  <>
+                    {par === "profil" ? libelleProfil(l.cle, t) : l.cle}
+                    <span className="cell-sub">{t("revueR3.cg.affaires", { count: l.affaires })}</span>
+                  </>
+                ),
+                sortValue: (l) => l.cle,
+              },
               { key: "caPrevu", header: t("ecarts_m11.tableau.caPrevu"), num: true, render: (l) => money(l.ca_prevu), sortValue: (l) => Number(l.ca_prevu ?? 0) },
               { key: "margePrevue", header: t("ecarts_m11.tableau.margePrevue"), num: true, render: (l) => money(l.marge_prevue) },
               { key: "produits", header: t("ecarts_m11.col.produits"), num: true, render: (l) => money(l.produits) },
@@ -602,9 +618,9 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
             caption={t("ecarts_m11.marges.title")}
             rows={withId(marges?.rows, (m) => m.affaire)}
             columns={[
-              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (m) => `${m.code} · ${m.titre}`, sortValue: (m) => m.code },
+              { key: "affaire", header: t("ecarts_m11.col.affaire"), render: (m) => <>{m.code}<span className="cell-sub">{m.titre}</span></>, sortValue: (m) => m.code },
               { key: "client", header: t("ecarts_m11.col.client"), render: (m) => m.client || "—" },
-              { key: "profil", header: t("ecarts_m11.col.profil"), render: (m) => m.profil },
+              { key: "profil", header: t("ecarts_m11.col.profil"), render: (m) => libelleProfil(m.profil, t) },
               { key: "ca", header: t("ecarts_m11.marges.ca"), num: true, render: (m) => money(m.ca), sortValue: (m) => Number(m.ca ?? 0) },
               {
                 key: "marge",
@@ -812,7 +828,7 @@ export function EcartsM11Section({ fiscalYear }: { fiscalYear: number | string }
       >
         <div className="field" style={{ maxWidth: "14rem" }}>
           <label htmlFor="m11-fnp-date">{t("ecarts_m11.fnp.date")}</label>
-          <input id="m11-fnp-date" type="date" value={dateFnp} onChange={(e) => setDateFnp(e.target.value)} />
+          <DatePicker id="m11-fnp-date" value={dateFnp} onChange={setDateFnp} />
         </div>
         <div data-testid="fnp-apercu">
           <DataTable

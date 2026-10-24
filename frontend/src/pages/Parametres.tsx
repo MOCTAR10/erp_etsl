@@ -23,15 +23,34 @@ import { formatDateTime, formatNumber } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
 import { corpsEdition, parModule, SaisieInvalide, type ParametreEtsl } from "../lib/parametres";
 
-/** Valeur lisible : nombres au format français (« 5 » plutôt que « 5.00 »), texte tel quel. */
-function valeurLisible(p: ParametreEtsl): string {
+/** Unités qui décrivent le type de saisie (et non une grandeur) : jamais affichées à côté de la valeur. */
+const UNITES_TECHNIQUES = new Set(["booléen", "booleen", "0/1", "texte", "json"]);
+/** Unités au singulier quand la valeur vaut 1 (« 1 an », « 1 jour »). */
+const SINGULIER: Record<string, string> = { ans: "an", jours: "jour", heures: "heure", semaines: "semaine", enregistrements: "enregistrement" };
+
+/** Paramètre booléen saisi en 0 / 1 : affiché « Oui » / « Non ». */
+const estBooleen = (p: ParametreEtsl) => ["booléen", "booleen", "0/1"].includes((p.unite ?? "").toLowerCase());
+
+/** Valeur lisible : nombres au format français (« 5 » plutôt que « 5.00 »), booléens en clair, texte tel quel. */
+function valeurLisible(p: ParametreEtsl, oui = "Oui", non = "Non"): string {
   if (!p.valeur) return "—";
+  if (estBooleen(p) && (p.valeur === "0" || p.valeur === "1" || Number(p.valeur) === 0 || Number(p.valeur) === 1)) return Number(p.valeur) ? oui : non;
   if ((p.type_valeur === "decimal" || p.type_valeur === "entier") && !Number.isNaN(Number(p.valeur))) {
     const n = Number(p.valeur);
     return formatNumber(n, { decimals: Number.isInteger(n) ? 0 : 2 });
   }
   return p.valeur;
 }
+
+/** Unité affichée après la valeur (aucune si la valeur est vide, technique ou booléenne). */
+function uniteLisible(p: ParametreEtsl): string {
+  const u = (p.unite ?? "").trim();
+  if (!u || !p.valeur || UNITES_TECHNIQUES.has(u.toLowerCase())) return "";
+  return Number(p.valeur) === 1 && SINGULIER[u] ? SINGULIER[u] : u;
+}
+
+/** Nom de module sans code de lot (« M1 Commercial » → « Commercial »). */
+const moduleLisible = (label: string) => label.replace(/^M\d{1,2}\s*[—–-]?\s*/u, "");
 
 /** Édition d'un paramètre dans un panneau latéral : appel à l'endpoint EXISTANT de l'application (droits du module). */
 function EditionParametre({ p, onClose }: { p: ParametreEtsl | null; onClose: () => void }) {
@@ -70,7 +89,7 @@ function EditionParametre({ p, onClose }: { p: ParametreEtsl | null; onClose: ()
         }
       }}
       title={p?.label ?? ""}
-      description={p ? `${p.module_label}${p.groupe ? ` · ${p.groupe}` : ""}` : undefined}
+      description={p ? `${moduleLisible(p.module_label)}${p.groupe ? ` · ${p.groupe}` : ""}` : undefined}
       width={480}
       preventOutsideClose={enregistrer.isPending}
       footer={
@@ -104,7 +123,7 @@ function EditionParametre({ p, onClose }: { p: ParametreEtsl | null; onClose: ()
             <div>
               <dt>{t("formulaires.parametres.actuelle")}</dt>
               <dd className="num">
-                {valeurLisible(p)} {p.unite ? <span className="muted">{p.unite}</span> : null}
+                {valeurLisible(p, t("revueR1.oui"), t("revueR1.non"))} {uniteLisible(p) ? <span className="muted">{uniteLisible(p)}</span> : null}
               </dd>
             </div>
             <div>
@@ -193,10 +212,7 @@ export function ParametresPage() {
           <button type="button" className="param-link" onClick={() => setEdite(p)}>
             {p.label}
           </button>
-          <span className="param-code">
-            {p.code}
-            {p.groupe ? ` · ${p.groupe}` : ""}
-          </span>
+          {p.groupe ? <span className="param-code">{p.groupe}</span> : null}
         </div>
       ),
     },
@@ -206,8 +222,8 @@ export function ParametresPage() {
       width: "26%",
       render: (p) => (
         <span className={`param-value${p.type_valeur === "json" ? " is-json" : ""}`}>
-          <span className="num">{valeurLisible(p)}</span>
-          {p.unite ? <span className="muted"> {p.unite}</span> : null}
+          <span className="num">{valeurLisible(p, t("revueR1.oui"), t("revueR1.non"))}</span>
+          {uniteLisible(p) ? <span className="muted"> {uniteLisible(p)}</span> : null}
         </span>
       ),
     },
@@ -239,7 +255,7 @@ export function ParametresPage() {
         p.provisoire ? (
           <button
             type="button"
-            className="btn sm param-confirm"
+            className="btn ghost sm param-confirm"
             disabled={confirmer.isPending && confirmer.variables?.id === p.id}
             onClick={() => confirmer.mutate(p)}
           >
@@ -280,11 +296,11 @@ export function ParametresPage() {
         <div className="banner warn param-banner" role="note" data-testid="alerte-provisoire-parametres">
           <CircleDashed size={18} aria-hidden="true" />
           <div className="banner-body">
-            <p className="banner-title">{t("ecarts_tr.parametres.bandeau", { count: provisoires })}</p>
-            <p className="banner-text">{t("formulaires.parametres.bandeauAide")}</p>
+            <strong className="banner-title">{t("dashboard2.provisoires", { count: provisoires })}</strong>
+            <span className="banner-text">{t("formulaires.parametres.bandeauAide")}</span>
           </div>
           {!aConfirmer ? (
-            <button type="button" className="btn sm banner-action" onClick={() => setAConfirmer(true)}>
+            <button type="button" className="banner-action" onClick={() => setAConfirmer(true)}>
               {t("formulaires.parametres.voirAConfirmer")}
             </button>
           ) : null}
@@ -300,7 +316,7 @@ export function ParametresPage() {
           <option value="">{t("formulaires.parametres.tousModules")}</option>
           {(data?.modules ?? []).map((m) => (
             <option key={m.module} value={m.module}>
-              {m.label}
+              {moduleLisible(m.label)}
             </option>
           ))}
         </select>
@@ -330,7 +346,7 @@ export function ParametresPage() {
             <SectionCard
               key={g.module}
               className="param-group"
-              title={g.label}
+              title={moduleLisible(g.label)}
               subtitle={t("formulaires.parametres.compte", { count: g.rows.length, provisoires: nbProv })}
               actions={
                 <div className="param-group-side">
@@ -345,7 +361,7 @@ export function ParametresPage() {
               <DataGrid
                 rows={g.rows.map((r) => ({ ...r, id: `${r.modele}-${r.id}` }))}
                 columns={columns}
-                caption={g.label}
+                caption={moduleLisible(g.label)}
                 density="compact"
                 maxHeight="none"
                 rowActions={(p) => [

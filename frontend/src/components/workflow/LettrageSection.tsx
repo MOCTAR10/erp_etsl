@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMoney, formatParametre } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { Lettrage, LettrageAnomalies, ParametreCompta } from "../../types";
-import { Badge, SectionCard } from "../ui";
+import { Badge, DataTable, SectionCard } from "../ui";
+import type { Column } from "../ui";
 
 interface CompteRef {
   id: string;
@@ -26,6 +28,8 @@ export function LettrageSection() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
+  // Paramètres repliés par défaut, ouverts tant que des valeurs provisoires attendent ETSL ; le choix de l'utilisateur prime ensuite.
+  const [ouvert, setOuvert] = useState<boolean | null>(null);
 
   const comptes = useQuery({
     queryKey: ["lettrage-comptes"],
@@ -90,25 +94,77 @@ export function LettrageSection() {
 
   if (comptes.isError) return null; // pas de droit : la section n'apparaît pas
   const provisoires = (params.data ?? []).filter((p) => p.est_provisoire).length;
+  const colonnes: Column<ParametreCompta>[] = [
+    { key: "libelle", header: t("revueKit.fin.parametre"), render: (p) => p.label, sortValue: (p) => p.label, width: 260 },
+    {
+      key: "valeur",
+      header: t("revueKit.fin.valeur"),
+      num: true,
+      render: (p) =>
+        edit?.id === p.id ? (
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            className="control"
+            aria-label={p.label}
+            value={edit.valeur}
+            onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })}
+          />
+        ) : (
+          <span className="cell-nowrap">{formatParametre(p.valeur, p.unite)}</span>
+        ),
+    },
+    {
+      key: "statut",
+      header: t("revueKit.fin.statut"),
+      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`lettrage.${p.statut_valeur}`)}</Badge>,
+      sortValue: (p) => p.statut_valeur,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("ui.actions")}</span>,
+      render: (p) => (
+        <div className="action-bar-buttons r3-nowrap">
+          {edit?.id === p.id ? (
+            <>
+              <button type="button" className="btn primary sm" disabled={modifier.isPending} onClick={() => modifier.mutate(edit)}>
+                {t("lettrage.valider")}
+              </button>
+              <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
+                {t("lettrage.annuler")}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn ghost sm" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>
+                {t("lettrage.modifier")}
+              </button>
+              {p.est_provisoire && (
+                <button type="button" className="btn ghost sm" disabled={confirmer.isPending} onClick={() => window.confirm(t("lettrage.confirmConfirmer")) && confirmer.mutate(p.id)}>
+                  {t("lettrage.confirmer")}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <SectionCard title={t("lettrage.title")}>
       <p className="muted">{t("lettrage.hint")}</p>
-      {provisoires > 0 && (
-        <p className="action-error" role="note" data-testid="alerte-provisoire-compta">
-          {t("lettrage.warnProvisoire", { count: provisoires })}
-        </p>
-      )}
       {error && <p className="action-error" role="alert">{error}</p>}
 
       <div className="row-actions">
-        <select aria-label={t("lettrage.compte")} value={compte} onChange={(e) => { setCompte(e.target.value); setMsg(null); }}>
+        <select className="control" aria-label={t("lettrage.compte")} value={compte} onChange={(e) => { setCompte(e.target.value); setMsg(null); }}>
           <option value="">{t("lettrage.choisir")}</option>
           {(comptes.data ?? []).map((c) => (
             <option key={c.id} value={c.id}>{c.code} — {c.label}</option>
           ))}
         </select>
-        <button type="button" className="btn" disabled={!compte || lancer.isPending} onClick={() => lancer.mutate()}>
+        <button type="button" className="btn primary" disabled={!compte || lancer.isPending} onClick={() => lancer.mutate()}>
           {t("lettrage.lancer")}
         </button>
       </div>
@@ -121,9 +177,9 @@ export function LettrageSection() {
             <tbody>
               {anomalies.data.anomalies.map((a) => (
                 <tr key={a.ligne}>
-                  <td>{formatDate(a.date)}</td>
+                  <td className="cell-nowrap">{formatDate(a.date)}</td>
                   <td>{a.reference || "—"}</td>
-                  <td className="num">{a.debit !== null && a.credit !== null ? formatNumber(Number(a.debit) - Number(a.credit)) : "••••••"}</td>
+                  <td className="num cell-nowrap">{a.debit !== null && a.credit !== null ? formatMoney(Number(a.debit) - Number(a.credit)) : "••••••"}</td>
                   <td><Badge tone="warn">{t(`lettrage.motif.${a.motif}`)}</Badge></td>
                 </tr>
               ))}
@@ -144,11 +200,11 @@ export function LettrageSection() {
                     {l.lignes.some((x) => x.piece) && <span className="muted"> · {l.lignes.map((x) => x.piece).filter(Boolean).join(", ")}</span>}
                   </td>
                   <td><Badge tone={l.statut === "actif" ? "ok" : "err"}>{t(`lettrage.statut.${l.statut}`)}</Badge></td>
-                  <td>
+                  <td className="num">
                     {l.statut === "actif" && (
                       <button
                         type="button"
-                        className="btn ghost"
+                        className="btn ghost sm"
                         onClick={() => {
                           const motif = window.prompt(t("lettrage.motifPrompt"));
                           if (motif) delettrer.mutate({ id: l.id, motif });
@@ -166,40 +222,18 @@ export function LettrageSection() {
       )}
 
       <h4 className="section-heading">{t("lettrage.params")}</h4>
-      <table className="table">
-        <tbody>
-          {(params.data ?? []).map((p) => (
-            <tr key={p.id}>
-              <td>{p.label}</td>
-              <td>
-                {edit?.id === p.id ? (
-                  <input type="number" min="0" step="0.01" aria-label={p.label} value={edit.valeur} onChange={(e) => setEdit({ id: p.id, valeur: e.target.value })} />
-                ) : (
-                  `${p.valeur} ${p.unite}`
-                )}
-              </td>
-              <td><Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`lettrage.${p.statut_valeur}`)}</Badge></td>
-              <td>
-                {edit?.id === p.id ? (
-                  <>
-                    <button type="button" className="btn" onClick={() => modifier.mutate(edit)}>{t("lettrage.valider")}</button>{" "}
-                    <button type="button" className="btn ghost" onClick={() => setEdit(null)}>{t("lettrage.annuler")}</button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" className="btn ghost" onClick={() => setEdit({ id: p.id, valeur: p.valeur })}>{t("lettrage.modifier")}</button>{" "}
-                    {p.est_provisoire && (
-                      <button type="button" className="btn ghost" onClick={() => window.confirm(t("lettrage.confirmConfirmer")) && confirmer.mutate(p.id)}>
-                        {t("lettrage.confirmer")}
-                      </button>
-                    )}
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {provisoires > 0 && (
+        <div className="banner warn" role="note" data-testid="alerte-provisoire-compta">
+          <AlertTriangle size={18} aria-hidden />
+          <div className="banner-body">
+            <span className="banner-text">{t("lettrage.warnProvisoire", { count: provisoires })}</span>
+          </div>
+        </div>
+      )}
+      <details className="r3-repli" open={ouvert ?? provisoires > 0} onToggle={(e) => setOuvert(e.currentTarget.open)}>
+        <summary>{t("revueKit.fin.voirParametres", { count: (params.data ?? []).length })}</summary>
+        <DataTable columns={colonnes} rows={params.data ?? []} caption={t("lettrage.params")} density="compact" />
+      </details>
     </SectionCard>
   );
 }

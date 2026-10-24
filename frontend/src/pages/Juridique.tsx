@@ -3,11 +3,13 @@ import { useState } from "react";
 import { FileText, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { EcartsM12Section } from "../components/juridique/EcartsM12Section";
 import { DocumentsOfficielsSection, RechercheJuridiqueSection } from "../components/workflow/JuridiqueM12Section";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
+import { actionsColumn } from "../components/ui/DataTable";
 import { formatDate, formatMoney } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import type {
@@ -41,6 +43,8 @@ const BANDE_BADGE: Record<BandeEcheance, "ok" | "warn" | "err"> = {
   expiree: "err",
 };
 const BANDES: BandeEcheance[] = ["expiree", "j0", "j15", "j30", "j60", "j90"];
+/** Alertes affichées d'emblée (les plus urgentes) ; la liste complète reste à un clic. */
+const ALERTES_VISIBLES = 8;
 
 /** Alertes d'échéance (conventions, cautions, assurances), de la plus urgente à la plus lointaine. */
 function alerteColumns(t: T): Column<AlerteEcheance & { id: string }>[] {
@@ -69,33 +73,40 @@ function alerteColumns(t: T): Column<AlerteEcheance & { id: string }>[] {
 }
 
 
+/** Pastille de colonne par statut de convention (une couleur = un sens ; clôturé/résilié = neutre). */
+const CONVENTION_COL_TONE: Record<StatutConvention, "ok" | "warn" | "brand" | "neutral"> = {
+  signe: "ok",
+  en_signature: "brand",
+  brouillon: "warn",
+  cloture: "neutral",
+  resilie: "neutral",
+};
+
 function ConventionCard({ c, index }: { c: Convention; index: number }) {
   const { t } = useTranslation();
-  const badge =
-    c.statut === "signe"
-      ? c.a_renouveler
-        ? "warn"
-        : "ok"
-      : c.statut === "cloture" || c.statut === "resilie"
-        ? "err"
-        : "warn";
+  const actif = c.statut === "signe";
+  // Échéance : rouge si dépassée sur une convention encore signée, orange si à renouveler, neutre sinon.
+  const tone = actif && c.days_left !== null && c.days_left < 0 ? "err" : actif && c.a_renouveler ? "warn" : "neutral";
+  const montant = c.has_amount_access && c.montant !== null ? formatMoney(c.montant) : "••••••";
   return (
     <BoardCard delay={Math.min(index * 0.03, 0.3)}>
-      <div className="title">
-        {c.code} <span className="muted">· {c.type_label}</span>
+      <div className="card-top">
+        <span className="card-code">
+          {c.code} · {c.type_label}
+        </span>
       </div>
-      <div className="meta">{c.titre}</div>
-      <div className="meta">
-        {c.has_amount_access && c.montant !== null ? formatMoney(c.montant) : "••••••"} ·{" "}
-        {c.partenaire_name ?? "—"}
-      </div>
-      <div className="meta">
-        <span className={`badge ${badge}`}>{t(`juridique.statut_convention.${c.statut}`)}</span>{" "}
-        {c.date_fin ? (
-          <span className="muted">
-            {c.date_fin ? formatDate(c.date_fin) : "—"} · {c.days_left !== null ? `${c.days_left} ${t("juridique.jours")}` : "—"}
-          </span>
-        ) : null}
+      <div className="title">{c.titre}</div>
+      {c.partenaire_name ? <div className="meta">{c.partenaire_name}</div> : null}
+      <div className="card-foot">
+        <span>
+          {c.date_fin ? (
+            <Badge tone={tone}>
+              {formatDate(c.date_fin)}
+              {actif && c.days_left !== null ? ` · ${c.days_left} ${t("juridique.jours")}` : ""}
+            </Badge>
+          ) : null}
+        </span>
+        <span className="amount">{montant}</span>
       </div>
     </BoardCard>
   );
@@ -196,29 +207,27 @@ function courrierColumns(t: T): Column<Courrier>[] {
     { key: "sens", header: t("juridique.col.sens"), render: (c) => c.sens_label },
     { key: "objet", header: t("juridique.col.objet"), render: (c) => c.objet },
     { key: "tiers", header: t("juridique.col.tiers"), render: (c) => c.tiers_name ?? "—" },
-    { key: "date", header: t("juridique.col.date"), render: (c) => dateOr(c.date_reception ?? c.date_courrier) },
+    { key: "date", header: t("juridique.col.date"), render: (c) => <span className="r3-nowrap">{dateOr(c.date_reception ?? c.date_courrier)}</span> },
     {
       key: "statut",
       header: t("juridique.col.statut"),
       render: (c) => (
         <>
           <Badge tone={COURRIER_TONE[c.statut]}>{t(`juridique.statut_courrier.${c.statut}`)}</Badge>
-          <ActionBar
-            actions={[
-              ...(c.statut === "recu"
-                ? [{ label: t("juridique.act.enregistrer"), path: `/api/juridique/courriers/${c.id}/enregistrer/`, tone: "ghost" as const }]
-                : []),
-              ...(c.statut === "recu" || c.statut === "enregistre"
-                ? [{ label: t("juridique.act.classer"), path: `/api/juridique/courriers/${c.id}/classer/`, tone: "ghost" as const }]
-                : []),
-              ...(c.statut === "enregistre" || c.statut === "classe"
-                ? [{ label: t("juridique.act.archiver"), path: `/api/juridique/courriers/${c.id}/archiver/` }]
-                : []),
-            ]}
-          />
         </>
       ),
     },
+    actionsColumn<Courrier>(t("ui.actions"), (c) => [
+      ...(c.statut === "recu"
+        ? [{ label: t("juridique.act.enregistrer"), path: `/api/juridique/courriers/${c.id}/enregistrer/`, tone: "ghost" as const }]
+        : []),
+      ...(c.statut === "recu" || c.statut === "enregistre"
+        ? [{ label: t("juridique.act.classer"), path: `/api/juridique/courriers/${c.id}/classer/`, tone: "ghost" as const }]
+        : []),
+      ...(c.statut === "enregistre" || c.statut === "classe"
+        ? [{ label: t("juridique.act.archiver"), path: `/api/juridique/courriers/${c.id}/archiver/`, tone: "ghost" as const }]
+        : []),
+    ]),
   ];
 }
 
@@ -253,6 +262,7 @@ export function JuridiquePage() {
   const courriers = usePagedList<Courrier>("juridique-courriers", (q) => api.courriersJuridique(q));
 
   const [convSearch, setConvSearch] = useState("");
+  const [toutesAlertes, setToutesAlertes] = useState(false);
   const conventions = useQuery({
     queryKey: ["juridique-conventions", convSearch],
     queryFn: () => api.conventionsJuridique(pagedQuery(1, 500, convSearch)),
@@ -341,19 +351,10 @@ export function JuridiquePage() {
         <Kpi
           label={t("juridique.alertes")}
           value={a.total}
-          hint={
-            <>
-              <span className="badge err">{a.compteurs["expiree"]}</span> {t("juridique.echeanceExpi")}
-              {" · "}
-              <span className="badge err">{(a.compteurs["j0"] ?? 0) + (a.compteurs["j15"] ?? 0)}</span> {t("juridique.echeanceJ15")}
-              {" · "}
-              <span className="badge warn">{a.compteurs["j30"]}</span> {t("juridique.echeanceJ30")}
-              {" · "}
-              <span className="badge warn">{a.compteurs["j60"]}</span> {t("juridique.echeanceJ60")}
-              {" · "}
-              <span className="badge ok">{a.compteurs["j90"]}</span> {t("juridique.echeanceJ90")}
-            </>
-          }
+          hint={t("revueR3.juridique.alertesHint", {
+            expirees: a.compteurs["expiree"] ?? 0,
+            urgentes: (a.compteurs["j0"] ?? 0) + (a.compteurs["j15"] ?? 0),
+          })}
           icon={Scale}
           tone="warn"
           delay={0}
@@ -365,16 +366,23 @@ export function JuridiquePage() {
 
       {a.total > 0 ? (
         <>
-          <h3 className="section-heading">
-            {t("juridique.alertes")} · {a.total}
-          </h3>
-          <SectionCard>
+          <SectionCard
+            title={`${t("juridique.alertes")} · ${a.total}`}
+            subtitle={t("revueR3.juridique.alertesSub")}
+            actions={
+              a.total > ALERTES_VISIBLES ? (
+                <button type="button" className="btn ghost sm" onClick={() => setToutesAlertes((v) => !v)} aria-expanded={toutesAlertes}>
+                  {toutesAlertes ? t("revueR3.cg.reduire") : t("revueR3.juridique.toutVoir", { count: a.total })}
+                </button>
+              ) : null
+            }
+          >
             <DataTable
               rows={BANDES.flatMap((bande) =>
                 [...a.conventions, ...a.cautions, ...a.assurances]
                   .filter((el) => el.bande === bande)
                   .map((el) => ({ ...el, id: `${el.type}-${el.code}` })),
-              )}
+              ).slice(0, toutesAlertes ? undefined : ALERTES_VISIBLES)}
               columns={alerteColumns(t)}
               caption={t("juridique.alertes")}
               density="compact"
@@ -386,11 +394,11 @@ export function JuridiquePage() {
       {convs.length > 0 || convSearch ? (
         <>
           <h3 className="section-heading">
-            {t("juridique.conventions")} · {convs.length}
+            {t("revueR3.juridique.conventions")} · {convs.length}
           </h3>
           <SearchField value={convSearch} onChange={setConvSearch} placeholder={t("juridique.searchConventions")} />
-          <div style={{ overflowX: "auto" }}>
-            <Board>
+          <div>
+            <Board label={t("revueR3.juridique.conventions")}>
               {(["signe", "en_signature", "brouillon", "cloture", "resilie"] as StatutConvention[]).map((st, ci) => {
                 const items = convs.filter((c) => c.statut === st);
                 if (items.length === 0) return null;
@@ -399,10 +407,9 @@ export function JuridiquePage() {
                     key={st}
                     title={t(`juridique.statut_convention.${st}`)}
                     count={items.length}
-                    tone="warn"
+                    tone={CONVENTION_COL_TONE[st]}
                     delay={ci * 0.05}
-                    minWidth={280}
-                    limit={20}
+                    limit={6}
                   >
                     {items.map((c, i) => (
                       <ConventionCard key={c.id} c={c} index={i} />

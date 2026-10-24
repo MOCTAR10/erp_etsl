@@ -61,7 +61,7 @@ function TaskCard({ task, locale, index }: { task: WorkflowTask; locale: string;
           <span className="kb-assignee" title={task.assigned_to_email}>
             <UserRound size={13} aria-hidden />
             <span className="sr-only">{t("kanban.assigned")} : </span>
-            {task.assigned_to_email.split("@")[0]}
+            <span className="kb-assignee-mail">{task.assigned_to_email}</span>
           </span>
         ) : null}
       </div>

@@ -6,7 +6,7 @@ import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { DaLigneForm } from "../achats/AchatsSaisie";
 import { useAnalytiques } from "../achats/refs";
-import { ActionBar, Badge, PagedDataTable, QuickForm, SectionCard, type Column } from "../ui";
+import { actionsColumn, Badge, EmptyState, PagedDataTable, QuickForm, SectionCard, type ActionDef, type Column } from "../ui";
 
 interface DemandeAchat {
   id: string;
@@ -35,7 +35,7 @@ export function DemandesAchat() {
   const list = usePagedList<DemandeAchat>("achats-da", (q) => api.get<Paginated<DemandeAchat>>(`/api/achats/requests/${q}`));
 
   const columns: Column<DemandeAchat>[] = [
-    { key: "code", header: t("purchases.da.code"), render: (d) => d.code },
+    { key: "code", header: t("purchases.da.code"), render: (d) => <span className="cell-nowrap">{d.code}</span> },
     {
       key: "title",
       header: t("purchases.da.objet"),
@@ -46,41 +46,41 @@ export function DemandesAchat() {
       ),
     },
     { key: "req", header: t("purchases.da.demandeur"), render: (d) => d.requester_name ?? "—" },
-    { key: "date", header: t("purchases.da.echeance"), render: (d) => (d.expected_date ? formatDate(d.expected_date) : "—") },
+    {
+      key: "date",
+      header: t("purchases.da.echeance"),
+      render: (d) => <span className="cell-nowrap">{d.expected_date ? formatDate(d.expected_date) : "—"}</span>,
+    },
     {
       key: "status",
       header: t("purchases.da.statut"),
-      render: (d) => (
-        <>
-          <Badge tone={TONE[d.status]}>{t(`purchases.da.status.${d.status}`)}</Badge>
-          <ActionBar
-            actions={[
-              ...(d.status === "brouillon"
-                ? [{ label: t("purchases.da.soumettre"), path: `/api/achats/requests/${d.id}/soumettre/`, tone: "ghost" as const }]
-                : []),
-              ...(d.status === "soumise"
-                ? [
-                    { label: t("actions.valider"), path: `/api/achats/requests/${d.id}/approuver/` },
-                    {
-                      label: t("actions.refuser"),
-                      path: `/api/achats/requests/${d.id}/rejeter/`,
-                      tone: "danger" as const,
-                      prompt: { name: "motif", label: t("purchases.da.motif") },
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </>
-      ),
+      render: (d) => <Badge tone={TONE[d.status]}>{t(`purchases.da.status.${d.status}`)}</Badge>,
     },
+    // Circuit de la demande : une action visible par ligne (soumettre, valider), le refus dans le menu « ⋯ ».
+    actionsColumn<DemandeAchat>(t("revueKit.ops.param.actions"), (d): ActionDef[] => [
+      ...(d.status === "brouillon"
+        ? [{ label: t("purchases.da.soumettre"), path: `/api/achats/requests/${d.id}/soumettre/`, tone: "ghost" as const }]
+        : []),
+      ...(d.status === "soumise"
+        ? [
+            { label: t("actions.valider"), path: `/api/achats/requests/${d.id}/approuver/` },
+            {
+              label: t("actions.refuser"),
+              path: `/api/achats/requests/${d.id}/rejeter/`,
+              tone: "danger" as const,
+              prompt: { name: "motif", label: t("purchases.da.motif") },
+            },
+          ]
+        : []),
+    ]),
   ];
 
-  return (
-    <SectionCard title={`${t("purchases.da.title")} · ${list.count}`}>
+  const actions = (
+    <div className="section-actions">
       <QuickForm
         title={t("purchases.da.new")}
         endpoint="/api/achats/requests/"
+        variant="secondary"
         fields={[
           { name: "title", label: t("purchases.da.objet"), required: true },
           { name: "department", label: t("purchases.da.service") },
@@ -102,8 +102,15 @@ export function DemandesAchat() {
         transform={(v) => ({ ...v, is_urgent: v.is_urgent === "true" })}
       />
       <DaLigneForm />
-      {(list.count > 0 || list.search) && (
+    </div>
+  );
+
+  return (
+    <SectionCard title={`${t("purchases.da.title")} · ${list.count}`} actions={actions}>
+      {list.count > 0 || list.search ? (
         <PagedDataTable list={list} columns={columns} caption={t("purchases.da.title")} searchPlaceholder={t("purchases.da.search")} />
+      ) : (
+        list.query.isSuccess && <EmptyState compact label={t("revueKit.ops.da.aucune")} />
       )}
     </SectionCard>
   );

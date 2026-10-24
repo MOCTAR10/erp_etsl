@@ -24,6 +24,14 @@ const EVENEMENTS = [
   "export",
 ];
 
+/** Zone fonctionnelle d'un chemin d'API journalisé (« /api/achats/… » → « Achats ») ; le chemin exact reste en infobulle. */
+function zoneLisible(chemin: string, tr: (cle: string) => string): string {
+  if (/^\/api\/users\/token/.test(chemin)) return tr("revueR1.secu.zones.connexion");
+  const cle = `revueR1.secu.zones.${chemin.split("/")[2] ?? ""}`;
+  const v = tr(cle);
+  return v === cle ? tr("revueR1.secu.zones.autre") : v;
+}
+
 /** Sécurité (lot 15b) : MFA du compte, délégations temporaires (EX-G-02), journal des accès pour l'admin (EX-G-10). */
 export function SecuritePage() {
   const { t } = useTranslation();
@@ -109,7 +117,15 @@ export function SecuritePage() {
     },
     { key: "compte", header: t("securite.col.compte"), render: (j) => j.email || "—" },
     { key: "ip", header: t("securite.col.ip"), width: 140, render: (j) => <span className="num">{j.ip ?? "—"}</span> },
-    { key: "ressource", header: t("securite.col.ressource"), render: (j) => <code className="shell-path">{j.chemin}</code> },
+    {
+      key: "ressource",
+      header: t("securite.col.ressource"),
+      render: (j) => (
+        <span className="shell-zone" title={j.chemin}>
+          {zoneLisible(j.chemin, (k) => t(k))}
+        </span>
+      ),
+    },
   ];
 
   const mfaActive = Boolean(user?.mfa_active);
@@ -124,10 +140,8 @@ export function SecuritePage() {
           </span>
           <div className="mfa-text">
             <div className="mfa-status">
-              <Badge tone={mfaActive ? "ok" : user?.mfa_requise ? "warn" : "neutral"}>
-                {mfaActive ? t("securite.mfaActive") : t("securite.mfaInactive")}
-              </Badge>
-              {user?.mfa_requise ? <span className="muted">{t("securite.mfaRequise")}</span> : null}
+              <strong className="mfa-etat">{mfaActive ? t("revueR1.secu.mfaOn") : t("revueR1.secu.mfaOff")}</strong>
+              {user?.mfa_requise ? <Badge tone="warn">{t("securite.mfaRequise")}</Badge> : null}
             </div>
             <p className="muted">{t("shell.secu.mfaTexte")}</p>
           </div>

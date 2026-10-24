@@ -1934,6 +1934,12 @@ kbd {
   outline-offset: -2px;
 }
 
+/* Rythme vertical de la page (DESIGN_SYSTEM §1) : 24 px entre blocs empilés directement dans la zone principale
+   (cartes, KPI, boards…), même sans conteneur de page. Spécificité nulle : toute règle de page l'emporte. */
+:where(.main) > :where(* + *:not(.page-header, [hidden], .sr-only)) {
+  margin-top: var(--space-6);
+}
+
 } /* fin @layer layout */
 
 

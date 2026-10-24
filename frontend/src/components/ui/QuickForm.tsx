@@ -37,6 +37,7 @@ export function QuickForm({
   fields,
   submitLabel,
   transform,
+  variant = "primary",
 }: {
   title: string;
   endpoint: string;
@@ -44,6 +45,12 @@ export function QuickForm({
   submitLabel?: string;
   /** Mise en forme du corps avant envoi (ex. champs vides retirés, numériques convertis). */
   transform?: (values: Record<string, string>) => Record<string, unknown>;
+  /**
+   * Style du déclencheur : `primary` (défaut, action principale d'un écran) ou `secondary`. Dans une carte, une
+   * barre d'actions de section ou une barre d'outils, le déclencheur est de toute façon rendu secondaire (CSS) :
+   * un seul primaire par écran.
+   */
+  variant?: "primary" | "secondary";
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -104,7 +111,7 @@ export function QuickForm({
 
   return (
     <span className="quick-form-anchor" {...(done && !open ? { role: "form", "aria-label": title } : {})}>
-      <button type="button" className="btn primary" onClick={openSheet}>
+      <button type="button" className={`btn ${variant === "secondary" ? "ghost" : "primary"}`} onClick={openSheet}>
         <Plus size={16} aria-hidden="true" /> {title}
       </button>
       {done && !open ? (

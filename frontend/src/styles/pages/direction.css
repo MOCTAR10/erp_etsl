@@ -1229,3 +1229,39 @@
     }
   }
 }
+
+/* ── Revue finale R1 ─────────────────────────────────────────────────────── */
+@layer pages {
+  /* Une valeur longue ne chevauche jamais son libellé : elle passe à la ligne, alignée à droite. */
+  .dir-stat dt {
+    flex: 1 1 auto;
+  }
+  .dir-stat dd {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+  .dir-card-note {
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-xs, 16px);
+    color: var(--text-muted);
+  }
+}
+
+@layer pages {
+  /* Kanban : le destinataire occupe toujours sa propre ligne (cartes homogènes, avec ou sans retard). */
+  .kb-assignee {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .kb-assignee-mail {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
