@@ -68,6 +68,23 @@ class AuthAPITests(APITestCase):
         resp = self.client.get("/api/users/me/")
         self.assertIn(resp.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 
+    def test_jeton_expire_ou_invalide_repond_401(self):
+        """401 (et non 403) : c'est le signal qui déclenche le rafraîchissement du jeton côté SPA (`api/client.ts`)."""
+        from datetime import timedelta
+
+        from rest_framework_simplejwt.tokens import AccessToken
+
+        expire = AccessToken.for_user(self.user)
+        expire.set_exp(lifetime=-timedelta(minutes=1))
+        for jeton in (str(expire), "pas-un-jeton"):
+            with self.subTest(jeton=jeton[:12]):
+                self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {jeton}")
+                resp = self.client.get("/api/reports/dashboard/")
+                self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+                self.assertIn("Bearer", resp.get("WWW-Authenticate", ""))
+        self.client.credentials()
+        self.assertEqual(self.client.get("/api/reports/dashboard/").status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_me_returns_profile(self):
         tokens = self.client.post(
             "/api/users/token/",
