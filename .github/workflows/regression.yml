@@ -76,7 +76,7 @@ jobs:
   backend:
     name: Backend ${{ matrix.shard }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90  # shard noyau-bi : jeu vitrine (≈ 50 min)
+    timeout-minutes: 60  # shard vitrine : seed complet ≈ 20-25 min, seul sur son runner
     strategy:
       fail-fast: false
       matrix:
@@ -85,7 +85,12 @@ jobs:
           - shard: socle-ged
             apps: "users documents workflow reports referentiels registres"
           - shard: noyau-bi
-            apps: "accounting_kernel integrations outbox analytics"
+            apps: "accounting_kernel integrations outbox analytics --ignore=analytics/test_seed_vitrine.py"
+          # Jeu vitrine : setUpTestData charge tout le seed démo (~20 min). En un seul processus (-n 0) :
+          # avec xdist, chaque worker qui reçoit un test de la classe rejoue le seed (44 min mesurées).
+          - shard: vitrine
+            apps: "analytics/test_seed_vitrine.py"
+            xdist: "-n 0"
           - shard: m1-m4
             apps: "commercial achats operations logistique"
           - shard: m5-m8
@@ -158,7 +163,7 @@ jobs:
           MINIO_INTEGRATION: ${{ matrix.shard == 'socle-ged' && '1' || '0' }}
         run: |
           set -o pipefail  # sinon `| tee` masquerait un échec de pytest
-          python -m pytest -n auto --cov=. --cov-report=xml:coverage.xml --cov-report=term ${{ matrix.apps }} | tee pytest.log
+          python -m pytest ${{ matrix.xdist || '-n auto' }} --cov=. --cov-report=xml:coverage.xml --cov-report=term ${{ matrix.apps }} | tee pytest.log
           echo "### Backend — ${{ matrix.shard }}" >> "$GITHUB_STEP_SUMMARY"
           tail -n 40 pytest.log >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
