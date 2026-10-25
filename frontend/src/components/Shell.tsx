@@ -47,6 +47,7 @@ import { canSeeApp, ROUTE_APP, sansCode, type ErpApp } from "../lib/modules";
 import { initiales, roleLabel } from "../lib/roles";
 import { MotionProvider } from "./Pilot";
 import { BrandLogo } from "./BrandLogo";
+import { NotificationBell } from "./NotificationBell";
 import { CommandPalette, Menu, Tooltip } from "./ui";
 import type { CommandGroupDef, CommandItemDef, MenuEntry } from "./ui";
 
@@ -409,6 +410,7 @@ export function Shell() {
                   <Languages size={16} aria-hidden="true" />
                 </button>
               </Tooltip>
+              <NotificationBell items={notifications.data ?? []} />
               <span className="topbar-sep" aria-hidden="true" />
               <Menu
                 align="end"

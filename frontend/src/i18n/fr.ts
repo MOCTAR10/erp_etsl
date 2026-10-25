@@ -3576,6 +3576,9 @@ export const fr = {
       videAide: "Les relances et escalades des circuits de validation apparaîtront ici.",
       videNonLues: "Tout est lu",
       erreur: "Action impossible",
+      clocheNonLues_one: "Notifications : {{count}} non lue",
+      clocheNonLues_other: "Notifications : {{count}} non lues",
+      voirTout: "Voir toutes les notifications",
     },
     secu: {
       sousTitre: "Vérification en deux étapes, délégations temporaires de vos validations et journal des accès.",

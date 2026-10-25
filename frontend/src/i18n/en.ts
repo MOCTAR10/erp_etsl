@@ -3576,6 +3576,9 @@ export const en = {
       videAide: "Workflow reminders and escalations will appear here.",
       videNonLues: "All caught up",
       erreur: "Action failed",
+      clocheNonLues_one: "Notifications: {{count}} unread",
+      clocheNonLues_other: "Notifications: {{count}} unread",
+      voirTout: "View all notifications",
     },
     secu: {
       sousTitre: "Two-step verification, temporary delegation of your approvals and access log.",
