@@ -8,6 +8,10 @@ import { ApiError, api } from "../api/client";
 import { Badge, DataTable, DatePicker, EmptyState, ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionCard } from "../components/ui";
 import type { Column } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
+import { avatarStyle, displayName, personInitials } from "../lib/people";
+import { roleLabel } from "../lib/roles";
+import { useThemeMode } from "../lib/useThemeMode";
+import { useAuth } from "../store/auth";
 import type { MonBulletin, MonConge } from "../types";
 
 type Conge = MonConge;
@@ -36,6 +40,48 @@ function errorMessage(err: unknown): string {
     if (parts.length) return parts.join(" · ");
   }
   return "Erreur";
+}
+
+/** Carte « Mon profil » : nom, rôle, e-mail, langue, thème, et accès au changement de mot de passe. */
+function MonProfilCarte() {
+  const { t, i18n } = useTranslation();
+  const user = useAuth((s) => s.user);
+  const mode = useThemeMode();
+  const nom = displayName(t, user);
+  return (
+    <SectionCard title={t("premiumPilotage.monEspace.profil")}>
+      <div className="me-profil">
+        <span className="compte-avatar me-avatar" aria-hidden="true" style={avatarStyle(nom)}>
+          {personInitials(t, user)}
+        </span>
+        <dl className="me-profil-grid">
+          <div>
+            <dt>{t("premiumPilotage.monEspace.nom")}</dt>
+            <dd>{nom}</dd>
+          </div>
+          <div>
+            <dt>{t("premiumPilotage.monEspace.role")}</dt>
+            <dd>{user?.role ? roleLabel(t, user.role) : "—"}</dd>
+          </div>
+          <div>
+            <dt>{t("premiumPilotage.monEspace.email")}</dt>
+            <dd>{user?.email ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>{t("premiumPilotage.monEspace.langue")}</dt>
+            <dd>{i18n.language.startsWith("en") ? "English" : "Français"}</dd>
+          </div>
+          <div>
+            <dt>{t("premiumPilotage.monEspace.theme")}</dt>
+            <dd>{mode === "dark" ? t("premiumPilotage.monEspace.sombre") : t("premiumPilotage.monEspace.clair")}</dd>
+          </div>
+        </dl>
+        <Link className="btn" to="/mon-mot-de-passe">
+          <KeyRound size={15} aria-hidden="true" /> {t("ecarts_tr.mdp.menu")}
+        </Link>
+      </div>
+    </SectionCard>
+  );
 }
 
 export function MonEspacePage() {
@@ -72,26 +118,30 @@ export function MonEspacePage() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["mes-conges"] }),
   });
 
-  if (profil.isLoading) return <KpiGridSkeleton count={2} />;
+  // Chargement : l'en-tête reste visible (jamais un écran fait de seuls squelettes, A-32).
+  if (profil.isLoading)
+    return (
+      <>
+        <PageHeader title={t("monEspace.title")} subtitle={t("revueR1.monEspace.sub")} />
+        <KpiGridSkeleton count={2} />
+      </>
+    );
   if (profil.isError) {
     const sansFiche = profil.error instanceof ApiError && profil.error.status === 403;
     return sansFiche ? (
       <>
-        <PageHeader
-          title={t("monEspace.title")}
-          subtitle={t("revueR1.monEspace.sub")}
-          actions={
-            <Link className="btn ghost" to="/mon-mot-de-passe">
-              <KeyRound size={15} aria-hidden="true" /> {t("ecarts_tr.mdp.menu")}
-            </Link>
-          }
-        />
+        <PageHeader title={t("monEspace.title")} subtitle={t("revueR1.monEspace.sub")} />
+        {/* Sans fiche salarié (dirigeant, compte technique) : le profil d'abord, l'état vide RH ensuite (A-33). */}
+        <MonProfilCarte />
         <SectionCard>
-          <EmptyState icon={UserRound} label={t("monEspace.pasDeFiche")} hint={t("revueR1.monEspace.sansFicheAide")} />
+          <EmptyState icon={UserRound} label={t("monEspace.pasDeFiche")} hint={t("revueR1.monEspace.sansFicheAide")} compact />
         </SectionCard>
       </>
     ) : (
-      <ErrorState message={t("common.error")} onRetry={() => void profil.refetch()} retryLabel={t("common.retry")} />
+      <>
+        <PageHeader title={t("monEspace.title")} subtitle={t("revueR1.monEspace.sub")} />
+        <ErrorState message={t("common.error")} onRetry={() => void profil.refetch()} retryLabel={t("common.retry")} />
+      </>
     );
   }
 

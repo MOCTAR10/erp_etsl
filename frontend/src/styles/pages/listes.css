@@ -20,6 +20,16 @@
 .listes-page > .page-header {
   margin-bottom: 0;
 }
+/* Groupes d'ancres (SectionNav) : même pile à 24 px que la page */
+.listes-page > .page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.listes-page > .page-section > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
 /* Bloc « barre d'outils + board / tableau » : 12 px entre la barre et la liste */
 .listes-block {
   display: flex;
@@ -98,21 +108,15 @@
 }
 
 /* ── Kanban horizontal (P2-6) ── */
+/* Colonnes en flex qui passent à la ligne (audit B10) : aucune colonne n'est plus coupée au bord droit à 1 440 px.
+   Une colonne pleine prend au moins 180 px (étirée si la place le permet), une colonne vide se réduit à 140 px.
+   Les cartes ne défilent plus dans la colonne (audit A06) : la colonne s'allonge, son en-tête reste collant. */
 .board {
-  display: grid;
-  grid-template-columns: none;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(260px, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--space-3);
-  align-items: start;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  /* Hauteur plafonnée (revue R2) : une colonne très remplie défile dans le board au lieu d'allonger
-     la page et de laisser un grand vide sous les colonnes courtes. */
-  max-height: min(76vh, 760px);
-  overflow-y: auto;
-  scroll-snap-type: x proximity;
-  scroll-padding-inline: var(--space-1);
+  overflow: visible;
   padding-bottom: var(--space-2);
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
@@ -122,19 +126,9 @@
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
-/* Fondu sur le bord qui cache des colonnes (affordance de défilement) */
-.board[data-overflow-end] {
-  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-}
-.board[data-overflow-start] {
-  mask-image: linear-gradient(to right, transparent, #000 56px);
-}
-.board[data-overflow-start][data-overflow-end] {
-  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
-}
 
 .board-col {
-  scroll-snap-align: start;
+  flex: 1 1 180px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -142,6 +136,48 @@
   gap: var(--space-2);
   min-width: 0;
   transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+/* Colonne vide : largeur réduite, simple mention sous l'en-tête (ne prend plus la moitié du board). */
+.board-col.is-empty {
+  flex: 0 1 140px;
+}
+/* Liste de cartes : toutes visibles (plus de hauteur maximale ni de fondu ; « Voir plus » reste géré par `limit`). */
+.board-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* place de l'anneau de focus et de l'ombre des cartes, sans rogner */
+  margin: -4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+}
+.board-col-body:focus {
+  outline: none;
+}
+.board-col-body:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 45%, transparent);
+}
+/* Mobile : colonnes empilées pleine largeur (plus de colonne coupée au bord, plus de 700 px de vide sous une
+   colonne vide) ; une colonne vide se réduit à son en-tête et à son compteur « 0 ». */
+@media (max-width: 640px) {
+  .board {
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 0;
+  }
+  .board-col,
+  .board-col.is-empty {
+    flex: none;
+    width: 100%;
+  }
+  .board-col.is-empty {
+    padding-block: var(--space-1);
+  }
+  .board-col.is-empty .board-empty,
+  .board-col.is-empty .board-col-summary,
+  .board-col.is-empty .board-col-body:has(> .empty-state:only-child) {
+    display: none;
+  }
 }
 /* Sombre : la colonne est en retrait (entre le fond et la carte), la carte ressort au-dessus —
    jamais une carte plus sombre que sa colonne. */
@@ -168,10 +204,10 @@
   min-width: 0;
   gap: var(--space-2);
 }
+/* Libellé de statut sur 2 lignes si besoin (« Approuvé hiérarchie ») plutôt que tronqué. */
 .board-col-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .board-dot {
   flex: none;
@@ -207,7 +243,6 @@
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .board-empty {
@@ -237,7 +272,6 @@
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 .task-card .card-code {
   font-weight: var(--fw-medium);
@@ -260,6 +294,12 @@
   font-weight: var(--fw-semibold);
   color: var(--text);
   overflow-wrap: anywhere;
+  /* A-38 : 3 lignes avant l'ellipse (« Mandji Offshore Exploration - … » restait coupé à 2) */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 .task-card .meta {
   font-size: var(--fs-xs);
@@ -277,7 +317,6 @@
   font-size: var(--fs-xs);
   line-height: var(--lh-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 .task-card .card-foot > .badge {
   min-width: 0;
@@ -359,7 +398,6 @@ td .card-actions--choice {
   color: var(--text-muted);
 }
 .cell-mono {
-  font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   color: var(--text-muted);
 }
@@ -422,7 +460,6 @@ td .card-actions--choice {
   border-bottom: 1px solid var(--border);
   font-size: var(--fs-sm);
   line-height: var(--lh-sm);
-  font-variant-numeric: tabular-nums;
 }
 .overload-list li:last-child {
   border-bottom: 0;
@@ -459,25 +496,10 @@ td .card-actions--choice {
   text-align: right;
   color: var(--text-muted);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 900px) {
-  /* Carrousel : une colonne à 84 % de largeur, la suivante dépasse (affordance), aimantation au bord */
-  .board {
-    grid-auto-columns: min(84%, 320px);
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 0;
-  }
-  /* Fondu plus court : la colonne suivante reste lisible (affordance sans voile) */
-  .board[data-overflow-end] {
-    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
-  }
-  .board[data-overflow-start] {
-    mask-image: linear-gradient(to right, transparent, #000 24px);
-  }
-  .board[data-overflow-start][data-overflow-end] {
-    mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
-  }
   .list-toolbar .search-field,
   .list-toolbar .field {
     flex: 1 1 100%;

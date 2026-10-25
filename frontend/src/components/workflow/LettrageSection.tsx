@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +6,7 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney, formatParametre } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import type { Lettrage, LettrageAnomalies, ParametreCompta } from "../../types";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 import { Badge, DataTable, SectionCard } from "../ui";
 import type { Column } from "../ui";
 
@@ -28,8 +28,6 @@ export function LettrageSection() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: string; valeur: string } | null>(null);
-  // Paramètres repliés par défaut, ouverts tant que des valeurs provisoires attendent ETSL ; le choix de l'utilisateur prime ensuite.
-  const [ouvert, setOuvert] = useState<boolean | null>(null);
 
   const comptes = useQuery({
     queryKey: ["lettrage-comptes"],
@@ -118,7 +116,7 @@ export function LettrageSection() {
     {
       key: "statut",
       header: t("revueKit.fin.statut"),
-      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{t(`lettrage.${p.statut_valeur}`)}</Badge>,
+      render: (p) => <ParamStatusBadge provisoire={p.est_provisoire} />,
       sortValue: (p) => p.statut_valeur,
     },
     {
@@ -196,7 +194,7 @@ export function LettrageSection() {
               {(lettrages.data ?? []).map((l) => (
                 <tr key={l.id}>
                   <td><strong>{l.code}</strong></td>
-                  <td>{l.automatique ? t("lettrage.auto") : t("lettrage.manuel")} · {l.lignes.length} {t("lettrage.lignes")}
+                  <td>{l.automatique ? t("lettrage.auto") : t("lettrage.manuel")} · {t("lettrage.lignes", { count: l.lignes.length })}
                     {l.lignes.some((x) => x.piece) && <span className="muted"> · {l.lignes.map((x) => x.piece).filter(Boolean).join(", ")}</span>}
                   </td>
                   <td><Badge tone={l.statut === "actif" ? "ok" : "err"}>{t(`lettrage.statut.${l.statut}`)}</Badge></td>
@@ -221,19 +219,16 @@ export function LettrageSection() {
         </>
       )}
 
-      <h4 className="section-heading">{t("lettrage.params")}</h4>
-      {provisoires > 0 && (
-        <div className="banner warn" role="note" data-testid="alerte-provisoire-compta">
-          <AlertTriangle size={18} aria-hidden />
-          <div className="banner-body">
-            <span className="banner-text">{t("lettrage.warnProvisoire", { count: provisoires })}</span>
-          </div>
-        </div>
-      )}
-      <details className="r3-repli" open={ouvert ?? provisoires > 0} onToggle={(e) => setOuvert(e.currentTarget.open)}>
-        <summary>{t("revueKit.fin.voirParametres", { count: (params.data ?? []).length })}</summary>
+      <ParamsPanel
+        module="comptabilite"
+        title={t("lettrage.params")}
+        count={params.data ? provisoires : undefined}
+        total={params.data?.length}
+        testId="parametres-compta"
+        alertTestId="alerte-provisoire-compta"
+      >
         <DataTable columns={colonnes} rows={params.data ?? []} caption={t("lettrage.params")} density="compact" />
-      </details>
+      </ParamsPanel>
     </SectionCard>
   );
 }

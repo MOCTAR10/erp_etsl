@@ -243,10 +243,18 @@ class CoutMoAffairesView(viewsets.ViewSet):
         fin = _date(request, "fin", default=today)
         voir = can_see_amount(request.user)
         rows = svc.cout_mo_par_affaire(debut, fin)
+        # Part des heures valorisées (taux horaire chargé connu) : 0 % ⇒ un seul bandeau à l'écran, pas N lignes à 0.
+        heures = sum((r["heures"] for r in rows), svc.ZERO)
+        non_val = sum((r["heures_non_valorisees"] for r in rows), svc.ZERO)
+        pct_valorisees = None if not heures else ((heures - non_val) * 100 / heures).quantize(svc.CENT)
         for r in rows:
             r["heures"], r["heures_non_valorisees"] = f"{r['heures']:.2f}", f"{r['heures_non_valorisees']:.2f}"
             r["cout"], r["cout_horaire_moyen"] = _money(voir, r["cout"]), _money(voir, r["cout_horaire_moyen"])
-        return Response({"debut": debut.isoformat(), "fin": fin.isoformat(), "rows": rows, "has_amount_access": voir})
+        return Response({
+            "debut": debut.isoformat(), "fin": fin.isoformat(), "rows": rows, "has_amount_access": voir,
+            "heures": f"{heures:.2f}", "heures_non_valorisees": f"{non_val:.2f}",
+            "pct_heures_valorisees": None if pct_valorisees is None else f"{pct_valorisees:.2f}",
+        })
 
 
 # ------------------------------------------------------------------------------------------------

@@ -16,8 +16,43 @@ import type { MenuEntry } from "./Menu";
 import { notify } from "./Toaster";
 
 /**
+ * Débordement vertical d'une liste défilante : `bottom` = des cartes restent sous le bord (fondu bas),
+ * `top` = des cartes sont passées au-dessus. Recalculé au défilement, au redimensionnement et quand le nombre
+ * de cartes affichées change (`size`).
+ */
+function useOverflowY(ref: { current: HTMLElement | null }, size: number) {
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) {
+      setEdges((prev) => (prev.top || prev.bottom ? { top: false, bottom: false } : prev));
+      return;
+    }
+    const update = () => {
+      const max = el.scrollHeight - el.clientHeight;
+      const top = max > 2 && el.scrollTop > 2;
+      const bottom = max > 2 && max - el.scrollTop > 2;
+      setEdges((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    for (const child of Array.from(el.children)) ro?.observe(child);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro?.disconnect();
+    };
+  }, [ref, size]);
+  return edges;
+}
+
+/**
  * Kanban horizontal : colonnes de largeur fixe (≥ 260 px, étirées si la place le permet) côte à côte,
- * défilement horizontal propre (fondu sur le bord qui cache des colonnes). La zone défilante est toujours une
+ * défilement horizontal propre (fondu sur le bord qui cache des colonnes). Chaque colonne défile pour son compte
+ * (en-tête fixe, fondu bas tant qu'il reste des cartes) : la page ne s'allonge plus sous une colonne pleine et la
+ * dernière carte n'est jamais coupée sans indice. Une colonne vide se réduit (bureau) ou à son seul en-tête
+ * (mobile ≤ 640 px, où les colonnes s'empilent). La zone défilante est toujours une
  * région nommée atteignable au clavier (←/→ font défiler ; axe « scrollable-region-focusable ») : `label` ou,
  * à défaut, un nom générique.
  */
@@ -105,22 +140,47 @@ export function BoardColumn({
   const cards = Children.toArray(children);
   const visible = shown === undefined ? cards : cards.slice(0, shown);
   const hidden = cards.length - visible.length;
+  const empty = cards.length === 0;
+  // Colonne à 0 (même si la page y pose son propre état vide) : largeur réduite.
+  const zero = empty || count === 0;
+  const titleId = useId();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const overflow = useOverflowY(bodyRef, visible.length);
+  const scrolls = overflow.top || overflow.bottom;
   return (
     <motion.section
       initial={{ opacity: 0, y: motionTokens.distance.xs }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: motionTokens.duration.fast, ease: motionTokens.ease.out, delay }}
-      className="board-col"
+      className={`board-col${zero ? " is-empty" : ""}`}
     >
       <div className="board-col-head">
         <span className="title">
           {Icon ? <Icon size={13} aria-hidden /> : <span className={`board-dot ${tone}`} aria-hidden />}
-          <span className="board-col-title">{title}</span>
+          <span className="board-col-title" id={titleId}>
+            {title}
+          </span>
         </span>
         {typeof count === "number" ? <span className="board-count">{count}</span> : null}
       </div>
       {summary ? <div className="board-col-summary">{summary}</div> : null}
-      {cards.length === 0 ? <p className="board-empty">{emptyLabel ?? t("listes.board.empty")}</p> : visible}
+      {empty ? (
+        <p className="board-empty">{emptyLabel ?? t("listes.board.empty")}</p>
+      ) : (
+        // Liste de la colonne : défile pour son compte (en-tête fixe au-dessus, fondu bas tant qu'il reste des
+        // cartes). Focusable et nommée seulement quand elle défile (axe « scrollable-region-focusable »).
+        <div
+          ref={bodyRef}
+          className="board-col-body"
+          data-overflow-top={overflow.top || undefined}
+          data-overflow-bottom={overflow.bottom || undefined}
+          role={scrolls ? "group" : undefined}
+          aria-labelledby={scrolls ? titleId : undefined}
+          tabIndex={scrolls ? 0 : undefined}
+        >
+          {visible}
+        </div>
+      )}
       {hidden > 0 ? (
         <button type="button" className="btn ghost sm board-more" onClick={() => setShown((shown ?? 0) + (limit ?? 0))}>
           {t("common.showMore", { count: hidden })}

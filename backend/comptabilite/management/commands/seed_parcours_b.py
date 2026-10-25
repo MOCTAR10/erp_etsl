@@ -35,9 +35,11 @@ class Command(ParcoursA):
             self._run()
 
     def _run(self):
+        from analytics.vitrine.nettoyage import renommer_libelles_herites
         from users.management.commands.seed_all_demo import _sync_sequences
 
         _sync_sequences()
+        renommer_libelles_herites()  # bases chargées avec les anciens libellés « (demo) » / sans accents
         self.clients = {}
         self.today = timezone.localdate()
         # 411 doit être lettrable (sinon le lettrage client est refusé) : paramétrage de référence, pas une donnée.
@@ -45,7 +47,14 @@ class Command(ParcoursA):
         self.parcours_situations()
         self.parcours_achats()
         self.parcours_inventaire()
+        self.parcours_tva()
         self.stdout.write(self.style.SUCCESS("Parcours lot B pret."))
+
+    def parcours_tva(self):
+        """Déclarations TVA du mois calculées sur les écritures 443 / 445 (sinon le KPI TVA reste à 0)."""
+        from comptabilite.fiscal import calculer_declarations_annee
+
+        calculer_declarations_annee(self.today.year)
 
     # -- M3 -> M10 : situations, facture, encaissement, lettrage ---------------------------------------------
     def _situation(self, affaire, label, montant, avancement, decalage):
@@ -78,10 +87,10 @@ class Command(ParcoursA):
         if affaire is None:
             raise CommandError("Affaire du lot A absente : lancer seed_parcours_demo avant seed_parcours_b.")
         etapes = (
-            ("Situation n1 (demo) - installation", 30_000_000, 25, "facturee"),
-            ("Situation n2 (demo) - tuyauterie principale", 24_000_000, 50, "validee"),
-            ("Situation n3 (demo) - essais", 18_000_000, 70, "soumise"),
-            ("Situation n4 (demo) - parachevement", 12_000_000, 85, "brouillon"),
+            ("Situation n°1 - installation", 30_000_000, 25, "facturee"),
+            ("Situation n°2 - tuyauterie principale", 24_000_000, 50, "validee"),
+            ("Situation n°3 - essais", 18_000_000, 70, "soumise"),
+            ("Situation n°4 - parachèvement", 12_000_000, 85, "brouillon"),
         )
         for i, (label, montant, avancement, cible) in enumerate(reversed(etapes)):
             situation = self._situation(affaire, label, montant, avancement, i)
@@ -200,9 +209,9 @@ class Command(ParcoursA):
         bc_std = self._chaine_achat("Achat matiere", standard, article, 40, Decimal("85000"), False, depot)
         bc_gr = self._chaine_achat("Location GR 618", gr, service, 1, Decimal("12500000"), True, depot)
         self._payer_facture(bc_std)  # la facture GR reste a payer : dette 401100 ouverte
-        self._litige(bc_std, "qualite", "Certificats matiere non conformes sur 4 pieces (demo)", 340000, "escalade")
-        self._litige(bc_std, "quantite", "Livraison partielle constatee a la reception (demo)", 120000, "ouvert")
-        self._litige(bc_gr, "prix", "Ecart de tarif de location facture (demo)", 500000, "resolu")
+        self._litige(bc_std, "qualite", "Certificats matière non conformes sur 4 pièces", 340000, "escalade")
+        self._litige(bc_std, "quantite", "Livraison partielle constatée à la réception", 120000, "ouvert")
+        self._litige(bc_gr, "prix", "Écart de tarif de location facturé", 500000, "resolu")
 
     # -- M5 : inventaire tournant -----------------------------------------------------------------------------
     def parcours_inventaire(self):

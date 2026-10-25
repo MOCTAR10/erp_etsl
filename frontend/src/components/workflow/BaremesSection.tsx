@@ -8,6 +8,8 @@ import { formatDate, formatMoney, formatParametre, formatPercent } from "../../l
 import { describeError } from "../../lib/offlineQueue";
 import type { BaremeCotisation, HistoriqueBareme, ParametrePaie } from "../../types";
 import { Badge, DatePicker, Menu, SectionCard } from "../ui";
+import { ParamsPanel } from "../parametres/ParamsPanel";
+import { ParamValueTable } from "../parametres/ParamValueTable";
 import { ImpotSection } from "./ImpotSection";
 
 const EMPTY = { code: "", label: "", organisme: "", nature: "salariale", base: "brut", taux: "", plafond: "", date_effet: "" };
@@ -87,7 +89,8 @@ export function BaremesSection() {
 
   if (baremes.isError) return null; // pas de droit sur la paie : la section n'apparaît pas
   const rows = baremes.data ?? [];
-  const provisoires = rows.filter((b) => b.statut_valeur !== "confirme").length + (params.data ?? []).filter((p) => p.statut_valeur !== "confirme").length;
+  const paramsProvisoires = (params.data ?? []).filter((p) => p.statut_valeur !== "confirme").length;
+  const provisoires = rows.filter((b) => b.statut_valeur !== "confirme").length + paramsProvisoires;
   const proposerRevision = (b: BaremeCotisation) => {
     const date_effet = window.prompt(t("baremes.revisionDate"));
     const taux = date_effet ? window.prompt(t("baremes.revisionTaux"), b.taux) : null;
@@ -138,7 +141,7 @@ export function BaremesSection() {
                   </div>
                 </td>
                 <td>
-                  <Badge tone={b.nature === "salariale" ? "brand" : "warn"}>{b.nature_label}</Badge>
+                  <Badge tone={b.nature === "salariale" ? "brand" : "warn"}>{t(`baremes.${b.nature}`, { defaultValue: b.nature_label })}</Badge>
                 </td>
                 {edit?.url === `/api/rh-paie/baremes/${b.id}/` ? (
                   <>
@@ -228,63 +231,30 @@ export function BaremesSection() {
         </div>
       )}
 
-      <h4 className="subtitle">{t("baremes.paramsTitle")}</h4>
-      <div className="table-wrap">
-      <table className="table">
-        <tbody>
-          {(params.data ?? []).map((p) => (
-            <tr key={p.id}>
-              <td>
-                <strong>{p.code}</strong>
-                <div className="cell-sub">{p.label}</div>
-              </td>
-              <td className="num cell-nowrap">
-                {edit?.url === `/api/rh-paie/parametres-paie/${p.id}/` ? (
-                  <input type="number" step="0.001" className="control" aria-label={t("baremes.valeur")} value={edit.valeur} onChange={(e) => setEdit({ ...edit, valeur: e.target.value })} />
-                ) : (
-                  formatParametre(p.valeur, p.unite)
-                )}
-              </td>
-              <td title={`${p.source} ${p.reference_texte}`.trim()}>
-                <Badge tone={p.statut_valeur === "confirme" ? "ok" : "warn"}>{t(`baremes.${p.statut_valeur}`)}</Badge>
-              </td>
-              <td className="num">
-                <div className="card-actions card-actions--end">
-                  {edit?.url === `/api/rh-paie/parametres-paie/${p.id}/` ? (
-                    <>
-                      <button type="button" className="btn primary sm" disabled={enregistrer.isPending} onClick={() => enregistrer.mutate(edit)}>
-                        {t("baremes.save")}
-                      </button>
-                      <button type="button" className="btn ghost sm" onClick={() => setEdit(null)}>
-                        {t("baremes.annuler")}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn ghost sm"
-                      onClick={() => setEdit({ url: `/api/rh-paie/parametres-paie/${p.id}/`, valeur: p.valeur, source: p.source })}
-                    >
-                      {t("baremes.modifier")}
-                    </button>
-                  )}
-                  {p.statut_valeur !== "confirme" && (
-                    <button
-                      type="button"
-                      className="btn ghost sm"
-                      disabled={confirmer.isPending}
-                      onClick={() => window.confirm(t("baremes.confirmConfirmer")) && confirmer.mutate(`/api/rh-paie/parametres-paie/${p.id}/`)}
-                    >
-                      {t("baremes.confirmer")}
-                    </button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
+      <ParamsPanel
+        module="rh_paie"
+        title={t("baremes.paramsTitle")}
+        count={params.data ? paramsProvisoires : undefined}
+        total={params.data?.length}
+        testId="parametres-paie"
+      >
+        {/* Libellé humain en premier, clé technique en secondaire (B-14) ; libellés traduits quand la clé est connue. */}
+        <ParamValueTable
+          rows={(params.data ?? []).map((p) => ({ ...p, est_provisoire: p.statut_valeur !== "confirme" }))}
+          caption={t("baremes.paramsTitle")}
+          libelle={(p) => t(`premiumParams.paie.${p.code}`, { defaultValue: p.label })}
+          valeur={(p) => formatParametre(p.valeur, p.unite)}
+          showCode
+          step="0.001"
+          pending={enregistrer.isPending || confirmer.isPending}
+          confirmMessage={t("baremes.confirmConfirmer")}
+          onSave={(id, valeur) => {
+            const p = (params.data ?? []).find((x) => x.id === id);
+            return enregistrer.mutateAsync({ url: `/api/rh-paie/parametres-paie/${id}/`, valeur, source: p?.source ?? "" });
+          }}
+          onConfirm={(id) => confirmer.mutate(`/api/rh-paie/parametres-paie/${id}/`)}
+        />
+      </ParamsPanel>
 
       <p className="muted">{t("baremes.editHint")}</p>
       {error && (

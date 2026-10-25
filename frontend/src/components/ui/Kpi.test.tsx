@@ -36,6 +36,15 @@ describe("<Kpi />", () => {
     expect(container.querySelector(".ui-kpi-unit")).toBeNull();
   });
 
+  it("montant long : taille ajustée à la carte (classe fit + largeur estimée), jamais abrégé", () => {
+    const { container } = render(<Kpi label="Pipeline" value="3337000000" kind="money" />);
+    const value = container.querySelector(".kpi-value") as HTMLElement;
+    expect(value).toHaveClass("kpi-value-fit");
+    expect(value).not.toHaveClass("kpi-value-md");
+    expect(Number(value.style.getPropertyValue("--kpi-em"))).toBeGreaterThan(6);
+    expect(value.textContent?.replace(/\s/g, " ")).toBe("3 337 000 000 FCFA");
+  });
+
   it("nombre simple : pas d'unité", () => {
     const { container } = render(<Kpi label="Bons" value={4} />);
     expect(container.querySelector(".kpi-value")?.textContent).toBe("4");

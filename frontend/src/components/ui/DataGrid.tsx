@@ -81,6 +81,22 @@ export interface DataGridProps<T extends { id: string | number }> {
   onSortChange?: (sort: GridSort) => void;
   /** Pagination serveur (composant `Pagination` existant) sous le tableau. */
   pagination?: GridPagination;
+  /**
+   * Rendu sous 640 px : `"cards"` (défaut, dès 3 colonnes) = une carte par ligne (1re colonne en titre, puis
+   * « libellé : valeur », montants jamais coupés) ; `"scroll"` = le tableau garde ses colonnes et défile.
+   */
+  mobile?: "cards" | "scroll";
+}
+
+/** Libellé texte d'une colonne (mode cartes) : `label`, sinon `header` s'il s'agit d'un texte. */
+function columnLabel<T>(c: GridColumn<T>): string | undefined {
+  if (c.label) return c.label;
+  return typeof c.header === "string" || typeof c.header === "number" ? String(c.header) : undefined;
+}
+
+function cellClass<T>(c: GridColumn<T>): string | undefined {
+  const cls = [c.num ? "num" : "", c.kind === "date" ? "date" : ""].filter(Boolean).join(" ");
+  return cls || undefined;
 }
 
 /**
@@ -89,14 +105,23 @@ export interface DataGridProps<T extends { id: string | number }> {
  * pas qu'on peut faire défiler.
  */
 export function useOverflowEdges(ref: { current: HTMLElement | null }) {
-  const [edges, setEdges] = useState({ start: false, end: false });
+  const [edges, setEdges] = useState({ start: false, end: false, vertical: false, bottom: false });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const update = () => {
       const max = el.scrollWidth - el.clientWidth;
-      const next = { start: max > 1 && el.scrollLeft > 1, end: max > 1 && el.scrollLeft < max - 1 };
-      setEdges((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
+      const maxY = el.scrollHeight - el.clientHeight;
+      const next = {
+        start: max > 1 && el.scrollLeft > 1,
+        end: max > 1 && el.scrollLeft < max - 1,
+        // Débordement vertical (zone de hauteur bornée) : `bottom` = des lignes restent sous le bord.
+        vertical: maxY > 1,
+        bottom: maxY > 1 && el.scrollTop < maxY - 1,
+      };
+      setEdges((prev) =>
+        prev.start === next.start && prev.end === next.end && prev.vertical === next.vertical && prev.bottom === next.bottom ? prev : next,
+      );
     };
     update();
     el.addEventListener("scroll", update, { passive: true });
@@ -179,6 +204,7 @@ export function DataGrid<T extends { id: string | number }>({
   sort,
   onSortChange,
   pagination,
+  mobile = "cards",
 }: DataGridProps<T>) {
   const { t } = useTranslation();
   const controlled = sort !== undefined && onSortChange !== undefined;
@@ -231,12 +257,16 @@ export function DataGrid<T extends { id: string | number }>({
   const headers = table.getHeaderGroups()[0]?.headers ?? [];
   const bodyRows = table.getRowModel().rows;
   const colCount = columns.length + (rowActions ? 1 : 0);
+  const [expanded, setExpanded] = useState(false);
   const height = maxHeight ?? "min(70vh, 760px)";
-  const scrollable = height !== "none";
+  const scrollable = height !== "none" && !expanded;
   const wrapStyle: CSSProperties | undefined = scrollable ? { maxHeight: height } : undefined;
   const wrapRef = useRef<HTMLDivElement>(null);
   const overflow = useOverflowEdges(wrapRef);
   const showSkeleton = loading && rows.length === 0;
+  // B32 : une zone de hauteur bornée qui coupe des lignes le dit (fondu bas) et propose « Afficher les N lignes ».
+  const clipped = scrollable && overflow.vertical && rows.length > 0;
+  const cards = mobile === "cards" && colCount >= 3;
 
   let body: ReactNode;
   if (showSkeleton) {
@@ -282,7 +312,7 @@ export function DataGrid<T extends { id: string | number }>({
           }
         >
           {columns.map((c) => (
-            <td key={c.key} className={c.num ? "num" : undefined} style={colStyle(c.width)}>
+            <td key={c.key} className={cellClass(c)} style={colStyle(c.width)} data-label={cards ? columnLabel(c) : undefined}>
               {c.render(row)}
             </td>
           ))}
@@ -295,19 +325,23 @@ export function DataGrid<T extends { id: string | number }>({
   }
 
   return (
-    <div className="ui-grid-root">
+    <div className="ui-grid-root" data-clipped={clipped || undefined}>
       {/* Zone défilante atteignable au clavier (flèches) : axe « scrollable-region-focusable » */}
       <div
         ref={wrapRef}
         className="table-wrap ui-grid-wrap"
         data-overflow-end={overflow.end || undefined}
         data-overflow-start={overflow.start || undefined}
+        data-overflow-bottom={clipped && overflow.bottom ? true : undefined}
         style={wrapStyle}
         tabIndex={0} /* toujours : le débordement horizontal dépend de la largeur d'écran */
         role="group"
         aria-label={caption ?? t("finition.gridScroll")}
       >
-        <table className={`table ui-grid ui-grid--${density}${loading && !showSkeleton ? " is-loading" : ""}`} aria-busy={loading || undefined}>
+        <table
+          className={`table ui-grid ui-grid--${density}${cards ? " ui-grid--cards" : ""}${loading && !showSkeleton ? " is-loading" : ""}`}
+          aria-busy={loading || undefined}
+        >
           {caption ? <caption className="sr-only">{caption}</caption> : null}
           <thead>
             <tr>
@@ -347,6 +381,13 @@ export function DataGrid<T extends { id: string | number }>({
         </table>
         {showSkeleton ? <span className="sr-only" role="status">{t("ui.loadingRows")}</span> : null}
       </div>
+      {clipped || expanded ? (
+        <div className="ui-grid-more" data-fade={(clipped && overflow.bottom) || undefined}>
+          <button type="button" className="btn ghost sm" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+            {expanded ? t("premiumKit.grid.showLess") : t("premiumKit.grid.showAll", { count: rows.length })}
+          </button>
+        </div>
+      ) : null}
       {pagination ? <Pagination {...pagination} /> : null}
     </div>
   );

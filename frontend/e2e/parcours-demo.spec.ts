@@ -12,7 +12,7 @@ test.describe("Parcours démo : finance", () => {
     await loginAs(page, DEMO_USERS.finance);
     await page.goto("/comptabilite");
 
-    await page.getByPlaceholder("Rechercher une facture (code, objet)…").fill("Situation n1 (demo)");
+    await page.getByPlaceholder("Rechercher une facture (code, objet)…").fill("Situation n°1 - installation");
     const facture = page.getByRole("row").filter({ has: page.getByText(/^FAC\d+$/) }).filter({ hasText: "Émise" });
     await expect(facture).toHaveCount(1);
     // Pièce de vente générée à l'émission (411 · 706 · 443) : c'est elle qu'on retrouve dans le lettrage.
@@ -25,7 +25,7 @@ test.describe("Parcours démo : finance", () => {
     await compte.selectOption(valeur!);
     const lettrage = page.getByRole("row").filter({ has: page.getByText(/^LET\d+$/) }).filter({ hasText: piece });
     await expect(lettrage).toHaveCount(1);
-    await expect(lettrage).toContainText("Manuel · 2 ligne(s)");
+    await expect(lettrage).toContainText("Manuel · 2 lignes");
     await expect(lettrage).toContainText("Actif");
   });
 });
@@ -71,8 +71,12 @@ test.describe("Parcours démo : direction", () => {
     await expect(budget.getByRole("button", { name: "Clôturer" })).toBeVisible();
 
     // Carte « Écarts > 10 % à analyser » : la colonne Échéance porte la date de l'analyse attendue.
-    const ecarts = page.locator(".card:not(:has(.card))", { hasText: "Écarts > 10 % à analyser" })
-      .getByRole("row", { name: new RegExp(AFFAIRE_CHANTIER) });
+    const carteEcarts = page.locator(".card:not(:has(.card))", { hasText: "Écarts > 10 % à analyser" });
+    // Liste bornée aux écarts les plus forts : « Voir les N écarts » déplie le reste (revue design #81).
+    const toutVoir = carteEcarts.getByRole("button", { name: /^Voir les \d+ écarts$/ });
+    await expect(carteEcarts.getByRole("table")).toBeVisible();
+    if (await toutVoir.isVisible()) await toutVoir.click();
+    const ecarts = carteEcarts.getByRole("row", { name: new RegExp(AFFAIRE_CHANTIER) });
     await expect(ecarts.first()).toBeVisible();
     await expect(ecarts.first()).toContainText(/[-−]\d+([.,]\d+)?\s?%/);
   });

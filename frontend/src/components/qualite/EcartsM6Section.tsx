@@ -6,9 +6,9 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { formatDate, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { ActionCorrective, NonConformite, ParametreStock } from "../../types";
+import type { ActionCorrective, NonConformite } from "../../types";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, Kpi, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, FileField, Kpi, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 
@@ -203,7 +203,7 @@ export function EcartsM6Section() {
       <CapaSection />
       <PunchListSection ofOpts={ofOpts} itpOpts={itpOpts} />
       <IndicateursSection />
-      <ParametresQualiteSection />
+      {/* Les paramètres qualité (ParametresQualiteSection) sont posés en fin de page Qualité (ancre « Paramètres »). */}
     </>
   );
 }
@@ -213,10 +213,13 @@ function ImageCndForm({ cndOpts }: { cndOpts: { value: string; label: string }[]
   const qc = useQueryClient();
   const [controle, setControle] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Clé du sélecteur de fichier : changée après un envoi réussi pour le vider.
+  const [fileKey, setFileKey] = useState(0);
   const send = useMutation({
     mutationFn: (f: File) => api.upload("/api/qualite/images-controle/", f, "fichier", { controle }),
     onSuccess: () => {
       setMsg({ ok: true, text: t("m6e.image.ok") });
+      setFileKey((k) => k + 1);
       void qc.invalidateQueries();
     },
     onError: (e) => setMsg({ ok: false, text: describeError(e) }),
@@ -228,15 +231,13 @@ function ImageCndForm({ cndOpts }: { cndOpts: { value: string; label: string }[]
         <option value="">{t("m6e.image.choisir")}</option>
         {cndOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <input
-        type="file"
+      <FileField
+        key={fileKey}
         aria-label={t("m6e.image.fichier")}
         accept="image/*,.pdf,.dcm"
         disabled={!controle || send.isPending}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
+        onChange={(f) => {
           if (f) send.mutate(f);
-          e.target.value = "";
         }}
       />
       {msg && <p className={msg.ok ? "quick-form-ok" : "action-error"} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
@@ -339,6 +340,7 @@ function CapaSection() {
     {
       key: "echeance",
       header: t("m6e.capa.echeance"),
+      kind: "date",
       render: (a) => (
         <>
           {a.echeance ? formatDate(a.echeance, i18n.language) : "—"}{" "}
@@ -395,6 +397,7 @@ function PunchListSection({ ofOpts, itpOpts }: { ofOpts: { value: string; label:
     {
       key: "echeance",
       header: t("m6e.capa.echeance"),
+      kind: "date",
       render: (i) => (
         <>
           {i.echeance ? formatDate(i.echeance, i18n.language) : "—"} {i.en_retard && <Badge tone="err">{t("m6e.capa.retard")}</Badge>}
@@ -492,76 +495,5 @@ function IndicateursSection() {
         )}
       </SectionCard>
     </div>
-  );
-}
-
-/** Valeur de paramètre : décimales conservées (« 0,5 »), entiers sans virgule. */
-const valeurParam = (v: string) => formatNumber(v, { decimals: Number.isInteger(Number(v)) ? 0 : 2 });
-
-/** Paramètres qualité (délai CAPA, escalade, alerte de péremption) : provisoires jusqu'à confirmation QA/QC. */
-function ParametresQualiteSection() {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
-  const q = useQuery({ queryKey: ["qualite-parametres"], queryFn: () => api.listAll<ParametreStock>("/api/qualite/parametres/"), retry: 0 });
-  const modifier = useMutation({
-    mutationFn: (v: { id: string; valeur: string }) => api.patch(`/api/qualite/parametres/${v.id}/`, { valeur: v.valeur }),
-    onSuccess: () => {
-      setError(null);
-      void qc.invalidateQueries({ queryKey: ["qualite-parametres"] });
-    },
-    onError: (e) => setError(describeError(e)),
-  });
-  if (q.isError || !q.data) return null;
-  const provisoires = q.data.filter((p) => p.est_provisoire).length;
-  const cols: Column<ParametreStock>[] = [
-    { key: "libelle", header: t("tableaux.qualite.parametre"), render: (p) => p.label, sortValue: (p) => p.label },
-    {
-      key: "valeur",
-      header: t("tableaux.qualite.valeur"),
-      num: true,
-      // Compte comptable sans séparateur de milliers, interrupteur 0/1 en Oui / Non : jamais « 624 000 compte » ni « 1 0/1 ».
-      render: (p) =>
-        p.unite === "compte"
-          ? t("revueR3.qualite.compte", { compte: p.valeur })
-          : p.unite === "0/1"
-            ? t(Number(p.valeur) ? "revueR3.oui" : "revueR3.non")
-            : `${valeurParam(p.valeur)} ${p.unite}`,
-    },
-    {
-      key: "statut",
-      header: t("qualite.col.statut"),
-      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("m5e.params.provisoire") : t("m5e.params.confirme")}</Badge>,
-    },
-    {
-      key: "actions",
-      header: <span className="sr-only">{t("ui.actions")}</span>,
-      render: (p) => (
-        <div className="action-bar-buttons r3-nowrap">
-          <button
-            type="button"
-            className="btn ghost sm"
-            onClick={() => {
-              const v = window.prompt(p.label, p.valeur);
-              if (v !== null) modifier.mutate({ id: p.id, valeur: v });
-            }}
-          >
-            {t("m5e.params.modifier")}
-          </button>
-          {p.est_provisoire && (
-            <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/qualite/parametres/${p.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer"), tone: "ghost" }]} />
-          )}
-        </div>
-      ),
-    },
-  ];
-  return (
-    <SectionCard title={t("m6e.params.title")}>
-      {provisoires > 0 && <p className="muted" role="note">{t("m6e.params.bandeau", { count: provisoires })}</p>}
-      {error && <p className="action-error" role="alert">{error}</p>}
-      <div data-testid="parametres-qualite">
-        <DataTable columns={cols} rows={q.data} caption={t("m6e.params.title")} />
-      </div>
-    </SectionCard>
   );
 }

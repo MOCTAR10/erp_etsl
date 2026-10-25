@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,8 +6,9 @@ import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, ModuleSettings, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 
 interface Parametre {
   id: string;
@@ -136,7 +136,7 @@ function ParametresAchats() {
     {
       key: "statut",
       header: t("tableaux.achats.statut"),
-      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("ecarts_m2.provisoire") : t("ecarts_m2.confirme")}</Badge>,
+      render: (p) => <ParamStatusBadge provisoire={p.est_provisoire} />,
     },
     {
       key: "actions",
@@ -166,22 +166,16 @@ function ParametresAchats() {
     },
   ];
   return (
-    <div data-testid="parametres-achats">
-      {provisoires > 0 && (
-        <div className="banner warn" role="note" style={{ marginBottom: "var(--space-3)" }}>
-          <SlidersHorizontal size={18} aria-hidden />
-          <div className="banner-body">
-            <span className="banner-title">{t("ecarts_m2.params.warn", { count: provisoires })}</span>
-          </div>
-        </div>
-      )}
+    // Panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05).
+    <ParamsPanel variant="card" module="achats" title={t("ecarts_m2.params.title")} count={provisoires} total={q.data.length} testId="parametres-achats">
       {error && (
         <p className="action-error" role="alert">
           {error}
         </p>
       )}
       <DataTable caption={t("ecarts_m2.params.title")} columns={columns} rows={q.data} />
-    </div>
+      <p className="muted">{t("ecarts_m2.params.note")}</p>
+    </ParamsPanel>
   );
 }
 
@@ -313,6 +307,8 @@ export function EcartsM2Section() {
 
   return (
     <>
+      {/* Groupes ciblés par la navigation de sections de la page Achats. */}
+      <div id="ach-fournisseurs" className="page-section">
       <SectionCard
         title={t("ecarts_m2.catalogue.title")}
         actions={
@@ -466,11 +462,11 @@ export function EcartsM2Section() {
         </div>
         <p className="muted">{t("ecarts_m2.ged.note", { n: pieces?.conservation_ans ?? 10 })}</p>
       </SectionCard>
+      </div>
 
-      <SectionCard title={t("ecarts_m2.params.title")}>
+      <ModuleSettings id="ach-parametres">
         <ParametresAchats />
-        <p className="muted">{t("ecarts_m2.params.note")}</p>
-      </SectionCard>
+      </ModuleSettings>
     </>
   );
 }

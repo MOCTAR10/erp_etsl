@@ -1,12 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatDateShort, formatMoney, formatNumber } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
+import "./comptabilite.css";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard } from "../ui";
+import { ScelleBadge } from "../sections/affichage";
+import { ActionBar, Badge, DataTable, DatePicker, QuickForm, SectionCard, notify } from "../ui";
 import type { Column } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
 import { ProvisionsChangeA7 } from "./ProvisionsChangeA7";
@@ -109,6 +111,15 @@ const cours = (v: string | null | undefined) =>
 export function EcartsA2Section() {
   const { t } = useTranslation();
   const [arrete, setArrete] = useState(new Date().toISOString().slice(0, 10));
+  const qc = useQueryClient();
+  const comptabiliserRav = useMutation({
+    mutationFn: (affaire: string) => api.post<unknown>("/api/comptabilite/reconnaissances-revenu/", { affaire, date_arrete: arrete }),
+    onSuccess: () => {
+      notify.success(t("listes.actions.done", { action: t("ecarts_a2.rav.comptabiliser") }));
+      void qc.invalidateQueries();
+    },
+    onError: (e) => notify.error(t("listes.actions.failed", { action: t("ecarts_a2.rav.comptabiliser") }), { description: describeError(e) }),
+  });
   const [dlError, setDlError] = useState<string | null>(null);
   const situation = useQuery({
     queryKey: ["a2", "taux-situation"],
@@ -271,20 +282,20 @@ export function EcartsA2Section() {
           </>
         ),
     },
-    actionsColumn<LigneRav>(t("ui.actions"), (r) =>
-      r.erreur || !Number(r.ecart)
-        ? []
-        : [
-            {
-              label: t("ecarts_a2.rav.comptabiliser"),
-              path: "/api/comptabilite/reconnaissances-revenu/",
-              body: { affaire: r.affaire, date_arrete: arrete },
-              confirm: t("ecarts_a2.rav.confirm"),
-              tone: "ghost",
-            },
-          ],
-    ),
   ];
+  // B02 : l'action de ligne passe dans le menu « ⋯ » (le bouton « Comptabiliser » était coupé en bout de tableau).
+  const actionsRav = (r: LigneRav) =>
+    r.erreur || !Number(r.ecart)
+      ? []
+      : [
+          {
+            label: t("ecarts_a2.rav.comptabiliser"),
+            disabled: comptabiliserRav.isPending,
+            onSelect: () => {
+              if (window.confirm(t("ecarts_a2.rav.confirm"))) comptabiliserRav.mutate(r.affaire);
+            },
+          },
+        ];
 
   const colsHisto: Column<Reconnaissance>[] = [
     { key: "code", header: t("ecarts_a2.rav.code"), render: (h) => h.code, sortValue: (h) => h.code },
@@ -321,7 +332,7 @@ export function EcartsA2Section() {
       header: t("ecarts_a2.sage.empreinte"),
       render: (x) => (
         <>
-          <code>{x.sha256.slice(0, 12)}</code> {x.gabarit_provisoire && provisoire}
+          <span className="cell-nowrap"><ScelleBadge sha={x.sha256} /> {x.gabarit_provisoire && provisoire}</span>
         </>
       ),
     },
@@ -429,7 +440,7 @@ export function EcartsA2Section() {
         </div>
         {apercu.isError && <p className="muted">{describeError(apercu.error)}</p>}
         <div data-testid="revenu-avancement">
-          <DataTable caption={t("ecarts_a2.rav.title")} columns={colsRav} rows={(apercu.data?.rows ?? []).map((r) => ({ ...r, id: r.affaire }))} />
+          <DataTable caption={t("ecarts_a2.rav.title")} columns={colsRav} rowActions={actionsRav} rows={(apercu.data?.rows ?? []).map((r) => ({ ...r, id: r.affaire }))} />
         </div>
         {(historique.data?.results ?? []).length > 0 && (
           <div data-testid="revenu-historique">

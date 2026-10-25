@@ -96,6 +96,7 @@ export function ClotureM6Section() {
     {
       key: "echeance",
       header: t("qualite.m6.echeance"),
+      kind: "date",
       render: (i) => formatDate(i.echeance_etalonnage, i18n.language),
       sortValue: (i) => i.echeance_etalonnage,
     },
@@ -141,7 +142,7 @@ export function ClotureM6Section() {
     { key: "soudeur", header: t("qualite.col.soudeur"), render: (j) => j.soudeur_nom, sortValue: (j) => j.soudeur_nom },
     { key: "wps", header: "WPS", render: (j) => j.wps_code ?? "—" },
     { key: "coulee", header: t("qualite.m6.coulee"), render: (j) => j.numero_coulee || "—" },
-    { key: "date", header: t("qualite.col.date"), render: (j) => formatDate(j.date_soudage, i18n.language), sortValue: (j) => j.date_soudage },
+    { key: "date", header: t("qualite.col.date"), kind: "date", render: (j) => formatDate(j.date_soudage, i18n.language), sortValue: (j) => j.date_soudage },
   ];
 
   const epCols: Column<Epreuve>[] = [

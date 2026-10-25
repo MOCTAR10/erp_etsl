@@ -1,15 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Download, FileCheck2, FileText, Send, ShieldCheck, Upload } from "lucide-react";
+import { Archive, Download, FileText, Send, ShieldCheck, Upload } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
+import { ParamsPanel } from "../components/parametres/ParamsPanel";
 import { cleanLabel } from "../components/workflow/libelle";
 import {
   Badge,
   DataGrid,
   DatePicker,
+  FileField,
   FilterBar,
   filtersToQuery,
   Kpi,
@@ -21,7 +22,7 @@ import {
   Sheet,
 } from "../components/ui";
 import type { BadgeTone, FilterDef, FilterValues, GridColumn } from "../components/ui";
-import { formatDate } from "../lib/format";
+import { formatDate, formatPercent } from "../lib/format";
 import { describeError } from "../lib/offlineQueue";
 import { usePagedList } from "../lib/usePagedList";
 import type { Paginated } from "../types";
@@ -61,6 +62,19 @@ interface Verification {
 }
 
 const TON: Record<string, BadgeTone> = { draft: "neutral", in_validation: "warn", rejected: "err", archived: "ok" };
+
+/**
+ * Titre de liste sans redite (A-15) : retire la référence en tête (« PV00007 — … », déjà en méta)
+ * et le suffixe technique « — archivage (receptionne) ». Le titre complet reste en infobulle.
+ */
+function titreLisible(titre: string, reference?: string | null): string {
+  let s = titre.replace(/\s+[—-]\s+archivage\s*\([^)]*\)\s*$/i, "");
+  if (reference && s.startsWith(reference)) {
+    const reste = s.slice(reference.length).replace(/^\s*[—:·-]\s*/, "");
+    if (reste) s = reste;
+  }
+  return s;
+}
 
 /** Ajout d'un document (fichier + métadonnées) dans un panneau latéral : POST multipart sur l'API GED existante. */
 function AjoutDocument({ types }: { types: DocType[] }) {
@@ -123,7 +137,7 @@ function AjoutDocument({ types }: { types: DocType[] }) {
         <div className="quick-form-fields">
           <div className="field wide">
             <label htmlFor={id("file")}>{t("ecarts_tr.ged.fichier")} *</label>
-            <input id={id("file")} name="file" type="file" required className="ged-file" />
+            <FileField id={id("file")} name="file" required />
           </div>
           <div className="field wide">
             <label htmlFor={id("title")}>{t("ecarts_tr.ged.titre")} *</label>
@@ -207,6 +221,12 @@ export function DocumentsPage() {
     extra,
   });
 
+  // Validations en retard (indice du KPI « En validation », A-18).
+  const taches = useQuery({ queryKey: ["tasks"], queryFn: api.tasks, staleTime: 60_000, retry: 0 });
+  const enRetard = (taches.data ?? []).filter(
+    (tk) => (tk.status === "pending" || tk.status === "delegated") && new Date(tk.due_date) < new Date(),
+  ).length;
+
   const verifier = async (d: DocRow) => {
     try {
       const r = await api.get<Verification>(`/api/documents/documents/${d.id}/verify/`);
@@ -235,10 +255,13 @@ export function DocumentsPage() {
       sortValue: (d) => d.title,
       render: (d) => {
         const meta = [d.reference, d.counterparty, d.project, d.dossier_path].filter(Boolean).join(" · ");
+        const titre = titreLisible(d.title, d.reference);
         return (
           <div className="ged-title">
             <span className="ged-title-main">
-              <strong>{d.title}</strong>
+              <strong className="ged-title-text" title={d.title}>
+                {titre}
+              </strong>
               {d.pdfa_statut === "converti" ? <Badge tone="ok">PDF/A-{d.pdfa_norme}</Badge> : null}
             </span>
             {meta ? <span className="ged-title-meta">{meta}</span> : null}
@@ -266,10 +289,11 @@ export function DocumentsPage() {
         const v = verif[d.id];
         if (v && typeof v !== "string")
           return <Badge tone={v.ok ? "ok" : "err"}>{v.ok ? t("ecarts_tr.ged.integre") : t("ecarts_tr.ged.altere")}</Badge>;
+        // Empreinte scellée : badge lisible, le SHA-256 complet reste en infobulle (A-16).
         return d.sha256 ? (
-          <code className="ged-sha" title={d.sha256}>
-            {`${d.sha256.slice(0, 10)}…`}
-          </code>
+          <Badge tone="ok" icon={ShieldCheck} title={t("premiumPilotage.ged.empreinte", { sha: d.sha256 })}>
+            {t("premiumPilotage.ged.integre")}
+          </Badge>
         ) : (
           <span className="muted">—</span>
         );
@@ -316,9 +340,33 @@ export function DocumentsPage() {
         }
       />
       <div className="kpi-grid">
-        <Kpi label={t("ecarts_tr.ged.total")} value={facets?.total ?? 0} icon={FileText} tone="brand" />
-        <Kpi label={t("ecarts_tr.ged.statuts.in_validation")} value={facets?.by_status?.in_validation ?? 0} icon={FileText} tone="warn" delay={0.05} />
-        <Kpi label={t("revueR1.ged.archives")} value={facets?.by_status?.archived ?? 0} icon={Archive} tone="accent" delay={0.1} />
+        <Kpi
+          label={t("ecarts_tr.ged.total")}
+          value={facets?.total ?? 0}
+          hint={t("premiumPilotage.ged.brouillons", { count: facets?.by_status?.draft ?? 0 })}
+          icon={FileText}
+          tone="brand"
+        />
+        <Kpi
+          label={t("ecarts_tr.ged.statuts.in_validation")}
+          value={facets?.by_status?.in_validation ?? 0}
+          hint={enRetard ? t("premiumPilotage.ged.enRetard", { count: enRetard }) : t("premiumPilotage.ged.aucunRetard")}
+          icon={FileText}
+          tone="warn"
+          delay={0.05}
+        />
+        <Kpi
+          label={t("revueR1.ged.archives")}
+          value={facets?.by_status?.archived ?? 0}
+          hint={
+            facets?.total
+              ? t("premiumPilotage.ged.partFonds", { pct: formatPercent(((facets.by_status?.archived ?? 0) / facets.total) * 100) })
+              : undefined
+          }
+          icon={Archive}
+          tone="accent"
+          delay={0.1}
+        />
       </div>
       <SectionCard title={t("ecarts_tr.ged.documents")} className="ged-card">
         <FilterBar
@@ -357,17 +405,18 @@ export function DocumentsPage() {
           ]}
         />
       </SectionCard>
-      <SectionCard
+      {/* Durées de conservation : doublon de « Paramètres ETSL › GED » replié en un panneau compact (A-17, chantier « params »). */}
+      <ParamsPanel
+        variant="card"
+        module="documents"
         title={t("ecarts_tr.ged.types")}
-        subtitle={t("ecarts_tr.ged.typesAide")}
-        actions={
-          <Link className="btn ghost sm" to="/parametres">
-            <FileCheck2 size={14} aria-hidden="true" /> {t("formulaires.ged.modifierRetention")}
-          </Link>
-        }
+        count={types.filter((ty) => ty.retention_provisoire).length}
+        total={types.length}
+        testId="ged-durees-conservation"
       >
+        <p className="muted">{t("ecarts_tr.ged.typesAide")}</p>
         <DataGrid rows={types} columns={typeColumns} caption={t("ecarts_tr.ged.types")} density="compact" maxHeight="none" emptyLabel={t("common.empty")} />
-      </SectionCard>
+      </ParamsPanel>
     </>
   );
 }

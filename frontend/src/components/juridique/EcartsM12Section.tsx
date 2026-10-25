@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { nomPersonne, nombre } from "../sections/affichage";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, ModuleSettings, QuickForm, SectionCard } from "../ui";
 import { actionsColumn } from "../ui/DataTable";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 
 interface Parametre {
   id: number;
@@ -240,42 +242,9 @@ export function EcartsM12Section() {
   ];
 
   return (
-    <div data-testid="ecarts-m12">
-      <SectionCard title={t("ecarts_m12.parametres.title")} subtitle={t("revueR3.juridique.parametresSub")}>
-        {provisoires > 0 && (
-          <p className="r3-note" role="note" data-testid="m12-provisoire">
-            {t("ecarts_m12.parametres.bandeau", { count: provisoires })}
-          </p>
-        )}
-        <details className="r3-repli">
-          <summary>
-            {t("revueR3.juridique.voirParametres", { count: params.length })}
-          </summary>
-        <div data-testid="m12-parametres">
-          <DataTable
-            caption={t("ecarts_m12.parametres.title")}
-            rows={params}
-            density="compact"
-            columns={[
-              { key: "libelle", header: t("tableaux.juridique.parametre"), render: (p) => p.libelle, sortValue: (p) => p.libelle },
-              { key: "valeur", header: t("tableaux.juridique.valeur"), render: (p) => <span className="muted">{valeurLisible(p.valeur, t)}</span> },
-              {
-                key: "statut",
-                header: t("tableaux.juridique.statut"),
-                render: (p) => (p.provisoire ? provisoireBadge : <Badge tone="ok">{t("ecarts_m12.confirme")}</Badge>),
-              },
-              actionsColumn<Parametre>(t("ui.actions"), (p) => [
-                { label: t("ecarts_m12.parametres.modifier"), path: `/api/juridique/parametres/${p.id}/modifier/`, tone: "ghost" as const, prompt: { name: "valeur", label: t("ecarts_m12.parametres.json") } },
-                ...(p.provisoire
-                  ? [{ label: t("ecarts_m12.parametres.confirmer"), path: `/api/juridique/parametres/${p.id}/confirmer/`, confirm: t("ecarts_m12.parametres.confirmerQ") }]
-                  : []),
-              ]),
-            ]}
-          />
-        </div>
-        </details>
-      </SectionCard>
-
+    <div data-testid="ecarts-m12" className="page-section">
+      {/* Groupes ciblés par la navigation de sections de la page Juridique ; paramètres en dernier. */}
+      <div id="jur-suivi" className="page-section">
       <SectionCard
         title={t("ecarts_m12.contentieux.title")}
         actions={
@@ -389,7 +358,7 @@ export function EcartsM12Section() {
               { key: "dossier", header: t("ecarts_m12.contentieux.dossier"), render: (a) => a.contentieux_code },
               { key: "type", header: t("ecarts_m12.contentieux.type"), render: (a) => a.type_label },
               { key: "description", header: t("ecarts_m12.contentieux.description"), render: (a) => a.description },
-              { key: "auteur", header: t("tableaux.juridique.auteur"), render: (a) => <span className="muted">{a.auteur_name ?? "—"}</span> },
+              { key: "auteur", header: t("tableaux.juridique.auteur"), render: (a) => <span className="muted">{nomPersonne(t, a.auteur_name)}</span> },
             ]}
           />
         </div>
@@ -413,7 +382,7 @@ export function EcartsM12Section() {
                   key: "probabilite",
                   header: t("ecarts_m12.contentieux.probabilite"),
                   sortValue: (r) => r.probabilite_pct,
-                  render: (r) => (r.probabilite ? `${t(`ecarts_m12.probas.${r.probabilite}`)} (${r.probabilite_pct} %)` : "—"),
+                  render: (r) => (r.probabilite ? `${t(`ecarts_m12.probas.${r.probabilite}`)} (${nombre(r.probabilite_pct, 1)} %)` : "—"),
                 },
                 { key: "enjeu", header: t("ecarts_m12.risk.enjeu"), num: true, render: (r) => fcfa(r.montant_en_jeu), sortValue: (r) => Number(r.montant_en_jeu ?? 0) },
                 { key: "exposition", header: t("ecarts_m12.risk.exposition"), num: true, render: (r) => fcfa(r.exposition), sortValue: (r) => Number(r.exposition ?? 0) },
@@ -529,73 +498,103 @@ export function EcartsM12Section() {
           />
         </div>
       </SectionCard>
+      </div>
 
-      <SectionCard title={t("ecarts_m12.archivage.title")} subtitle={t("ecarts_m12.archivage.note")}>
-        <div data-testid="m12-retention">
+      {/* Paramétrage replié en bas de page (B11) : durées de rétention / purge, puis paramètres provisoires. */}
+      <ModuleSettings id="jur-parametres">
+        <SectionCard title={t("ecarts_m12.archivage.title")} subtitle={t("ecarts_m12.archivage.note")}>
+          <div data-testid="m12-retention">
+            <DataTable
+              caption={t("tableaux.juridique.retention")}
+              rows={types}
+              density="compact"
+              columns={[
+                { key: "type", header: t("tableaux.juridique.typeDocument"), render: (ty) => ty.label, sortValue: (ty) => ty.label },
+                {
+                  key: "duree",
+                  header: t("tableaux.juridique.duree"),
+                  num: true,
+                  sortValue: (ty) => ty.retention_years,
+                  render: (ty) => (ty.retention_years === null ? t("ecarts_m12.archivage.sansEcheance") : t("revueR3.ans", { count: ty.retention_years })),
+                },
+                {
+                  key: "statut",
+                  header: t("tableaux.juridique.statut"),
+                  render: (ty) => (ty.retention_provisoire ? provisoireBadge : <Badge tone="ok">{t("ecarts_m12.confirme")}</Badge>),
+                },
+                actionsColumn<TypeDoc>(t("ui.actions"), (ty) => [
+                  { label: t("ecarts_m12.archivage.modifier"), path: `/api/documents/types/${ty.id}/definir-retention/`, tone: "ghost" as const, prompt: { name: "retention_years", label: t("ecarts_m12.archivage.duree") } },
+                  ...(ty.retention_provisoire ? [{ label: t("ecarts_m12.parametres.confirmer"), path: `/api/documents/types/${ty.id}/confirmer-retention/`, tone: "ghost" as const }] : []),
+                ]),
+              ]}
+            />
+          </div>
+          <h4>{t("ecarts_m12.archivage.candidats")}</h4>
+          <div data-testid="m12-candidats-purge">
+            <DataTable
+              caption={t("ecarts_m12.archivage.candidats")}
+              rows={candidats}
+              emptyLabel={t("ecarts_m12.archivage.aucunCandidat")}
+              columns={[
+                { key: "document", header: t("tableaux.juridique.document"), render: (c) => c.title },
+                { key: "type", header: t("tableaux.juridique.typeDocument"), render: (c) => c.type_label },
+                { key: "fin", header: t("tableaux.juridique.finRetention"), render: (c) => formatDate(c.fin_retention), sortValue: (c) => c.fin_retention },
+                actionsColumn<Candidat>(t("ui.actions"), (c) => [{ label: t("ecarts_m12.archivage.proposer"), path: "/api/documents/purges/", body: { document: c.id }, tone: "ghost" as const }]),
+              ]}
+            />
+          </div>
+          <h4>{t("tableaux.juridique.purges")}</h4>
+          <div data-testid="m12-purges">
+            <DataTable
+              caption={t("tableaux.juridique.purges")}
+              rows={purges}
+              emptyLabel={t("tableaux.juridique.aucunePurge")}
+              columns={[
+                { key: "document", header: t("tableaux.juridique.document"), render: (p) => p.document_title },
+                { key: "type", header: t("tableaux.juridique.typeDocument"), render: (p) => p.type_label },
+                { key: "fin", header: t("tableaux.juridique.finRetention"), render: (p) => formatDate(p.fin_retention), sortValue: (p) => p.fin_retention },
+                { key: "statut", header: t("tableaux.juridique.statut"), render: (p) => <Badge tone={p.statut === "executee" ? "ok" : p.statut === "rejetee" ? "brand" : "warn"}>{p.statut_label}</Badge> },
+                actionsColumn<Purge>(
+                  t("ui.actions"),
+                  (p) =>
+                    p.statut === "proposee"
+                      ? [
+                          { label: t("ecarts_m12.archivage.rejeter"), path: `/api/documents/purges/${p.id}/rejeter/`, tone: "ghost" as const },
+                          { label: t("ecarts_m12.archivage.valider"), path: `/api/documents/purges/${p.id}/valider/`, tone: "danger" as const, confirm: t("ecarts_m12.archivage.validerQ") },
+                        ]
+                      : [],
+                ),
+              ]}
+            />
+          </div>
+        </SectionCard>
+      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
+      <ParamsPanel variant="card" module="juridique" title={t("ecarts_m12.parametres.title")} count={provisoires} total={params.length} alertTestId="m12-provisoire">
+        <p className="muted">{t("revueR3.juridique.parametresSub")}</p>
+        <div data-testid="m12-parametres">
           <DataTable
-            caption={t("tableaux.juridique.retention")}
-            rows={types}
+            caption={t("ecarts_m12.parametres.title")}
+            rows={params}
             density="compact"
             columns={[
-              { key: "type", header: t("tableaux.juridique.typeDocument"), render: (ty) => ty.label, sortValue: (ty) => ty.label },
-              {
-                key: "duree",
-                header: t("tableaux.juridique.duree"),
-                num: true,
-                sortValue: (ty) => ty.retention_years,
-                render: (ty) => (ty.retention_years === null ? t("ecarts_m12.archivage.sansEcheance") : t("revueR3.ans", { count: ty.retention_years })),
-              },
+              { key: "libelle", header: t("tableaux.juridique.parametre"), render: (p) => p.libelle, sortValue: (p) => p.libelle },
+              { key: "valeur", header: t("tableaux.juridique.valeur"), render: (p) => <span className="muted">{valeurLisible(p.valeur, t)}</span> },
               {
                 key: "statut",
                 header: t("tableaux.juridique.statut"),
-                render: (ty) => (ty.retention_provisoire ? provisoireBadge : <Badge tone="ok">{t("ecarts_m12.confirme")}</Badge>),
+                render: (p) => <ParamStatusBadge provisoire={p.provisoire} />,
               },
-              actionsColumn<TypeDoc>(t("ui.actions"), (ty) => [
-                { label: t("ecarts_m12.archivage.modifier"), path: `/api/documents/types/${ty.id}/definir-retention/`, tone: "ghost" as const, prompt: { name: "retention_years", label: t("ecarts_m12.archivage.duree") } },
-                ...(ty.retention_provisoire ? [{ label: t("ecarts_m12.parametres.confirmer"), path: `/api/documents/types/${ty.id}/confirmer-retention/`, tone: "ghost" as const }] : []),
+              actionsColumn<Parametre>(t("ui.actions"), (p) => [
+                { label: t("ecarts_m12.parametres.modifier"), path: `/api/juridique/parametres/${p.id}/modifier/`, tone: "ghost" as const, prompt: { name: "valeur", label: t("ecarts_m12.parametres.json") } },
+                ...(p.provisoire
+                  ? [{ label: t("ecarts_m12.parametres.confirmer"), path: `/api/juridique/parametres/${p.id}/confirmer/`, confirm: t("ecarts_m12.parametres.confirmerQ") }]
+                  : []),
               ]),
             ]}
           />
         </div>
-        <h4>{t("ecarts_m12.archivage.candidats")}</h4>
-        <div data-testid="m12-candidats-purge">
-          <DataTable
-            caption={t("ecarts_m12.archivage.candidats")}
-            rows={candidats}
-            emptyLabel={t("ecarts_m12.archivage.aucunCandidat")}
-            columns={[
-              { key: "document", header: t("tableaux.juridique.document"), render: (c) => c.title },
-              { key: "type", header: t("tableaux.juridique.typeDocument"), render: (c) => c.type_label },
-              { key: "fin", header: t("tableaux.juridique.finRetention"), render: (c) => formatDate(c.fin_retention), sortValue: (c) => c.fin_retention },
-              actionsColumn<Candidat>(t("ui.actions"), (c) => [{ label: t("ecarts_m12.archivage.proposer"), path: "/api/documents/purges/", body: { document: c.id }, tone: "ghost" as const }]),
-            ]}
-          />
-        </div>
-        <h4>{t("tableaux.juridique.purges")}</h4>
-        <div data-testid="m12-purges">
-          <DataTable
-            caption={t("tableaux.juridique.purges")}
-            rows={purges}
-            emptyLabel={t("tableaux.juridique.aucunePurge")}
-            columns={[
-              { key: "document", header: t("tableaux.juridique.document"), render: (p) => p.document_title },
-              { key: "type", header: t("tableaux.juridique.typeDocument"), render: (p) => p.type_label },
-              { key: "fin", header: t("tableaux.juridique.finRetention"), render: (p) => formatDate(p.fin_retention), sortValue: (p) => p.fin_retention },
-              { key: "statut", header: t("tableaux.juridique.statut"), render: (p) => <Badge tone={p.statut === "executee" ? "ok" : p.statut === "rejetee" ? "brand" : "warn"}>{p.statut_label}</Badge> },
-              actionsColumn<Purge>(
-                t("ui.actions"),
-                (p) =>
-                  p.statut === "proposee"
-                    ? [
-                        { label: t("ecarts_m12.archivage.rejeter"), path: `/api/documents/purges/${p.id}/rejeter/`, tone: "ghost" as const },
-                        { label: t("ecarts_m12.archivage.valider"), path: `/api/documents/purges/${p.id}/valider/`, tone: "danger" as const, confirm: t("ecarts_m12.archivage.validerQ") },
-                      ]
-                    : [],
-              ),
-            ]}
-          />
-        </div>
-      </SectionCard>
+      </ParamsPanel>
+      </ModuleSettings>
     </div>
   );
 }

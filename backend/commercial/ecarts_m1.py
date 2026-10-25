@@ -359,11 +359,9 @@ def profil_opportunite(o):
 
 def pipe_par_profil(voir):
     from .models import PROFILS_PIPE, Opportunity
-    from .services import PIPE_CATEGORIES
+    from .services import PIPE_CATEGORIES, ponderations_pipe
 
-    from django.conf import settings
-
-    poids = getattr(settings, "COMMERCIAL_PIPE_PONDERATION", {"signe": 0.90, "en_cours": 0.60, "prospect": 0.25})
+    poids = ponderations_pipe()
     poids_etape = {e: Decimal(str(poids[c])) for c, etapes in PIPE_CATEGORIES.items() for e in etapes}
     libelles = dict(PROFILS_PIPE) | {"non_renseigne": "Non renseigné"}
     groupes = {}

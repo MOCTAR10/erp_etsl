@@ -32,9 +32,11 @@ class Command(ParcoursA):
 
     def _run(self):
         from analytics import cubes
+        from analytics.vitrine.nettoyage import renommer_libelles_herites
         from users.management.commands.seed_all_demo import _sync_sequences
 
         _sync_sequences()
+        renommer_libelles_herites()  # bases chargées avec les anciens libellés « (demo) » / sans accents
         self.clients = {}
         self.today = timezone.localdate()
         self.parcours_budget()
@@ -115,7 +117,7 @@ class Command(ParcoursA):
                 "is_global_rental": gr,
             })["id"])
         if contrat.status == Contract.Status.BROUILLON:
-            doc = self._document_signe(f"Contrat signe {contrat.code} (demo)")
+            doc = self._document_signe(f"Contrat signé {contrat.code}")
             self.call("admin@etls.local", "post", f"/api/commercial/contracts/{contrat.pk}/activer/", {"document": str(doc.pk)})
             contrat.refresh_from_db()
         return contrat
@@ -131,7 +133,7 @@ class Command(ParcoursA):
                 "contract": str(contrat.pk), "objet": "Extension de périmètre : lignes annexes",
                 "delta_montant": "15000000", "nouvelle_date_fin": str(self.today + timedelta(days=30 * 15)),
             })
-            doc = self._document_signe(f"Avenant 1 {contrat.code} (demo)")
+            doc = self._document_signe(f"Avenant n°1 {contrat.code}")
             self.call("admin@etls.local", "post", f"/api/commercial/avenants/{av['id']}/signer/", {"document": str(doc.pk)})
         # Recherche juridique interconnectée : le document signé est lié à son contrat.
         contrat.refresh_from_db()
@@ -145,7 +147,7 @@ class Command(ParcoursA):
         # Dossier GLOBAL RENTAL (618) lié au contrat GR et à l'affaire GR, puis ouvert.
         if not DossierGlobalRental.objects.filter(affaire=gr_affaire).exists():
             dossier = self.call("admin@etls.local", "post", "/api/juridique/dossiers-gr/", {
-                "partenaire_gr": str(Partner.objects.get(code="GR-2000").pk), "affaire": str(gr_affaire.pk),
+                "partenaire_gr": str(Partner.objects.get(code="GR-0001").pk), "affaire": str(gr_affaire.pk),
                 "reference_contrat": contrat_gr.code, "objet": "Location d'équipement intra-groupe",
                 "montant_estime": "60000000", "signe_618": True, "date_debut": str(self.today - timedelta(days=12)),
                 "date_fin": str(self.today + timedelta(days=170)),

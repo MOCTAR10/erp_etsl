@@ -28,7 +28,7 @@ import { PilotageSection } from "../components/direction/Pilotage";
 import { ReportingSection } from "../components/direction/Reporting";
 import { TrendPanel } from "../components/direction/TrendPanel";
 import type { IndicateursCommerciaux, Pilotage } from "../components/direction/types";
-import { ErrorState, Kpi, KpiGridSkeleton, PageHeader, Skeleton } from "../components/ui";
+import { ErrorState, Kpi, KpiGridSkeleton, PageHeader, SectionNav, Skeleton } from "../components/ui";
 import { formatMoney, formatNumber, formatPercent } from "../lib/format";
 import type { AlertesAgregees, DashboardDirection, ReportingPetrolier, Tendances } from "../types";
 
@@ -130,6 +130,13 @@ export function DirectionPage() {
   // Héros 3 — sécurité.
   const jsa = p.hse.jours_sans_accident;
   const securiteTone = jsa === null ? "ok" : jsa < 30 ? "err" : jsa < 90 ? "warn" : "ok";
+  // Pastille Sécurité explicite (A-09) : « Objectif non atteint (3 accidents) » plutôt qu'un
+  // « Sous l'objectif » ambigu à côté de « 83 jours sans accident ».
+  const accidents = p.hse.accidents;
+  const securiteStatut = accidents
+    ? t("premiumPilotage.direction.securite.nonAtteint", { count: accidents })
+    : t("premiumPilotage.direction.securite.atteint");
+  const securiteBadge = accidents ? (securiteTone === "err" ? "err" : "warn") : "ok";
   // Héros 4 — clôtures mensuelles dans les délais.
   const j4 = d.controle_gestion.conformite_j4;
   const clotureTaux = j4.taux * 100;
@@ -161,9 +168,19 @@ export function DirectionPage() {
   return (
     <>
       {header}
+      <SectionNav
+        items={[
+          { id: "dir-synthese", label: t("premiumVague2.sections.direction.synthese") },
+          { id: "dir-tendances", label: t("premiumVague2.sections.direction.tendances") },
+          { id: "dir-modules", label: t("premiumVague2.sections.direction.modules") },
+          { id: "dir-reporting", label: t("premiumVague2.sections.direction.reporting") },
+          { id: "echeances", label: t("premiumVague2.sections.direction.echeances") },
+          { id: "dir-pilotage", label: t("premiumVague2.sections.direction.pilotage") },
+        ]}
+      />
 
       {/* 1. Chiffres héros : cible, écart, état */}
-      <section className="dir-heroes" aria-label={t("direction2.heros")}>
+      <section id="dir-synthese" className="dir-heroes" aria-label={t("direction2.heros")}>
         <HeroStat
           label={t("direction2.ca.label")}
           value={ca.value}
@@ -185,7 +202,7 @@ export function DirectionPage() {
           gauge={{ value: dispo, target: OBJECTIF_DISPO.ok, ok: OBJECTIF_DISPO.ok, warn: OBJECTIF_DISPO.warn, label: t("direction.heroDispo") }}
           foot={
             <>
-              <span>{t("direction2.objectif", { n: OBJECTIF_DISPO.ok })}</span>
+              <span>{t("premiumPilotage.direction.objectif", { valeur: formatPercent(OBJECTIF_DISPO.ok) })}</span>
               <span className={`dir-delta tone-${dispoTone}`}>{ecart(dispoEcart)}</span>
             </>
           }
@@ -196,12 +213,13 @@ export function DirectionPage() {
           label={t("direction.heroSecurite")}
           value={jsa === null ? formatNumber(p.hse.accidents) : formatNumber(jsa)}
           unit={jsa === null ? t("direction2.securite.accidents", { count: p.hse.accidents }) : t("direction2.securite.jours", { count: jsa })}
-          tone={securiteTone}
-          status={statut(securiteTone)}
+          tone={securiteBadge}
+          status={securiteStatut}
           foot={
             <>
-              <span>{t("direction2.securite.objectif")}</span>
-              <span className={`dir-delta tone-${securiteTone}`}>{statut(securiteTone)}</span>
+              {/* Audit A07 : un simple constat neutre (plus de pastille rouge sous « 83 jours sans accident »). */}
+              <span className="dir-hero-objectif">{t("direction2.securite.objectif")}</span>
+              <span>{t("premiumPilotage.direction.securite.declaresTotal", { count: accidents })}</span>
             </>
           }
           hint={
@@ -219,7 +237,7 @@ export function DirectionPage() {
           gauge={{ value: clotureTaux, target: OBJECTIF_CLOTURE.ok, ok: OBJECTIF_CLOTURE.ok, warn: OBJECTIF_CLOTURE.warn, label: t("direction2.cloture.label") }}
           foot={
             <>
-              <span>{t("direction2.objectif", { n: OBJECTIF_CLOTURE.ok })}</span>
+              <span>{t("premiumPilotage.direction.objectif", { valeur: formatPercent(OBJECTIF_CLOTURE.ok) })}</span>
               <span className={`dir-delta tone-${clotureTone}`}>{ecart(Math.round(clotureTaux - OBJECTIF_CLOTURE.ok))}</span>
             </>
           }
@@ -229,13 +247,13 @@ export function DirectionPage() {
       </section>
 
       {/* 2. Tendances + « À traiter maintenant » (colonne latérale) */}
-      <div className="dir-split">
+      <div id="dir-tendances" className="dir-split">
         <TrendPanel data={tr} loading={tendances.isPending} />
         <AttentionList items={urgents} />
       </div>
 
       {/* 3. Indicateurs par module : 2 rangées de 4 */}
-      <section className="dir-section" aria-labelledby="dir-modules-title">
+      <section id="dir-modules" className="dir-section" aria-labelledby="dir-modules-title">
         <h3 id="dir-modules-title" className="section-title">
           {t("direction.directionKPIs")}
         </h3>
@@ -268,13 +286,17 @@ export function DirectionPage() {
       </section>
 
       {/* 4. Reporting client pétrolier */}
-      <ReportingSection p={p} />
+      <div id="dir-reporting" className="page-section">
+        <ReportingSection p={p} />
+      </div>
 
       {/* 5. Échéances */}
       <EcheancesSection a={a} />
 
       {/* 6. Pilotage financier et cubes (onglets) */}
-      <PilotageSection commercial={d.commercial.indicateurs} />
+      <div id="dir-pilotage" className="page-section">
+        <PilotageSection commercial={d.commercial.indicateurs} />
+      </div>
     </>
   );
 }

@@ -4,11 +4,13 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { ScelleBadge, nomPersonne } from "../sections/affichage";
 import { SectionActions } from "../sections/SectionActions";
-import { ActionBar, Badge, DataTable, Kpi, Menu, QuickForm, SectionCard } from "../ui";
+import { ActionBar, Badge, DataTable, Kpi, Menu, ModuleSettings, QuickForm, SectionCard } from "../ui";
 import type { ActionDef, Column } from "../ui";
 import { CardActions } from "../ui/Board";
 import { actionsColumn } from "../ui/DataTable";
+import { ParamsPanel, ParamStatusBadge } from "../parametres/ParamsPanel";
 import { decimales, statutLabel, useClientPage } from "./outils";
 
 interface Parametre {
@@ -200,6 +202,8 @@ type ChargeLigne = ChargeJour & { id: string };
 
 const qte = (v: string) => formatNumber(Number(v), { decimals: decimales(v) });
 const nombre = (v: string | null) => (v === null ? null : Number(v));
+/** Avancement (%) sous lequel la marge à terminaison est « non significative ». */
+const SEUIL_MARGE_SIGNIFICATIVE = 5;
 const telecharger = (path: string, name: string) => void api.download(path, name).catch(() => undefined);
 /** Colonne d'actions qui ne passe pas à la ligne (boutons « Valoriser par les attachements », « Transférer en paie »…). */
 const sansRetour = <T,>(col: Column<T>): Column<T> => ({ ...col, render: (row) => <span className="cell-nowrap">{col.render(row)}</span> });
@@ -295,7 +299,7 @@ export function EcartsM3Section() {
       key: "statut",
       header: k("parametres.statut"),
       sortValue: (p) => p.est_provisoire,
-      render: (p) => (p.est_provisoire ? <Badge tone="warn">{t("tableaux.operations.provisoire")}</Badge> : <Badge tone="ok">{k("confirme")}</Badge>),
+      render: (p) => <ParamStatusBadge provisoire={p.est_provisoire} />,
     },
     actionsColumn<Parametre>(
       actionsHeader,
@@ -316,7 +320,7 @@ export function EcartsM3Section() {
       sortValue: (f) => f.statut_label,
       render: (f) => (
         <>
-          <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{statutLabel("fiche", f.statut, f.statut_label)}</Badge> {f.valide_par_nom ?? ""}
+          <Badge tone={f.statut === "validee" ? "ok" : "warn"}>{statutLabel("fiche", f.statut, f.statut_label)}</Badge> {f.valide_par_nom ? nomPersonne(t, f.valide_par_nom) : ""}
         </>
       ),
     },
@@ -522,11 +526,15 @@ export function EcartsM3Section() {
       header: k("suivi.marge"),
       num: true,
       sortValue: (a) => nombre(a.marge_a_terminaison),
-      render: (a) => (
-        <>
-          {fcfa(a.marge_a_terminaison)} {a.marge_pct !== null && <span className="muted">({pct(a.marge_pct)})</span>}
-        </>
-      ),
+      // Sous 5 % d'avancement, la marge à terminaison n'a pas de sens (ex. 100 % pour 48 000 FCFA engagés).
+      render: (a) =>
+        a.marge_a_terminaison === null || (nombre(a.avancement_pct) ?? 0) < SEUIL_MARGE_SIGNIFICATIVE ? (
+          <span className="muted">{t("vague3C2.operations.nonSignificatif")}</span>
+        ) : (
+          <>
+            {fcfa(a.marge_a_terminaison)} {a.marge_pct !== null && <span className="muted">({pct(a.marge_pct)})</span>}
+          </>
+        ),
     },
   ];
   const colsOrdres: Column<Of>[] = [
@@ -646,24 +654,15 @@ export function EcartsM3Section() {
   ];
   const colsDossiers: Column<Dossier>[] = [
     { key: "dossier", header: k("registre.dossier"), sortValue: (d) => d.ordre_code, render: (d) => d.ordre_code },
-    { key: "empreinte", header: k("registre.empreinte"), render: (d) => <code title={d.sha256}>{d.sha256.slice(0, 16)}…</code> },
+    { key: "empreinte", header: k("registre.empreinte"), render: (d) => <ScelleBadge sha={d.sha256} /> },
     { key: "conservation", header: k("registre.conservation"), num: true, render: (d) => t("ecarts_m3.registre.ans", { n: d.retention_years }) },
     { key: "date", header: k("date"), sortValue: (d) => d.created_at, render: (d) => formatDate(d.created_at) },
   ];
 
   return (
     <>
-      <SectionCard title={k("parametres.title")} subtitle={t("tableaux.operations.nbParametres", { count: parametres.length })}>
-        {provisoires > 0 && (
-          <p data-testid="m3-provisoire">
-            <Badge tone="warn">{t("tableaux.operations.provisoire")}</Badge> {t("ecarts_m3.parametres.bandeau", { n: provisoires })}
-          </p>
-        )}
-        <div data-testid="m3-parametres">
-          <DataTable columns={colsParametres} rows={parametres} caption={k("parametres.title")} emptyLabel={t("tableaux.operations.aucunParametre")} />
-        </div>
-      </SectionCard>
-
+      {/* Groupes ciblés par la navigation de sections de la page Opérations ; paramètres en dernier. */}
+      <div id="ops-suivi" className="page-section">
       <SectionCard
         title={k("preparation.title")}
         actions={
@@ -892,8 +891,18 @@ export function EcartsM3Section() {
       >
         {ind && (
           <div className="kpi-grid">
-            <Kpi label={k("suivi.productivite")} value={pct(ind.productivite_pct)} tone="brand" delay={0} />
-            <Kpi label={k("suivi.rebut")} value={pct(ind.taux_rebut_pct)} tone="accent" delay={0.03} />
+            <Kpi
+              label={k("suivi.productivite")}
+              value={ind.productivite_pct === null ? t("vague3C2.operations.donneesInsuffisantes") : pct(ind.productivite_pct)}
+              tone={ind.productivite_pct === null ? "neutral" : "brand"}
+              delay={0}
+            />
+            <Kpi
+              label={k("suivi.rebut")}
+              value={ind.taux_rebut_pct === null ? t("vague3C2.operations.donneesInsuffisantes") : pct(ind.taux_rebut_pct)}
+              tone={ind.taux_rebut_pct === null ? "neutral" : "accent"}
+              delay={0.03}
+            />
             <Kpi label={k("suivi.directe")} value={`${formatNumber(Number(ind.heures_directes))} h`} hint={`${formatNumber(Number(ind.heures_indirectes))} h ${k("suivi.indirecte")}`} tone="brand" delay={0.06} />
             <Kpi label={k("suivi.retards")} value={ind.of_en_retard} hint={`${ind.ruptures_ouvertes} ${k("suivi.ruptures")}`} tone="accent" delay={0.09} />
           </div>
@@ -953,6 +962,16 @@ export function EcartsM3Section() {
           <DataTable columns={colsDossiers} rows={dossiers} caption={t("tableaux.operations.dossiers")} emptyLabel={t("tableaux.operations.aucunDossier")} />
         </div>
       </SectionCard>
+      </div>
+
+      <ModuleSettings id="ops-parametres">
+      {/* Paramètres provisoires : panneau compact replié + lien vers « Paramètres ETSL » (chantier « params », B-05). */}
+      <ParamsPanel variant="card" module="operations" title={k("parametres.title")} count={provisoires} total={parametres.length} alertTestId="m3-provisoire">
+        <div data-testid="m3-parametres">
+          <DataTable columns={colsParametres} rows={parametres} caption={k("parametres.title")} emptyLabel={t("tableaux.operations.aucunParametre")} />
+        </div>
+      </ParamsPanel>
+      </ModuleSettings>
     </>
   );
 }

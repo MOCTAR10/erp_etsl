@@ -159,3 +159,54 @@ describe("<DataGrid />", () => {
     await i18n.changeLanguage("fr");
   });
 });
+
+describe("<DataGrid /> — finitions premium (kit)", () => {
+  type Ligne = { id: number; code: string; date: string; montant: string };
+  const lignes: Ligne[] = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, code: `BC-${i + 1}`, date: "03 sept. 2026", montant: "1 000 FCFA" }));
+  const cols: GridColumn<Ligne>[] = [
+    { key: "code", header: "Code", render: (r) => r.code },
+    { key: "date", header: "Date", kind: "date", render: (r) => r.date },
+    { key: "montant", header: <span>Montant</span>, label: "Montant", num: true, render: (r) => r.montant },
+  ];
+
+  it("colonne date sans retour à la ligne ; libellés de cellule pour le mode cartes (mobile)", () => {
+    const { container, rerender } = render(<DataGrid columns={cols} rows={lignes.slice(0, 2)} />);
+    const cells = container.querySelectorAll("tbody tr:first-child td");
+    expect(cells[1]).toHaveClass("date");
+    expect(cells[1]).toHaveAttribute("data-label", "Date");
+    expect(cells[2]).toHaveClass("num");
+    expect(cells[2]).toHaveAttribute("data-label", "Montant");
+    expect(container.querySelector("table")).toHaveClass("ui-grid--cards");
+    rerender(<DataGrid columns={cols} rows={lignes.slice(0, 2)} mobile="scroll" />);
+    expect(container.querySelector("table")).not.toHaveClass("ui-grid--cards");
+    expect(container.querySelector("td[data-label]")).toBeNull();
+  });
+
+  it("zone bornée qui coupe des lignes : « Afficher les N lignes » puis « Réduire le tableau »", async () => {
+    const user = userEvent.setup();
+    const h = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight");
+    const c = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 900 });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 400 });
+    try {
+      const { container } = render(<DataGrid columns={cols} rows={lignes} maxHeight={400} />);
+      const more = await screen.findByRole("button", { name: "Afficher les 12 lignes" });
+      expect(container.querySelector(".ui-grid-root")).toHaveAttribute("data-clipped");
+      await user.click(more);
+      const less = screen.getByRole("button", { name: "Réduire le tableau" });
+      expect(less).toHaveAttribute("aria-expanded", "true");
+      expect((container.querySelector(".ui-grid-wrap") as HTMLElement).style.maxHeight).toBe("");
+    } finally {
+      // Propriétés héritées d'Element : on retire les surcharges posées sur HTMLElement.
+      if (h) Object.defineProperty(HTMLElement.prototype, "scrollHeight", h);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+      if (c) Object.defineProperty(HTMLElement.prototype, "clientHeight", c);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
+    }
+  });
+
+  it("sans débordement : aucun bouton « Afficher »", () => {
+    render(<DataGrid columns={cols} rows={lignes} />);
+    expect(screen.queryByRole("button", { name: /Afficher les/ })).toBeNull();
+  });
+});

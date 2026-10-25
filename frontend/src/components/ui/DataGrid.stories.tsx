@@ -27,7 +27,7 @@ const TON: Record<string, "ok" | "warn" | "neutral"> = { Comptabilisée: "ok", "
 const COLONNES: GridColumn<Facture>[] = [
   { key: "code", header: "Référence", render: (r) => <strong>{r.code}</strong>, sortValue: (r) => r.code },
   { key: "fournisseur", header: "Fournisseur", render: (r) => r.fournisseur, sortValue: (r) => r.fournisseur },
-  { key: "date", header: "Date", render: (r) => formatDateShort(r.date), sortValue: (r) => r.date },
+  { key: "date", header: "Date", kind: "date", render: (r) => formatDateShort(r.date), sortValue: (r) => r.date },
   { key: "montant", header: "Montant", num: true, render: (r) => formatMoney(r.montant), sortValue: (r) => r.montant },
   { key: "statut", header: "Statut", render: (r) => <Badge tone={TON[r.statut]}>{r.statut}</Badge> },
 ];

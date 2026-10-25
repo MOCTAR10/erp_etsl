@@ -532,7 +532,7 @@ def alertes_agregees(user=None):
         for epi in Epi.objects.filter(statut=Epi.Statut.EN_USAGE, date_renouvellement__lte=horizon_epi).select_related("employe", "beneficiaire"):
             jours = (epi.date_renouvellement - aujourdhui_hse).days
             rh_liste.append({
-                "type": "epi", "code": epi.code, "libelle": f"EPI {epi.get_type_epi_display()} — {epi.employe or epi.beneficiaire or epi.designation}",
+                "type": "epi", "code": epi.code, "libelle": f"EPI {epi.get_type_epi_display()} — {epi.employe or (epi.beneficiaire.nom_affiche if epi.beneficiaire else epi.designation)}",
                 "date_echeance": epi.date_renouvellement, "bande": _band(jours), "jours": jours,
                 "statut": "expiree" if jours < 0 else "active",
             })

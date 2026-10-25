@@ -3,9 +3,9 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate } from "../../lib/format";
 import { describeError } from "../../lib/offlineQueue";
-import type { AptitudeMedicale, ExigenceHabilitationHse, FormationSecurite, ParametreStock, PasseportSecurite, PersonnelHse } from "../../types";
+import type { AptitudeMedicale, ExigenceHabilitationHse, FormationSecurite, PasseportSecurite, PersonnelHse } from "../../types";
 import { SectionActions } from "../sections/SectionActions";
 import { ActionBar, Badge, DataTable, QuickForm, SectionCard } from "../ui";
 import type { Column } from "../ui";
@@ -16,12 +16,6 @@ const TYPES_EPI = ["casque", "lunettes", "ecran_facial", "protection_auditive", 
 function usePersonnel() {
   return useQuery({ queryKey: ["hse-personnel"], queryFn: () => api.listAll<PersonnelHse>("/api/hse/personnel/"), retry: 0 });
 }
-
-/** Valeur exacte d'un paramètre (décimales significatives conservées, séparateurs français). */
-const valeurExacte = (v: string) => {
-  const dec = (String(Number(v)).split(".")[1] ?? "").length;
-  return formatNumber(v, { decimals: Math.min(dec, 4) });
-};
 
 type LignePasseport = { id: string; element: ReactNode; debut: string | null; fin: ReactNode };
 
@@ -57,7 +51,7 @@ export function PersonnelHseSection() {
     : [];
   const colPasseport: Column<LignePasseport>[] = [
     { key: "element", header: t("tableaux.hse.element"), render: (l) => l.element },
-    { key: "debut", header: t("tableaux.hse.obtention"), sortValue: (l) => l.debut, render: (l) => (l.debut ? formatDate(l.debut) : "—") },
+    { key: "debut", header: t("tableaux.hse.obtention"), kind: "date", sortValue: (l) => l.debut, render: (l) => (l.debut ? formatDate(l.debut) : "—") },
     { key: "fin", header: t("tableaux.hse.validite"), render: (l) => l.fin },
   ];
   return (
@@ -253,13 +247,13 @@ export function AptitudesSection() {
   if (q.isError || !q.data || q.data.length === 0) return null;
   const columns: Column<AptitudeMedicale>[] = [
     { key: "salarie", header: t("m7e.perso.salarie"), sortValue: (a) => a.employe_nom, render: (a) => a.employe_nom },
-    { key: "visite", header: t("m7e.perso.visite"), sortValue: (a) => a.date_visite, render: (a) => formatDate(a.date_visite) },
+    { key: "visite", header: t("m7e.perso.visite"), kind: "date", sortValue: (a) => a.date_visite, render: (a) => formatDate(a.date_visite) },
     {
       key: "resultat",
       header: t("m7e.perso.resultat"),
       render: (a) => <Badge tone={a.resultat === "inapte" ? "err" : a.resultat === "apte" ? "ok" : "warn"}>{a.resultat_label}</Badge>,
     },
-    { key: "validite", header: t("m7e.perso.validite"), sortValue: (a) => a.date_validite, render: (a) => (a.date_validite ? formatDate(a.date_validite) : "—") },
+    { key: "validite", header: t("m7e.perso.validite"), kind: "date", sortValue: (a) => a.date_validite, render: (a) => (a.date_validite ? formatDate(a.date_validite) : "—") },
   ];
   return (
     <SectionCard title={`${t("m7e.perso.aptitudes")} · ${q.data.length}`}>
@@ -270,57 +264,6 @@ export function AptitudesSection() {
   );
 }
 
-/** Paramètres HSE (délais d'alerte EPI et aptitude) : provisoires jusqu'à confirmation par le HSE. */
-export function ParametresHseSection() {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
-  const q = useQuery({ queryKey: ["hse-parametres"], queryFn: () => api.listAll<ParametreStock>("/api/hse/parametres/"), retry: 0 });
-  const modifier = useMutation({
-    mutationFn: (v: { id: string; valeur: string }) => api.patch(`/api/hse/parametres/${v.id}/`, { valeur: v.valeur }),
-    onSuccess: () => {
-      setError(null);
-      void qc.invalidateQueries({ queryKey: ["hse-parametres"] });
-    },
-    onError: (e) => setError(describeError(e)),
-  });
-  if (q.isError || !q.data) return null;
-  const columns: Column<ParametreStock>[] = [
-    { key: "parametre", header: t("tableaux.hse.parametre"), sortValue: (p) => p.label, render: (p) => p.label },
-    { key: "valeur", header: t("tableaux.hse.valeur"), num: true, sortValue: (p) => Number(p.valeur), render: (p) => `${valeurExacte(p.valeur)} ${p.unite}` },
-    {
-      key: "statut",
-      header: t("tableaux.hse.statut"),
-      render: (p) => <Badge tone={p.est_provisoire ? "warn" : "ok"}>{p.est_provisoire ? t("m5e.params.provisoire") : t("m5e.params.confirme")}</Badge>,
-    },
-    {
-      key: "actions",
-      header: <span className="sr-only">{t("ui.actions")}</span>,
-      render: (p) => (
-        <div className="permis-actions">
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={() => {
-              const v = window.prompt(p.label, p.valeur);
-              if (v !== null) modifier.mutate({ id: p.id, valeur: v });
-            }}
-          >
-            {t("m5e.params.modifier")}
-          </button>
-          {p.est_provisoire && (
-            <ActionBar actions={[{ label: t("m5e.params.confirmer"), path: `/api/hse/parametres/${p.id}/confirmer/`, confirm: t("m5e.params.confirmConfirmer") }]} />
-          )}
-        </div>
-      ),
-    },
-  ];
-  return (
-    <SectionCard title={t("m7e.params.title")}>
-      {error && <p className="action-error" role="alert">{error}</p>}
-      <div data-testid="parametres-hse">
-        <DataTable columns={columns} rows={q.data} caption={t("m7e.params.title")} />
-      </div>
-    </SectionCard>
-  );
-}
+
+/** Paramètres HSE : déplacés dans leur propre fichier (chantier « params »), réexportés pour les imports existants. */
+export { ParametresHseSection } from "./ParametresHseSection";

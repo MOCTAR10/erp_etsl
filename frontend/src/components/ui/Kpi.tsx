@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { formatMoney, formatNumber, formatPercent } from "../../lib/format";
 import { motionTokens } from "../../theme/tokens";
@@ -47,6 +47,21 @@ function sizeClass(text: string): string {
   return "";
 }
 
+/**
+ * Largeur estimée d'un montant, en cadratins (Inter gras, chiffres tabulaires) : chiffre ≈ 0,62 em,
+ * espace insécable ≈ 0,28 em, signe ≈ 0,45 em. Sert au calcul CSS de la taille qui tient dans la carte (B15).
+ */
+function moneyEm(body: string): number {
+  let em = 0;
+  for (const ch of body) {
+    if (ch >= "0" && ch <= "9") em += 0.62;
+    else if (ch === "-" || ch === "−" || ch === "+") em += 0.45;
+    else if (ch.trim() === "") em += 0.28;
+    else em += 0.6;
+  }
+  return Math.round(em * 100) / 100;
+}
+
 /** Carte KPI standard — libellé, valeur (count-up si numérique), indication, icône en tonalité douce. */
 export function Kpi({ label, value, hint, icon: Icon, tone = "brand", delay = 0, kind = "number", format }: Props) {
   const fmt = format ?? FORMATS[kind];
@@ -63,7 +78,13 @@ export function Kpi({ label, value, hint, icon: Icon, tone = "brand", delay = 0,
   }
   // Montant : « 25 000 000 » et « FCFA » restent chacun d'un bloc ; sur une carte étroite, seule la coupure
   // entre le nombre et l'unité est permise (jamais au milieu de « FCFA »). Texte lu : « 25 000 000 FCFA ».
+  // B15 : un montant garde la taille KPI (28 px) tant qu'il tient dans la carte ; sinon la police se réduit
+  // juste assez (calcul CSS d'après sa largeur estimée), l'unité « FCFA » restant à 14 px.
+  let valueClass = `kpi-value${sizeClass(text)}`;
+  let valueStyle: CSSProperties | undefined;
   if (moneyUnit && text.endsWith(UNIT)) {
+    valueClass = "kpi-value kpi-value-fit";
+    valueStyle = { "--kpi-em": moneyEm(text.slice(0, -UNIT.length)) } as CSSProperties;
     const body = typeof value === "number" ? display : text.slice(0, -UNIT.length);
     display = (
       <>
@@ -90,7 +111,9 @@ export function Kpi({ label, value, hint, icon: Icon, tone = "brand", delay = 0,
           </span>
         ) : null}
       </div>
-      <span className={`kpi-value${sizeClass(text)}`}>{display}</span>
+      <span className={valueClass} style={valueStyle}>
+        {display}
+      </span>
       {hint ? <span className="kpi-hint">{hint}</span> : null}
     </motion.div>
   );

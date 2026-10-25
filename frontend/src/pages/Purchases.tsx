@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { formatDate, formatMoney } from "../lib/format";
 import { pagedQuery } from "../lib/usePagedList";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SearchField } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SearchField, SectionNav } from "../components/ui";
 import type { Paginated, PoStatus, PurchaseOrder } from "../types";
 import { DemandesAchat } from "../components/workflow/DemandesAchat";
 import { AchatsPilotage } from "../components/achats/AchatsPilotage";
@@ -95,6 +95,16 @@ export function PurchasesPage() {
   return (
     <div className="listes-page">
       <PageHeader title={t("purchases.title")} subtitle={t("listes.sub.purchases")} />
+      <SectionNav
+        items={[
+          { id: "ach-commandes", label: t("premiumVague2.sections.purchases.commandes") },
+          { id: "ach-demandes", label: t("premiumVague2.sections.purchases.demandes") },
+          { id: "ach-consultations", label: t("premiumVague2.sections.purchases.consultations") },
+          { id: "ach-receptions", label: t("premiumVague2.sections.purchases.receptions") },
+          { id: "ach-fournisseurs", label: t("premiumVague2.sections.purchases.fournisseurs") },
+          { id: "ach-parametres", label: t("premiumVague2.sections.purchases.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("purchases.orders")} value={total} icon={ShoppingCart} tone="brand" delay={0} />
@@ -104,7 +114,7 @@ export function PurchasesPage() {
         <Kpi label={t("purchases.gr")} value={data.grCount} icon={Truck} tone="accent" delay={0.1} />
       </div>
 
-      <section className="listes-block">
+      <section id="ach-commandes" className="listes-block">
         <div className="list-toolbar">
           <SearchField value={search} onChange={setSearch} placeholder={t("purchases.search")} />
         </div>
@@ -130,11 +140,17 @@ export function PurchasesPage() {
         </Board>
       </section>
 
-      <DemandesAchat />
+      <div id="ach-demandes" className="page-section">
+        <DemandesAchat />
+      </div>
 
-      <AchatsSaisie />
+      <div id="ach-consultations" className="page-section">
+        <AchatsSaisie />
+      </div>
 
-      <AchatsPilotage />
+      <div id="ach-receptions" className="page-section">
+        <AchatsPilotage />
+      </div>
 
       <EcartsM2Section />
     </div>

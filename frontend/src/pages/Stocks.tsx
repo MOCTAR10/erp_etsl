@@ -6,8 +6,9 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { useSiteOptions } from "../components/sites/SiteFilter";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
+import { nomPersonne } from "../components/sections/affichage";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { ActionBar, Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, Kpi, ModuleSettings, PageHeader, PagedDataGrid, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { Column } from "../components/ui";
@@ -240,7 +241,7 @@ export function StocksPage() {
           {c.date_validation ? (
             <>
               {formatDate(c.date_validation)}
-              {c.valide_par_name ? <span className="cell-sub">{c.valide_par_name}</span> : null}
+              {c.valide_par_name ? <span className="cell-sub">{nomPersonne(t, c.valide_par_name)}</span> : null}
             </>
           ) : (
             <Badge tone="warn">{t("m5e.cert.aValider")}</Badge>
@@ -318,6 +319,15 @@ export function StocksPage() {
           />
         }
       />
+      <SectionNav
+        items={[
+          { id: "stk-lots", label: t("premiumVague2.sections.stocks.lots") },
+          { id: "stk-stock", label: t("premiumVague2.sections.stocks.stock") },
+          { id: "stk-tracabilite", label: t("premiumVague2.sections.stocks.tracabilite") },
+          { id: "stk-inventaires", label: t("premiumVague2.sections.stocks.inventaires") },
+          { id: "stk-parametres", label: t("premiumVague2.sections.stocks.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi
@@ -341,7 +351,7 @@ export function StocksPage() {
         <Kpi label={t("stocks.totalMvt")} value={mouvements.count} hint={`${t("stocks.inventaires")} · ${inventaires.count}`} icon={ArrowLeftRight} tone="warn" delay={0.15} />
       </div>
 
-      <section className="listes-block">
+      <section id="stk-lots" className="listes-block">
         <div className="list-toolbar">
           <SearchField value={lotSearch} onChange={setLotSearch} placeholder={t("stocks.searchLots")} />
           <div className="list-toolbar-end">
@@ -370,6 +380,7 @@ export function StocksPage() {
         </Board>
       </section>
 
+      <div id="stk-stock" className="page-section">
       {(valAll.length > 0 || quantsAll.length > 0) && (
         <SectionCard
           title={t("listes.stocks.stockParDepot")}
@@ -419,12 +430,10 @@ export function StocksPage() {
 
       <AuditValorisationSection depots={depots.data ?? []} articles={articles.data ?? []} />
       <AlertesStockSection />
-      <TracabiliteSection lots={allLots} />
-      <ConfigArticlesSection articles={articles.data ?? []} />
-      <ParametresStockSection />
-      <ReservationsStockSection />
-      <InventaireAnnuelSection />
+      </div>
 
+      <div id="stk-tracabilite" className="page-section">
+      <TracabiliteSection lots={allLots} />
       <SectionCard
         title={`${t("stocks.certificats")} · ${certificats.count}`}
         actions={
@@ -453,6 +462,11 @@ export function StocksPage() {
       >
         <PagedDataGrid list={certificats} columns={certColumns} caption={t("stocks.certificats")} />
       </SectionCard>
+      <ReservationsStockSection />
+      </div>
+
+      <div id="stk-inventaires" className="page-section">
+      <InventaireAnnuelSection />
 
       {(inventaires.count > 0 || inventaires.search) && (
         <SectionCard title={t("stocks.inventaires")}>
@@ -476,6 +490,12 @@ export function StocksPage() {
           <DataTable rows={plans.data ?? []} columns={planColumns} caption={t("stocks.plansTournants")} density="compact" />
         </SectionCard>
       )}
+      </div>
+
+      <ModuleSettings id="stk-parametres">
+        <ConfigArticlesSection articles={articles.data ?? []} />
+        <ParametresStockSection />
+      </ModuleSettings>
     </div>
   );
 }

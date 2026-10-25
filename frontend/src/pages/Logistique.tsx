@@ -10,7 +10,7 @@ import { TarifsGrSection } from "../components/workflow/TarifsGrSection";
 import { EcartsM4Section } from "../components/logistique/EcartsM4Section";
 import { formatDate, formatMoney, formatNumber } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, PagedDataTable, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, ModuleSettings, PageHeader, PagedDataTable, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { Column } from "../components/ui";
 import type {
@@ -109,22 +109,24 @@ function locationColumns(t: T, lbl: Lbl): Column<LocationGR>[] {
       header: t("logistique.col.montant"),
       num: true,
       sortValue: (l) => (l.montant_estime === null ? null : Number(l.montant_estime)),
-      render: (l) => (l.montant_estime === null ? t("logistique.masked") : formatMoney(l.montant_estime)),
+      render: (l) => (
+        <>
+          {l.montant_estime === null ? t("logistique.masked") : formatMoney(l.montant_estime)}
+          {l.imputation_618 && (
+            <span className="cell-sub" title={t("tableaux.logistique.compte618")}>
+              {t("premiumModules.compte618")}
+            </span>
+          )}
+        </>
+      ),
     },
     {
       key: "statut",
       header: t("logistique.col.statut"),
       render: (l) => (
-        <span className="cell-nowrap">
-          <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
-            {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
-          </Badge>
-          {l.imputation_618 && (
-            <Badge tone="neutral" title={t("tableaux.logistique.compte618")}>
-              618
-            </Badge>
-          )}
-        </span>
+        <Badge tone={l.statut === "active" ? "warn" : l.statut === "terminee" ? "ok" : "neutral"}>
+          {lbl(`revueR2.logistique.statutLocation.${l.statut}`, l.statut_label)}
+        </Badge>
       ),
     },
     actionsColumn<LocationGR>(t("listes.col.actions"), (l) => [
@@ -222,6 +224,15 @@ export function LogistiquePage() {
   return (
     <div className="listes-page">
       <PageHeader title={t("logistique.title")} subtitle={t("listes.sub.logistique")} />
+      <SectionNav
+        items={[
+          { id: "log-parc", label: t("premiumVague2.sections.logistique.parc") },
+          { id: "log-locations", label: t("premiumVague2.sections.logistique.locations") },
+          { id: "log-suivi", label: t("premiumVague2.sections.logistique.suivi") },
+          ...(demandes.count > 0 || demandes.search ? [{ id: "log-demandes", label: t("premiumVague2.sections.logistique.demandes") }] : []),
+          { id: "log-parametres", label: t("premiumVague2.sections.logistique.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi
@@ -243,7 +254,7 @@ export function LogistiquePage() {
         <Kpi label={t("logistique.demandes")} value={demandes.count} icon={ClipboardList} tone="warn" delay={0.1} />
       </div>
 
-      <section className="listes-block">
+      <section id="log-parc" className="listes-block">
         <div className="list-toolbar">
           <SearchField value={eqSearch} onChange={setEqSearch} placeholder={t("logistique.searchEquipements")} />
           <SiteFilter value={eqSite} onChange={setEqSite} />
@@ -259,20 +270,26 @@ export function LogistiquePage() {
         </Board>
       </section>
 
+      <div id="log-locations" className="page-section">
       {(locations.count > 0 || locations.search) && (
         <SectionCard title={`${t("listes.logistique.locationsTitle")} · ${locations.count}`}>
           <PagedDataTable list={locations} columns={locationColumns(t, lbl)} caption={t("listes.logistique.locationsTitle")} searchPlaceholder={t("logistique.searchLocations")} />
         </SectionCard>
       )}
       <GrAffairesSection />
-      <TarifsGrSection />
-      <ParametresLogistiqueSection />
-      <EcartsM4Section />
+      </div>
+      <div id="log-suivi" className="page-section">
+        <EcartsM4Section />
+      </div>
       {(demandes.count > 0 || demandes.search) && (
-        <SectionCard title={`${t("logistique.demandes")} · ${demandes.count}`}>
+        <SectionCard id="log-demandes" title={`${t("logistique.demandes")} · ${demandes.count}`}>
           <PagedDataTable list={demandes} columns={demandeColumns(t, lbl)} caption={t("logistique.demandes")} searchPlaceholder={t("logistique.searchDemandes")} />
         </SectionCard>
       )}
+      <ModuleSettings id="log-parametres">
+        <TarifsGrSection />
+        <ParametresLogistiqueSection />
+      </ModuleSettings>
     </div>
   );
 }

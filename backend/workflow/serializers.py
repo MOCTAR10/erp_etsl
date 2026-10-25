@@ -59,6 +59,9 @@ class TaskSerializer(serializers.ModelSerializer):
     step_order = serializers.IntegerField(source="step.order", read_only=True)
     circuit_label = serializers.CharField(source="circuit.label", read_only=True)
     assigned_to_email = serializers.EmailField(source="assigned_to.email", read_only=True)
+    # Nom affiché (nom complet, sinon fonction) et rôle de l'assigné : le kanban n'affiche jamais l'e-mail.
+    assigned_to_name = serializers.CharField(source="assigned_to.nom_affiche", read_only=True, default=None)
+    assigned_to_role = serializers.CharField(source="assigned_to.role", read_only=True, default=None)
     comments_count = serializers.IntegerField(
         source="comments.count", read_only=True
     )
@@ -76,6 +79,8 @@ class TaskSerializer(serializers.ModelSerializer):
             "step_order",
             "assigned_to",
             "assigned_to_email",
+            "assigned_to_name",
+            "assigned_to_role",
             "status",
             "due_date",
             "completed_at",
@@ -112,6 +117,9 @@ class CommentSerializer(serializers.Serializer):
 class NotificationSerializer(serializers.ModelSerializer):
     document_title = serializers.CharField(source="task.document.title", read_only=True)
     step_name = serializers.CharField(source="task.step.name", read_only=True)
+    # Libellé de notification compact (vague 3) : échéance de la tâche et service acteur de l'étape.
+    task_due_date = serializers.DateTimeField(source="task.due_date", read_only=True)
+    step_role = serializers.CharField(source="task.step.actor_role", read_only=True)
 
     class Meta:
         model = Notification
@@ -124,6 +132,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "task",
             "document_title",
             "step_name",
+            "task_due_date",
+            "step_role",
             "created_at",
         ]
         read_only_fields = fields

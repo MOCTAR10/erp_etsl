@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { cleanLabel } from "../components/workflow/libelle";
+import { roleLabel } from "../lib/roles";
 import { ConfirmDialog, useServerAction } from "../components/workflow/actions";
 import { Badge, BoardSkeleton, DataGrid, EmptyState, ErrorState, Menu, PageHeader, Sheet, SheetClose } from "../components/ui";
 import type { GridColumn } from "../components/ui";
@@ -137,16 +138,21 @@ function CircuitCard({ circuit, gestion, roleOpts }: { circuit: Circuit; gestion
   const label = cleanLabel(circuit.label);
   const steps = [...circuit.steps].sort((a, b) => a.order - b.order);
 
+  // Libellé i18n du rôle d'acteur (jamais « (hérité) » ni « (technique) » du libellé serveur).
+  const acteur = (s: CircuitStep) => {
+    const code = (s as CircuitStep & { actor_role?: string }).actor_role;
+    return code ? roleLabel(t, code) : s.actor_role_label;
+  };
   const columns: GridColumn<CircuitStep>[] = [
     { key: "order", header: "#", width: 48, render: (s) => <span className="circ-order">{s.order}</span> },
     { key: "name", header: t("circuits2.etape"), width: "44%", render: (s) => (
         <>
           <strong className="circ-step">{s.name}</strong>
-          <span className="circ-actor-inline">{s.actor_role_label}</span>
+          <span className="circ-actor-inline">{acteur(s)}</span>
         </>
       ),
     },
-    { key: "actor", header: t("circuits.actor"), render: (s) => <span className="circ-actor">{s.actor_role_label}</span> },
+    { key: "actor", header: t("circuits.actor"), render: (s) => <span className="circ-actor">{acteur(s)}</span> },
     { key: "days", header: t("circuits2.delai"), num: true, width: 110, render: (s) => t("circuits2.jours", { count: s.max_days }) },
   ];
 
@@ -301,8 +307,8 @@ export function CircuitsPage() {
   });
 
   const roleOpts: Option[] = roles?.length
-    ? roles.map((r) => ({ value: r.role, label: r.label }))
-    : Object.entries(ROLES_SECOURS).map(([value, label]) => ({ value, label }));
+    ? roles.map((r) => ({ value: r.role, label: roleLabel(t, r.role) || r.label }))
+    : Object.entries(ROLES_SECOURS).map(([value, label]) => ({ value, label: roleLabel(t, value) || label }));
 
   const header = (
     <PageHeader

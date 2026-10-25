@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { DEMO_PASSWORD, DEMO_USERS, loginAs } from "./helpers";
+import { DEMO_PASSWORD, DEMO_USERS, loginAs, ouvrirParametresModule } from "./helpers";
 
 // Clôture M6 (2026-10-18) : métrologie, registre des joints, épreuves P/T et approbation de l'ITP.
 test.describe("M6 Qualité : parcours de clôture", () => {
@@ -31,6 +31,8 @@ test.describe("M6 Qualité : écarts M6-B", () => {
     await ligne.getByLabel("Valeur").fill("1");
     await ligne.getByRole("button", { name: "Saisir la mesure" }).click();
     await expect(ligne.getByText(/hors seuil/)).toBeVisible();
+    // Critères d'acceptation : paramétrage replié en bas de page (B11).
+    await ouvrirParametresModule(page);
     await expect(page.getByTestId("criteres-controle").getByText("Provisoire").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Étiquette" }).first()).toBeVisible();
   });
@@ -78,6 +80,9 @@ test.describe("M6 Qualité : écarts M6-A", () => {
     await expect(page.getByTestId("wps-cycle")).toBeVisible();
     await expect(page.getByTestId("punch-list")).toBeVisible();
     await expect(page.getByTestId("indicateurs-qualite").getByText("Taux de conformité")).toBeVisible();
+    // Paramètres repliés en bas de page (B11), puis dans un panneau compact (B-05) : on les affiche avant de les lire.
+    await ouvrirParametresModule(page);
+    await page.getByTestId("parametres-qualite").getByRole("button", { name: "Afficher", exact: true }).click();
     await expect(page.getByTestId("parametres-qualite").getByText("CAPA : délai de clôture (jours calendaires)")).toBeVisible();
   });
 });

@@ -40,6 +40,17 @@ export function formatBytes(bytes: number): string {
   return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }
 
+/**
+ * Séparateur de milliers UNIQUE (A-14) : `fr-FR` produit une espace fine insécable (U+202F) pour les nombres,
+ * les montants une espace insécable (U+00A0) — deux espacements côte à côte. Tout passe en U+00A0.
+ */
+const thousandsOnly = (text: string) => text.replace(/[  ]/g, NBSP);
+
+/** Signe moins typographique U+2212 (« −818 000 FCFA ») : le trait d'union ASCII est trop court et s'écarte du chiffre. */
+const MINUS = "−";
+const minus = (text: string) => (/^-0([.,]0+)?$/.test(text) ? text.slice(1) : text.replace(/^-/, MINUS));
+const thousands = (text: string) => minus(thousandsOnly(text));
+
 export type NumberOptions = {
   /** Nombre de décimales fixes (défaut : 0). */
   decimals?: number;
@@ -50,10 +61,12 @@ export function formatNumber(value: Numeric, options: NumberOptions = {}): strin
   const n = toNumber(value);
   if (n === null) return EMPTY;
   const decimals = options.decimals ?? 0;
-  return n.toLocaleString(numberLocale(), {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+  return thousands(
+    n.toLocaleString(numberLocale(), {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }),
+  );
 }
 
 export type MoneyOptions = {
@@ -75,7 +88,7 @@ export function formatMoney(value: Numeric, options: MoneyOptions = {}): string 
   }
   const currency = options.currency ?? "FCFA";
   const body = n.toLocaleString(numberLocale(), { maximumFractionDigits: 0 });
-  return `${body.replace(/[\u202f ]/g, NBSP)}${NBSP}${currency}`;
+  return `${thousands(body)}${NBSP}${currency}`;
 }
 
 export type PercentOptions = {

@@ -146,7 +146,7 @@ export function EcartsA3Section() {
     { key: "code", header: t("ecarts_a3.cnq.cols.code"), render: (c) => c.code, sortValue: (c) => c.code },
     { key: "nc", header: t("ecarts_a3.cnq.nc"), render: (c) => c.nc_code, sortValue: (c) => c.nc_code },
     { key: "nature", header: t("ecarts_a3.cnq.nature"), render: (c) => c.nature_label },
-    { key: "date", header: t("ecarts_a3.cnq.cols.date"), render: (c) => formatDate(c.date), sortValue: (c) => c.date },
+    { key: "date", header: t("ecarts_a3.cnq.cols.date"), kind: "date", render: (c) => formatDate(c.date), sortValue: (c) => c.date },
     {
       key: "montant",
       header: t("ecarts_a3.cnq.cols.montant"),

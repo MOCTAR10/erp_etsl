@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { DEMO_USERS, loginAs } from "./helpers";
+import { DEMO_USERS, loginAs, ouvrirParametresModule } from "./helpers";
 
 // M8 : fiabilité du parc (MTBF / MTTR / disponibilité) à paramètres provisoires, pièces de rechange sorties du
 // stock M5 et liées à l'OT, réappro sous seuil, coût de maintenance par machine publié à M11.
@@ -12,8 +12,12 @@ test.describe("M8 Maintenance : fiabilité, pièces de rechange, coût vers M11"
     await expect(fiabilite).toContainText("MTBF");
     await expect(fiabilite.getByTestId("alerte-provisoire-maintenance")).toContainText(/provisoire/);
 
+    // Paramètres du module repliés en bas de page (B11).
+    await ouvrirParametresModule(page);
     const section = page.getByTestId("parametres-maintenance");
     await expect(section.getByTestId("alerte-provisoire-parametres-m8")).toContainText(/provisoire/);
+    // Paramètres repliés dans un panneau compact (B-05) : on les affiche avant de les modifier.
+    await section.getByRole("button", { name: "Afficher", exact: true }).click();
     const ligne = section.getByRole("row", { name: /heures de service théoriques/ });
     // Valeur différente de l'actuelle : une valeur inchangée resterait « confirmée » d'une exécution à l'autre.
     const actuelle = /(?<![\d.])24(\.00)? heures/.test(await ligne.innerText()) ? "20" : "24";

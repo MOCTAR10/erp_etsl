@@ -121,6 +121,10 @@
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
+  /* « Objectif : 0 accident » ne se coupe plus sur 3 lignes (audit A07). */
+  .dir-hero-objectif {
+    white-space: nowrap;
+  }
 
   .dir-delta {
     padding: 1px 8px;
@@ -252,7 +256,8 @@
     font-weight: var(--fw-medium);
   }
 
-  .dir-attn-toggle {
+  /* « Voir tout » réservé au mobile quand la liste bureau (5 lignes) est déjà complète. */
+  .dir-attn-more-mobile {
     display: none;
   }
 
@@ -341,6 +346,36 @@
   /* ------------------------------------------------------- Sections */
   .dir-section {
     scroll-margin-top: var(--space-6);
+  }
+
+  /* Titre de section + icône d'information (hypothèses de pilotage) alignés ; plus de bandeau « provisoire ». */
+  .dir-section-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .dir-section-head .section-title {
+    margin-bottom: 0;
+  }
+  .dir-section-head + * {
+    margin-top: var(--space-3);
+  }
+  .dir-hypotheses {
+    color: var(--text-muted);
+  }
+  .dir-hypotheses-pop {
+    display: grid;
+    gap: var(--space-2);
+    max-width: 320px;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-sm);
+  }
+  .dir-hypotheses-pop p {
+    margin: 0;
+    color: var(--text-muted);
+  }
+  .dir-hypotheses-pop .btn {
+    justify-self: start;
   }
 
   .dir-count {
@@ -744,6 +779,20 @@
   .dir-chart {
     height: 180px;
   }
+  /* Trésorerie : axe Y en montants exacts, unité « FCFA » en titre d'axe (A-08). */
+  .dir-chart-axis {
+    position: relative;
+    height: 220px;
+  }
+  .dir-chart-unit {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: var(--fs-xs);
+    line-height: 16px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
 
   .dir-solde {
     display: inline-flex;
@@ -927,7 +976,8 @@
   }
   .kb-card-head .title {
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3; /* A-38 : titre lisible sans coupure au milieu */
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: var(--fs-sm);
@@ -1094,7 +1144,7 @@
       line-height: var(--lh-xs);
     }
 
-    /* « À traiter » replié derrière un bouton */
+    /* « À traiter » : les 3 premiers points (critiques) en clair, puis « Voir tout (n) » (A-26). */
     .dir-attn {
       padding: var(--space-4) 0 var(--space-2);
     }
@@ -1102,23 +1152,11 @@
     .dir-attn-sub {
       padding: 0 var(--space-4);
     }
-    .dir-attn-total {
+    .dir-attn[data-all="false"] .dir-attn-list li:nth-child(n + 4) {
       display: none;
     }
-    .dir-attn-toggle {
-      display: flex;
-      justify-content: space-between;
-      margin: var(--space-3) var(--space-4) var(--space-1);
-    }
-    .dir-attn-chevron {
-      transition: transform var(--dur-fast) var(--ease-out);
-    }
-    .dir-attn[data-open="true"] .dir-attn-chevron {
-      transform: rotate(180deg);
-    }
-    .dir-attn[data-open="false"] .dir-attn-list,
-    .dir-attn[data-open="false"] .dir-attn-more {
-      display: none;
+    .dir-attn-more.dir-attn-more-mobile {
+      display: inline-flex;
     }
     .dir-attn-item {
       padding: 6px var(--space-4);

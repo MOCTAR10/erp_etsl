@@ -38,9 +38,9 @@ class Command(BaseCommand):
             code="ASSUREUR-01",
             defaults=dict(name="AXA Gabon", kind="fournisseur", is_global_rental=False),
         )
-        gr, _ = Partner.objects.get_or_create(
-            code="GR-01",
-            defaults=dict(name="GLOBAL RENTAL", kind="fournisseur", is_global_rental=True),
+        gr, _ = Partner.objects.get_or_create(  # tiers GLOBAL RENTAL unique du référentiel
+            code="GR-0001",
+            defaults=dict(name="GLOBAL RENTAL", kind="both", is_global_rental=True),
         )
 
         # Courrier entrant (bureau d'ordre, §3.3).

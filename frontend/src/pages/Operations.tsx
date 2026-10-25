@@ -3,22 +3,22 @@ import { CoutMainOeuvreSection } from "../components/rhpaie/EcartsM9bSection";
 import { EcartsM3Section } from "../components/operations/EcartsM3Section";
 import { ConsommationOfSection } from "../components/operations/ConsommationOfSection";
 import { statutLabel } from "../components/operations/outils";
+import { ChargeSurcharge } from "../components/operations/ChargeSurcharge";
 import { FluxM4Section } from "../components/suivi/SuiviSections";
 import { useState } from "react";
 import { Clock3, Construction, Factory, HardHat } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import "../styles/pages/sections.css";
 import { api } from "../api/client";
 import { SiteFilter, siteQuery } from "../components/sites/SiteFilter";
 import { formatDate, formatMoney, formatNumber, formatPercent } from "../lib/format";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataTable, ErrorState, Kpi, PageHeader, PagedDataTable, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { ActionDef } from "../components/ui";
 import type {
-  ChargeAlerte,
-  ChargeStats,
   EquipeAffectation,
   OfStatus,
   OrdreFabrication,
@@ -84,68 +84,6 @@ function OfCard({ of, index }: { of: OrdreFabrication; index: number }) {
   );
 }
 
-/** Alertes affichées avant « Afficher les N alertes » : la liste complète couvre souvent plus d'un an de semaines. */
-const ALERTES_VISIBLES = 6;
-/** Dépassement (en %) à partir duquel l'alerte passe au rouge : charge au moins triple de la capacité. */
-const SURCHARGE_FORTE = 200;
-
-function Charge({ stats }: { stats: ChargeStats }) {
-  const { t } = useTranslation();
-  const [toutes, setToutes] = useState(false);
-  const alertes = stats.alertes ?? [];
-  if (alertes.length === 0) return null;
-  // Semaines à venir d'abord (la semaine en cours comprise), puis les semaines passées ; chronologique dans chaque groupe.
-  const lundi = new Date();
-  lundi.setDate(lundi.getDate() - 7);
-  const seuil = lundi.toISOString().slice(0, 10);
-  const triees = [...alertes].sort((a, b) => {
-    const pa = a.week >= seuil ? 0 : 1;
-    const pb = b.week >= seuil ? 0 : 1;
-    return pa - pb || a.week.localeCompare(b.week) || a.scope.localeCompare(b.scope);
-  });
-  const visibles = toutes ? triees : triees.slice(0, ALERTES_VISIBLES);
-  // Échelle commune : charge / capacité rapportée à la plus forte charge de la liste ; le repère marque la capacité.
-  const charge = (a: ChargeAlerte) => (a.capacity > 0 ? a.planned_hours / a.capacity : 1);
-  const maxCharge = Math.max(1, ...alertes.map(charge));
-  const repere = Math.round((1 / maxCharge) * 100);
-  return (
-    <SectionCard
-      title={`${t("operations.surcharge")} · ${alertes.length}`}
-      actions={
-        alertes.length > ALERTES_VISIBLES ? (
-          <button type="button" className="btn ghost sm" aria-expanded={toutes} onClick={() => setToutes((v) => !v)}>
-            {toutes ? t("revueR2.operations.alertesReduire") : t("revueR2.operations.alertesVoir", { count: alertes.length })}
-          </button>
-        ) : undefined
-      }
-    >
-      <ul className="overload-list" data-testid="alertes-surcharge">
-        {visibles.map((a) => {
-          const largeur = Math.max(4, Math.round((charge(a) / maxCharge) * 100));
-          // Rouge réservé aux dépassements les plus forts (charge au moins triple de la capacité), orange sinon.
-          const fort = a.overload_pct >= SURCHARGE_FORTE;
-          return (
-            <li key={`${a.scope}-${a.week}`}>
-              <span>
-                <strong>{t(`operations.${a.scope}`)}</strong>
-                <span className="cell-sub">{t("listes.operations.surchargeHint", { date: formatDate(a.week) })}</span>
-              </span>
-              <span className={`overload-bar${fort ? " err" : ""}`} aria-hidden>
-                <span style={{ width: `${largeur}%` }} />
-                <span className="overload-cap" style={{ left: `${repere}%` }} />
-              </span>
-              <span className="overload-hours">
-                {formatNumber(a.planned_hours)} h / {formatNumber(a.capacity)} h
-              </span>
-              <Badge tone={fort ? "err" : "warn"}>+{formatPercent(a.overload_pct)}</Badge>
-            </li>
-          );
-        })}
-      </ul>
-    </SectionCard>
-  );
-}
-
 export function OperationsPage() {
   const { t } = useTranslation();
 
@@ -177,12 +115,6 @@ export function OperationsPage() {
   });
 
   const situations = usePagedList<SituationTravaux>("situations", (q) => api.situations(q));
-  // Heures déclarées : somme sur toutes les situations, pas seulement la page affichée.
-  const situationsToutes = useQuery({
-    queryKey: ["situations-toutes"],
-    queryFn: () => api.listAll<SituationTravaux>("/api/operations/situations/"),
-  });
-
   const affectations = useQuery({
     queryKey: ["affectations"],
     queryFn: () => api.affectations(`?page_size=100`),
@@ -219,7 +151,6 @@ export function OperationsPage() {
           void byStatus.refetch();
           void charge.refetch();
           void situations.query.refetch();
-          void situationsToutes.refetch();
         }}
         retryLabel={t("common.retry")}
       />
@@ -238,16 +169,35 @@ export function OperationsPage() {
     { value: "chantier", label: t("operations.chantier") },
   ];
   const active = groups.en_cours.length + groups.lance.length + groups.prevu.length;
-  const reported = situationsToutes.data?.reduce((a, s) => a + Number(s.ordered_hours), 0) ?? 0;
   const chargeData = charge.data;
+  // Heures réellement pointées (atelier + chantier) ; le prévu passe en sous-titre (l'ancien KPI sommait le prévu des situations).
+  const pointeesTotal = chargeData ? chargeData.totals.atelier.pointed + chargeData.totals.chantier.pointed : null;
+  const prevuesTotal = chargeData ? chargeData.totals.atelier.calculated + chargeData.totals.chantier.calculated : null;
 
   return (
     <div className="listes-page">
       <PageHeader title={t("operations.title")} subtitle={t("listes.sub.operations")} />
+      <SectionNav
+        items={[
+          { id: "ops-ordres", label: t("premiumVague2.sections.operations.ordres") },
+          ...(situations.count > 0 || situations.search ? [{ id: "ops-situations", label: t("premiumVague2.sections.operations.situations") }] : []),
+          { id: "ops-equipes", label: t("premiumVague2.sections.operations.equipes") },
+          { id: "ops-consommations", label: t("premiumVague2.sections.operations.consommations") },
+          { id: "ops-suivi", label: t("premiumVague2.sections.operations.suivi") },
+          { id: "ops-parametres", label: t("premiumVague2.sections.operations.parametres") },
+        ]}
+      />
 
       <div className="kpi-grid">
         <Kpi label={t("operations.of")} value={active} icon={HardHat} tone="brand" delay={0} />
-        <Kpi label={t("operations.reported")} value={`${formatNumber(reported)} h`} icon={Clock3} tone="accent" delay={0.05} />
+        <Kpi
+          label={t("operations.reported")}
+          value={pointeesTotal === null ? null : `${formatNumber(pointeesTotal)} h`}
+          hint={prevuesTotal === null ? undefined : t("vague3C2.operations.surPrevues", { h: formatNumber(prevuesTotal) })}
+          icon={Clock3}
+          tone="accent"
+          delay={0.05}
+        />
         {chargeData
           ? (["atelier", "chantier"] as const).map((key, i) => (
               <Kpi
@@ -262,7 +212,8 @@ export function OperationsPage() {
             ))
           : null}
       </div>
-      {charge.data ? <Charge stats={charge.data} /> : null}
+      <div id="ops-ordres" className="page-section">
+      {charge.data ? <ChargeSurcharge stats={charge.data} /> : null}
 
       <section className="listes-block">
         <div className="list-toolbar">
@@ -279,9 +230,10 @@ export function OperationsPage() {
           ))}
         </Board>
       </section>
+      </div>
 
       {(situations.count > 0 || situations.search) && (
-        <SectionCard title={`${t("operations.situations")} · ${situations.count}`}>
+        <SectionCard id="ops-situations" title={`${t("operations.situations")} · ${situations.count}`}>
           <PagedDataTable
             list={situations}
             searchPlaceholder={t("operations.searchSituations")}
@@ -306,6 +258,7 @@ export function OperationsPage() {
         </SectionCard>
       )}
 
+      <div id="ops-equipes" className="page-section">
       <SectionCard
         title={`${t("operations.equipes")} · ${(affectations.data ?? []).length}`}
         actions={
@@ -402,9 +355,14 @@ export function OperationsPage() {
           />
         </SectionCard>
       <CoutMainOeuvreSection />
+      </div>
+
+      <div id="ops-consommations" className="page-section">
+        <ConsommationOfSection />
+        <FluxM4Section />
+      </div>
+
       <EcartsM3Section />
-      <ConsommationOfSection />
-      <FluxM4Section />
     </div>
   );
 }

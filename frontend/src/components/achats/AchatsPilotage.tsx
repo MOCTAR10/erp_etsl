@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { nombre } from "../sections/affichage";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { Badge, DataTable, PagedDataTable, QuickForm, SectionCard } from "../ui";
@@ -162,7 +163,7 @@ export function AchatsPilotage() {
     { key: "note", header: t("achatsPilotage.col.note"), num: true, render: (f) => (f.note === null ? "—" : `${f.note}/100`) },
     { key: "bc", header: t("achatsPilotage.col.commandes"), num: true, render: (f) => f.commandes },
     { key: "service", header: t("achatsPilotage.col.service"), num: true, render: (f) => pct(f.taux_service) },
-    { key: "retard", header: t("achatsPilotage.col.retard"), num: true, render: (f) => (f.retard_moyen_jours === null ? "—" : `${f.retard_moyen_jours} j`) },
+    { key: "retard", header: t("achatsPilotage.col.retard"), num: true, render: (f) => (f.retard_moyen_jours === null ? "—" : `${nombre(f.retard_moyen_jours, 1)} j`) },
     { key: "qualite", header: t("achatsPilotage.col.conformite"), num: true, render: (f) => pct(f.taux_conformite) },
     { key: "litiges", header: t("achatsPilotage.col.litiges"), num: true, render: (f) => f.litiges_ouverts },
   ];

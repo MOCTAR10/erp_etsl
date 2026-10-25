@@ -77,6 +77,9 @@ export interface NotificationItem {
   is_read: boolean;
   document_title: string | null;
   step_name: string | null;
+  /** Échéance de la tâche liée et rôle acteur de l'étape (libellé compact, vague 3). */
+  task_due_date?: string | null;
+  step_role?: string | null;
   created_at: string;
 }
 
@@ -127,7 +130,15 @@ export interface PipelineStats {
   won_total: number;
   margin_by_segment: Record<string, { count: number; total_margin: number; total_amount: number }>;
   /** Pipe pondéré 90 / 60 / 25 % (signé / en cours / prospect) publié vers M11 (clôture M1). */
-  pipe_pondere?: { signe: number; en_cours: number; prospect: number; total: number };
+  pipe_pondere?: {
+    signe: number;
+    en_cours: number;
+    prospect: number;
+    total: number;
+    ponderations?: { signe: number; en_cours: number; prospect: number };
+  };
+  /** Même pipe restreint aux clôtures prévues dans l'exercice : c'est le chiffre du contrôle de gestion. */
+  pipe_pondere_exercice?: { annee: number; total: number };
 }
 
 export type PoStatus =
@@ -1772,6 +1783,8 @@ export interface DeclarationTva {
   tva_collectee: string | null;
   tva_deductible: string | null;
   net_a_payer: string | null;
+  /** Vide tant que la déclaration n'a jamais été calculée (montants à 0 par défaut, pas une TVA nulle). */
+  source_calcul?: "ecritures" | "paiements" | "";
   statut: StatutDeclarationTva;
   statut_label: string;
   has_amount_access: boolean;

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
+import { nomPersonne, sansPrefixeType } from "../sections/affichage";
 import { usePagedList } from "../../lib/usePagedList";
 import type { Paginated } from "../../types";
 import { Badge, DataTable, PagedDataTable, SectionCard } from "../ui";
@@ -143,7 +144,7 @@ export function CommercialSections() {
 
   const colOffres: Column<Offre>[] = [
     { key: "code", header: t("commercial.col.code"), render: (o) => <span className="cell-nowrap">{`${o.code} · v${o.version}`}</span>, sortValue: (o) => o.code },
-    { key: "titre", header: t("commercial.col.titre"), render: (o) => o.title },
+    { key: "titre", header: t("commercial.col.titre"), render: (o) => <span title={o.title}>{sansPrefixeType(o.title)}</span> },
     { key: "client", header: t("commercial.col.client"), render: (o) => o.client_name ?? "—" },
     { key: "montant", header: t("commercial.col.montant"), num: true, render: (o) => montant(o.montant_offre), sortValue: (o) => (o.montant_offre === null ? null : Number(o.montant_offre)) },
     { key: "statut", header: t("commercial.col.statut"), render: (o) => statut("statutsOffre", o.status, o.status_label) },
@@ -153,7 +154,7 @@ export function CommercialSections() {
     { key: "code", header: t("commercial.col.code"), render: (a) => <span className="cell-nowrap">{a.code}</span>, sortValue: (a) => a.code },
     { key: "titre", header: t("commercial.col.titre"), render: (a) => a.title },
     { key: "client", header: t("commercial.col.client"), render: (a) => a.client_name ?? "—" },
-    { key: "resp", header: t("commercial.col.responsable"), render: (a) => a.responsable_email ?? "—" },
+    { key: "resp", header: t("commercial.col.responsable"), render: (a) => nomPersonne(t, a.responsable_email) },
     { key: "statut", header: t("commercial.col.statut"), render: (a) => statut("statutsAffaire", a.status, a.status_label) },
     actionsColumn<Affaire>(t("ui.actions"), (a) => actionsAffaire(a, t)),
   ];

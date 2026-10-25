@@ -240,6 +240,8 @@ class PilotageTests(BaseM1):
             Opportunity.objects.create(subject=stage, client=self.cli, stage=stage, amount=Decimal("1000000"))
         pipe = self.client.get("/api/commercial/opportunities/pipeline/").data["pipe_pondere"]
         self.assertEqual((pipe["signe"], pipe["en_cours"], pipe["prospect"], pipe["total"]), (900000.0, 600000.0, 250000.0, 1750000.0))
+        exercice = self.client.get("/api/commercial/opportunities/pipeline/").data["pipe_pondere_exercice"]
+        self.assertEqual(exercice["total"], 1750000.0)  # sans date de clôture : dans l'exercice courant
         self.client.force_authenticate(self.dg)
         self.assertEqual(self.client.get("/api/analytics/dashboard/").data["commercial"]["pipe_pondere"], 1750000.0)
 

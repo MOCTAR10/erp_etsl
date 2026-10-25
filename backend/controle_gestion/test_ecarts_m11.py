@@ -151,6 +151,22 @@ class PipeKpiImputationTests(EcartsM11Base):
         self.assertEqual(b.lignes.get(period=self.period(3)).montant, Decimal("625"))
         self.assertEqual(sum(l.montant for l in b.lignes.all()), Decimal("900"))
 
+    def test_pipe_commercial_et_controle_gestion_meme_source(self):
+        """B03 (audit premium) : mêmes pondérations (paramètres RGM_POND_PROSPECT) ; seul le périmètre diffère —
+        le Pipeline montre tous les horizons et, en « dont clôtures », exactement le chiffre du contrôle de gestion."""
+        from commercial.services import pipe_pondere
+
+        Opportunity.objects.create(subject="A", stage="negociation", amount=Decimal("1000"), expected_close=date(2026, 3, 15))
+        Opportunity.objects.create(subject="B", stage="prospection", amount=Decimal("1200"))
+        Opportunity.objects.create(subject="C", stage="offre", amount=Decimal("5000"), expected_close=date(2027, 6, 1))
+        self.client.get(f"{BASE}parametres/")
+        ParametreGestion.objects.filter(code="POND_EN_COURS").update(valeur=50)  # modifié par ETSL à l'écran
+        cg = self.client.get(f"{BASE}pipe-budget/?fiscal_year={self.fy.pk}").data["total"]
+        self.assertEqual(cg, "800.00")  # 1000 × 50 % + 1200 × 25 %
+        self.assertEqual(pipe_pondere(2026)["total"], 800.0)
+        self.assertEqual(pipe_pondere()["total"], 3300.0)  # + 5000 × 50 % (clôture 2027)
+        self.assertEqual(pipe_pondere()["ponderations"]["en_cours"], 0.5)
+
     def test_douze_kpi(self):
         self.ecriture("701000", "1000")
         r = self.client.get(f"{BASE}kpis/?fiscal_year={self.fy.pk}")
@@ -262,6 +278,7 @@ class MargeMoProvisionTests(EcartsM11Base):
     def test_cout_mo_par_affaire(self):
         r = self.client.get(f"{BASE}cout-mo-affaires/?debut=2026-01-01&fin=2026-12-31")
         self.assertEqual((r.status_code, r.data["rows"]), (200, []))
+        self.assertEqual((r.data["heures"], r.data["pct_heures_valorisees"]), ("0.00", None))
         self.assertEqual(self.client.get(f"{BASE}cout-mo-affaires/?debut=xx").status_code, 400)
 
     def test_provision_408_et_extourne(self):

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import "../styles/pages/sections.css";
 import { api } from "../api/client";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, PageHeader, QuickForm, SearchField, SectionCard } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, DataGrid, DataTable, ErrorState, FilterBar, Kpi, ModuleSettings, PageHeader, QuickForm, SearchField, SectionCard, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import { actionsColumn } from "../components/ui/DataTable";
 import type { ActionDef, Column } from "../components/ui";
@@ -13,10 +13,11 @@ import { ClotureSection } from "../components/workflow/ClotureSection";
 import { FacturationSection } from "../components/workflow/FacturationSection";
 import { BanqueSection } from "../components/workflow/BanqueSection";
 import { LettrageSection } from "../components/workflow/LettrageSection";
-import { EcartsM10Section } from "../components/comptabilite/EcartsM10Section";
+import { EcartsM10Section, GabaritsEtatsSection } from "../components/comptabilite/EcartsM10Section";
 import { EcartsA2Section } from "../components/comptabilite/EcartsA2Section";
 import { ImportGrandLivreSection, RetenuesGarantieSection } from "../components/suivi/SuiviSections";
 import { formatDate, formatMoney } from "../lib/format";
+import { nomPersonne } from "../components/sections/affichage";
 import { pagedQuery, usePagedList } from "../lib/usePagedList";
 import { useFiltresListe } from "../lib/useFiltresListe";
 import type {
@@ -150,10 +151,14 @@ export function ComptabilitePage() {
   const relevesAll = releves.rows;
   const banquesAll = banques.data ?? [];
   const valides = (paiementsTous.data ?? []).filter((p) => p.statut === "valide");
-  const tvaDue = tvaAll.reduce(
-    (acc, d) => acc + (d.has_amount_access && d.net_a_payer !== null ? Number(d.net_a_payer) : 0),
+  // B05 : une déclaration jamais calculée porte des montants à 0 par défaut — ce n'est pas une TVA nulle.
+  const tvaCalculees = tvaAll.filter((d) => Boolean(d.source_calcul));
+  const tvaDue = tvaCalculees.reduce(
+    (acc, d) => acc + (d.statut !== "deposee" && d.has_amount_access && d.net_a_payer !== null ? Number(d.net_a_payer) : 0),
     0,
   );
+  const aCalculer = <span className="muted">{t("vague3C2.compta.aCalculer")}</span>;
+  const montantTva = (d: DeclarationTva, v: string | null) => (!d.has_amount_access ? masque : d.source_calcul ? formatMoney(v) : aCalculer);
   const enCours = groups["brouillon"].length + groups["soumis"].length;
 
   const bankColumns: Column<CompteBancaire>[] = [
@@ -214,17 +219,17 @@ export function ComptabilitePage() {
     { key: "code", header: t("comptabilite.col.code"), render: (d) => d.code },
     { key: "mois", header: t("listes.compta.mois"), sortValue: (d) => d.mois, render: (d) => formatDate(d.mois) },
     { key: "taux", header: t("listes.compta.taux"), render: (d) => d.taux_tva_code },
-    { key: "base", header: t("listes.compta.base"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.base_imposable) : masque) },
-    { key: "collectee", header: t("listes.compta.collectee"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.tva_collectee) : masque) },
-    { key: "deductible", header: t("listes.compta.deductible"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.tva_deductible) : masque) },
-    { key: "net", header: t("listes.compta.net"), num: true, render: (d) => (d.has_amount_access ? formatMoney(d.net_a_payer) : masque) },
+    { key: "base", header: t("listes.compta.base"), num: true, render: (d) => montantTva(d, d.base_imposable) },
+    { key: "collectee", header: t("listes.compta.collectee"), num: true, render: (d) => montantTva(d, d.tva_collectee) },
+    { key: "deductible", header: t("listes.compta.deductible"), num: true, render: (d) => montantTva(d, d.tva_deductible) },
+    { key: "net", header: t("listes.compta.net"), num: true, render: (d) => montantTva(d, d.net_a_payer) },
     { key: "statut", header: t("listes.compta.statut"), render: (d) => <Badge tone={d.statut === "deposee" ? "ok" : "warn"}>{t(`comptabilite.tva_statut.${d.statut}`)}</Badge> },
   ];
   const controleColumns: Column<ControleInterne>[] = [
     { key: "code", header: t("comptabilite.col.code"), render: (c) => c.code },
     { key: "libelle", header: t("listes.compta.controle"), render: (c) => c.libelle },
     { key: "ref", header: t("listes.compta.reference"), render: (c) => referenceProcedure(c.reference_procedure, t) },
-    { key: "resp", header: t("listes.compta.responsable"), render: (c) => c.responsable_name ?? "—" },
+    { key: "resp", header: t("listes.compta.responsable"), render: (c) => nomPersonne(t, c.responsable_name) },
     { key: "date", header: t("listes.compta.datePrevue"), sortValue: (c) => c.date_prevue, render: (c) => formatDate(c.date_prevue) },
     {
       key: "statut",
@@ -288,6 +293,18 @@ export function ComptabilitePage() {
         }
       />
 
+      <SectionNav
+        items={[
+          { id: "cpt-tresorerie", label: t("premiumVague2.sections.comptabilite.tresorerie") },
+          { id: "cpt-facturation", label: t("premiumVague2.sections.comptabilite.facturation") },
+          { id: "cpt-lettrage", label: t("premiumVague2.sections.comptabilite.lettrage") },
+          { id: "cpt-etats", label: t("premiumVague2.sections.comptabilite.etats") },
+          { id: "cpt-devises", label: t("premiumVague2.sections.comptabilite.devises") },
+          { id: "cpt-cloture", label: t("premiumVague2.sections.comptabilite.cloture") },
+          { id: "cpt-parametres", label: t("premiumKit.moduleSettings.nav") },
+        ]}
+      />
+
       <div className="kpi-grid">
         <Kpi
           label={t("comptabilite.banques")}
@@ -295,9 +312,14 @@ export function ComptabilitePage() {
           hint={t("revueR3.compta.soldesOuverture", { montant: formatMoney(banquesAll.reduce((n, b) => n + Number(b.solde_initial || 0), 0)) })} icon={Landmark} tone="brand" delay={0} />
         <Kpi label={t("comptabilite.engagements")} value={enCours} hint={t("revueR3.compta.engagementsEnCours", { count: enCours })} icon={ClipboardList} tone="warn" delay={0.05} />
         <Kpi label={t("comptabilite.paiements")} value={valides.length} hint={t("comptabilite.paiementsValides")} icon={CreditCard} tone="brand" delay={0.1} />
-        <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
+        {tvaCalculees.length > 0 ? (
+          <Kpi label={t("comptabilite.tva")} value={tvaDue} kind="money" hint={t("comptabilite.tvaDue")} icon={BadgePercent} tone="accent" delay={0.15} />
+        ) : (
+          <Kpi label={t("comptabilite.tva")} value={t("vague3C2.compta.aCalculer")} hint={t("vague3C2.compta.tvaACalculerHint")} icon={BadgePercent} tone="warn" delay={0.15} />
+        )}
       </div>
 
+      <div id="cpt-tresorerie" className="page-section">
       <section className="listes-block">
         <div className="list-toolbar">
           <SearchField value={engSearch} onChange={setEngSearch} placeholder={t("comptabilite.searchEngagements")} />
@@ -319,7 +341,6 @@ export function ComptabilitePage() {
             </BoardColumn>
           ))}
         </Board>
-        <p className="listes-note">{t("comptabilite.pendingNote")}</p>
       </section>
 
       {banquesAll.length > 0 ? (
@@ -359,19 +380,20 @@ export function ComptabilitePage() {
         </SectionCard>
       )}
 
-      <ClotureSection />
-
-      <FacturationSection />
-
       <BanqueSection />
+      </div>
 
-      <LettrageSection />
-
-      <EcartsM10Section />
-      <EcartsA2Section />
+      <div id="cpt-facturation" className="page-section">
+      <FacturationSection />
       <RetenuesGarantieSection />
-      <ImportGrandLivreSection />
+      </div>
 
+      <div id="cpt-lettrage" className="page-section">
+      <LettrageSection />
+      </div>
+
+      <div id="cpt-etats" className="page-section">
+      <EcartsM10Section />
       {tvaAll.length > 0 ? (
         <SectionCard title={`${t("listes.compta.tva")} · ${tvaAll.length}`}>
           <DataTable rows={tvaAll} columns={tvaColumns} caption={t("listes.compta.tva")} />
@@ -383,6 +405,20 @@ export function ComptabilitePage() {
           <DataTable rows={controlesAll} columns={controleColumns} caption={t("listes.compta.controles")} />
         </SectionCard>
       ) : null}
+      </div>
+
+      <div id="cpt-devises" className="page-section">
+      <EcartsA2Section />
+      </div>
+
+      <div id="cpt-cloture" className="page-section">
+      <ClotureSection />
+      </div>
+
+      <ModuleSettings id="cpt-parametres">
+        <GabaritsEtatsSection />
+        <ImportGrandLivreSection />
+      </ModuleSettings>
     </div>
   );
 }

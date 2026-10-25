@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { formatDate, formatMoney, formatPercent } from "../lib/format";
 import { CommercialSections } from "../components/commercial/CommercialSections";
 import { EcartsM1Section } from "../components/commercial/EcartsM1Section";
-import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader } from "../components/ui";
+import { Badge, Board, BoardCard, BoardColumn, BoardSkeleton, ErrorState, Kpi, PageHeader, SectionNav } from "../components/ui";
 import { CardActions } from "../components/ui/Board";
 import type { Opportunity, OpportunityStage, Paginated } from "../types";
 
@@ -97,6 +97,16 @@ export function PipelinePage() {
   return (
     <div className="listes-page">
       <PageHeader title={t("pipeline.title")} subtitle={t("listes.sub.pipeline")} />
+      <SectionNav
+        items={[
+          { id: "com-opportunites", label: t("premiumVague2.sections.pipeline.opportunites") },
+          { id: "com-offres", label: t("premiumVague2.sections.pipeline.offres") },
+          { id: "com-relances", label: t("premiumVague2.sections.pipeline.relances") },
+          { id: "com-chiffrage", label: t("premiumVague2.sections.pipeline.chiffrage") },
+          { id: "com-profils", label: t("premiumVague2.sections.pipeline.profils") },
+          { id: "com-parametres", label: t("premiumVague2.sections.pipeline.parametres") },
+        ]}
+      />
 
       {s ? (
         <div className="kpi-grid">
@@ -105,10 +115,26 @@ export function PipelinePage() {
           <Kpi label={t("pipeline.activeSegments")} value={Object.keys(s.margin_by_segment).length} icon={Layers} tone="brand" delay={0.1} />
           {s.pipe_pondere ? (
             <Kpi
-              label={t("pipeline.pipePondere")}
+              label={t("pipeline.pipePondereTous")}
               value={s.pipe_pondere.total}
               kind="money"
-              hint={t("pipeline.pipePondereHint")}
+              hint={
+                <span title={t("pipeline.pipePondereInfo")}>
+                  {s.pipe_pondere_exercice
+                    ? t("pipeline.pipePondereExercice", {
+                        annee: s.pipe_pondere_exercice.annee,
+                        montant: formatMoney(s.pipe_pondere_exercice.total),
+                      })
+                    : null}
+                  {s.pipe_pondere.ponderations
+                    ? t("pipeline.pipePonderePoids", {
+                        signe: Math.round(s.pipe_pondere.ponderations.signe * 100),
+                        enCours: Math.round(s.pipe_pondere.ponderations.en_cours * 100),
+                        prospect: Math.round(s.pipe_pondere.ponderations.prospect * 100),
+                      })
+                    : t("pipeline.pipePondereHint")}
+                </span>
+              }
               icon={Scale}
               tone="accent"
               delay={0.15}
@@ -117,6 +143,7 @@ export function PipelinePage() {
         </div>
       ) : null}
 
+      <div id="com-opportunites" className="page-section">
       <Board label={t("listes.boardLabel.pipeline")}>
         {COLUMNS.map((col, ci) => {
           const sum = stageTotal(groups[col.stage]);
@@ -137,8 +164,11 @@ export function PipelinePage() {
           );
         })}
       </Board>
+      </div>
 
-      <CommercialSections />
+      <div id="com-offres" className="page-section">
+        <CommercialSections />
+      </div>
       <EcartsM1Section />
     </div>
   );

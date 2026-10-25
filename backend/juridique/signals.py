@@ -96,6 +96,21 @@ def _libelle_statut(objet, statut):
     return statut
 
 
+def titre_archivage(objet, libelle_statut):
+    """Titre GED d'une fiche archivée : libellé métier de l'objet, puis son statut s'il n'y figure pas déjà.
+
+    Le code de l'objet (« PV00007 ») n'est pas répété en tête : il est porté par la référence du document.
+    Jamais de suffixe technique « — archivage (…) » (constat A-15).
+    """
+    nom = str(objet)
+    code = str(getattr(objet, "code", "") or "")
+    if code and nom.startswith(f"{code} — "):
+        nom = nom[len(code) + 3:]
+    if libelle_statut and libelle_statut not in nom:
+        nom = f"{nom} — {libelle_statut}"
+    return nom
+
+
 def archiver_objet(objet, objet_type, statut, type_code=None, user=None):
     """Dépose en GED une fiche PDF de l'objet pour ce statut (idempotent) ; renvoie le document ou None."""
     from django.core.files.base import ContentFile
@@ -112,7 +127,7 @@ def archiver_objet(objet, objet_type, statut, type_code=None, user=None):
     sha = hashlib.sha256(contenu).hexdigest()
     now = timezone.now()
     doc = Document.objects.create(
-        title=f"{objet} — archivage ({_libelle_statut(objet, statut)})"[:255],
+        title=titre_archivage(objet, _libelle_statut(objet, statut))[:255],
         status=Document.Status.ARCHIVED,
         archived_at=now,
         document_date=timezone.localdate(),

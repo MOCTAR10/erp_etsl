@@ -5,6 +5,8 @@ Lectures : tout utilisateur authentifié. Écriture : rôles porteurs du module
 volontairement restreints (même logique que RF-59 dans `documents`).
 """
 
+from datetime import date
+
 from django.db.models import Count, Q, Sum
 
 from rest_framework.permissions import BasePermission
@@ -106,6 +108,8 @@ def pipeline_stats():
 
     return {
         "pipe_pondere": pipe_pondere(),
+        # Même périmètre que le contrôle de gestion (clôtures prévues dans l'exercice) : réconcilie les deux écrans.
+        "pipe_pondere_exercice": {"annee": date.today().year, "total": pipe_pondere(date.today().year)["total"]},
         "by_stage": by_stage,
         "conversion_rate": conversion_rate,
         "won_total": float(won["total"] or 0),
@@ -223,13 +227,30 @@ PIPE_CATEGORIES = {
 }
 
 
-def pipe_pondere():
-    from django.conf import settings
+def ponderations_pipe():
+    """Poids du pipe en fraction — source unique : paramètres de gestion de la table RGM_POND_PROSPECT
+    (modifiables par ETSL dans /parametres), partagés avec le pipe → budget de produits du M11."""
+    from controle_gestion.services import get_param_gestion
 
-    poids = getattr(settings, "COMMERCIAL_PIPE_PONDERATION", {"signe": 0.90, "en_cours": 0.60, "prospect": 0.25})
+    codes = {"signe": "POND_SIGNE", "en_cours": "POND_EN_COURS", "prospect": "POND_PROSPECT"}
+    return {cat: float(get_param_gestion(code)) / 100 for cat, code in codes.items()}
+
+
+def filtre_exercice(annee):
+    """Périmètre « exercice » : clôture prévue dans l'année, ou sans date (même filtre que le budget M11)."""
+    return Q(expected_close__isnull=True) | Q(expected_close__year=annee)
+
+
+def pipe_pondere(annee=None):
+    """Pipe pondéré par catégorie. `annee=None` : tout le pipe actif (tous horizons) ;
+    `annee` : seulement les clôtures prévues cette année-là (périmètre du contrôle de gestion)."""
+    poids = ponderations_pipe()
+    qs = Opportunity.objects.filter(is_active=True)
+    if annee is not None:
+        qs = qs.filter(filtre_exercice(annee))
     resultat = {}
     for categorie, etapes in PIPE_CATEGORIES.items():
-        brut = Opportunity.objects.filter(is_active=True, stage__in=etapes).aggregate(t=Sum("amount"))["t"] or 0
+        brut = qs.filter(stage__in=etapes).aggregate(t=Sum("amount"))["t"] or 0
         resultat[categorie] = round(float(brut) * poids[categorie], 2)
     resultat["total"] = round(sum(resultat.values()), 2)
     resultat["ponderations"] = poids

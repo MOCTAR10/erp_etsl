@@ -1,0 +1,50 @@
+/* B02 (audit premium) : états comptables et revenu à l'avancement tenus dans 1 440 px.
+   L'unité FCFA est rappelée une fois sous le titre de l'état ; les montants restent complets. */
+
+.etat-unite {
+  margin: -0.25rem 0 0.5rem;
+  font-size: 12px;
+}
+
+/* En-têtes sur 2 lignes au besoin ; montants compacts en chiffres tabulaires, jamais coupés. */
+.etat-bloc .ui-grid thead th,
+[data-testid="revenu-avancement"] .ui-grid thead th {
+  white-space: normal;
+  line-height: 1.25;
+  vertical-align: bottom;
+}
+.etat-bloc .ui-grid td.num,
+[data-testid="revenu-avancement"] .ui-grid td.num {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Balance générale : « Compte » à largeur fixe, puis « Intitulé » collant à sa suite quand le tableau déborde
+   (la 1re colonne est déjà collante, règle B08 de primitives.css). */
+[data-testid="etat-balance"] .ui-grid:not(.ui-grid--cards) :is(th, td):first-child {
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
+}
+[data-testid="etat-balance"] .ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid :is(th, td):nth-child(2) {
+  position: sticky;
+  left: 88px;
+  z-index: 1;
+  background-clip: padding-box;
+}
+[data-testid="etat-balance"] .ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid tbody td:nth-child(2) {
+  background: var(--surface);
+}
+[data-testid="etat-balance"] .ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid tbody tr:hover > td:nth-child(2) {
+  background: var(--ui-hover);
+}
+[data-testid="etat-balance"] .ui-grid-wrap:is([data-overflow-start], [data-overflow-end]) > .ui-grid thead th:nth-child(2) {
+  z-index: 3;
+}
+[data-testid="etat-balance"] .ui-grid-wrap[data-overflow-start] > .ui-grid :is(th, td):nth-child(2) {
+  box-shadow: 6px 0 8px -6px color-mix(in srgb, var(--text) 22%, transparent);
+}
+[data-testid="etat-balance"] .ui-grid-wrap[data-overflow-start] > .ui-grid :is(th, td):first-child {
+  box-shadow: none;
+}

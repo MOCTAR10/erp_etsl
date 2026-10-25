@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { DEMO_USERS, loginAs } from "./helpers";
+import { DEMO_USERS, loginAs, ouvrirParametresModule } from "./helpers";
 
 // M4 : paramètres de la formule glissante et de la valorisation GR paramétrables par ETSL, valeurs provisoires
 // signalées ; coût GR du mois ventilé par affaire (flux compteurs -> M11, compte 618 isolé).
@@ -8,8 +8,11 @@ test.describe("M4 Logistique : paramètres GR et coût par affaire", () => {
   test("un paramètre provisoire est signalé, modifié puis confirmé", async ({ page }) => {
     await loginAs(page, DEMO_USERS.admin);
     await page.goto("/logistique");
+    await ouvrirParametresModule(page);
     const section = page.getByTestId("parametres-logistique");
     await expect(section.getByTestId("alerte-provisoire-logistique")).toContainText(/provisoire/);
+    // Paramètres repliés dans un panneau compact (B-05) : on les affiche avant de les modifier.
+    await section.getByRole("button", { name: "Afficher", exact: true }).click();
 
     const ligne = section.getByRole("row", { name: /jours par mois facturable/ });
     // Valeur différente de l'actuelle : une valeur inchangée resterait « confirmée » d'une exécution à l'autre.
@@ -42,6 +45,8 @@ test.describe("M4 Logistique : grille tarifaire GR", () => {
     const effet = new Date(Date.UTC(2040, 0, 1) + (Date.now() % 20000) * 86_400_000).toISOString().slice(0, 10);
     await loginAs(page, DEMO_USERS.logistique);
     await page.goto("/logistique");
+    // Grille tarifaire : paramétrage replié en bas de page (B11).
+    await ouvrirParametresModule(page);
     const section = page.getByTestId("tarifs-gr");
     await section.getByRole("button", { name: "Nouvelle version de tarif" }).click();
     const form = page.getByRole("form", { name: "Nouvelle version de tarif" });

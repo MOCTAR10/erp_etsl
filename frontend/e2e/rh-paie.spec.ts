@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-import { DEMO_USERS, loginAs } from "./helpers";
+import { DEMO_USERS, loginAs, ouvrirParametresModule } from "./helpers";
 
 // M9 : barèmes de paie paramétrables, valeurs provisoires signalées jusque sur les bulletins.
 test.describe("M9 RH & Paie : paramétrage des barèmes", () => {
   test("un barème provisoire est signalé, puis confirmé par le cercle paie", async ({ page }) => {
     await loginAs(page, DEMO_USERS.rh);
     await page.goto("/rh-paie");
+    // Barèmes : paramétrage replié en bas de page (B11).
+    await ouvrirParametresModule(page);
     await expect(page.getByTestId("alerte-provisoire")).toContainText(/provisoire/);
 
     const code = `E2E-${Date.now() % 100000}`;
@@ -29,6 +31,9 @@ test.describe("M9 RH & Paie : paramétrage des barèmes", () => {
   test("les paramètres de paie (SMIG, durée légale) sont visibles", async ({ page }) => {
     await loginAs(page, DEMO_USERS.rh);
     await page.goto("/rh-paie");
+    await ouvrirParametresModule(page);
+    // Paramètres repliés dans un panneau compact (B-05) : libellé en premier, clé technique en secondaire (B-14).
+    await page.getByTestId("parametres-paie").getByRole("button", { name: "Afficher", exact: true }).click();
     await expect(page.getByText("DUREE_LEGALE_HEBDO")).toBeVisible();
     await expect(page.getByText("SMIG", { exact: true })).toBeVisible();
   });
@@ -38,6 +43,7 @@ test.describe("M9 : ETSL modifie les taux lui-même", () => {
   test("un taux de cotisation se modifie depuis l'écran et repasse en provisoire", async ({ page }) => {
     await loginAs(page, DEMO_USERS.rh);
     await page.goto("/rh-paie");
+    await ouvrirParametresModule(page);
     const ligne = page.getByRole("row", { name: /CNSS-VIEIL-S/ });
     await ligne.getByRole("button", { name: "Modifier" }).click();
     await ligne.getByLabel("Taux (%)").fill("5.5");

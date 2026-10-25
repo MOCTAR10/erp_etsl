@@ -1,17 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Download, KeyRound, Minus, ShieldOff, Trash2, UserCheck, UserCog, UserX } from "lucide-react";
+import { Check, Download, KeyRound, MapPin, Minus, ShieldOff, Trash2, UserCheck, UserCog, UserX } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
-import { SiteCompte, SitesSection } from "../components/sites/SitesSection";
+import { useSites } from "../components/sites/SiteFilter";
+import { SitesSection } from "../components/sites/SitesSection";
 import { Badge, Menu, Modal, PageHeader, PagedDataGrid, QuickForm, SectionCard, SheetClose, notify } from "../components/ui";
 import type { BadgeTone, GridColumn, MenuEntry } from "../components/ui";
+import { champsVisibles, regrouperAudit, valeurLisible } from "../lib/auditLisible";
 import { formatDateTime } from "../lib/format";
 import { APP_NAV_KEY, sansCode, type ErpApp } from "../lib/modules";
 import { describeError } from "../lib/offlineQueue";
-import { initiales, roleLabel } from "../lib/roles";
+import { avatarStyle, displayName, personInitials } from "../lib/people";
+import { roleLabel } from "../lib/roles";
 import { usePagedList } from "../lib/usePagedList";
 import type { Paginated } from "../types";
 
@@ -70,15 +73,31 @@ const REFERENTIELS = [
 
 const AUDIT_TONE: Record<string, BadgeTone> = { create: "ok", delete: "err", update: "info", acl_grant: "brand", acl_revoke: "warn" };
 
-const court = (v: unknown) => {
-  const s = typeof v === "string" ? v : JSON.stringify(v);
-  return s && s.length > 60 ? `${s.slice(0, 60)}…` : (s ?? "—");
-};
+/** Champs « clés » d'une fiche, affichés pour une création (au lieu de « 9 champs renseignés », A-25). */
+const CHAMPS_CLES = ["code", "reference", "numero", "titre", "title", "libelle", "label", "name", "nom", "statut", "status", "montant"];
 
-const nomCompte = (c: Compte) => [c.first_name, c.last_name].filter(Boolean).join(" ") || c.email;
+/** Libellé lisible d'un champ audité : i18n `premiumPilotage.audit.champs.*`, sinon « next_number » → « Next number ». */
+function champLisible(t: (k: string, o?: Record<string, unknown>) => string, champ: string): string {
+  const lisible = champ.replace(/_/g, " ");
+  return t(`premiumPilotage.audit.champs.${champ}`, { defaultValue: lisible.charAt(0).toUpperCase() + lisible.slice(1) });
+}
+
+/** Libellé métier d'un objet audité (code / référence / titre de la fiche), si le détail le porte. */
+function refObjet(detail: Audit["detail"]): string | null {
+  for (const src of [detail.apres, detail.avant]) {
+    if (!src) continue;
+    for (const k of ["code", "reference", "numero", "titre", "title", "libelle", "label", "name", "nom"]) {
+      const v = src[k];
+      if (typeof v === "string" && v.trim()) return v.length > 40 ? `${v.slice(0, 40)}…` : v;
+    }
+  }
+  return null;
+}
+
+const renseigne = (v: unknown) => v !== null && v !== undefined && v !== "";
 
 /** Action de compte en cours (fenêtre de confirmation / saisie). */
-type Dialogue = { type: "role" | "mdp" | "mfa"; compte: Compte } | null;
+type Dialogue = { type: "role" | "mdp" | "mfa" | "site"; compte: Compte } | null;
 
 /** Mutation d'administration : retour par notification, rafraîchissement des listes. */
 function useActionAdmin() {
@@ -145,7 +164,24 @@ export function AdministrationPage() {
   const [nouveauRole, setNouveauRole] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [purge, setPurge] = useState(false);
+  const [nouveauSite, setNouveauSite] = useState("");
   const action = useActionAdmin();
+  const sites = useSites().data ?? [];
+  // Nom affichable d'un compte : prénom + nom, sinon libellé du rôle — jamais l'e-mail (A-24).
+  const nomCompte = (c: Compte) => displayName(t, c);
+  // Annuaire e-mail → compte : la piste d'audit affiche un nom, l'e-mail reste en infobulle.
+  const annuaire = useQuery({
+    queryKey: ["admin-comptes-annuaire"],
+    queryFn: () => api.listAll<Compte>("/api/users/users/"),
+    retry: 0,
+    staleTime: 300_000,
+  }).data;
+  const parEmail = new Map((annuaire ?? []).map((c) => [c.email.toLowerCase(), c]));
+  const nomParEmail = (email: string | null) => {
+    if (!email) return "—";
+    const c = parEmail.get(email.toLowerCase());
+    return c ? nomCompte(c) : displayName(t, { email });
+  };
 
   const matrice = useQuery({ queryKey: ["matrice-roles"], queryFn: () => api.get<Matrice>("/api/users/users/matrice/"), retry: 0 }).data;
   const roles = matrice?.roles ?? [];
@@ -161,8 +197,9 @@ export function AdministrationPage() {
   const libelleRole = (code: string) => roleLabel(t, code);
   const roleOpts = roles.map((r) => ({ value: r.role, label: libelleRole(r.role) }));
 
-  const ouvrir = (type: "role" | "mdp" | "mfa", compte: Compte) => {
+  const ouvrir = (type: "role" | "mdp" | "mfa" | "site", compte: Compte) => {
     setNouveauRole(compte.role);
+    setNouveauSite(compte.site_etsl == null ? "" : String(compte.site_etsl));
     setMotDePasse("");
     setDialogue({ type, compte });
   };
@@ -176,10 +213,13 @@ export function AdministrationPage() {
     if (dialogue.type === "mdp")
       action.mutate({ path: `${base}reinitialiser-mot-de-passe/`, body: { mot_de_passe: motDePasse }, ok: t("shell.admin.reinitMdpOk") }, fin);
     if (dialogue.type === "mfa") action.mutate({ path: `${base}reinitialiser-mfa/`, ok: t("shell.admin.reinitMfaOk") }, fin);
+    if (dialogue.type === "site")
+      action.mutate({ path: base, patch: true, body: { site_etsl: nouveauSite ? Number(nouveauSite) : null }, ok: t("premiumPilotage.admin.siteOk") }, fin);
   };
 
   const actionsCompte = (c: Compte): MenuEntry[] => [
     { label: t("shell.admin.changerRole"), icon: UserCog, onSelect: () => ouvrir("role", c) },
+    { label: t("premiumPilotage.admin.changerSite"), icon: MapPin, onSelect: () => ouvrir("site", c) },
     { label: t("shell.admin.reinitMdp"), icon: KeyRound, onSelect: () => ouvrir("mdp", c) },
     c.mfa_active && { label: t("ecarts_tr.admin.reinitMfa"), icon: ShieldOff, onSelect: () => ouvrir("mfa", c) },
     "separator",
@@ -204,8 +244,8 @@ export function AdministrationPage() {
       sortValue: (c) => nomCompte(c),
       render: (c) => (
         <span className="compte-cell">
-          <span className="compte-avatar" aria-hidden="true">
-            {initiales(nomCompte(c))}
+          <span className="compte-avatar" aria-hidden="true" style={avatarStyle(nomCompte(c))}>
+            {personInitials(t, c)}
           </span>
           <span className="compte-text">
             <span className="compte-nom">{nomCompte(c)}</span>
@@ -215,7 +255,19 @@ export function AdministrationPage() {
       ),
     },
     { key: "role", header: t("ecarts_tr.admin.role"), sortValue: (c) => libelleRole(c.role), render: (c) => libelleRole(c.role) },
-    { key: "site", header: t("ecarts_a5.siteCompte"), render: (c) => <SiteCompte id={c.id} email={c.email} site={c.site_etsl} /> },
+    {
+      key: "site",
+      header: t("ecarts_a5.siteCompte"),
+      // Site en texte (édition dans le menu ⋯) : plus de liste déroulante par ligne (A-24).
+      render: (c) => {
+        const site = sites.find((x) => x.id === c.site_etsl);
+        return site ? (
+          <span className="compte-site">{site.libelle || site.code}</span>
+        ) : (
+          <span className="compte-site muted">{t("premiumPilotage.admin.nonRattache")}</span>
+        );
+      },
+    },
     {
       key: "etat",
       header: t("ecarts_tr.admin.etat"),
@@ -235,9 +287,16 @@ export function AdministrationPage() {
       render: (c) => <span className="num">{c.last_login ? formatDateTime(c.last_login) : <span className="muted">{t("shell.admin.jamais")}</span>}</span>,
     },
   ];
-  const colAudit: GridColumn<Audit>[] = [
+  // Valeurs du journal rendues lisibles (A03) : null → « — », ISO → date, UUID → référence courte.
+  const court = (v: unknown) => valeurLisible(v, t("ecarts_a1.filtres.oui"), t("ecarts_a1.filtres.non"));
+  const auditGroupe = { ...audit, rows: regrouperAudit(audit.rows) };
+  const colAudit: GridColumn<Audit & { repetitions?: number }>[] = [
     { key: "quand", header: t("ecarts_tr.audit.quand"), width: 170, render: (a) => <span className="num">{formatDateTime(a.created_at)}</span> },
-    { key: "qui", header: t("ecarts_tr.audit.qui"), render: (a) => a.user_email ?? "—" },
+    {
+      key: "qui",
+      header: t("ecarts_tr.audit.qui"),
+      render: (a) => <span title={a.user_email ?? undefined}>{nomParEmail(a.user_email)}</span>,
+    },
     {
       key: "action",
       header: t("ecarts_tr.audit.action"),
@@ -247,30 +306,55 @@ export function AdministrationPage() {
       key: "objet",
       header: t("ecarts_tr.audit.objet"),
       render: (a) => (
-        <span className="audit-objet" title={a.object_type}>
-          {zoneObjet(a.object_type, (k) => t(k))} <span className="muted num">#{a.object_id.slice(0, 8)}</span>
+        <span className="audit-objet" title={`${a.object_type} #${a.object_id}`}>
+          {zoneObjet(a.object_type, (k) => t(k))}
+          {refObjet(a.detail) ? <span className="muted"> · {refObjet(a.detail)}</span> : null}
         </span>
       ),
     },
     {
       key: "detail",
       header: t("ecarts_tr.audit.avantApres"),
-      render: (a) =>
-        a.detail.champs ? (
+      render: (a) => (
+        <>
+        {(a.repetitions ?? 1) > 1 ? (
+          <Badge tone="neutral">{t("vague3B.audit.repetitions", { count: a.repetitions })}</Badge>
+        ) : null}
+        {a.detail.champs && champsVisibles(a.detail.champs).length ? (
           <ul className="audit-diff">
-            {a.detail.champs.slice(0, 4).map((k) => (
+            {champsVisibles(a.detail.champs).slice(0, 4).map((k) => (
               <li key={k}>
-                <span className="audit-champ">{k}</span> <span className="muted">{court(a.detail.avant?.[k])}</span> → {court(a.detail.apres?.[k])}
+                <span className="audit-champ" title={k}>
+                  {champLisible(t, k)}
+                </span>{" "}
+                <span className="muted">{court(a.detail.avant?.[k])}</span> → {court(a.detail.apres?.[k])}
               </li>
             ))}
           </ul>
+        ) : a.detail.apres && CHAMPS_CLES.some((k) => renseigne(a.detail.apres?.[k])) ? (
+          <ul className="audit-diff">
+            {CHAMPS_CLES.filter((k) => renseigne(a.detail.apres?.[k]))
+              .slice(0, 3)
+              .map((k) => (
+                <li key={k}>
+                  <span className="audit-champ" title={k}>
+                    {champLisible(t, k)}
+                  </span>{" "}
+                  {court(a.detail.apres?.[k])}
+                </li>
+              ))}
+          </ul>
+        ) : a.detail.champs ? (
+          <span className="muted">{t("vague3B.audit.technique")}</span>
         ) : a.detail.apres || a.detail.avant ? (
           <span className="muted">
             {t(a.detail.apres ? "revueR1.audit.renseignes" : "revueR1.audit.supprimes", { count: Object.keys(a.detail.apres ?? a.detail.avant ?? {}).length })}
           </span>
         ) : (
           <span className="muted audit-brut">{court(a.detail)}</span>
-        ),
+        )}
+        </>
+      ),
     },
   ];
 
@@ -324,6 +408,27 @@ export function AdministrationPage() {
       };
     if (dialogue.type === "mfa")
       dialogueContenu = { titre: t("shell.admin.reinitMfaTitre", { nom }), texte: t("ecarts_tr.admin.confirmReinitMfa"), danger: true, pret: true };
+    if (dialogue.type === "site")
+      dialogueContenu = {
+        titre: t("premiumPilotage.admin.changerSiteTitre", { nom }),
+        texte: t("premiumPilotage.admin.changerSiteAide"),
+        pret: nouveauSite !== (dialogue.compte.site_etsl == null ? "" : String(dialogue.compte.site_etsl)),
+        corps: (
+          <div className="field">
+            <label htmlFor="admin-nouveau-site">{t("ecarts_a5.siteCompte")}</label>
+            <select id="admin-nouveau-site" value={nouveauSite} onChange={(e) => setNouveauSite(e.target.value)}>
+              <option value="">{t("premiumPilotage.admin.nonRattache")}</option>
+              {sites
+                .filter((x) => x.actif || String(x.id) === nouveauSite)
+                .map((x) => (
+                  <option key={x.id} value={String(x.id)}>
+                    {x.libelle || x.code}
+                  </option>
+                ))}
+            </select>
+          </div>
+        ),
+      };
   }
 
   return (
@@ -510,7 +615,7 @@ export function AdministrationPage() {
             ))}
           </select>
         </div>
-        <PagedDataGrid list={audit} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" maxHeight="none" />
+        <PagedDataGrid list={auditGroupe} columns={colAudit} caption={t("ecarts_tr.audit.title")} density="compact" maxHeight="none" />
         </div>
       </SectionCard>
 
