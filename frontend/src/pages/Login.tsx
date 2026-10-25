@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   Calculator,
   CircleAlert,
+  Clock,
   Eye,
   EyeOff,
   Factory,
@@ -75,6 +76,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setSession = useAuth((s) => s.setSession);
+  const sessionExpiree = useAuth((s) => s.expiree);
   const isDark = useThemeMode() === "dark";
 
   const [email, setEmail] = useState("");
@@ -229,6 +231,12 @@ export function LoginPage() {
               <p className="login-alert" role="alert">
                 <CircleAlert size={16} aria-hidden />
                 <span>{error}</span>
+              </p>
+            )}
+            {!error && sessionExpiree && (
+              <p className="login-alert is-info" role="status">
+                <Clock size={16} aria-hidden />
+                <span>{t("login.sessionExpiree")}</span>
               </p>
             )}
 

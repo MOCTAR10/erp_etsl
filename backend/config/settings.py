@@ -160,9 +160,11 @@ AUTH_PASSWORD_VALIDATORS = [
 # ── Django REST Framework ──
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        # JWT en premier : DRF prend l'en-tête WWW-Authenticate du 1er authentificateur. Session en tête, un jeton
+        # expiré (30 min) répondait 403 au lieu de 401 → le SPA ne rafraîchissait plus et tout l'ERP passait en erreur.
         # JWT + changement de mot de passe imposé après une réinitialisation par l'administrateur.
         "users.authentication.JWTAuthenticationMdp",
+        "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

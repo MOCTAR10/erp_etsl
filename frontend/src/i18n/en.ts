@@ -592,6 +592,7 @@ export const en = {
     password: "Password",
     submit: "Sign in",
     invalid: "Invalid credentials.",
+    sessionExpiree: "Your session has expired. Sign in again to pick up where you left off.",
     serverError: "Server unreachable. Check the backend is running.",
     eyebrow: "Integrated management platform",
     heroTitle: "From bid to job site, the whole company on a single workstation.",
@@ -3576,6 +3577,9 @@ export const en = {
       videAide: "Workflow reminders and escalations will appear here.",
       videNonLues: "All caught up",
       erreur: "Action failed",
+      clocheNonLues_one: "Notifications: {{count}} unread",
+      clocheNonLues_other: "Notifications: {{count}} unread",
+      voirTout: "View all notifications",
     },
     secu: {
       sousTitre: "Two-step verification, temporary delegation of your approvals and access log.",

@@ -592,6 +592,7 @@ export const fr = {
     password: "Mot de passe",
     submit: "Se connecter",
     invalid: "Identifiants incorrects.",
+    sessionExpiree: "Votre session a expiré. Reconnectez-vous pour reprendre là où vous en étiez.",
     serverError: "Serveur indisponible. Vérifiez que le backend est démarré.",
     eyebrow: "Plateforme de gestion intégrée",
     heroTitle: "De l'offre au chantier, toute l'entreprise sur un seul poste.",
@@ -3576,6 +3577,9 @@ export const fr = {
       videAide: "Les relances et escalades des circuits de validation apparaîtront ici.",
       videNonLues: "Tout est lu",
       erreur: "Action impossible",
+      clocheNonLues_one: "Notifications : {{count}} non lue",
+      clocheNonLues_other: "Notifications : {{count}} non lues",
+      voirTout: "Voir toutes les notifications",
     },
     secu: {
       sousTitre: "Vérification en deux étapes, délégations temporaires de vos validations et journal des accès.",

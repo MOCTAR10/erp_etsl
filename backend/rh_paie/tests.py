@@ -104,9 +104,9 @@ class EmployeTests(BaseRHTest):
         self.assertEqual(r.status_code, status.HTTP_204_NO_CONTENT, r.data)
         self.assertFalse(Employe.objects.filter(pk=self.employe2.pk).exists())
 
-    def test_employes_non_authentifie_403(self):
+    def test_employes_non_authentifie_401(self):
         r = self.client.get(f"{BASE}employes/")
-        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_employes_ecriture_rh_ok(self):
         _auth(self.client, "rh@etls.local")
