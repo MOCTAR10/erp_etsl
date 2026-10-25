@@ -144,9 +144,9 @@ class ComptesBancairesTests(BaseComptaTest):
         r = self.client.get(f"{BASE}comptes-bancaires/")
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_non_authentifie_403(self):
+    def test_non_authentifie_401(self):
         r = self.client.get(f"{BASE}comptes-bancaires/")
-        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_ecriture_finance_ok(self):
         _auth(self.client, "finance@etls.local")
