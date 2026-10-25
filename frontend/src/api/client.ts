@@ -29,21 +29,28 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
 
   const res = await fetch(apiUrl(path), { ...init, headers });
 
-  if (res.status === 401 && auth.refresh) {
-    try {
-      const refreshed = await refreshToken(auth.refresh);
-      useAuth.getState().setAccess(refreshed.access);
-      const retry = await fetch(apiUrl(path), {
-        ...init,
-        headers: new Headers({
-          ...Object.fromEntries(headers.entries()),
-          Authorization: `Bearer ${refreshed.access}`,
-        }),
-      });
-      if (retry.ok) return (retry.status === 204 ? undefined : await retry.json()) as T;
-    } catch {
-      useAuth.getState().clear();
+  if (auth.access && (await jetonRefuse(res))) {
+    if (auth.refresh) {
+      try {
+        const refreshed = await refreshToken(auth.refresh);
+        useAuth.getState().setAccess(refreshed.access);
+        const retry = await fetch(apiUrl(path), {
+          ...init,
+          headers: new Headers({
+            ...Object.fromEntries(headers.entries()),
+            Authorization: `Bearer ${refreshed.access}`,
+          }),
+        });
+        if (retry.ok) return (retry.status === 204 ? undefined : await retry.json()) as T;
+        if (!(await jetonRefuse(retry))) throw new ApiError(retry.status, await retry.json().catch(() => null));
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+      }
     }
+    // Session non renouvelable (jeton de rafraîchissement expiré ou révoqué) : retour à la connexion, avec un
+    // message « session expirée » plutôt qu'une erreur sur chaque écran.
+    useAuth.getState().expire();
+    throw new ApiError(401, { detail: "session_expiree" });
   }
 
   if (!res.ok) {
@@ -55,6 +62,17 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/**
+ * Jeton d'accès refusé : 401, ou 403 « token_not_valid » (serveur dont la session Django précédait le JWT dans
+ * DEFAULT_AUTHENTICATION_CLASSES). Lit une copie de la réponse : le corps reste lisible par l'appelant.
+ */
+async function jetonRefuse(res: Response): Promise<boolean> {
+  if (res.status === 401) return true;
+  if (res.status !== 403) return false;
+  const corps = (await res.clone().json().catch(() => null)) as { code?: unknown } | null;
+  return corps?.code === "token_not_valid";
 }
 
 async function postForm<T>(path: string, body: Record<string, string>): Promise<T> {

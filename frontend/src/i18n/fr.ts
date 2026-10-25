@@ -592,6 +592,7 @@ export const fr = {
     password: "Mot de passe",
     submit: "Se connecter",
     invalid: "Identifiants incorrects.",
+    sessionExpiree: "Votre session a expiré. Reconnectez-vous pour reprendre là où vous en étiez.",
     serverError: "Serveur indisponible. Vérifiez que le backend est démarré.",
     eyebrow: "Plateforme de gestion intégrée",
     heroTitle: "De l'offre au chantier, toute l'entreprise sur un seul poste.",

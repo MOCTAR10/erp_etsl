@@ -2288,6 +2288,13 @@ kbd {
   flex-shrink: 0;
 }
 
+/* Information (session expirée) : même gabarit, ton bleu au lieu du rouge d'erreur */
+.login-alert.is-info {
+  border-color: color-mix(in srgb, var(--info) 28%, transparent);
+  background: var(--info-soft);
+  color: var(--info-text);
+}
+
 .login-fields {
   display: grid;
   gap: 1.15rem;

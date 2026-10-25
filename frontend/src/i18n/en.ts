@@ -592,6 +592,7 @@ export const en = {
     password: "Password",
     submit: "Sign in",
     invalid: "Invalid credentials.",
+    sessionExpiree: "Your session has expired. Sign in again to pick up where you left off.",
     serverError: "Server unreachable. Check the backend is running.",
     eyebrow: "Integrated management platform",
     heroTitle: "From bid to job site, the whole company on a single workstation.",

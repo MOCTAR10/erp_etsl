@@ -12,6 +12,7 @@ vi.mock("../api/client", () => ({
 }));
 
 import { login, mfaVerification } from "../api/client";
+import { useAuth } from "../store/auth";
 import { LoginPage } from "./Login";
 
 const mockedLogin = vi.mocked(login);
@@ -102,6 +103,13 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText("Mot de passe"), "Etls#Demo2026");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
     await waitFor(() => expect(screen.getByText("page-rh-paie")).toBeInTheDocument());
+  });
+
+  it("explique une session expirée au lieu d'une erreur", () => {
+    useAuth.setState({ expiree: true });
+    renderLogin();
+    expect(screen.getByRole("status")).toHaveTextContent("Votre session a expiré");
+    useAuth.setState({ expiree: false });
   });
 
   it("affiche une erreur si les identifiants sont invalides", async () => {
