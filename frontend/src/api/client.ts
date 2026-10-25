@@ -30,22 +30,19 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), { ...init, headers });
 
   if (auth.access && (await jetonRefuse(res))) {
-    if (auth.refresh) {
-      try {
-        const refreshed = await refreshToken(auth.refresh);
-        useAuth.getState().setAccess(refreshed.access);
-        const retry = await fetch(apiUrl(path), {
-          ...init,
-          headers: new Headers({
-            ...Object.fromEntries(headers.entries()),
-            Authorization: `Bearer ${refreshed.access}`,
-          }),
-        });
-        if (retry.ok) return (retry.status === 204 ? undefined : await retry.json()) as T;
-        if (!(await jetonRefuse(retry))) throw new ApiError(retry.status, await retry.json().catch(() => null));
-      } catch (e) {
-        if (e instanceof ApiError) throw e;
-      }
+    const refreshed = auth.refresh ? await refreshToken(auth.refresh).catch(() => null) : null;
+    if (refreshed) {
+      useAuth.getState().setAccess(refreshed.access);
+      const retry = await fetch(apiUrl(path), {
+        ...init,
+        headers: new Headers({
+          ...Object.fromEntries(headers.entries()),
+          Authorization: `Bearer ${refreshed.access}`,
+        }),
+      });
+      if (retry.ok) return (retry.status === 204 ? undefined : await retry.json()) as T;
+      // Session renouvelée mais requête refusée pour une autre raison (droits, validation) : erreur de la page.
+      if (!(await jetonRefuse(retry))) throw new ApiError(retry.status, await retry.json().catch(() => null));
     }
     // Session non renouvelable (jeton de rafraîchissement expiré ou révoqué) : retour à la connexion, avec un
     // message « session expirée » plutôt qu'une erreur sur chaque écran.
